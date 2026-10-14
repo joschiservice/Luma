@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { DataRegion } from '@luma/identity';
 import { hashPassword } from 'better-auth/crypto';
 import { Pool } from 'pg';
 
@@ -25,7 +26,10 @@ export { readStaffSettings } from './infrastructure/settings.js';
 export type { StaffSettings } from './infrastructure/settings.js';
 
 /** Owns isolated staff database resources, authentication and application services. */
-export function createStaff(settings: StaffSettings) {
+export function createStaff(
+  settings: StaffSettings,
+  dependencies: { release?: () => Promise<boolean> } = {},
+) {
   settings = validateStaffSettings(settings);
   const pool = new Pool({
     connectionString: settings.databaseUrl,
@@ -38,6 +42,7 @@ export function createStaff(settings: StaffSettings) {
 
   return {
     settings,
+    regionalDirectoryEnabled: dependencies.release ?? (async () => false),
     service: createStaffService(createStaffRepository(pool), {
       customerOrigin: settings.customerOrigin,
     }),
@@ -57,16 +62,33 @@ export function createStaff(settings: StaffSettings) {
       if (!session) throw new StaffError(401, 'Staff sign-in required.');
       const result = await pool.query<{
         permissions: string[];
+        regions: DataRegion[];
         created_at: Date;
       }>(
         headers.get('x-luma-staff-activity') === 'true'
-          ? `UPDATE staff_sessions s SET updated_at=clock_timestamp() FROM staff_users u,staff_access a WHERE s.id=$1 AND s.user_id=u.id AND a.email=lower(u.email) AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes' RETURNING a.permissions,s.created_at`
-          : `SELECT a.permissions,s.created_at FROM staff_sessions s JOIN staff_users u ON s.user_id=u.id JOIN staff_access a ON a.email=lower(u.email) WHERE s.id=$1 AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes'`,
+          ? `UPDATE staff_sessions s SET updated_at=clock_timestamp() FROM staff_users u,staff_access a WHERE s.id=$1 AND s.user_id=u.id AND a.email=lower(u.email) AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes' RETURNING a.permissions,a.regions,s.created_at`
+          : `SELECT a.permissions,a.regions,s.created_at FROM staff_sessions s JOIN staff_users u ON s.user_id=u.id JOIN staff_access a ON a.email=lower(u.email) WHERE s.id=$1 AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes'`,
         [session.session.id, settings.mode],
       );
       const access = result.rows[0];
       if (!access)
         throw new StaffError(403, 'Staff access is unavailable or expired.');
+      const region = settings.region ?? 'AU';
+      if (!access.regions.includes(region)) {
+        await pool.query(
+          "INSERT INTO staff_audit(staff_user_id,staff_session_id,event,request_id,details) VALUES($1,$2,'staff.region.denied',$3,$4)",
+          [
+            session.user.id,
+            session.session.id,
+            requestId,
+            JSON.stringify({ region }),
+          ],
+        );
+        throw new StaffError(
+          403,
+          'Staff access is unavailable in this region.',
+        );
+      }
       const permissions = access.permissions.filter(
         (permission): permission is StaffPermission =>
           staffPermissions.some((known) => known === permission),
@@ -74,6 +96,8 @@ export function createStaff(settings: StaffSettings) {
 
       return {
         context: {
+          region,
+          regions: access.regions,
           userId: session.user.id,
           sessionId: session.session.id,
           sessionCreatedAt: access.created_at,
@@ -94,7 +118,15 @@ export function createStaff(settings: StaffSettings) {
       );
       await pool.query('SELECT id FROM staff_users LIMIT 0');
 
-      return result.rows[0]?.safe === true;
+      const cell = await pool.query<{ region: string }>(
+        'SELECT region FROM luma_cell_region',
+      );
+
+      return (
+        result.rows[0]?.safe === true &&
+        cell.rows.length === 1 &&
+        cell.rows[0]?.region === (settings.region ?? 'AU')
+      );
     },
     /** Releases the staff-only database pool. */
     close: () => pool.end(),
@@ -144,7 +176,7 @@ export async function seedLocalStaff(
       [randomUUID(), userId, await hashPassword(input.password)],
     );
     const admitted = await tx.query(
-      'INSERT INTO staff_access(email,permissions) VALUES($1,$2) ON CONFLICT(email) DO NOTHING',
+      'INSERT INTO staff_access(email,permissions,regions) VALUES($1,$2,ARRAY[(SELECT region FROM luma_cell_region)]) ON CONFLICT(email) DO NOTHING',
       [email, input.permissions],
     );
     if (admitted.rowCount)
@@ -172,6 +204,7 @@ export async function provisionStaffIdentity(
     permissions: StaffPermission[];
     operator: string;
     reason: string;
+    regions?: DataRegion[] | undefined;
   },
 ) {
   input = validateStaffProvisioning(input);
@@ -190,10 +223,17 @@ export async function provisionStaffIdentity(
       provider_subject: string | null;
       active: boolean;
       permissions: string[];
+      regions: DataRegion[];
     }>(
-      'SELECT provider_subject,active,permissions FROM staff_access WHERE email=$1 FOR UPDATE',
+      'SELECT provider_subject,active,permissions,regions FROM staff_access WHERE email=$1 FOR UPDATE',
       [input.email],
     );
+    const cell = await tx.query<{ region: DataRegion }>(
+      'SELECT region FROM luma_cell_region',
+    );
+    if (!cell.rows[0])
+      throw new Error('Provision the cell region before staff admission.');
+    const regions = input.regions ?? [cell.rows[0].region];
     const admission = previous.rows[0];
     if (
       !input.active ||
@@ -202,7 +242,9 @@ export async function provisionStaffIdentity(
         (admission.provider_subject !== input.subject ||
           admission.active !== input.active ||
           [...admission.permissions].sort().join(',') !==
-            [...input.permissions].sort().join(',')))
+            [...input.permissions].sort().join(',') ||
+          [...admission.regions].sort().join(',') !==
+            [...regions].sort().join(',')))
     )
       await tx.query(
         'DELETE FROM staff_sessions s USING staff_users u WHERE s.user_id=u.id AND lower(u.email)=$1',
@@ -237,12 +279,13 @@ export async function provisionStaffIdentity(
       }
     }
     await tx.query(
-      'INSERT INTO staff_access(email,provider_subject,active,permissions) VALUES($1,$2,$3,$4) ON CONFLICT(email) DO UPDATE SET provider_subject=excluded.provider_subject,active=excluded.active,permissions=excluded.permissions',
+      'INSERT INTO staff_access(email,provider_subject,active,permissions,regions) VALUES($1,$2,$3,$4,COALESCE($5::text[],ARRAY[(SELECT region FROM luma_cell_region)])) ON CONFLICT(email) DO UPDATE SET provider_subject=excluded.provider_subject,active=excluded.active,permissions=excluded.permissions,regions=excluded.regions',
       [
         input.email.toLowerCase(),
         input.subject,
         input.active,
         input.permissions,
+        regions,
       ],
     );
     await tx.query(
@@ -256,6 +299,7 @@ export async function provisionStaffIdentity(
           active: input.active,
           permissions: input.permissions,
           operator: input.operator,
+          regions,
         }),
       ],
     );

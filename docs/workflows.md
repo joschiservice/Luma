@@ -311,7 +311,7 @@ and publish. The model is an author, not an authority: a generated draft goes th
 same validation, tests, publication, activation, admission and verification as a hand-built
 one. Generation never publishes, activates, approves or starts anything.
 
-- **Availability:** generation needs the `authoring` route on `bedrock-eu` with zero data
+- **Availability:** generation needs the `authoring` route on `bedrock` with zero data
   retention (see [Model gateway](model-gateway.md#workflow-authoring-profile)). Without it,
   requests return 503 with the reason and no model is called. Permission is checked first.
 - **Describe** creates a new draft with explanations and open questions tied to a step and

@@ -20,7 +20,7 @@ const context = makeTenantContext(
     id: 'tenant',
     name: 'Fixture',
     slug: 'fixture',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
     status: 'active',
   },
   builtInMembership(
@@ -280,7 +280,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
       address: env.address,
       namespace: 'default',
       taskQueue: 'scope-test',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     identity,
   );
@@ -289,7 +289,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
       address: env.address,
       namespace: 'default',
       taskQueue: 'scope-test',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     identity,
   );
@@ -303,7 +303,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
         id: 'other',
         name: 'Other',
         slug: 'other',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -321,7 +321,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
         id: 'tenant',
         name: 'Fixture',
         slug: 'fixture',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(

@@ -1,8 +1,10 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 import {
   AccountDisabledError,
+  builtInMembership,
   IdentityError,
+  makeTenantContext,
   MembershipSuspendedError,
   WorkspaceInactiveError,
 } from '@luma/identity';
@@ -21,7 +23,16 @@ import type { WorkflowBundleWithSourceMap } from '@temporalio/worker';
 import { bundleWorkflowCode, DefaultLogger, Worker } from '@temporalio/worker';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
-import { temporalActivities, workflowPath } from './runtime.js';
+import {
+  temporalDataConverter,
+  type TemporalPayloadEncryption,
+} from './payload-codec.js';
+import {
+  createExceptionClient,
+  createExceptionWorker,
+  temporalActivities,
+  workflowPath,
+} from './runtime.js';
 
 let env: TestWorkflowEnvironment;
 
@@ -36,7 +47,8 @@ afterAll(async () => {
   await env?.teardown();
 });
 
-const input: ExceptionWorkflowInput = {
+const input: ExceptionWorkflowInput & { dataRegion: 'AU' } = {
+  dataRegion: 'AU',
   tenantId: 'tenant',
   userId: 'requester',
   requestId: 'request',
@@ -710,3 +722,174 @@ it.each(['ready', 'missing', 'insufficient', 'clear'] as const)(
     expect(activities.verify).not.toHaveBeenCalled();
   },
 );
+
+it('created AU clients and workers write encrypted history and reject foreign envelopes', async () => {
+  const keyArn =
+    'arn:aws:kms:ap-southeast-2:123456789012:key/11111111-1111-1111-1111-111111111111';
+  const encryption: TemporalPayloadEncryption = {
+    keyArn,
+    kmsRegion: 'ap-southeast-2',
+    decryptionKeyArns: [],
+    credentials: { accessKeyId: 'synthetic', secretAccessKey: 'synthetic' },
+    cacheTtlMs: 1000,
+    cacheMaxUses: 100,
+  };
+  const wrappedKeys = new Map<string, Buffer>();
+  const keys = {
+    async generate() {
+      const plaintext = randomBytes(32);
+      const wrappedKey = randomBytes(48);
+      wrappedKeys.set(wrappedKey.toString('base64'), Buffer.from(plaintext));
+
+      return { plaintext, wrappedKey };
+    },
+    async decrypt(_keyArn: string, wrappedKey: Uint8Array) {
+      const key = wrappedKeys.get(Buffer.from(wrappedKey).toString('base64'));
+      if (!key) throw new Error('Temporal encryption key unavailable');
+
+      return Buffer.from(key);
+    },
+  };
+  const settings = {
+    address: env.address,
+    namespace: 'default',
+    taskQueue: randomUUID(),
+    dataRegion: 'AU' as const,
+    payloadEncryption: encryption,
+    payloadKeyService: keys,
+  };
+  const activities = fixture();
+  activities.diagnose.mockRejectedValueOnce(
+    new Error('private-upstream-error'),
+  );
+  const worker = await createExceptionWorker(settings, activities);
+  const tenantId = randomUUID();
+  const scoped = makeTenantContext(
+    { userId: 'private-user', sessionId: 'synthetic-session' },
+    {
+      id: tenantId,
+      name: 'Synthetic',
+      slug: 'synthetic',
+      status: 'active',
+      dataRegion: 'AU',
+    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: tenantId, userId: 'private-user' },
+      'owner',
+    ),
+    'private-request',
+  );
+  const client = await createExceptionClient(settings, {
+    refreshContext: async (value) => value,
+  });
+  const running = worker.run();
+  const replay = temporalDataConverter(settings);
+  try {
+    const source = { kind: 'incident' as const, id: 'private-source' };
+    const started = await client.start(scoped, source);
+    await vi.waitFor(
+      async () =>
+        expect(await client.progress(scoped, source)).toMatchObject({
+          phase: 'resolved',
+        }),
+      { timeout: 10000 },
+    );
+    const history = await env.client.workflow
+      .getHandle(started.workflowId)
+      .fetchHistory();
+    let payloadCount = 0;
+
+    function inspect(value: unknown, path = 'history') {
+      if (!value || typeof value !== 'object' || value instanceof Uint8Array)
+        return;
+      if (
+        'metadata' in value &&
+        value.metadata &&
+        typeof value.metadata === 'object' &&
+        'encoding' in value.metadata
+      ) {
+        if (
+          path.endsWith(
+            '.upsertWorkflowSearchAttributesEventAttributes.searchAttributes.indexedFields.TemporalChangeVersion',
+          )
+        ) {
+          expect(
+            'data' in value
+              ? JSON.parse(Buffer.from(value.data as Uint8Array).toString())
+              : null,
+          ).toEqual(['automatic-proposal-refresh-v1']);
+
+          return;
+        }
+        if (
+          path.endsWith(
+            '.markerRecordedEventAttributes.details.patch-data.payloads.0',
+          )
+        ) {
+          expect(
+            'data' in value
+              ? JSON.parse(Buffer.from(value.data as Uint8Array).toString())
+              : null,
+          ).toEqual({ id: 'automatic-proposal-refresh-v1', deprecated: false });
+
+          return;
+        }
+        const encoding = value.metadata.encoding;
+        expect(encoding).toBeInstanceOf(Uint8Array);
+        expect(
+          Buffer.from(encoding as Uint8Array).toString(),
+          `${path}: ${'data' in value ? Buffer.from(value.data as Uint8Array).toString() : ''}`,
+        ).toBe('binary/luma-kms-v1');
+        payloadCount += 1;
+      }
+      for (const [key, child] of Object.entries(value))
+        inspect(child, `${path}.${key}`);
+    }
+
+    inspect(history);
+    expect(payloadCount).toBeGreaterThan(5);
+    const raw = JSON.stringify(history);
+    expect(raw).not.toContain('private-user');
+    expect(raw).not.toContain('private-request');
+    expect(raw).not.toContain('private-source');
+    expect(raw).not.toContain('private-upstream-error');
+    expect(raw).not.toContain(scoped.tenantId);
+    await Worker.runReplayHistory(
+      { workflowBundle: bundle, dataConverter: replay.converter },
+      history,
+    );
+    expect(activities.execute).toHaveBeenCalledOnce();
+
+    const unavailable = vi.fn(async () => {
+      throw new Error('Temporal encryption key unavailable');
+    });
+    const noAccess = temporalDataConverter({
+      ...settings,
+      payloadKeyService: {
+        ...keys,
+        decrypt: unavailable,
+      },
+    });
+    try {
+      await expect(
+        Worker.runReplayHistory(
+          { workflowBundle: bundle, dataConverter: noAccess.converter },
+          history,
+        ),
+      ).rejects.toThrow();
+      expect(unavailable).toHaveBeenCalled();
+      expect(activities.execute).toHaveBeenCalledOnce();
+    } finally {
+      noAccess.close();
+    }
+    await expect(
+      client.start({ ...scoped, dataRegion: 'EU' }, source),
+    ).rejects.toThrow('region rejected');
+  } finally {
+    worker.shutdown();
+    await running;
+    await client.close();
+    await worker.close();
+    replay.close();
+  }
+}, 30000);

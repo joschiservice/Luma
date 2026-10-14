@@ -41,6 +41,8 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page
     .getByLabel('Email', { exact: true })

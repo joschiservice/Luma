@@ -36,6 +36,7 @@ import {
 import type { FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
+import { assertCellRegion } from '../cell-region.js';
 import { createMetricListener } from '../infrastructure/metric-listener.js';
 import {
   type ApplicationServices,
@@ -58,6 +59,7 @@ import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
+import { createRegionalTemporalSettings } from './temporal-settings.js';
 
 /**
  * Creates the configured API and its database-backed services. Closing the app releases its
@@ -75,6 +77,11 @@ export async function buildRuntimeApp(
       ) => ConnectionManagement | ReturnType<typeof createAppHost>),
   workflowSettings?: WorkflowConfig,
 ) {
+  if (workflowSettings)
+    workflowSettings = {
+      ...workflowSettings,
+      temporal: createRegionalTemporalSettings(workflowSettings.temporal),
+    };
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');
   const modelGateway =
@@ -99,6 +106,7 @@ export async function buildRuntimeApp(
       statement_timeout: 5000,
     });
     resources.add(() => casePool.end());
+    await assertCellRegion(casePool, settings.region ?? 'AU');
     // Support views restrict their requests to reads; these transactions then refuse writes.
     const tenantDatabase = () =>
       createTenantDatabase(casePool, { readOnly: requestIsReadOnly });

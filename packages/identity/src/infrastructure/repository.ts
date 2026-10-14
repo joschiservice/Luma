@@ -29,7 +29,7 @@ const organizationDto = (
   row: typeof schema.organization.$inferSelect,
 ): Organization => {
   if (
-    !['EU', 'US', 'APAC'].includes(row.dataRegion) ||
+    !['EU', 'AU', 'US'].includes(row.dataRegion) ||
     !['active', 'suspended', 'closed'].includes(row.status)
   )
     throw new IdentityError(
@@ -84,6 +84,15 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
     securityEventsPlugin(pool, settings.secret, settings.passwordMail),
   ]);
   const repository: IdentityRepository = {
+    placement: {
+      async regionForTenant(tenantId) {
+        const result = await pool.query<{
+          region: Organization['dataRegion'] | null;
+        }>('SELECT identity_tenant_region($1) AS region', [tenantId]);
+
+        return result.rows[0]?.region ?? null;
+      },
+    },
     async getSession(credentials) {
       const session = await auth.api.getSession({
         headers: new Headers(credentials),
@@ -170,7 +179,12 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   schema.organization,
                   eq(schema.member.organizationId, schema.organization.id),
                 )
-                .where(eq(schema.member.userId, userId));
+                .where(
+                  and(
+                    eq(schema.member.userId, userId),
+                    eq(schema.organization.dataRegion, settings.region ?? 'AU'),
+                  ),
+                );
 
               return rows.map((row) => ({
                 ...organizationDto(row.organization),

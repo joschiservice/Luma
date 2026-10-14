@@ -77,7 +77,12 @@ export async function settingsFixture(
       method: 'POST',
       url: '/auth/sign-up/email',
       headers: { origin },
-      payload: { name, email, password: 'settings-test-password-123' },
+      payload: {
+        name,
+        email,
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+        password: 'settings-test-password-123',
+      },
     });
     assert.equal(response.statusCode, 200, response.body);
     const cookies = response.headers['set-cookie'];

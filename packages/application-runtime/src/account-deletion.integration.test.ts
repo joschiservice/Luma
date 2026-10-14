@@ -49,6 +49,7 @@ describe.skipIf(!databaseUrl)(
           body: JSON.stringify({
             name,
             email,
+            dataRegion: 'AU',
             password: 'customer-test-password-long-enough',
           }),
         }),
@@ -132,6 +133,7 @@ describe.skipIf(!databaseUrl)(
         );
         setup.release();
       }
+      await db.query('SELECT luma_provision_cell_region($1)', ['AU']);
       for (const [name, role] of [
         [login, 'luma_staff_runtime'],
         [customerLogin, 'luma_identity'],
@@ -212,7 +214,7 @@ describe.skipIf(!databaseUrl)(
         [owner],
       );
       await db.query(
-        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','EU',now()),($2,'Workspace Beta','beta','active','EU',now())",
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','AU',now()),($2,'Workspace Beta','beta','active','AU',now())",
         [tenantA, tenantB],
       );
       await join(tenantA, owner, 'owner');
@@ -461,7 +463,7 @@ describe.skipIf(!databaseUrl)(
       const olga = await signUp('Olga Owner', 'olga@example.test');
       const tenant = randomUUID();
       await db.query(
-        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Solo',$2,'active','EU',now())",
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Solo',$2,'active','AU',now())",
         [tenant, `solo-${tenant}`],
       );
       await join(tenant, olga, 'owner');

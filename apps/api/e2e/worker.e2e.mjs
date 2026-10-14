@@ -20,7 +20,7 @@ test('the standalone worker starts and drains on SIGTERM', async (t) => {
     TEMPORAL_ADDRESS: temporal.address,
     TEMPORAL_NAMESPACE: 'default',
     TEMPORAL_TASK_QUEUE: `worker-startup-${randomUUID()}`,
-    TEMPORAL_DATA_REGION: 'EU',
+    TEMPORAL_DATA_REGION: process.env.LUMA_REGION ?? 'AU',
   });
   await until(() => {
     if (worker.result) throw new Error(worker.output);

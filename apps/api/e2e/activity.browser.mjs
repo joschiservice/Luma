@@ -34,6 +34,8 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Email', { exact: true }).fill('activity@example.test');
   await page
@@ -316,7 +318,7 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
     .toBe(0);
   const second = await context.request.post('/api/v1/organizations', {
     headers: { origin },
-    data: { name: 'Other studio', slug: 'other-studio', dataRegion: 'EU' },
+    data: { name: 'Other studio', slug: 'other-studio', dataRegion: 'AU' },
   });
   expect(second.status()).toBe(201);
   const secondId = (await second.json()).id;

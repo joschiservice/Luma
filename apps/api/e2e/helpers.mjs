@@ -34,7 +34,13 @@ export function startProcess(t, script, env = {}, ipc = false) {
   const child = spawn(process.execPath, [script], {
     cwd: apiDirectory,
     // Do not inherit developer credentials, telemetry exporters, or NODE_OPTIONS.
-    env: { PATH: process.env.PATH, NODE_ENV: 'test', ...env },
+    env: {
+      PATH: process.env.PATH,
+      NODE_ENV: 'test',
+      LUMA_REGION: process.env.LUMA_REGION ?? 'AU',
+      LUMA_ENABLED_REGIONS: process.env.LUMA_REGION ?? 'AU',
+      ...env,
+    },
     stdio: ['ignore', 'pipe', 'pipe', ...(ipc ? ['ipc'] : [])],
   });
   let output = '';
@@ -140,6 +146,11 @@ export async function database(t) {
           migration.output,
         );
 
+        if (expectedCode === 0)
+          await owner.query('SELECT luma_provision_cell_region($1)', [
+            process.env.LUMA_REGION ?? 'AU',
+          ]);
+
         return migration.output;
       } finally {
         await lock.query(
@@ -229,6 +240,7 @@ export async function signup(api, name) {
       name,
       email: `${name}@example.test`,
       password: 'long-e2e-test-password',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
   const cookie = response.headers

@@ -37,6 +37,7 @@ const suites = {
   full: [
     ['setup:code'],
     ['check'],
+    ['test:region-eu'],
     ['test:e2e'],
     ['test:browser'],
     ['test:simulator'],

@@ -2,7 +2,8 @@ import type { AppPermission, Permission } from './permissions.js';
 import type { BuiltInRoleKey, RoleReference } from './roles.js';
 import { builtInReference, PermissionSet } from './roles.js';
 
-type DataRegion = 'EU' | 'US' | 'APAC';
+/** A concrete supported data-residency jurisdiction. */
+export type DataRegion = 'EU' | 'AU' | 'US';
 
 export interface Organization {
   id: string;
@@ -49,7 +50,7 @@ export interface SupportView {
 export interface TenantContext {
   readonly [resolvedContext]: true;
   readonly tenantId: string;
-  readonly dataRegion: 'EU';
+  readonly dataRegion: DataRegion;
   readonly actor: Readonly<{
     type: 'user';
     id: string;
@@ -177,7 +178,7 @@ export function requireChangesAllowed(context: TenantContext): void {
 }
 
 /**
- * Creates an immutable context for a matching, active membership in an active EU organization;
+ * Creates an immutable context for a matching, active membership in an active organization in the serving cell;
  * rejects inaccessible or unsupported organizations. A suspended or closed organization
  * raises `WorkspaceInactiveError`, a suspended membership `MembershipSuspendedError` and a
  * disabled account `AccountDisabledError`.
@@ -189,6 +190,7 @@ export function makeTenantContext(
   member: Membership,
   requestId: string,
   supportView?: SupportView,
+  cellRegion: DataRegion = organization.dataRegion,
 ): TenantContext {
   if (
     member.userId !== session.userId ||
@@ -197,7 +199,7 @@ export function makeTenantContext(
     throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
   if (organization.status !== 'active') throw new WorkspaceInactiveError();
   requireActiveMembership(member);
-  if (organization.dataRegion !== 'EU')
+  if (organization.dataRegion !== cellRegion)
     throw new IdentityError(
       503,
       'REGION_UNAVAILABLE',
@@ -207,7 +209,7 @@ export function makeTenantContext(
   return Object.freeze({
     [resolvedContext]: true as const,
     tenantId: organization.id,
-    dataRegion: 'EU' as const,
+    dataRegion: organization.dataRegion,
     actor: Object.freeze({
       type: 'user' as const,
       id: session.userId,

@@ -226,7 +226,7 @@ it('deduplicates monitored conditions and isolates rules, reviews and decisions 
     payload: {
       name: 'Other workspace',
       slug: `other-${randomUUID()}`,
-      dataRegion: 'EU',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
   expect(other.statusCode, other.body).toBe(201);
@@ -516,7 +516,7 @@ it('reports readiness, previews bulk setup and keeps every surface honest when s
     payload: {
       name: 'Other workspace',
       slug: `other-${randomUUID()}`,
-      dataRegion: 'EU',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
   expect(other.statusCode, other.body).toBe(201);

@@ -19,8 +19,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
 import { reasonSchema } from './access';
-import { staffApi } from './api';
+import { useRegionalStaffApi } from './api';
 import { Failure } from './feedback';
+import { staffRegion } from './regions';
 
 /** Why an account is disabled; staff see it, the customer never does. */
 export const disableCategories = [
@@ -56,6 +57,7 @@ export function AccountStatusDialog({
   action: 'disable' | 'enable';
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const client = useQueryClient();
   const ids = useId();
   const disable = action === 'disable';
@@ -74,7 +76,9 @@ export function AccountStatusDialog({
           : { action, grantId, commandId, reason: value },
       ),
     onSuccess: () =>
-      client.invalidateQueries({ queryKey: ['staff', 'account', userId] }),
+      client.invalidateQueries({
+        queryKey: ['staff', staffRegion(), 'account', userId],
+      }),
   });
   // A failed request keeps its inputs: a retry with the same command ID returns the original result.
   const locked = change.isPending || change.isError;

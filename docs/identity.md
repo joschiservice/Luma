@@ -1,6 +1,6 @@
 # Authentication and organization access
 
-Luma stores Better Auth users, credentials and sessions in its PostgreSQL database, and the `@luma/identity` package owns them. Organizations are tenants. Each membership has one role: built-in Owner, Admin or Member, or a custom workspace role, and roles grant permissions from a typed catalog; see [ADR-009](architecture/009-permissions-and-roles.md) and the [permission reference](permissions.md). Every tenant request is authorized from the current session and membership, never from caller-supplied context. V0 provisions only EU organizations.
+Luma stores Better Auth users, credentials and sessions in its PostgreSQL database, and the `@luma/identity` package owns them. Organizations are tenants. Each membership has one role: built-in Owner, Admin or Member, or a custom workspace role, and roles grant permissions from a typed catalog; see [ADR-009](architecture/009-permissions-and-roles.md) and the [permission reference](permissions.md). Every tenant request is authorized from the current session and membership, never from caller-supplied context. Each identity store serves one configured `EU`, `AU` or `US` cell. New development environments and the initial production cell use `AU`. Accounts and credentials stay in their cell.
 
 ## Database roles and configuration
 
@@ -45,7 +45,7 @@ People can add an authenticator app (TOTP) as a second factor after their passwo
 - Trusted devices are not supported: requests with `trustDevice` or `disableSession` are rejected. Code delivery by email or SMS, rereading the TOTP URI and renaming passkeys are not exposed.
 - Registering a passkey needs a session created within the last day. A passkey sign-in counts as both factors and skips the code step.
 
-The passkey relying-party ID is the `BETTER_AUTH_URL` hostname, and assertions are accepted only from `AUTH_TRUSTED_ORIGINS`. Browsers reject IP addresses as relying-party IDs, so local development serves the web app on `http://localhost:<port>`; `127.0.0.1` remains trusted for password sign-in only. Changing the production hostname invalidates existing passkeys. Passkeys created in one worktree are offered in others on `localhost`, but only work against the database that stored them.
+The passkey relying-party ID is `AUTH_PASSKEY_RP_ID`, defaulting locally to the `BETTER_AUTH_URL` hostname, and assertions are accepted only from `AUTH_TRUSTED_ORIGINS`. Configure a stable parent domain before registering production passkeys. Every trusted origin must be the RP hostname or a subdomain of it; changing the RP ID invalidates registered passkeys. Browsers reject IP addresses as relying-party IDs, so local development serves the web app on `http://localhost:<port>`; `127.0.0.1` remains trusted for password sign-in only. Changing the production hostname invalidates existing passkeys. Passkeys created in one worktree are offered in others on `localhost`, but only work against the database that stored them.
 
 With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-in, to three requests per 10 seconds per client IP. Without a forwarded client address all callers share one bucket, so the [production proxy](#production-proxy) must overwrite `X-Forwarded-For`. The limit store is per process; several API instances need shared storage before relying on these limits.
 
@@ -108,7 +108,7 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 | Account disabled or deleted (sessions are gone)  | 401      |
 | Member without the required permission           | 403      |
 | Organization placed in another region            | 503      |
-| Provisioning in an unavailable region (US, APAC) | 422      |
+| Provisioning in a disabled or other cell region  | 422      |
 
 For a member, a suspended or closed organization raises `WorkspaceInactiveError`, a 404
 `IdentityError` subclass. Callers see the same response; background work uses the subclass
@@ -173,7 +173,7 @@ Workspace creation is never retried automatically. After an uncertain creation, 
 
 ## Production proxy
 
-Serve the web app and API under one HTTPS origin. Set `BETTER_AUTH_URL` to that origin and include it in `AUTH_TRUSTED_ORIGINS`. Forward `/api/` to the trusted API service, removing only the `/api` prefix. Preserve `Cookie`, `Origin` and every `Set-Cookie` header. Replace `X-Forwarded-For` with the client address so auth rate limits apply per client. Disable caching for auth and organization responses. Never rewrite an untrusted Origin into a trusted one. For example, with Nginx:
+Serve each cell’s web app and API under its configured regional HTTPS origin. DNS must route authenticated traffic directly to that cell so TLS terminates in-region; authenticated routes must not pass through a global CDN. Set `BETTER_AUTH_URL` to that origin and include it in `AUTH_TRUSTED_ORIGINS`. Forward `/api/` to the trusted API service, removing only the `/api` prefix. Preserve `Cookie`, `Origin` and every `Set-Cookie` header. Replace `X-Forwarded-For` with the client address so auth rate limits apply per client. Disable caching for auth and organization responses. Never rewrite an untrusted Origin into a trusted one. For example, with Nginx:
 
 ```nginx
 location /api/ {
@@ -187,10 +187,35 @@ location /api/ {
 }
 ```
 
-`luma_api` is the deployment's fixed private API upstream. Forward all other paths to the TanStack Start server. Keep session cookies secure and HttpOnly; never expose session tokens to JavaScript or browser storage. The development Vite proxy applies the same rewrite and preserves Origin and cookies.
+`luma_api` is the deployment's fixed private API upstream. Forward all other paths to the TanStack Start server. Keep session cookies host-only, secure and HttpOnly, with no Domain attribute; never expose session tokens to JavaScript or browser storage. The development Vite proxy applies the same rewrite and preserves Origin and cookies.
 
 ## SSO and SCIM extension points
 
 `AuthSettings.plugins` accepts reviewed Better Auth server plugins. Adding a plugin does not expose HTTP endpoints: extend the auth allowlist, migrations and tests deliberately. Account and provider IDs stay separate from the canonical user UUID, and organization UUIDs stay stable across identity providers. Automatic account linking stays disabled until a verified linking policy exists.
 
 SCIM provisioning must resolve a verified installation to one organization and recheck authority, state and placement before changing memberships. A tenant ID is never proof of authority. Regional federation must preserve ADR-003's residency boundary. SSO, SCIM credentials and service actors are not enabled.
+
+## Regional placement and signup
+
+The migration owner provisions the database cell once. Runtime roles can read its region and
+cannot change it. API, worker and staff startup refuse a different `LUMA_REGION`; an existing
+local EU database must keep EU configuration or be intentionally reset. Workspaces receive an
+explicit immutable region matching their cell, and provisioning rejects disabled regions.
+
+Identity resolves opaque workspace placement before reading memberships or tenant records.
+A workspace in another cell returns `503 REGION_UNAVAILABLE`; Luma does not silently route
+customer data across cells. The local placement directory holds only the lookup needed for
+this check. Workspace slugs are unique within a regional identity store. A second cell must
+keep region-qualified links; slugs are not global identity.
+
+Email signup requires explicit confirmation of this cell’s enabled region before creating an
+account. Missing, unavailable or other-cell choices return `422 REGION_UNAVAILABLE`. The
+confirmed region, account that confirmed it and server timestamp commit as audit evidence
+with the account insert. Onboarding creates the workspace in the same region. Public regional
+configuration contains origins and availability only, never accounts or sessions. The global
+entry redirects to the initial AU cell and stores no customer session.
+
+Regional activation is an explicit deployment policy: production defaults to an AU-only
+`LUMA_ENABLED_REGIONS` list. A reviewed new cell must set that list, its own `LUMA_REGION`,
+regional origins and approved service endpoints, and provision the matching immutable database
+record. Workspace requests cannot opt a region into that policy.

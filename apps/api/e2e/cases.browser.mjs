@@ -39,6 +39,8 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('cases@example.test');
   await page
@@ -109,7 +111,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
       id: organizationId,
       name: 'North Studio',
       slug: 'north',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

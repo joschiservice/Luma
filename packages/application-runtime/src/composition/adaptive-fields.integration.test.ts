@@ -33,7 +33,7 @@ describe.skipIf(!databaseUrl)('adaptive custom fields on PostgreSQL', () => {
         foreignRecord = randomUUID();
       for (const tenant of [tenantId, foreignTenant])
         await db.owner.query(
-          "INSERT INTO organizations(id,name,slug,created_at) VALUES($1::uuid,'Shop',$1::text,now())",
+          "INSERT INTO organizations(data_region,id,name,slug,created_at) VALUES('AU',$1::uuid,'Shop',$1::text,now())",
           [tenant],
         );
       const context = (tenant: string) =>
@@ -43,7 +43,7 @@ describe.skipIf(!databaseUrl)('adaptive custom fields on PostgreSQL', () => {
             id: tenant,
             name: 'Shop',
             slug: tenant,
-            dataRegion: 'EU',
+            dataRegion: 'AU',
             status: 'active',
           },
           builtInMembership(

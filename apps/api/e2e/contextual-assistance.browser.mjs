@@ -36,7 +36,7 @@ test('explains a record beside its page and preserves exact chart selection', as
     {
       routes: {
         assistant: {
-          adapter: 'bedrock-eu',
+          adapter: 'bedrock',
           model,
           providers: ['bedrock'],
           zeroDataRetention: true,
@@ -46,8 +46,8 @@ test('explains a record beside its page and preserves exact chart selection', as
     },
     observability,
     {
-      bedrockEu: {
-        region: 'EU',
+      bedrock: {
+        region: 'AU',
         supportsZeroDataRetention: true,
         async generate(_route, request) {
           modelRequests.push(request);

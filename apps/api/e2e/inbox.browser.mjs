@@ -277,7 +277,7 @@ test('works supplier and customer threads, documents, replies and mailbox rules'
     {
       name: 'New shop',
       slug: `new-${randomUUID().slice(0, 8)}`,
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     { cookie: outsider.cookie, status: 201 },
   );

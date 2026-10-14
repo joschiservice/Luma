@@ -228,7 +228,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   };
   const actor = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
-    { ...f.org, status: 'active', dataRegion: 'EU' },
+    { ...f.org, status: 'active', dataRegion: 'AU' },
     builtInMembership(
       { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
       'owner',

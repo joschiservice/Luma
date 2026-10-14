@@ -1,3 +1,5 @@
+import type { DataRegion } from '@luma/platform';
+
 export const staffPermissions = [
   'staff.directory.read',
   'staff.workspace.inspect',
@@ -14,6 +16,10 @@ export const staffPermissions = [
 export type StaffPermission = (typeof staffPermissions)[number];
 
 export interface StaffContext {
+  /** Region of the API cell resolving this authority. */
+  region: DataRegion;
+  /** Current regional scopes of the staff admission. */
+  regions: DataRegion[];
   userId: string;
   sessionId: string;
   sessionCreatedAt: Date;
@@ -36,7 +42,10 @@ export function requireStaffPermission(
   context: StaffContext,
   permission: StaffPermission,
 ) {
-  if (!context.permissions.includes(permission))
+  if (
+    !context.regions.includes(context.region) ||
+    !context.permissions.includes(permission)
+  )
     throw new StaffError(403, 'Staff permission required.');
 }
 

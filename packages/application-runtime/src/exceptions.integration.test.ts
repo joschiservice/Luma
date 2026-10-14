@@ -83,7 +83,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         id,
         name: 'Fixture',
         slug: 'fixture',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -149,10 +149,11 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     // This fixture exercises enabled execution independently of identity provisioning.
     for (const id of [tenantId, otherTenant])
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,created_at,write_mode) VALUES($1::uuid,'Fixture',$1::uuid::text,now(),'writes_enabled')",
+        "INSERT INTO organizations(data_region,id,name,slug,created_at,write_mode) VALUES('AU',$1::uuid,'Fixture',$1::uuid::text,now(),'writes_enabled')",
         [id],
       );
     // Policy reads real membership counts even though this fixture mocks principal refresh.
@@ -1733,7 +1734,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         id: tenant,
         name: 'Fixture',
         slug: 'fixture',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -2609,7 +2610,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           id,
           name: 'Fixture',
           slug: 'fixture',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
           status: 'active',
         },
         builtInMembership(
@@ -2924,7 +2925,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           id,
           name: 'Fixture',
           slug: 'fixture',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
           status: 'active',
         },
         builtInMembership(
@@ -3903,7 +3904,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           output: { hypotheses: [] } as T,
           toolCalls: [],
           metadata: {
-            adapter: 'bedrock-eu' as const,
+            adapter: 'bedrock' as const,
             model: 'fixture',
             latencyMs: 1,
             inputTokens: 1,
@@ -3955,7 +3956,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         ) => {
           expect(modelRequest.dataPolicy).toEqual({
             classification: 'sensitive',
-            region: 'EU',
+            region: 'AU',
             zeroDataRetention: true,
           });
           expect(modelRequest.tools).toBeUndefined();
@@ -3983,7 +3984,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
                 ? [{ id: 'write', name: 'inventory.write', arguments: {} }]
                 : [],
             metadata: {
-              adapter: 'bedrock-eu' as const,
+              adapter: 'bedrock' as const,
               model: 'fixture',
               latencyMs: 1,
               inputTokens: 1,

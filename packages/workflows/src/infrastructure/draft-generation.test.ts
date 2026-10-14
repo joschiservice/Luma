@@ -41,7 +41,7 @@ function context(role: 'owner' | 'admin' | 'member', userId = `${role}-id`) {
       id: tenantId,
       name: 'Tenant',
       slug: 'tenant',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(
@@ -263,7 +263,7 @@ function fakeGateway(replies: Reply[]) {
           inputTokens: 100,
           outputTokens: 50,
           costUsd: null,
-          adapter: 'bedrock-eu' as const,
+          adapter: 'bedrock' as const,
           model: 'eu.test-model',
           latencyMs: 1,
         },
@@ -539,7 +539,7 @@ describe('draft generation', () => {
     expect(request!.profile).toBe('authoring');
     expect(request!.dataPolicy).toEqual({
       classification: 'sensitive',
-      region: 'EU',
+      region: 'AU',
       zeroDataRetention: true,
     });
     const schema = JSON.stringify(request!.output!.jsonSchema);
@@ -585,7 +585,7 @@ describe('draft generation', () => {
     });
     expect(result.generation.route).toEqual({
       profile: 'authoring',
-      adapter: 'bedrock-eu',
+      adapter: 'bedrock',
       model: 'eu.test-model',
     });
   });

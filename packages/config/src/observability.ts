@@ -1,4 +1,8 @@
+import type { DataRegion } from './regions.js';
+import { assertRegionalServiceEndpoint, readRegionConfig } from './regions.js';
+
 export interface ObservabilityConfig {
+  dataRegion: DataRegion;
   environment: 'development' | 'test' | 'staging' | 'production';
   release: string;
   sampleRate: number;
@@ -12,7 +16,7 @@ export interface ObservabilityConfig {
 }
 
 /**
- * Reads telemetry settings and validates EU export destinations; enabled exports require a
+ * Reads telemetry settings and validates regional export destinations; enabled exports require a
  * tenant hash key. Feature flag overrides are accepted only in development and test.
  */
 export function readObservabilityConfig(
@@ -28,6 +32,7 @@ export function readObservabilityConfig(
   if (!/^(0(\.\d+)?|1(\.0+)?)$/.test(rate))
     throw new Error('OBSERVABILITY_SAMPLE_RATE must be between 0 and 1');
   const config: ObservabilityConfig = {
+    dataRegion: readRegionConfig(env).region,
     environment: environment as ObservabilityConfig['environment'],
     release,
     sampleRate: Number(rate),
@@ -68,7 +73,6 @@ export function readObservabilityConfig(
     }
     if (
       url.protocol !== 'https:' ||
-      !/^o\d+\.ingest\.de\.sentry\.io$/.test(url.hostname) ||
       !/^[a-f0-9]+$/.test(url.username) ||
       url.password ||
       url.port ||
@@ -76,7 +80,10 @@ export function readObservabilityConfig(
       url.search ||
       url.hash
     )
-      throw new Error('SENTRY_DSN must use EU Sentry ingestion');
+      throw new Error(
+        'SENTRY_DSN must use an approved Sentry ingestion endpoint',
+      );
+    assertRegionalServiceEndpoint(env, 'sentry', env.SENTRY_DSN);
     config.sentryDsn = env.SENTRY_DSN;
   }
   if (env.LANGFUSE_PUBLIC_KEY || env.LANGFUSE_SECRET_KEY) {
@@ -85,8 +92,7 @@ export function readObservabilityConfig(
         'LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are both required',
       );
     const baseUrl = env.LANGFUSE_BASE_URL ?? 'https://cloud.langfuse.com';
-    if (baseUrl !== 'https://cloud.langfuse.com')
-      throw new Error('LANGFUSE_BASE_URL must use EU Langfuse ingestion');
+    assertRegionalServiceEndpoint(env, 'langfuse', baseUrl);
     config.langfuse = {
       publicKey: env.LANGFUSE_PUBLIC_KEY,
       secretKey: env.LANGFUSE_SECRET_KEY,
@@ -97,8 +103,7 @@ export function readObservabilityConfig(
     throw new Error('POSTHOG_SECRET_KEY requires POSTHOG_API_KEY');
   if (env.POSTHOG_API_KEY) {
     const host = env.POSTHOG_HOST ?? 'https://eu.i.posthog.com';
-    if (host !== 'https://eu.i.posthog.com')
-      throw new Error('POSTHOG_HOST must use EU PostHog ingestion');
+    assertRegionalServiceEndpoint(env, 'posthog', host);
     config.posthog = { apiKey: env.POSTHOG_API_KEY, host };
     if (env.POSTHOG_SECRET_KEY) {
       // The project key (phc_) is public; local evaluation needs a server-only key.

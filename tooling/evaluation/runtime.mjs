@@ -53,7 +53,7 @@ export function createWorker(
         name: 'Evaluation',
         slug: 'evaluation',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
       },
       builtInMembership(
         { id: `membership:${user}`, organizationId: tenant, userId: user },

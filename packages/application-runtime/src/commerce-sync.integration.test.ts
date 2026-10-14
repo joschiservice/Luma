@@ -251,7 +251,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: workspaceStatus,
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       builtInMembership(
         { id: `m-${user}`, organizationId: tenant, userId: user },
@@ -471,9 +471,10 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     // Sync discovery returns active workspaces only.
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,created_at) VALUES($1,'Fixture',$2,now())",
+      "INSERT INTO organizations(data_region,id,name,slug,created_at) VALUES('AU',$1,'Fixture',$2,now())",
       [tenant, `fixture-${tenant}`],
     );
     const password = randomUUID();
@@ -1451,7 +1452,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
             name: 'Fixture',
             slug: 'fixture',
             status: 'active',
-            dataRegion: 'EU',
+            dataRegion: 'AU',
           },
           {
             ...builtInMembership(
@@ -1601,7 +1602,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       {
         ...builtInMembership(
@@ -2984,7 +2985,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
           async () =>
             (
               await owner.query(
-                "SELECT count(*)::int AS count FROM pg_locks WHERE locktype='advisory' AND NOT granted",
+                "SELECT count(*)::int AS count FROM pg_locks WHERE locktype='advisory' AND NOT granted AND database=(SELECT oid FROM pg_database WHERE datname=current_database())",
               )
             ).rows[0].count,
           { timeout: 5000 },

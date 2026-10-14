@@ -71,6 +71,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       );
       setup.release();
     }
+    await owners.query('SELECT luma_provision_cell_region($1)', ['AU']);
     for (const [login, role] of [
       [staffLogin, 'luma_staff_runtime'],
       [customerLogin, 'luma_identity'],
@@ -116,7 +117,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       adminUrl,
     );
     await owners.query(
-      "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','EU',now())",
+      "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','AU',now())",
       [tenant],
     );
     await owners.query(

@@ -21,7 +21,7 @@ export const assistantContract = {
       path,
       summary: 'Check whether you can ask Luma here',
       description:
-        'Any member can check this. Asking Luma needs the Use Ask Luma permission and an EU model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role. `contextual` reports whether record and chart assistance is available in this workspace.',
+        'Any member can check this. Asking Luma needs the Use Ask Luma permission and a regional model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role. `contextual` reports whether record and chart assistance is available in this workspace.',
     })
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(z.object({ params: organizationParamsSchema }))

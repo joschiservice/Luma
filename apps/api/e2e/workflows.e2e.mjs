@@ -33,7 +33,11 @@ it('publishes native workflows without cases, retains immutable versions and exp
       cookie: user.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Workflows', slug: 'workflows', dataRegion: 'EU' },
+      body: {
+        name: 'Workflows',
+        slug: 'workflows',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   const tenantId = org.id;

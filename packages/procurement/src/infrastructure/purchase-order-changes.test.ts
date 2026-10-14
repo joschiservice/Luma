@@ -44,7 +44,7 @@ function actor(userId: string) {
       id: tenantId,
       name: 'Shop',
       slug: 'shop',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(
@@ -433,7 +433,7 @@ it('refreshes authority and release gates and isolates stored requests by tenant
       id: foreignTenant,
       name: 'Other',
       slug: 'other',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

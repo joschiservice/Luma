@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Alert, AlertDescription } from '@luma/ui/components/primitives/alert';
 import { LumaLockup } from '@luma/ui/components/primitives/brand';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -19,17 +20,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { staffApi } from './api';
+import { useRegionalStaffApi } from './api';
 import { Failure, Loading } from './feedback';
 import { clearPrivate } from './queries';
+import { staffPath, staffRegion, staffRegions } from './regions';
 import { loginRoute } from './router';
 
 /** Offers only the authentication mode admitted by the server, then checks staff eligibility. */
 export function LoginPage() {
+  const staffApi = useRegionalStaffApi();
   const client = useQueryClient();
   const { denied, signInFailed } = loginRoute.useSearch();
   const config = useQuery({
-    queryKey: ['staff', 'config'],
+    queryKey: ['staff', 'config', staffRegion()],
     queryFn: ({ signal }) => staffApi.config(signal),
     retry: false,
   });
@@ -45,7 +48,7 @@ export function LoginPage() {
       await staffApi.signIn(email, password);
       await staffApi.session();
       await clearPrivate(client);
-      window.location.replace('/');
+      window.location.replace(staffPath('/'));
     },
   });
   const google = useMutation({ mutationFn: staffApi.google });
@@ -73,6 +76,22 @@ export function LoginPage() {
           />
         </CardHeader>
         <CardContent className="staff-form">
+          <p>{m.identity_staff_regions_lead()}</p>
+          {staffRegions().length > 1 ? (
+            <nav aria-label={m.identity_staff_region_label()}>
+              {staffRegions().map((region) => (
+                <a
+                  key={region}
+                  href={staffPath('/login', region)}
+                  aria-current={region === staffRegion() ? 'page' : undefined}
+                >
+                  {region}
+                </a>
+              ))}
+            </nav>
+          ) : (
+            <p>{staffRegion()}</p>
+          )}
           {signInFailed ? (
             <Alert tone="warning" role="alert">
               <AlertDescription>

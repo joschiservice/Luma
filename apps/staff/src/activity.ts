@@ -2,18 +2,22 @@ const reportIntervalMs = 30_000;
 const activityLifetimeMs = 60_000;
 
 /**
- * Records trusted browser input and reports it once on a later private request. Passive
+ * Records trusted browser input and reports it once per regional API on a later private request. Passive
  * refreshes cannot manufacture activity; stale input is discarded and reports are throttled.
  */
 export function createStaffActivityTracker(now: () => number = Date.now) {
   let pendingAt: number | undefined;
-  let reportedAt = Number.NEGATIVE_INFINITY;
+  let sequence = 0;
+  const reports = new Map<string, { at: number; sequence: number }>();
 
   return {
     record(event: Pick<Event, 'isTrusted'>) {
-      if (event.isTrusted) pendingAt = now();
+      if (event.isTrusted) {
+        pendingAt = now();
+        sequence++;
+      }
     },
-    consume() {
+    consume(scope = 'default') {
       const current = now();
       if (pendingAt === undefined) return false;
       if (current - pendingAt > activityLifetimeMs) {
@@ -21,15 +25,20 @@ export function createStaffActivityTracker(now: () => number = Date.now) {
 
         return false;
       }
-      if (current - reportedAt < reportIntervalMs) return false;
-      pendingAt = undefined;
-      reportedAt = current;
+      const previous = reports.get(scope);
+      if (
+        previous?.sequence === sequence ||
+        (previous && current - previous.at < reportIntervalMs)
+      )
+        return false;
+      reports.set(scope, { at: current, sequence });
 
       return true;
     },
     reset() {
       pendingAt = undefined;
-      reportedAt = Number.NEGATIVE_INFINITY;
+      sequence = 0;
+      reports.clear();
     },
   };
 }

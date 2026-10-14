@@ -72,7 +72,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
   ) =>
     makeTenantContext(
       { userId: actorId, sessionId: 'session' },
-      { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
+      { id, name: 'Store', slug: 'store', dataRegion: 'AU', status: 'active' },
       builtInMembership(
         { id: 'membership', organizationId: id, userId: actorId },
         role,

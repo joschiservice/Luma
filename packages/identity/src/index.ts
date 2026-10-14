@@ -59,3 +59,5 @@ export type {
   SupportMembershipChange,
   SupportSessionRevocation,
 } from './application/support.js';
+
+export type { DataRegion } from './domain/context.js';

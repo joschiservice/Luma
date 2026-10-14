@@ -7,7 +7,7 @@ const bedrock = {
   credentials: { accessKeyId: 'AKIAEXAMPLE0000000', secretAccessKey: 'secret' },
 };
 const route = {
-  adapter: 'bedrock-eu' as const,
+  adapter: 'bedrock' as const,
   model: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
   providers: ['bedrock'],
   zeroDataRetention: true,
@@ -16,25 +16,36 @@ const route = {
 it('allows authoring only on an EU Bedrock route with zero data retention', () => {
   expect(
     authoringAvailability(
-      { routes: { authoring: route }, bedrock, timeoutMs: 1000 },
+      {
+        dataRegion: 'EU' as const,
+        routes: { authoring: route },
+        bedrock,
+        timeoutMs: 1000,
+      },
       true,
     ),
   ).toEqual({ available: true, reason: null });
 
   for (const [settings, installed, reason] of [
     [undefined, false, /aren’t configured/],
-    [{ routes: {}, timeoutMs: 1000 }, true, /configure the authoring route/],
+    [
+      { dataRegion: 'EU' as const, routes: {}, timeoutMs: 1000 },
+      true,
+      /configure the authoring route/,
+    ],
     [
       {
+        dataRegion: 'EU' as const,
         routes: { authoring: { ...route, adapter: 'vercel' as const } },
         apiKey: 'key',
         timeoutMs: 1000,
       },
       true,
-      /doesn’t process data in the EU/,
+      /doesn’t process data in the cell region/,
     ],
     [
       {
+        dataRegion: 'EU' as const,
         routes: { authoring: { ...route, zeroDataRetention: false } },
         bedrock,
         timeoutMs: 1000,
@@ -43,7 +54,11 @@ it('allows authoring only on an EU Bedrock route with zero data retention', () =
       /zero data retention\.$/,
     ],
     [
-      { routes: { authoring: route }, timeoutMs: 1000 },
+      {
+        dataRegion: 'EU' as const,
+        routes: { authoring: route },
+        timeoutMs: 1000,
+      },
       true,
       /Bedrock isn’t configured/,
     ],
@@ -52,7 +67,7 @@ it('allows authoring only on an EU Bedrock route with zero data retention', () =
     expect(result.available).toBe(false);
     expect(result.reason).toMatch(reason);
     expect(result.reason).toMatch(
-      /^Describing workflows needs an EU model route/,
+      /^Describing workflows needs a regional model route/,
     );
   }
 });
@@ -60,18 +75,28 @@ it('allows authoring only on an EU Bedrock route with zero data retention', () =
 it('gives the assistant its own EU route', () => {
   expect(
     assistantAvailability(
-      { routes: { assistant: route }, bedrock, timeoutMs: 1000 },
+      {
+        dataRegion: 'EU' as const,
+        routes: { assistant: route },
+        bedrock,
+        timeoutMs: 1000,
+      },
       true,
     ),
   ).toEqual({ available: true, reason: null });
 
   // An authoring route doesn't enable the assistant.
   const result = assistantAvailability(
-    { routes: { authoring: route }, bedrock, timeoutMs: 1000 },
+    {
+      dataRegion: 'EU' as const,
+      routes: { authoring: route },
+      bedrock,
+      timeoutMs: 1000,
+    },
     true,
   );
   expect(result.available).toBe(false);
   expect(result.reason).toBe(
-    'Asking Luma needs an EU model route with zero data retention. Whoever runs this Luma server needs to configure the assistant route.',
+    'Asking Luma needs a regional model route with zero data retention. Whoever runs this Luma server needs to configure the assistant route.',
   );
 });

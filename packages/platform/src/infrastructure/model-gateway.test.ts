@@ -229,7 +229,7 @@ describe('model gateway', () => {
     const gateway = createRoutedModelGateway(
       {
         reasoning: {
-          adapter: 'bedrock-eu',
+          adapter: 'bedrock',
           model: 'eu.model',
           providers: ['bedrock'],
           zeroDataRetention: true,

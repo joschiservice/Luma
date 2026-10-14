@@ -34,6 +34,8 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page
     .getByLabel('Email', { exact: true })
@@ -380,7 +382,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   ).rows[0].user_id;
   const other = randomUUID();
   await db.owner.query(
-    "INSERT INTO organizations(id,name,slug,data_region,status,created_at) VALUES($1,'Other studio',$2,'EU','active',now())",
+    "INSERT INTO organizations(id,name,slug,data_region,status,created_at) VALUES($1,'Other studio',$2,'AU','active',now())",
     [other, `other-${other}`],
   );
   await db.owner.query(

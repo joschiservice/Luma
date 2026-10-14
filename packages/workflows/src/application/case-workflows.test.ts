@@ -29,7 +29,7 @@ const context = (id: string, role: 'owner' | 'admin' | 'member' = 'admin') =>
       id: tenantId,
       name: 'Tenant',
       slug: 'tenant',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

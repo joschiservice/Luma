@@ -57,7 +57,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
         id: organization,
         name: 'Shop',
         slug: `shop-${organization}`,
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -253,6 +253,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -268,7 +269,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
 
     for (const id of [tenant, otherTenant])
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,created_at,write_mode) VALUES($1,'Shop',$2,'active',now(),'writes_enabled')",
+        "INSERT INTO organizations(data_region,id,name,slug,status,created_at,write_mode) VALUES('AU',$1,'Shop',$2,'active',now(),'writes_enabled')",
         [id, `shop-${id}`],
       );
     await owner.query(

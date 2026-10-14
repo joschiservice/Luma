@@ -42,7 +42,7 @@ function supportApp() {
           id: tenantId,
           name: 'Workspace',
           slug: 'workspace',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
           status: 'active',
         },
         builtInMembership(

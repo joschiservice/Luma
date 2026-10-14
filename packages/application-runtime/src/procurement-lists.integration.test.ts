@@ -43,7 +43,7 @@ describe.skipIf(!databaseUrl)(
           name: 'Fixture',
           slug: 'fixture',
           status: 'active',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         permissions
           ? { ...membership, permissions: new PermissionSet(permissions) }
@@ -132,7 +132,7 @@ describe.skipIf(!databaseUrl)(
       );
       for (const id of [tenant, otherTenant])
         await owner.query(
-          "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Fixture',$2,'active',now())",
+          "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Fixture',$2,'active',now())",
           [id, `procurement-${id}`],
         );
       runtime = new Pool({ connectionString: url.toString() });

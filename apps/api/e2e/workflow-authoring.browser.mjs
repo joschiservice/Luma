@@ -34,6 +34,8 @@ test('creates workflows from templates and from scratch, then publishes without 
   await mkdir(screenshots, { recursive: true });
 
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('author@example.test');
   await page
@@ -61,7 +63,7 @@ test('creates workflows from templates and from scratch, then publishes without 
     path: `${screenshots}/gallery-desktop.png`,
     fullPage: true,
   });
-  // Without an EU zero-retention model route, describing a workflow says why it's unavailable.
+  // Without an AU zero-retention model route, describing a workflow says why it's unavailable.
   await page.getByRole('button', { name: 'Describe a workflow' }).click();
   const describe = page.getByRole('dialog', { name: 'Describe a workflow' });
   await describe.getByText(/model route/i).waitFor();

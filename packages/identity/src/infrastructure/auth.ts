@@ -15,6 +15,7 @@ import { organization, twoFactor } from 'better-auth/plugins';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { DataRegion } from '../domain/context.js';
 import { describeUserAgent } from '../domain/sessions.js';
 import { requestLocale } from './locale.js';
 import { passwordMailLocale } from './password-mail.js';
@@ -24,6 +25,10 @@ export interface AuthSettings {
   secret: string;
   baseURL: string;
   trustedOrigins: string[];
+  region?: DataRegion;
+  enabledRegions?: DataRegion[];
+  passkeyRpId?: string;
+  regionalOrigins?: Partial<Record<DataRegion, string>>;
   /** Separates sessions for applications sharing a hostname. */
   cookiePrefix?: string;
   /** Reviewed server plugins, e.g. regional SSO/SCIM adapters. */
@@ -36,8 +41,23 @@ export interface AuthSettings {
 }
 
 // Trusted devices and session-less code checks would let a second factor be skipped later.
-function accountSecurityMiddleware(db: NodePgDatabase<typeof schema>) {
+function accountSecurityMiddleware(
+  db: NodePgDatabase<typeof schema>,
+  settings: AuthSettings,
+) {
   return createAuthMiddleware(async (ctx) => {
+    if (ctx.path === '/sign-up/email') {
+      const region = settings.region ?? 'AU';
+      if (
+        ctx.body?.dataRegion !== region ||
+        !(settings.enabledRegions ?? [region]).includes(region)
+      )
+        throw new APIError('UNPROCESSABLE_ENTITY', {
+          code: 'REGION_UNAVAILABLE',
+          message:
+            'Confirm an available data region before creating your account.',
+        });
+    }
     if (ctx.path === '/change-password') {
       const session = await getAuthoritativeSessionFromCtx(ctx);
       if (session?.user.twoFactorEnabled) {
@@ -117,7 +137,7 @@ function factorPlugins(settings: AuthSettings): BetterAuthPlugin[] {
   return [
     twoFactor(),
     passkey({
-      rpID: new URL(settings.baseURL).hostname,
+      rpID: settings.passkeyRpId ?? new URL(settings.baseURL).hostname,
       origin: settings.trustedOrigins,
     }),
   ];
@@ -169,7 +189,7 @@ function accountSessionsPlugin(
 /**
  * Configures email and password sign-in, authenticator-app two-factor authentication, passkeys
  * and organization support using the supplied database and trusted origins. Passkeys use the
- * `baseURL` host as relying-party ID and accept assertions only from trusted origins.
+ * explicitly configured relying-party ID and accept assertions only from trusted origins.
  * Disabled accounts get no new session. `observers` run after every other plugin, so their hooks
  * see final responses.
  */
@@ -180,6 +200,15 @@ export function createAuth(
   observers: BetterAuthPlugin[] = [],
 ) {
   const passwordMail = settings.passwordMail;
+
+  const rpId = settings.passkeyRpId ?? new URL(settings.baseURL).hostname;
+  for (const origin of [settings.baseURL, ...settings.trustedOrigins]) {
+    const host = new URL(origin).hostname;
+    if (host !== rpId && !host.endsWith(`.${rpId}`))
+      throw new Error(
+        'Passkey relying-party ID must contain every trusted origin.',
+      );
+  }
 
   return betterAuth({
     secret: settings.secret,
@@ -218,6 +247,17 @@ export function createAuth(
       },
     },
     account: { accountLinking: { enabled: false } },
+    user: {
+      additionalFields: {
+        dataRegion: { type: 'string', required: false, input: true },
+        regionConfirmedAt: {
+          type: 'date',
+          required: false,
+          input: false,
+          defaultValue: () => new Date(),
+        },
+      },
+    },
     session: {
       cookieCache: { enabled: false },
       // Session resolution advances this at a bounded rate; see sessionActivityDue.
@@ -230,7 +270,7 @@ export function createAuth(
         },
       },
     },
-    hooks: { before: accountSecurityMiddleware(db) },
+    hooks: { before: accountSecurityMiddleware(db, settings) },
     databaseHooks: {
       session: {
         create: {
@@ -240,6 +280,8 @@ export function createAuth(
       },
     },
     advanced: {
+      useSecureCookies: new URL(settings.baseURL).protocol === 'https:',
+      crossSubDomainCookies: { enabled: false },
       ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),
       database: {
         generateId: ({ model }) =>
@@ -254,7 +296,7 @@ export function createAuth(
               dataRegion: {
                 type: 'string',
                 required: true,
-                defaultValue: 'EU',
+                defaultValue: settings.region ?? 'AU',
                 input: false,
               },
               status: {

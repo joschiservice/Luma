@@ -97,7 +97,7 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
         id: organization,
         name: 'Shop',
         slug: `shop-${organization}`,
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -280,7 +280,7 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
         output,
         toolCalls: [],
         metadata: {
-          adapter: 'bedrock-eu',
+          adapter: 'bedrock',
           model: 'test-model',
           latencyMs: 1,
           inputTokens: 1,
@@ -329,6 +329,7 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -341,7 +342,7 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
 
     for (const id of [tenant, otherTenant])
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Shop',$2,'active',now())",
+        "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Shop',$2,'active',now())",
         [id, `shop-${id}`],
       );
     await owner.query(
@@ -487,7 +488,7 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
       ],
     });
     expect(
-      prompts.every((p) => p === 'document-extraction:sensitive:EU:true'),
+      prompts.every((p) => p === 'document-extraction:sensitive:AU:true'),
     ).toBe(true);
 
     const plan = await messaging.documents.document(

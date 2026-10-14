@@ -2,11 +2,25 @@
 
 Luma's server processes can export errors, traces, model observations, product events and flags to hosted providers (Sentry, Langfuse and PostHog), or traces, metrics, logs and profiles to a local Grafana stack for diagnostics. Every exporter is optional and off unless configured. All telemetry follows one data policy: opaque correlation IDs and fixed operation names, never customer content, credentials or raw tenant identifiers. The browser loads no vendor SDKs, cookies, session replay or autocapture; it only sends an action ID through the typed API client.
 
+## Regional exports
+
+`LUMA_REGION` binds telemetry to its cell. `LUMA_REGIONAL_SERVICE_ENDPOINTS` lists exact
+HTTPS origins that operators have inspected for that region. Production enables only AU by default. Activating a reviewed additional cell requires an explicit
+`LUMA_ENABLED_REGIONS` list and matching provisioned placement; no source changes are needed
+for the reserved EU and US cells. AU exporters have no default
+endpoint and stay disabled without this explicit list; an AU process never inherits EU
+cloud ingestion. Self-hosted endpoints require verified Australian storage, processing and
+backup locations. Local diagnostics remain restricted to loopback in development and test.
+
+`staff-regional-directory` controls search fan-out beyond the current cell. It defaults off
+and is evaluated server-side through PostHog. Disabled or failed remote searches remain
+visible as incomplete; the flag never bypasses regional staff scope or customer grants.
+
 ## Hosted providers
 
 Credentials go in the API and worker `.env` files; see `apps/api/.env.example`. Use separate projects and tenant hash secrets for development, staging and production.
 
-- Only EU ingestion hosts are accepted: Sentry `o<org>.ingest.de.sentry.io`, `https://cloud.langfuse.com` and `https://eu.i.posthog.com`. There is no cross-region fallback. Operators must also verify each project's processing location, access and retention under [ADR-003](architecture/003-tenant-isolation-and-data-residency.md), and set retention before enabling customer traffic.
+- Each cell accepts only its approved ingestion hosts. EU defaults are Sentry `o<org>.ingest.de.sentry.io`, `https://cloud.langfuse.com` and `https://eu.i.posthog.com`. There is no cross-region fallback. Operators must also verify each project's processing location, access and retention under [ADR-003](architecture/003-tenant-isolation-and-data-residency.md), and set retention before enabling customer traffic.
 - `OBSERVABILITY_TENANT_HASH_KEY`, a random secret of at least 32 characters, is required whenever any exporter is enabled.
 - Both Langfuse keys are required together; a partial pair fails startup.
 - PostHog receives product events and evaluates flags only in staging and production. Development and test never contact it, even when its keys are set.
@@ -25,7 +39,7 @@ The runtime initializes identity and telemetry before accepting requests. Closin
 
 `@luma/platform` exposes a framework-independent `Observability` interface. Composition roots inject it into application services; vendor SDK imports stay in the platform infrastructure adapter. Pass the immutable `TraceContext` explicitly through workflow, agent, model and tool operations; concurrent requests never share an ambient tenant context.
 
-The API binds telemetry to `request.tenantContext` only after the identity guard succeeds, and handlers pass `request.observation.context` to application services. Background work calls `forTenant(context, authorizedTenantId, 'EU')` after reauthorizing. Exports carry an environment-specific HMAC as `tenant_ref`, never raw organization or user IDs; the pseudonym is still restricted metadata. Never derive tenant context from a header, body or analytics ID. Trace context grants no authority: reauthorize any persisted workflow envelope before resuming it.
+The API binds telemetry to `request.tenantContext` only after the identity guard succeeds, and handlers pass `request.observation.context` to application services. Background work calls `forTenant(context, authorizedTenantId, tenantRegion)` after reauthorizing. Exports carry an environment-specific HMAC as `tenant_ref`, never raw organization or user IDs; the pseudonym is still restricted metadata. Never derive tenant context from a header, body or analytics ID. Trace context grants no authority: reauthorize any persisted workflow envelope before resuming it.
 
 Span names, product event names, flag keys and model names are explicit allowlists. Extend them in code review; never use customer content as a name.
 
@@ -33,7 +47,7 @@ Span names, product event names, flag keys and model names are explicit allowlis
 
 Adaptive workspace rollout uses `adaptive-custom-fields`, `adaptive-saved-views`,
 `adaptive-view-generation`, `adaptive-view-actions` and `adaptive-operational-packages`.
-Each defaults off. Saved-view generation also requires an approved EU zero-retention authoring
+Each defaults off. Saved-view generation also requires an approved regional zero-retention authoring
 route; a release flag never grants access or bypasses that processing requirement.
 
 Flags are server-side release toggles evaluated through `Observability.flag`. The browser has no flag SDK; expose a flag's effect to the web app through the API.

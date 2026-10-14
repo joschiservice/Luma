@@ -65,7 +65,8 @@
     "knip:check": "knip --include files,dependencies,unlisted,unresolved --no-config-hints && knip --exports --include-entry-exports --no-config-hints",
     "typecheck:tooling": "turbo run typecheck --filter=@luma/tooling",
     "lint:ui": "node tooling/style/check-ui.mjs",
-    "dev:staff": "node tooling/dev/cli.mjs staff"
+    "dev:staff": "node tooling/dev/cli.mjs staff",
+    "test:region-eu": "LUMA_REGION=EU LUMA_ENABLED_REGIONS=EU node tooling/dev/test.mjs test --filter=@luma/application-runtime -- regions.integration.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

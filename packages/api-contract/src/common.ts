@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
-export const dataRegionSchema = z.enum(['EU', 'US', 'APAC']);
+export const dataRegionSchema = z.enum(['EU', 'AU', 'US']);
 
 export const organizationParamsSchema = z.object({
   organizationId: z.string().uuid(),

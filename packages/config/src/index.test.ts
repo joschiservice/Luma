@@ -40,6 +40,8 @@ const authEnvironment = {
 it('accepts distinct cookie namespaces and rejects invalid cookie names', () => {
   expect(
     readIdentityConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       ...authEnvironment,
       BETTER_AUTH_COOKIE_PREFIX: 'luma-worktree_1',
     }).cookiePrefix,
@@ -48,6 +50,8 @@ it('accepts distinct cookie namespaces and rejects invalid cookie names', () => 
   for (const value of ['', 'has spaces', 'cookie;path=/', 'x'.repeat(65)]) {
     expect(() =>
       readIdentityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
         ...authEnvironment,
         BETTER_AUTH_COOKIE_PREFIX: value,
       }),
@@ -66,7 +70,12 @@ it('requires explicit identity credentials and exact trusted origins', () => {
     'BETTER_AUTH_URL',
   ]) {
     expect(() =>
-      readIdentityConfig({ ...authEnvironment, [key]: undefined }),
+      readIdentityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
+        ...authEnvironment,
+        [key]: undefined,
+      }),
     ).toThrow();
   }
   for (const AUTH_TRUSTED_ORIGINS of [
@@ -76,19 +85,33 @@ it('requires explicit identity credentials and exact trusted origins', () => {
     'https://user:pass@example.com',
   ]) {
     expect(() =>
-      readIdentityConfig({ ...authEnvironment, AUTH_TRUSTED_ORIGINS }),
+      readIdentityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
+        ...authEnvironment,
+        AUTH_TRUSTED_ORIGINS,
+      }),
     ).toThrow();
   }
   expect(() =>
     readIdentityConfig({ ...authEnvironment, NODE_ENV: 'production' }),
   ).toThrow('HTTPS');
   expect(() =>
-    readIdentityConfig({ ...authEnvironment, BETTER_AUTH_SECRET: 'short' }),
+    readIdentityConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
+      ...authEnvironment,
+      BETTER_AUTH_SECRET: 'short',
+    }),
   ).toThrow('32');
 });
 
 it('reads the optional Resend webhook secret only with the mail settings', () => {
   const mail = {
+    LUMA_REGIONAL_SERVICE_ENDPOINTS:
+      '{"EU":{"mail":["https://api.resend.com"]}}',
+    LUMA_REGION: 'EU',
+    LUMA_ENABLED_REGIONS: 'EU',
     ...authEnvironment,
     MAIL_RESEND_API_KEY: 're_test',
     MAIL_FROM: 'Luma <notifications@example.test>',
@@ -106,6 +129,8 @@ it('reads the optional Resend webhook secret only with the mail settings', () =>
   ).toThrow('MAIL_RESEND_WEBHOOK_SECRET');
   expect(() =>
     readIdentityConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       ...authEnvironment,
       MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
     }),

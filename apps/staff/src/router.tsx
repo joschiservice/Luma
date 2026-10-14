@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { LumaLockup } from '@luma/ui/components/primitives/brand';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
@@ -19,9 +20,18 @@ import {
 import { useEffect } from 'react';
 import { z } from 'zod';
 
-import { staffApi } from './api';
+import { staffActivity } from './activity';
+import { createStaffApi, useRegionalStaffApi } from './api';
 import { Failure, Loading } from './feedback';
 import { clearPrivate, isAccessLoss, sessionOptions } from './queries';
+import {
+  initializeStaffRegions,
+  regionalFetch,
+  staffPath,
+  staffRegion,
+  staffRegions,
+  staffRegionSchema,
+} from './regions';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,11 +41,17 @@ export const queryClient = new QueryClient({
 });
 
 const rootRoute = createRootRoute({
+  validateSearch: z.object({ region: staffRegionSchema.optional() }),
+  beforeLoad: async ({ search }) => initializeStaffRegions(search.region),
   component: Outlet,
   notFoundComponent: () => (
     <main className="staff-content">
       <h1>Page not found</h1>
-      <Link to="/" className={buttonVariants({ variant: 'outline' })}>
+      <Link
+        to="/"
+        search={{ region: staffRegion() }}
+        className={buttonVariants({ variant: 'outline' })}
+      >
         Return to directory
       </Link>
     </main>
@@ -55,13 +71,16 @@ export const loginRoute = createRoute({
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'staff',
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
     try {
-      await queryClient.fetchQuery(sessionOptions());
+      await queryClient.fetchQuery(sessionOptions(search.region));
     } catch (error) {
       if (isAccessLoss(error)) {
         await clearPrivate(queryClient);
-        throw redirect({ to: '/login', search: { denied: true } });
+        throw redirect({
+          to: '/login',
+          search: { denied: true, region: staffRegion() },
+        });
       }
       throw error;
     }
@@ -89,6 +108,29 @@ export const directoryRoute = createRoute({
 export const workspaceRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/workspaces/$workspaceId',
+  beforeLoad: async ({ params, search }) => {
+    if (search.region) return;
+    const results = await Promise.all(
+      staffRegions().map(async (region) => {
+        try {
+          return await createStaffApi(
+            regionalFetch(region),
+            staffActivity,
+            region,
+          ).placement(params.workspaceId);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const found = results.filter((result) => result !== null);
+    if (found.length !== 1) throw new Error(m.identity_staff_region_unknown());
+    throw redirect({
+      to: '/workspaces/$workspaceId',
+      params,
+      search: { ...search, region: found[0]!.region },
+    });
+  },
   validateSearch: z.object({ grantId: z.uuid().optional().catch(undefined) }),
   component: lazyRouteComponent(() => import('./workspace'), 'WorkspacePage'),
 });
@@ -145,13 +187,14 @@ declare module '@tanstack/react-router' {
 }
 
 function StaffShell() {
+  const staffApi = useRegionalStaffApi();
   const client = useQueryClient();
   const session = useQuery(sessionOptions());
   const logout = useMutation({
     mutationFn: async () => {
       await staffApi.signOut();
       await clearPrivate(client);
-      window.location.replace('/login');
+      window.location.replace(staffPath('/login'));
     },
   });
   useEffect(() => {
@@ -166,7 +209,7 @@ function StaffShell() {
   useEffect(() => {
     if (session.isError && isAccessLoss(session.error)) {
       void clearPrivate(client).then(() =>
-        window.location.replace('/login?denied=true'),
+        window.location.replace(staffPath('/login?denied=true')),
       );
     }
   }, [client, session.error, session.isError]);
@@ -190,12 +233,17 @@ function StaffShell() {
       </a>
       <header className="staff-bar">
         <div className="staff-brand">
-          <Link to="/" aria-label="Luma staff directory">
-            <LumaLockup />
-          </Link>
-          <Badge>Staff</Badge>
           <Link
             to="/"
+            search={{ region: staffRegion() }}
+            aria-label="Luma staff directory"
+          >
+            <LumaLockup />
+          </Link>
+          <Badge>Staff · {staffRegion()}</Badge>
+          <Link
+            to="/"
+            search={{ region: staffRegion() }}
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
           >
             Directory
@@ -203,6 +251,7 @@ function StaffShell() {
           {session.data.permissions.includes('staff.audit.read') ? (
             <Link
               to="/audit"
+              search={{ region: staffRegion() }}
               className={buttonVariants({ variant: 'ghost', size: 'sm' })}
             >
               Audit log

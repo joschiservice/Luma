@@ -55,7 +55,7 @@ describe.skipIf(!databaseUrl)(
               id: tenant,
               name: 'Shop',
               slug: 'shop',
-              dataRegion: 'EU',
+              dataRegion: 'AU',
               status: 'active',
             },
             builtInMembership(
@@ -68,7 +68,7 @@ describe.skipIf(!databaseUrl)(
         const buyer = context(tenantId);
         for (const tenant of [tenantId, otherTenant])
           await db.owner.query(
-            "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Shop',$2,'active',now())",
+            "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Shop',$2,'active',now())",
             [tenant, tenant],
           );
         for (const [id, kind, key] of [

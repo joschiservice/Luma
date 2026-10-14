@@ -70,8 +70,12 @@ export function differences(generated, reference) {
  * Describes every corpus case through the production authoring path and measures the valid-draft
  * rate and structural equivalence to each reference. Model failures count as invalid drafts.
  */
-export async function evaluateAuthoring(corpus, { gateway, maxAttempts }) {
+export async function evaluateAuthoring(
+  corpus,
+  { gateway, maxAttempts, dataRegion = process.env.LUMA_REGION ?? 'AU' },
+) {
   const harness = createAuthoringHarness({
+    dataRegion,
     gateway,
     vocabulary: corpus.vocabulary,
     ...(maxAttempts ? { maxAttempts } : {}),

@@ -5,18 +5,18 @@ import { authoringModelProfile } from '@luma/platform';
 import { supplierExtractionProfile } from '@luma/procurement/composition';
 
 const needed =
-  'Describing workflows needs an EU model route with zero data retention.';
+  'Describing workflows needs a regional model route with zero data retention.';
 
 /**
  * Decides whether workflow authoring may use the configured model routes. Descriptions contain
- * tenant data, so only a Bedrock route in the EU with zero data retention qualifies. Anything else
+ * tenant data, so only a Bedrock route in the cell region with zero data retention qualifies. Anything else
  * makes the feature unavailable, with a reason whoever runs the server can act on.
  */
 export function authoringAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
 ): { available: boolean; reason: string | null } {
-  return euAvailability(
+  return regionalAvailability(
     settings,
     gatewayInstalled,
     authoringModelProfile,
@@ -27,56 +27,56 @@ export function authoringAvailability(
 
 /**
  * Decides whether supplier messages may be read by a model. Messages contain tenant and
- * personal data, so the same EU zero-retention Bedrock requirement applies.
+ * personal data, so the same regional zero-retention Bedrock requirement applies.
  */
 export function supplierExtractionAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
 ) {
-  return euAvailability(
+  return regionalAvailability(
     settings,
     gatewayInstalled,
     supplierExtractionProfile,
-    'Reading supplier messages needs an EU model route with zero data retention.',
+    'Reading supplier messages needs a regional model route with zero data retention.',
     'supplier-extraction',
   );
 }
 
 /**
  * Decides whether documents attached to messages may be read by a model. Documents contain
- * tenant and personal data, so the same EU zero-retention Bedrock requirement applies.
+ * tenant and personal data, so the same regional zero-retention Bedrock requirement applies.
  */
 export function documentExtractionAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
 ) {
-  return euAvailability(
+  return regionalAvailability(
     settings,
     gatewayInstalled,
     documentExtractionProfile,
-    'Reading documents needs an EU model route with zero data retention.',
+    'Reading documents needs a regional model route with zero data retention.',
     'document-extraction',
   );
 }
 
 /**
  * Decides whether members can ask the workspace assistant. Questions and the records it reads
- * are tenant data, so the same EU zero-retention Bedrock requirement applies.
+ * are tenant data, so the same regional zero-retention Bedrock requirement applies.
  */
 export function assistantAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
 ) {
-  return euAvailability(
+  return regionalAvailability(
     settings,
     gatewayInstalled,
     assistantModelProfile,
-    'Asking Luma needs an EU model route with zero data retention.',
+    'Asking Luma needs a regional model route with zero data retention.',
     'assistant',
   );
 }
 
-function euAvailability(
+function regionalAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
   profile: string,
@@ -89,8 +89,8 @@ function euAvailability(
       ? `${needed} Model routes aren’t configured on this server.`
       : !route
         ? `${needed} Whoever runs this Luma server needs to configure the ${name} route.`
-        : route.adapter !== 'bedrock-eu'
-          ? `${needed} The ${name} route doesn’t process data in the EU. Whoever runs this Luma server needs to route it to Bedrock in the EU.`
+        : route.adapter !== 'bedrock'
+          ? `${needed} The ${name} route doesn’t process data in the cell region. Whoever runs this Luma server needs to route it to regional Bedrock.`
           : !route.zeroDataRetention
             ? `${needed} The ${name} route keeps data. Whoever runs this Luma server needs to turn on zero data retention.`
             : !settings.bedrock

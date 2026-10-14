@@ -1147,6 +1147,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     );
     const requestedDate = submission?.requestedDeliveryDate ?? null;
     const result = await extractFacts({
+      dataRegion: context.dataRegion,
       gateway: deps.model.gateway,
       output: deps.model.output,
       available: deps.model.available,

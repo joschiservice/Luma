@@ -1,5 +1,5 @@
 // Model answers for the authoring E2E server. Drafts use only the default installed vocabulary.
-export const authoringModel = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0';
+export const authoringModel = 'au.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 /** A replenishment draft with an approval before the order. */
 export const describedDraft = {

@@ -113,11 +113,21 @@ const staffReasonSchema = z.string().trim().min(10).max(500);
 export const staffConfigSchema = z.object({
   mode: z.enum(['local', 'google']),
   providerId: z.literal('google').nullable(),
+  region: z.enum(['AU', 'EU', 'US']),
+  regionalApiOrigins: z.partialRecord(z.enum(['AU', 'EU', 'US']), z.url()),
+  regionalDirectoryEnabled: z.boolean(),
 });
 
 export const staffSessionSchema = z.object({
   user: staffUserSchema,
   permissions: z.array(staffPermissionSchema),
+});
+
+/** Minimal placement information; no customer names or contact details. */
+export const staffWorkspacePlacementSchema = z.object({
+  id: z.uuid(),
+  region: z.enum(['AU', 'EU', 'US']),
+  status: z.string(),
 });
 
 export const staffDirectorySchema = z.object({
@@ -567,6 +577,15 @@ export const staffContract = {
       }),
     )
     .output(staffDirectorySchema),
+  workspacePlacement: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/staff/workspaces/{workspaceId}/placement',
+      summary: 'Locate a workspace in this regional cell',
+    })
+    .meta({ errors })
+    .input(z.object({ params: workspaceParams }))
+    .output(staffWorkspacePlacementSchema),
   grantAccess: endpoint
     .route({
       method: 'POST',

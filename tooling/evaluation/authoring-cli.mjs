@@ -10,7 +10,7 @@ import {
 import { evaluateAuthoring } from './authoring.mjs';
 
 const usage =
-  'Usage: pnpm evaluate:authoring [corpus.json] [report.json]. Configure the EU authoring route first; see docs/model-gateway.md.';
+  'Usage: pnpm evaluate:authoring [corpus.json] [report.json]. Configure the regional authoring route first; see docs/model-gateway.md.';
 
 try {
   const { readModelGatewayConfig } =
@@ -19,7 +19,7 @@ try {
   const route = settings.routes[authoringModelProfile];
   if (
     !route ||
-    route.adapter !== 'bedrock-eu' ||
+    route.adapter !== 'bedrock' ||
     !route.zeroDataRetention ||
     !settings.bedrock
   )
@@ -29,6 +29,7 @@ try {
   );
   const output = resolve(process.argv[3] ?? '.luma/evaluations/authoring.json');
   const observability = createObservability({
+    dataRegion: settings.dataRegion,
     environment: 'development',
     release: 'authoring-evaluation',
     sampleRate: 0,
@@ -37,7 +38,10 @@ try {
   try {
     const report = await evaluateAuthoring(
       JSON.parse(await readFile(source, 'utf8')),
-      { gateway: createModelGateway(settings, observability) },
+      {
+        gateway: createModelGateway(settings, observability),
+        dataRegion: settings.dataRegion,
+      },
     );
     await mkdir(dirname(output), { recursive: true });
     await writeFile(`${output}.tmp`, `${JSON.stringify(report, null, 2)}\n`, {

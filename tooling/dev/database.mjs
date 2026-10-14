@@ -3,7 +3,11 @@ import { Pool } from 'pg';
 import { run } from './process.mjs';
 
 /** Applies database migrations and provisions restricted local API and worker roles. */
-export async function provision(saved, migrationUrl) {
+export async function provision(
+  saved,
+  migrationUrl,
+  region = process.env.LUMA_REGION ?? 'AU',
+) {
   await run('pnpm', ['--filter', '@luma/api', 'db:migrate'], {
     env: { ...process.env, MIGRATION_DATABASE_URL: migrationUrl },
   });
@@ -14,6 +18,7 @@ export async function provision(saved, migrationUrl) {
   });
   const client = await pool.connect();
   try {
+    await client.query('SELECT luma_provision_cell_region($1)', [region]);
     await client.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
     await client.query('BEGIN');
     await client.query(

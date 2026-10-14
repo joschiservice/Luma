@@ -18,7 +18,11 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
     await api.request('/v1/organizations', {
       method: 'POST',
       cookie: owner.cookie,
-      body: { name: 'Activity', slug: 'activity', dataRegion: 'EU' },
+      body: {
+        name: 'Activity',
+        slug: 'activity',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
       status: 201,
     })
   ).body.id;

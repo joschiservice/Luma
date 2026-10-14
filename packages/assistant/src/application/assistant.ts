@@ -27,13 +27,12 @@ import { incompleteAnswer, systemPrompt } from '../domain/prompt.js';
 import type { AssistantContext } from './context.js';
 import type { ToolExecution, ToolRegistry } from './tools.js';
 
-/** Model profile for assistant answers. Route it to an EU zero-retention route. */
+/** Model profile for assistant answers. Route it to a regional zero-retention route. */
 export const assistantModelProfile = 'assistant';
 
 // Questions and read results contain tenant data. The policy is fixed here, after authorization.
 const dataPolicy = {
   classification: 'sensitive',
-  region: 'EU',
   zeroDataRetention: true,
 } as const;
 
@@ -147,7 +146,7 @@ function failureReason(code: ModelErrorCode) {
       return 'The model is busy. Try again in a minute.';
     case 'route_denied':
     case 'adapter_unavailable':
-      return 'The EU model route isn’t available right now. Whoever runs this Luma server needs to check the assistant route.';
+      return 'The regional model route isn’t available right now. Whoever runs this Luma server needs to check the assistant route.';
     case 'invalid_output':
       return 'Luma couldn’t read the model’s answer. Try again or rephrase your question.';
     default:
@@ -390,7 +389,7 @@ export function createAssistant(deps: {
               const result = await untilAborted(
                 gateway.generate(trace, {
                   profile: assistantModelProfile,
-                  dataPolicy,
+                  dataPolicy: { ...dataPolicy, region: context.dataRegion },
                   messages,
                   tools,
                   maxOutputTokens: Math.min(

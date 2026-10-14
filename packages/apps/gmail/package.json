@@ -27,7 +27,8 @@
     "fastify": "catalog:",
     "jose": "6.2.12",
     "react": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@luma/config": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

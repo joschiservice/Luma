@@ -62,14 +62,14 @@ test('release-off rejects before calling a model; generated specs retain model p
       calls += 1;
       assert.deepEqual(request.dataPolicy, {
         classification: 'sensitive',
-        region: 'EU',
+        region: 'AU',
         zeroDataRetention: true,
       });
       assert.equal(request.profile, 'authoring');
 
       return {
         output: request.output.parse({ scenarios: [spec] }),
-        metadata: { adapter: 'bedrock-eu', model: 'test-model' },
+        metadata: { adapter: 'bedrock', model: 'test-model' },
       };
     },
   };
@@ -80,6 +80,7 @@ test('release-off rejects before calling a model; generated specs retain model p
   assert.equal(calls, 0);
   const result = await proposeRedTeamScenarios(corpus, {
     gateway,
+    dataRegion: 'AU',
     enabled: true,
     trace: {},
   });

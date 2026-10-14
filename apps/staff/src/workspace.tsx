@@ -13,6 +13,7 @@ import { AccessHistory } from './access-history';
 import { Failure, Loading } from './feedback';
 import { WorkspaceHealth } from './health';
 import { sessionOptions, workspaceOptions } from './queries';
+import { staffRegion } from './regions';
 import { workspaceRoute } from './router';
 import {
   SupportAccessRequestDialog,
@@ -69,7 +70,11 @@ export function WorkspacePage() {
 
   return (
     <>
-      <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+      <Link
+        to="/"
+        search={{ region: staffRegion() }}
+        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+      >
         Back to directory
       </Link>
       {!grantId ? (
@@ -180,7 +185,7 @@ export function WorkspacePage() {
                       <Link
                         to="/accounts/$userId"
                         params={{ userId: row.userId }}
-                        search={{}}
+                        search={{ region: staffRegion() }}
                         className="staff-link"
                       >
                         {row.name}

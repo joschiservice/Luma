@@ -46,7 +46,7 @@ function context(userId = 'member-id') {
       id: tenantId,
       name: 'Tenant',
       slug: 'tenant',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(
@@ -115,7 +115,7 @@ function setup(
   const requests: ModelRequest<unknown>[] = [];
   let call = 0;
   const adapter: ModelAdapter = {
-    region: 'EU',
+    region: 'AU',
     supportsZeroDataRetention: true,
     async generate(_route, request) {
       // Later turns append to the same message list, so keep a copy of what this call saw.
@@ -147,7 +147,7 @@ function setup(
     {
       routes: {
         [assistantModelProfile]: {
-          adapter: 'bedrock-eu',
+          adapter: 'bedrock',
           model,
           providers: ['bedrock'],
           zeroDataRetention: true,
@@ -156,7 +156,7 @@ function setup(
       timeoutMs: 30_000,
     },
     observability,
-    { bedrockEu: adapter },
+    { bedrock: adapter },
   );
   const items = options.items ?? [
     orderItem(firstOrder, '#1001'),
@@ -281,7 +281,7 @@ describe('workspace assistant', () => {
       profile: 'assistant',
       dataPolicy: {
         classification: 'sensitive',
-        region: 'EU',
+        region: 'AU',
         zeroDataRetention: true,
       },
     });

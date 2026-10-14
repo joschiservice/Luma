@@ -11,7 +11,7 @@ const context = makeTenantContext(
     name: 'Fixture',
     slug: 'fixture',
     status: 'active',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
   },
   builtInMembership(
     { id: 'membership', organizationId: 'tenant', userId: 'operator' },

@@ -59,7 +59,10 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
       status: 201,
     })
   ).body;
-  assert.strictEqual(organization.dataRegion, 'EU');
+  assert.strictEqual(
+    organization.dataRegion,
+    globalThis.process.env.LUMA_REGION ?? 'AU',
+  );
   const contextPath = `/v1/organizations/${organization.id}/context`;
   const context = (await api.request(contextPath, { cookie: alice.cookie }))
     .body;

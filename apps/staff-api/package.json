@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@luma/staff": "workspace:*",
-    "fastify": "catalog:"
+    "fastify": "catalog:",
+    "@luma/config": "workspace:*",
+    "@luma/platform": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

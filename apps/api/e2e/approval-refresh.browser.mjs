@@ -46,7 +46,7 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
       address: temporal.address,
       namespace: 'default',
       taskQueue: `approval-browser-${manifest.runId}`,
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     { proposalFreshnessMs: 65_000 },
   );

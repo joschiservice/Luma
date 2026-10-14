@@ -45,6 +45,10 @@ const provisioningSchema = z
       .transform((value) => value.toLowerCase()),
     subject: z.string().trim().min(1).max(255),
     active: z.boolean(),
+    regions: z
+      .array(z.enum(['EU', 'AU', 'US']))
+      .min(1)
+      .optional(),
     permissions: z.array(
       z.enum([
         'staff.directory.read',
@@ -88,6 +92,10 @@ export function validateLocalStaffDatabaseUrl(value: string) {
 const settingsSchema = z
   .object({
     databaseUrl: databaseUrlSchema,
+    region: z.enum(['EU', 'AU', 'US']).default('AU'),
+    regionalApiOrigins: z
+      .partialRecord(z.enum(['EU', 'AU', 'US']), z.string().url())
+      .default({}),
     secret: z.string().min(32),
     publicOrigin: z.string().url(),
     /** The customer app's origin, where support views open. Without it, views can't start. */
@@ -116,6 +124,31 @@ const settingsSchema = z
       .default([]),
   })
   .superRefine((settings, context) => {
+    if (
+      settings.environment === 'production' &&
+      !settings.regionalApiOrigins[settings.region]
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Production staff cells require an explicit regional API origin.',
+      });
+    for (const origin of Object.values(settings.regionalApiOrigins)) {
+      const regional = URL.parse(origin);
+      if (
+        !regional ||
+        regional.origin !== origin ||
+        regional.username ||
+        regional.password ||
+        (settings.environment === 'production' &&
+          regional.protocol !== 'https:')
+      )
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Staff regional API URLs must be exact origins and HTTPS in production.',
+        });
+    }
     let url: URL;
     let databaseHost: string;
     try {
@@ -204,6 +237,10 @@ export function readStaffSettings(
 ): StaffSettings {
   return settingsSchema.parse({
     databaseUrl: env.STAFF_DATABASE_URL,
+    region: env.LUMA_REGION ?? 'AU',
+    regionalApiOrigins: env.STAFF_REGIONAL_API_ORIGINS
+      ? JSON.parse(env.STAFF_REGIONAL_API_ORIGINS)
+      : {},
     secret: env.STAFF_AUTH_SECRET,
     publicOrigin: env.STAFF_PUBLIC_ORIGIN,
     customerOrigin: env.STAFF_CUSTOMER_ORIGIN?.trim() || undefined,

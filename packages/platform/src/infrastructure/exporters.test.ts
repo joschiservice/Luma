@@ -106,7 +106,7 @@ it('keeps all steps unsampled at rate zero and uses safe defaults without export
   root.end();
   expect(spans.getFinishedSpans()).toHaveLength(0);
   expect(await telemetry.flag(root.context, 'observability-test')).toBe(false);
-  expect(telemetry.forTenant(root.context, 'tenant', 'EU')).toBe(root.context);
+  expect(telemetry.forTenant(root.context, 'tenant', 'AU')).toBe(root.context);
   expect(() =>
     telemetry.captureActivityError(new Error('disabled'), {
       workflowId: 'workflow',
@@ -241,7 +241,7 @@ it('exports HTTP failures with stack, causes and a redacted request', async () =
     route: '/v1/organizations/:organizationId/skus/:skuId',
     method: 'GET',
   });
-  const context = telemetry.forTenant(root.context, randomUUID(), 'EU');
+  const context = telemetry.forTenant(root.context, randomUUID(), 'AU');
   const caseId = randomUUID();
   telemetry.captureError(
     Object.assign(

@@ -19,8 +19,8 @@ persistent Temporal deployment for durable operation. Settings are documented in
   [database roles](development.md#database-roles).
 - `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE` and `TEMPORAL_TASK_QUEUE` select the service and
   queue. Each worker connection belongs to one namespace and task queue.
-- `TEMPORAL_DATA_REGION=EU` declares placement. Operators must provision the server,
-  namespace, backups and workers in the approved EU region; the setting cannot verify
+- `TEMPORAL_DATA_REGION` must equal `LUMA_REGION` (`AU` by default). Operators must provision
+  the server, namespace, backups and workers in the approved cell region; the setting cannot verify
   physical placement.
 - `TEMPORAL_TLS=true` is required in production and whenever `TEMPORAL_API_KEY` is set.
   Inject the key as a deployment secret.
@@ -30,6 +30,29 @@ intervention when no published proposal exists. It resolves no connector effect 
 itself and never invents an action from diagnosis prose or resolves an incident without a
 verifier. App-owned writes, such as Shopify corrections, run through
 [case workflows](workflows.md#case-workflows) and their owners' services.
+
+## Payload encryption and recovery
+
+Production clients and workers require regional KMS envelope encryption, including failure
+messages and stacks. Local synthetic runs may omit it. Every worker rejects a foreign-region
+or missing-region envelope before invoking the activity, and encrypted payload headers bind
+the cell region and namespace before decryption. Workflow IDs contain opaque hashes; memos
+contain only a request hash and there are no tenant-bearing search attributes. Temporal
+SDK patch markers and `TemporalChangeVersion` remain plaintext technical metadata; their
+static version identifiers must never contain tenant data.
+
+Configure `TEMPORAL_KMS_KEY_ARN`, `TEMPORAL_KMS_REGION` and the KMS credentials as deployment
+secrets. AU uses a single-region Sydney key. KMS data keys are cached in process memory for
+one minute or 1,000 payload uses by default; the hard limits are five minutes and 10,000 uses.
+A cold cache or expired key with inaccessible KMS stops processing. An authorized cached
+key remains usable only within those limits. Closing the codec clears key bytes.
+
+KMS automatic rotation preserves the key ARN. When replacing the key, deploy the new write
+ARN and add the old ARN to `TEMPORAL_KMS_DECRYPTION_KEY_ARNS` in every API and worker before
+writing new history. Retain old-key decrypt permission until all referencing histories and
+backups expire. Missing, disabled or retired keys and tampered history fail decryption;
+restore the authorized key/access and replay. Never fall back to plaintext, another region,
+or re-dispatch uncertain effects as a recovery shortcut.
 
 ## Starting and identity
 
@@ -78,7 +101,7 @@ expiry and changed membership never authorize execution.
 ## Authority, retries and recovery
 
 Every activity rebuilds the initiating user's context through identity and checks current
-membership, role, organization status and EU placement. Serialized contexts, sessions,
+membership, role, organization status and cell placement. Serialized contexts, sessions,
 cookies and earlier roles are not trusted. Logout does not stop an explicitly started
 workflow; membership removal or role loss does.
 

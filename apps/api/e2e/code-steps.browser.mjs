@@ -31,6 +31,8 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('code@example.test');
   await page

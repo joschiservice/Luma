@@ -1,3 +1,6 @@
+import type { DataRegion } from './regions.js';
+import { assertRegionalServiceEndpoint, readRegionConfig } from './regions.js';
+
 const levels = [
   'fatal',
   'error',
@@ -34,6 +37,11 @@ export function readApiConfig(
 }
 
 export interface IdentityConfig {
+  region: DataRegion;
+  enabledRegions: DataRegion[];
+  passkeyRpId: string;
+  regionalOrigins: Partial<Record<DataRegion, string>>;
+  globalEntryUrl?: string;
   mail?: {
     apiKey: string;
     from: string;
@@ -55,6 +63,7 @@ export interface IdentityConfig {
 export function readIdentityConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): IdentityConfig {
+  const cell = readRegionConfig(env);
   const databaseUrl = env.IDENTITY_DATABASE_URL;
   if (
     !databaseUrl ||
@@ -95,6 +104,70 @@ export function readIdentityConfig(
     if (env.NODE_ENV === 'production' && parsed.protocol !== 'https:')
       throw new Error('Production auth origins must use HTTPS');
   }
+  const passkeyRpId = env.AUTH_PASSKEY_RP_ID ?? base.hostname;
+  if (
+    !/^[a-z0-9.-]+$/.test(passkeyRpId) ||
+    passkeyRpId.startsWith('.') ||
+    passkeyRpId.endsWith('.') ||
+    !trustedOrigins.every((origin) => {
+      const host = new URL(origin).hostname;
+
+      return (
+        host === passkeyRpId ||
+        (passkeyRpId.includes('.') && host.endsWith(`.${passkeyRpId}`))
+      );
+    })
+  )
+    throw new Error(
+      'AUTH_PASSKEY_RP_ID must be the hostname or a parent domain of every auth origin',
+    );
+  let rawOrigins: unknown;
+  try {
+    rawOrigins = JSON.parse(env.LUMA_REGIONAL_ORIGINS ?? '{}');
+  } catch {
+    throw new Error(
+      'LUMA_REGIONAL_ORIGINS must be a JSON region-to-origin map',
+    );
+  }
+  if (
+    !rawOrigins ||
+    typeof rawOrigins !== 'object' ||
+    Array.isArray(rawOrigins)
+  )
+    throw new Error('Invalid regional origins');
+  const regionalOrigins: Partial<Record<DataRegion, string>> = {
+    [cell.region]: base.origin,
+  };
+  for (const [region, origin] of Object.entries(rawOrigins)) {
+    if (!['EU', 'AU', 'US'].includes(region) || typeof origin !== 'string')
+      throw new Error('Invalid regional origins');
+    const parsed = new URL(origin);
+    if (
+      parsed.origin !== origin ||
+      !['https:', 'http:'].includes(parsed.protocol) ||
+      (env.NODE_ENV === 'production' && parsed.protocol !== 'https:')
+    )
+      throw new Error('Regional origins must be exact secure HTTP origins');
+    regionalOrigins[region as DataRegion] = origin;
+  }
+  if (
+    regionalOrigins[cell.region] !== base.origin ||
+    cell.enabledRegions.some((region) => !regionalOrigins[region])
+  )
+    throw new Error(
+      'Every enabled region needs an origin and the cell must match BETTER_AUTH_URL',
+    );
+  const globalEntryUrl = env.LUMA_GLOBAL_ENTRY_URL;
+  if (globalEntryUrl) {
+    const parsed = new URL(globalEntryUrl);
+    if (
+      parsed.origin !== globalEntryUrl ||
+      parsed.origin === base.origin ||
+      !['https:', 'http:'].includes(parsed.protocol) ||
+      (env.NODE_ENV === 'production' && parsed.protocol !== 'https:')
+    )
+      throw new Error('LUMA_GLOBAL_ENTRY_URL must be a separate HTTP origin');
+  }
   const cookiePrefix = env.BETTER_AUTH_COOKIE_PREFIX;
   if (cookiePrefix !== undefined && !/^[a-zA-Z0-9_-]{1,64}$/.test(cookiePrefix))
     throw new Error(
@@ -107,6 +180,7 @@ export function readIdentityConfig(
       throw new Error(
         'Configure MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN together',
       );
+    assertRegionalServiceEndpoint(env, 'mail', 'https://api.resend.com');
     const origin = new URL(env.MAIL_PUBLIC_ORIGIN);
     if (
       origin.origin !== env.MAIL_PUBLIC_ORIGIN ||
@@ -137,6 +211,10 @@ export function readIdentityConfig(
 
   return {
     ...(mail ? { mail } : {}),
+    ...cell,
+    passkeyRpId,
+    regionalOrigins,
+    ...(globalEntryUrl ? { globalEntryUrl } : {}),
     databaseUrl,
     secret,
     baseURL: base.origin,
@@ -162,3 +240,7 @@ export type { ConnectionsConfig } from './connections.js';
 export { readCommerceSyncConfig } from './sync.js';
 
 export type { CommerceSyncConfig } from './sync.js';
+
+export { readRegionConfig } from './regions.js';
+
+export type { DataRegion } from './regions.js';

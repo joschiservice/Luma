@@ -13,9 +13,12 @@ import { z } from 'zod';
 import {
   auth,
   clearPrivate,
+  type DataRegion,
   returnPath,
+  signUpInRegion,
   usePasskeySupport,
 } from '../../kit/identity/data';
+import { RegionChoice, regionLabel } from './region-choice';
 import { SecondFactorForm } from './second-factor';
 import { ResolutionStory } from './story';
 
@@ -31,6 +34,7 @@ export function AuthForm({
   returnTo: string;
 }) {
   const client = useQueryClient();
+  const [confirmedRegion, setConfirmedRegion] = useState<DataRegion>();
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
@@ -100,13 +104,13 @@ export function AuthForm({
     },
     defaultValues: { name: '', email: '', password: '' },
     onSubmit: async ({ value }) => {
-      if (lock.current) return;
+      if (lock.current || (signup && !confirmedRegion)) return;
       lock.current = true;
       setPending(true);
       setMessage('');
       try {
         const result = signup
-          ? await auth.signUp.email(value)
+          ? await signUpInRegion(value, confirmedRegion!)
           : await auth.signIn.email({
               email: value.email,
               password: value.password,
@@ -154,6 +158,21 @@ export function AuthForm({
     ? m.identity_auth_creating_account()
     : m.identity_auth_signing_in();
 
+  if (signup && !confirmedRegion)
+    return (
+      <AuthLayout
+        title={m.identity_region_title()}
+        lead={m.identity_region_lead()}
+      >
+        <RegionChoice returnTo={returnTo} onConfirm={setConfirmedRegion} />
+        <p className="auth-switch">
+          <Link to="/sign-in" search={{ returnTo }}>
+            {m.identity_auth_signin_submit()}
+          </Link>
+        </p>
+      </AuthLayout>
+    );
+
   if (challenge)
     return (
       <AuthLayout
@@ -179,6 +198,23 @@ export function AuthForm({
         signup ? m.identity_auth_signup_lead() : m.identity_auth_signin_lead()
       }
     >
+      {signup && confirmedRegion ? (
+        <div className="auth-region-confirmed">
+          <p>
+            {m.identity_region_confirmed({
+              region: regionLabel(confirmedRegion),
+            })}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => setConfirmedRegion(undefined)}
+          >
+            {m.identity_region_change()}
+          </Button>
+        </div>
+      ) : null}
       <form
         ref={formElement}
         noValidate
@@ -243,6 +279,7 @@ export function AuthForm({
                   <Input
                     id={name}
                     name={name}
+                    autoFocus={signup && name === 'name'}
                     autoComplete={
                       name === 'password'
                         ? signup

@@ -26,7 +26,7 @@ it('keeps stale provider fields unavailable after a partial human override', asy
       id: tenantId,
       name: 'Shop',
       slug: 'shop',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

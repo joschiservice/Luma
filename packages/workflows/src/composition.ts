@@ -568,6 +568,7 @@ export function createDraftGenerations(
 export function createAuthoringHarness(deps: {
   gateway: ModelGateway;
   vocabulary: AuthoringVocabulary;
+  dataRegion: TenantContext['dataRegion'];
   maxAttempts?: number;
   timeoutMs?: number;
 }) {
@@ -584,6 +585,7 @@ export function createAuthoringHarness(deps: {
       const draftId = randomUUID();
 
       return generateDraft({
+        dataRegion: deps.dataRegion,
         gateway: deps.gateway,
         trace: generationTrace({ requestId: draftId }),
         signal: AbortSignal.timeout(deps.timeoutMs ?? 60_000),

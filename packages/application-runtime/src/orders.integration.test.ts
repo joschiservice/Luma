@@ -79,7 +79,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       builtInMembership(
         { id: 'membership', organizationId: tenantId, userId: 'operator' },
@@ -343,6 +343,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     // The writer mirrors the ingestion worker; the reader mirrors the API login.
     for (const [role, grants] of [
@@ -1155,7 +1156,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       {
         ...builtInMembership(
@@ -1217,7 +1218,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const ask = async (tenantId: string) => {
       let call = 0;
       const adapter: ModelAdapter = {
-        region: 'EU',
+        region: 'AU',
         supportsZeroDataRetention: true,
         async generate(_route, request) {
           const usage = { inputTokens: 1, outputTokens: 1, costUsd: null };
@@ -1243,7 +1244,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         {
           routes: {
             [assistantModelProfile]: {
-              adapter: 'bedrock-eu',
+              adapter: 'bedrock',
               model: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
               providers: ['bedrock'],
               zeroDataRetention: true,
@@ -1256,7 +1257,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           release: 'test',
           sampleRate: 0,
         }),
-        { bedrockEu: adapter },
+        { bedrock: adapter },
       );
       const unavailable = async () => {
         throw new Error('Not read by this question');
@@ -2643,7 +2644,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const skuId = (await workspace().get(context(), id))!.sources[0]!.lines[0]!
       .comparisonKey!;
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at,write_mode) VALUES($1,'Plan',$2,'active',now(),'writes_enabled') ON CONFLICT (id) DO UPDATE SET write_mode='writes_enabled'",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at,write_mode) VALUES('AU',$1,'Plan',$2,'active',now(),'writes_enabled') ON CONFLICT (id) DO UPDATE SET write_mode='writes_enabled'",
       [tenant, `plan-${tenant}`],
     );
     const grants = ['orders.read', 'fulfillment.read', 'inventory.read'];
@@ -2692,7 +2693,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           name: 'Fixture',
           slug: 'fixture',
           status: 'active',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         builtInMembership(
           { id: 'm-member', organizationId: tenant, userId: 'member' },
@@ -2719,7 +2720,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             name: 'Fixture',
             slug: 'fixture',
             status: 'active',
-            dataRegion: 'EU',
+            dataRegion: 'AU',
           },
           ordersOnly,
           randomUUID(),
@@ -2859,7 +2860,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   });
   it('filters and sorts the list by custom order fields the reader may read', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     const field = async (type: string, readPermission = 'orders.read') => {
@@ -2993,7 +2994,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
 
   it('filters and sorts customers by custom customer fields the reader may read, within one tenant', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     await owner.query('DELETE FROM customer_profiles WHERE tenant_id=$1', [
@@ -3142,7 +3143,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
 
   it('applies saved-view custom filters and ordering before native pagination and denies unavailable fields', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     const fieldId = randomUUID();
@@ -3237,7 +3238,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
 
   it('queries custom order filters and sorting over 100,000 native projections without page sampling', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     const original = await seedOrder({
@@ -3335,7 +3336,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
 
   it('groups and charts the complete filtered custom-field query and refuses inaccessible fields', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     const fieldId = randomUUID();
@@ -3444,7 +3445,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       {
         ...builtInMembership(
@@ -3520,7 +3521,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       {
         ...builtInMembership(
@@ -3537,7 +3538,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   });
   it('persists private saved-view revisions under the restricted tenant role with replay and archive restore', async () => {
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
       [tenant, `adaptive-${tenant}`],
     );
     const userId = randomUUID();
@@ -3549,7 +3550,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           name: 'Fixture',
           slug: 'fixture',
           status: 'active',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         builtInMembership(
           { id: randomUUID(), organizationId: tenantId, userId: user },

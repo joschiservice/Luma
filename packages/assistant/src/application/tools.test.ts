@@ -22,7 +22,7 @@ function context(access: 'member' | readonly Permission[]) {
       name: 'Workspace',
       slug: 'workspace',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     access === 'member'
       ? builtInMembership(member, 'member')

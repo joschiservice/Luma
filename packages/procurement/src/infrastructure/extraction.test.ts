@@ -26,7 +26,7 @@ function gateway(output: unknown): ModelGateway {
       output: request.output!.parse(output),
       toolCalls: [],
       metadata: {
-        adapter: 'bedrock-eu' as const,
+        adapter: 'bedrock' as const,
         model: 'eu.model',
         latencyMs: 1,
         inputTokens: 1,
@@ -40,6 +40,7 @@ function gateway(output: unknown): ModelGateway {
 describe('supplier message extraction', () => {
   it('keeps only facts whose quote is in the message and locates their span', async () => {
     const result = await extractFacts({
+      dataRegion: 'AU',
       gateway: gateway({
         relatesToOrder: true,
         facts: [
@@ -96,6 +97,7 @@ describe('supplier message extraction', () => {
 
   it('marks facts for an unknown line as not confident', async () => {
     const result = await extractFacts({
+      dataRegion: 'AU',
       gateway: gateway({
         relatesToOrder: true,
         facts: [
@@ -126,6 +128,7 @@ describe('supplier message extraction', () => {
 
   it('reports an unavailable route without calling a model, and failures without model text', async () => {
     const unavailable = await extractFacts({
+      dataRegion: 'AU',
       gateway: null,
       output,
       available: false,
@@ -142,6 +145,7 @@ describe('supplier message extraction', () => {
       }),
     };
     const failed = await extractFacts({
+      dataRegion: 'AU',
       gateway: failing,
       output,
       available: true,

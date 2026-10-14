@@ -90,7 +90,7 @@ try {
     address: process.env.TEMPORAL_ADDRESS,
     namespace: 'default',
     taskQueue: `luma-pilot-${manifest.runId}`,
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     telemetry,
   };
   pilot = await createPilot(process.env, directory, manifest, temporal, {

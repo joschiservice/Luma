@@ -1,4 +1,5 @@
 import type {
+  DataRegion,
   ModelAdapter,
   ModelAdapterId,
   ModelRoute,
@@ -6,8 +7,8 @@ import type {
 } from './application/model-gateway.js';
 import { createRoutedModelGateway } from './application/model-gateway.js';
 import type { Observability } from './application/observability.js';
-import type { BedrockEuSettings } from './infrastructure/bedrock-eu-model-adapter.js';
-import { createBedrockEuModelAdapter } from './infrastructure/bedrock-eu-model-adapter.js';
+import type { BedrockSettings } from './infrastructure/bedrock-model-adapter.js';
+import { createBedrockModelAdapter } from './infrastructure/bedrock-model-adapter.js';
 import { createVercelModelAdapter } from './infrastructure/vercel-model-adapter.js';
 
 export { createObservability } from './infrastructure/observability.js';
@@ -16,21 +17,22 @@ export { createTenantDatabase } from './infrastructure/database.js';
 
 /**
  * Creates the model gateway from startup configuration. Vercel routes need `apiKey`.
- * `bedrock-eu` routes need `bedrock` settings or an injected EU adapter. A route whose
+ * `bedrock` routes need `bedrock` settings or an injected regional adapter. A route whose
  * adapter is not installed fails with `adapter_unavailable` and never falls back to another
- * adapter. Throws when the Bedrock region is outside the EU or the adapter does not enforce
- * EU processing.
+ * adapter. Throws when the Bedrock region is outside the cell jurisdiction or the adapter does not enforce
+ * cell processing.
  */
 export function createModelGateway(
   settings: {
+    dataRegion?: DataRegion;
     routes: Readonly<Record<string, ModelRoute>>;
     apiKey?: string;
-    bedrock?: Pick<BedrockEuSettings, 'region' | 'credentials'>;
+    bedrock?: Pick<BedrockSettings, 'region' | 'credentials' | 'dataRegion'>;
     timeoutMs: number;
   },
   observability: Observability,
   dependencies: {
-    bedrockEu?: ModelAdapter;
+    bedrock?: ModelAdapter;
     routingPolicy?: ModelRoutingPolicy;
     transport?: typeof fetch;
     now?: () => number;
@@ -42,18 +44,25 @@ export function createModelGateway(
       { apiKey: settings.apiKey, timeoutMs: settings.timeoutMs },
       dependencies.transport,
     );
-  const bedrockEu =
-    dependencies.bedrockEu ??
+  const bedrock =
+    dependencies.bedrock ??
     (settings.bedrock
-      ? createBedrockEuModelAdapter(
-          { ...settings.bedrock, timeoutMs: settings.timeoutMs },
+      ? createBedrockModelAdapter(
+          {
+            ...settings.bedrock,
+            ...(settings.dataRegion ? { dataRegion: settings.dataRegion } : {}),
+            timeoutMs: settings.timeoutMs,
+          },
           dependencies.transport,
         )
       : undefined);
-  if (bedrockEu) {
-    if (bedrockEu.region !== 'EU')
-      throw new Error('Bedrock adapter must enforce EU processing');
-    adapters['bedrock-eu'] = bedrockEu;
+  if (bedrock) {
+    if (
+      bedrock.region === 'unrestricted' ||
+      (settings.dataRegion && bedrock.region !== settings.dataRegion)
+    )
+      throw new Error('Bedrock adapter must enforce the cell jurisdiction');
+    adapters['bedrock'] = bedrock;
   }
 
   return createRoutedModelGateway(
@@ -66,3 +75,5 @@ export function createModelGateway(
 }
 
 export { startLocalTelemetry } from './infrastructure/local-telemetry.js';
+
+export { createKmsDataKeyService } from './infrastructure/kms-data-key.js';

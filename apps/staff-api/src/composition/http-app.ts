@@ -28,6 +28,26 @@ export function createStaffHttpApp(
     bodyLimit: 16 * 1024,
     trustProxy: trustedProxy.length ? [...trustedProxy] : false,
   });
+  // The global console holds no regional session. Each API admits only its exact origin.
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.headers.origin === staff.settings.publicOrigin) {
+      reply.header('Access-Control-Allow-Origin', staff.settings.publicOrigin);
+      reply.header('Access-Control-Allow-Credentials', 'true');
+      reply.header('Vary', 'Origin');
+      if (request.method === 'OPTIONS') {
+        reply.header(
+          'Access-Control-Allow-Methods',
+          'GET, POST, PATCH, DELETE, OPTIONS',
+        );
+        reply.header(
+          'Access-Control-Allow-Headers',
+          'Content-Type, X-Luma-Staff-Activity, X-Luma-Action-Id',
+        );
+
+        return reply.status(204).send();
+      }
+    }
+  });
   registerStaffHttp(app, staff);
   app.addHook('onClose', () => staff.close());
 

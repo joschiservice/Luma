@@ -19,7 +19,7 @@ const context = makeTenantContext(
     name: 'Workspace',
     slug: 'workspace',
     status: 'active',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
   },
   builtInMembership(
     { id: randomUUID(), organizationId: tenantId, userId },

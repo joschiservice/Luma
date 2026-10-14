@@ -135,6 +135,7 @@ describe.skipIf(!databaseUrl)(
         payload: {
           name,
           email: `${name}@example.test`,
+          dataRegion: 'AU',
           password: 'long-test-password',
         },
       });
@@ -668,6 +669,7 @@ describe.skipIf(!databaseUrl)(
         );
         roleSetup.release();
       }
+      await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
@@ -1711,7 +1713,7 @@ describe.skipIf(!databaseUrl)(
           address: env.address,
           namespace: 'default',
           taskQueue: randomUUID(),
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         {
           refreshContext,

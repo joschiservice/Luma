@@ -24,6 +24,17 @@ describe('staff browser activity', () => {
     expect(tracker.consume()).toBe(false);
   });
 
+  it('reports trusted input independently to each regional session without extending passive activity', () => {
+    const tracker = createStaffActivityTracker();
+    tracker.record({ isTrusted: true });
+    expect(tracker.consume('AU')).toBe(true);
+    expect(tracker.consume('EU')).toBe(true);
+    expect(tracker.consume('AU')).toBe(false);
+    expect(tracker.consume('EU')).toBe(false);
+    tracker.reset();
+    expect(tracker.consume('EU')).toBe(false);
+  });
+
   it('discards old input rather than extending idle access when a tab wakes later', () => {
     let time = 1_000;
     const tracker = createStaffActivityTracker(() => time);

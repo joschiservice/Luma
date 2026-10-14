@@ -21,8 +21,9 @@ import { useId, useState } from 'react';
 import { z } from 'zod';
 
 import { reasonSchema } from './access';
-import { staffApi } from './api';
+import { useRegionalStaffApi } from './api';
 import { Failure } from './feedback';
+import { staffRegion } from './regions';
 
 const categories = [
   { value: 'security_incident', label: 'Security incident' },
@@ -96,6 +97,7 @@ export function SupportViewDialog({
   canEmergency: boolean;
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const ids = { reason: useId(), category: useId(), reference: useId() };
   const [mode, setMode] = useState<'consent' | 'emergency'>(
     consented && canConsent ? 'consent' : 'emergency',
@@ -323,6 +325,7 @@ export function SupportAccessRequestDialog({
   grantId: string;
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const client = useQueryClient();
   const ids = { reason: useId(), duration: useId() };
   const [reason, setReason] = useState('');
@@ -334,7 +337,7 @@ export function SupportAccessRequestDialog({
       staffApi.requestSupportAccess(workspaceId, { grantId, ...body }),
     onSuccess: () =>
       client.invalidateQueries({
-        queryKey: ['staff', 'workspace', workspaceId, grantId],
+        queryKey: ['staff', staffRegion(), 'workspace', workspaceId, grantId],
       }),
   });
 

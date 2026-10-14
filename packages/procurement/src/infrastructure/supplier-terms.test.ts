@@ -29,7 +29,7 @@ const context = makeTenantContext(
     id: tenantId,
     name: 'Shop',
     slug: 'shop',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
     status: 'active',
   },
   builtInMembership(

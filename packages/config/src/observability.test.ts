@@ -4,7 +4,13 @@ import { readObservabilityConfig } from './observability.js';
 
 describe('observability configuration', () => {
   it('runs locally without exporters or credentials', () => {
-    expect(readObservabilityConfig({})).toEqual({
+    expect(
+      readObservabilityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
+      }),
+    ).toEqual({
+      dataRegion: 'EU',
       environment: 'development',
       release: 'local',
       sampleRate: 1,
@@ -49,6 +55,8 @@ describe('observability configuration', () => {
   });
   it('accepts EU exporters and production metadata', () => {
     const config = readObservabilityConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       OBSERVABILITY_ENVIRONMENT: 'production',
       OBSERVABILITY_TENANT_HASH_KEY: 'a'.repeat(32),
       OBSERVABILITY_RELEASE: 'abc123',
@@ -70,6 +78,8 @@ describe('observability configuration', () => {
   it('reads development flag overrides, also in local diagnostics', () => {
     expect(
       readObservabilityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
         LUMA_LOCAL_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
         FEATURE_FLAG_OVERRIDES: ' observability-test=true, constructor=false ',
       }).featureFlagOverrides,
@@ -80,6 +90,8 @@ describe('observability configuration', () => {
 it('local mode ignores hosted credentials and uses only loopback endpoints', () => {
   expect(
     readObservabilityConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       LUMA_LOCAL_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
       LUMA_LOCAL_PROFILES_ENDPOINT: 'http://localhost:4040/',
       SENTRY_DSN: 'invalid',
@@ -87,6 +99,7 @@ it('local mode ignores hosted credentials and uses only loopback endpoints', () 
       LANGFUSE_PUBLIC_KEY: 'partial',
     }),
   ).toEqual({
+    dataRegion: 'EU',
     environment: 'development',
     release: 'local',
     sampleRate: 1,

@@ -34,7 +34,7 @@ updating them.
 | `pnpm pilot`, `simulator` | Synthetic provider environments; see the [pilot](pilot-environment.md) and [simulator](simulator.md) guides.             |
 | `pnpm storybook`          | Component workshop; needs no API.                                                                                        |
 
-Setup creates `demo@example.test` with a generated password in `.luma/demo.json`, one EU
+Setup creates `demo@example.test` with a generated password in `.luma/demo.json`, one AU
 workspace and two synthetic exceptions taken from the golden corpus. Seeding uses the real
 services and is idempotent. For the other exception classes and safe execution, use the
 pilot.
@@ -228,3 +228,17 @@ when every job succeeds.
 - **Missing browser:** rerun `pnpm run setup`. On Linux, add Playwright's `--with-deps`.
 - **Database password mismatch:** restore this checkout's original `.luma/state.json`;
   bootstrap deliberately keeps existing data.
+
+## Cell region
+
+New checkouts, seed data and disposable test databases use `AU`. Every process compares
+`LUMA_REGION` with the immutable cell record before serving requests or loading work.
+An existing local database containing EU workspaces must use `LUMA_REGION=EU` and
+`LUMA_ENABLED_REGIONS=EU` in its API environment, or be intentionally reset. Setup never
+converts workspace data between regions.
+
+For a new deployment, run the shared migrations, then
+`pnpm --filter @luma/application-runtime db:provision-region` with migration credentials
+in `MIGRATION_DATABASE_URL`. Runtime roles cannot initialize or alter the cell record.
+The provisioning command rejects a different region once the record exists and rejects
+existing workspaces in another region. Database restore procedures must preserve this record.

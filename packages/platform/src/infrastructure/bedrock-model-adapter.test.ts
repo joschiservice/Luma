@@ -18,9 +18,9 @@ import {
   createRoutedModelGateway,
 } from '../application/model-gateway.js';
 import {
-  bedrockEuRegions,
-  createBedrockEuModelAdapter,
-} from './bedrock-eu-model-adapter.js';
+  bedrockRegionalAwsRegions,
+  createBedrockModelAdapter,
+} from './bedrock-model-adapter.js';
 import { createObservability } from './observability.js';
 
 const credentials = {
@@ -29,10 +29,63 @@ const credentials = {
   sessionToken: 'bedrock-session-token',
 };
 
+it('allows AU inference only when every destination stays in Australia', async () => {
+  for (const destinations of [
+    ['ap-southeast-2', 'ap-southeast-4'],
+    ['ap-southeast-2', 'ap-southeast-1'],
+  ]) {
+    const transport = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/data-retention')
+        return Response.json({ mode: 'none' });
+      if (url.pathname === '/logging/modelinvocations')
+        return Response.json({});
+      if (url.pathname.startsWith('/inference-profiles/'))
+        return Response.json(profile(...destinations));
+
+      return Response.json(converse('end_turn', [{ text: 'verified' }]));
+    });
+    const adapter = createBedrockModelAdapter(
+      {
+        region: 'ap-southeast-2',
+        dataRegion: 'AU',
+        credentials,
+        timeoutMs: 1000,
+      },
+      transport,
+    );
+    const auRoute = {
+      ...route,
+      model: 'au.anthropic.claude-sonnet-4-5-20250929-v1:0',
+    };
+    const auRequest = {
+      ...request,
+      dataPolicy: { ...request.dataPolicy, region: 'AU' as const },
+    };
+    if (destinations.includes('ap-southeast-1')) {
+      await expect(adapter.generate(auRoute, auRequest)).rejects.toMatchObject({
+        code: 'route_denied',
+      });
+      expect(
+        transport.mock.calls.some(([url]) => String(url).includes('/converse')),
+      ).toBe(false);
+    } else {
+      expect((await adapter.generate(auRoute, auRequest)).text).toBe(
+        'verified',
+      );
+    }
+    transport.mockClear();
+    await expect(
+      adapter.generate({ ...auRoute, model }, auRequest),
+    ).rejects.toMatchObject({ code: 'route_denied' });
+    expect(transport).not.toHaveBeenCalled();
+  }
+});
+
 const model = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 const route: ModelRoute = {
-  adapter: 'bedrock-eu',
+  adapter: 'bedrock',
   model,
   providers: ['bedrock'],
   zeroDataRetention: true,
@@ -126,11 +179,16 @@ function stub(
 
 function create(
   transport: typeof fetch,
-  settings: { region?: string; verificationIntervalMs?: number } = {},
+  settings: {
+    dataRegion?: 'EU' | 'AU' | 'US';
+    region?: string;
+    verificationIntervalMs?: number;
+  } = {},
 ) {
-  return createBedrockEuModelAdapter(
+  return createBedrockModelAdapter(
     {
       region: 'eu-central-1',
+      dataRegion: 'EU',
       credentials,
       timeoutMs: 1000,
       ...settings,
@@ -147,12 +205,15 @@ const sentBody = (transport: ReturnType<typeof stub>) =>
   JSON.parse(String(transport.mock.calls.at(-1)?.[1]?.body));
 
 describe('Bedrock EU adapter configuration', () => {
-  it.each(bedrockEuRegions)('accepts the EU region %s', (region) => {
-    expect(create(stub(), { region })).toMatchObject({
-      region: 'EU',
-      supportsZeroDataRetention: true,
-    });
-  });
+  it.each(bedrockRegionalAwsRegions.EU)(
+    'accepts the EU region %s',
+    (region) => {
+      expect(create(stub(), { region })).toMatchObject({
+        region: 'EU',
+        supportsZeroDataRetention: true,
+      });
+    },
+  );
 
   it.each([
     'eu-west-2',
@@ -163,13 +224,13 @@ describe('Bedrock EU adapter configuration', () => {
     '',
   ])('rejects the non-EU region %j at construction', (region) => {
     expect(() => create(stub(), { region })).toThrow(
-      'Bedrock region must be an AWS region in the EU',
+      'Bedrock region must match the cell jurisdiction',
     );
   });
 
   it('rejects missing credentials without echoing them', () => {
     expect(() =>
-      createBedrockEuModelAdapter(
+      createBedrockModelAdapter(
         {
           region: 'eu-central-1',
           credentials: { ...credentials, secretAccessKey: '' },
@@ -643,7 +704,7 @@ describe('authoring route through the model gateway', () => {
     shutdown.push(() => telemetry.shutdown());
     const gateway = createRoutedModelGateway(
       { [authoringModelProfile]: { ...route, ...settings.route } },
-      settings.installed === false ? {} : { 'bedrock-eu': create(transport) },
+      settings.installed === false ? {} : { bedrock: create(transport) },
       telemetry,
       () => clock.now,
     );
@@ -679,7 +740,7 @@ describe('authoring route through the model gateway', () => {
       output: answer,
     });
     expect(result.output).toEqual({ answer: 'synthetic-response' });
-    expect(result.metadata).toMatchObject({ adapter: 'bedrock-eu', model });
+    expect(result.metadata).toMatchObject({ adapter: 'bedrock', model });
     root.end();
     expect(exported()).toContain(model);
     expect(exported()).not.toMatch(/synthetic|bedrock-secret|bedrock-session/);

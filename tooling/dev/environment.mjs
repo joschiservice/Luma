@@ -228,6 +228,9 @@ export async function environment(saved, workflows = false, observing = false) {
     throw new Error('The configured web URL must be an exact HTTP origin');
   /** @type {Record<string, string>} */
   const generated = {
+    LUMA_REGION: apiEnv.LUMA_REGION ?? 'AU',
+    LUMA_ENABLED_REGIONS:
+      apiEnv.LUMA_ENABLED_REGIONS ?? apiEnv.LUMA_REGION ?? 'AU',
     CONNECTIONS_ACTIVE_KEY_ID: 'local',
     CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),
     HOST: '127.0.0.1',
@@ -239,13 +242,15 @@ export async function environment(saved, workflows = false, observing = false) {
     BETTER_AUTH_SECRET: saved.authSecret,
     BETTER_AUTH_COOKIE_PREFIX: project,
     BETTER_AUTH_URL: webOrigin,
-    AUTH_TRUSTED_ORIGINS: [
-      ...new Set([webOrigin, localOrigin, loopbackOrigin]),
-    ].join(','),
+    AUTH_TRUSTED_ORIGINS: [...new Set([webOrigin, localOrigin, loopbackOrigin])]
+      .filter(
+        (origin) => new URL(origin).hostname === new URL(webOrigin).hostname,
+      )
+      .join(','),
     __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: new URL(webOrigin).hostname,
     TEMPORAL_NAMESPACE: 'default',
     TEMPORAL_TASK_QUEUE: 'luma-exceptions-v1',
-    TEMPORAL_DATA_REGION: 'EU',
+    TEMPORAL_DATA_REGION: apiEnv.LUMA_REGION ?? 'AU',
     TEMPORAL_TLS: 'false',
     TEMPORAL_API_KEY: '',
     STAFF_DATABASE_URL: database('luma_staff', saved.staffPassword),

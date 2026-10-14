@@ -53,7 +53,7 @@ function fakeModel(answer) {
             inputTokens: 10,
             outputTokens: 5,
             costUsd: null,
-            adapter: 'bedrock-eu',
+            adapter: 'bedrock',
             model: 'fake-model',
             latencyMs: 1,
           },
@@ -75,7 +75,7 @@ test('a model that reproduces every reference yields only valid, equivalent draf
   assert.equal(report.equivalenceRate, 1);
   assert.deepEqual(report.route, {
     profile: 'authoring',
-    adapter: 'bedrock-eu',
+    adapter: 'bedrock',
     model: 'fake-model',
   });
   assert.equal(model.requests.length, 6);
@@ -83,7 +83,7 @@ test('a model that reproduces every reference yields only valid, equivalent draf
     assert.equal(request.profile, 'authoring');
     assert.deepEqual(request.dataPolicy, {
       classification: 'sensitive',
-      region: 'EU',
+      region: 'AU',
       zeroDataRetention: true,
     });
   }

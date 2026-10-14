@@ -291,7 +291,7 @@ it('withholds changed-authority recommendations without rewriting the stored dia
       id: tenantId,
       name: 'Store',
       slug: 'store',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

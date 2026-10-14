@@ -42,7 +42,7 @@ export function testContext({
       name: 'Workspace',
       slug: 'workspace',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     membership,
     'request',

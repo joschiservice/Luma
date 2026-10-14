@@ -61,6 +61,11 @@ export function readShopifyConfig(
       throw new Error(`${name} must be true or false`);
   }
 
+  if (env.BETTER_AUTH_URL && new URL(env.BETTER_AUTH_URL).origin !== web.origin)
+    throw new Error(
+      'Shopify callback must use the configured regional web origin',
+    );
+
   return {
     allOrdersApproved: env.SHOPIFY_ALL_ORDERS_APPROVED === 'true',
     ...(env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'

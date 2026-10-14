@@ -11,7 +11,7 @@ import {
 import { proposeRedTeamScenarios } from './red-team.mjs';
 
 const usage =
-  'Usage: pnpm propose:red-team <workspace-id> <corpus.json> <proposals.json>. Requires the workspace release and an EU zero-retention authoring route.';
+  'Usage: pnpm propose:red-team <workspace-id> <corpus.json> <proposals.json>. Requires the workspace release and an regional zero-retention authoring route.';
 
 try {
   const [tenantId, source, destination, extra] = process.argv.slice(2);
@@ -38,7 +38,11 @@ try {
   try {
     // This maintenance command is run by a deployment operator for an explicit workspace.
     // No customer data is loaded and the release check grants no execution authority.
-    const trace = observability.forTenant(observation.context, tenantId, 'EU');
+    const trace = observability.forTenant(
+      observation.context,
+      tenantId,
+      models.dataRegion,
+    );
     const enabled = await observability.flag(
       trace,
       'workflow-red-teaming',
@@ -47,17 +51,24 @@ try {
     if (!enabled) throw new Error('Workflow red teaming is disabled.');
     if (
       !route ||
-      route.adapter !== 'bedrock-eu' ||
+      route.adapter !== 'bedrock' ||
       !route.zeroDataRetention ||
       !models.bedrock
     )
-      throw new Error('Configure the EU zero-retention authoring route first.');
+      throw new Error(
+        'Configure the regional zero-retention authoring route first.',
+      );
     const input = resolve(source);
     if ((await stat(input)).size > 1024 * 1024)
       throw new Error('Scenario catalogue exceeds 1 MiB.');
     const generated = await proposeRedTeamScenarios(
       JSON.parse(await readFile(input, 'utf8')),
-      { gateway: createModelGateway(models, observability), enabled, trace },
+      {
+        gateway: createModelGateway(models, observability),
+        enabled,
+        trace,
+        dataRegion: models.dataRegion,
+      },
     );
     const proposals = {
       ...generated,

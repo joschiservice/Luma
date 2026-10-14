@@ -17,6 +17,8 @@ import { stateDirectory } from './environment.mjs';
  */
 export async function seed(saved, env, outputDirectory = stateDirectory) {
   const settings = {
+    region: env.LUMA_REGION ?? 'AU',
+    enabledRegions: [env.LUMA_REGION ?? 'AU'],
     databaseUrl: env.IDENTITY_DATABASE_URL,
     secret: env.BETTER_AUTH_SECRET,
     cookiePrefix: env.BETTER_AUTH_COOKIE_PREFIX,
@@ -62,6 +64,7 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
     });
     if (auth.statusCode === 401)
       auth = await request('/auth/sign-up/email', {
+        dataRegion: env.LUMA_REGION ?? 'AU',
         email,
         password: saved.seedPassword,
         name: 'Demo operator',
@@ -79,7 +82,7 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
         await request('/v1/organizations', {
           name: 'Demo workspace',
           slug: 'demo-workspace',
-          dataRegion: 'EU',
+          dataRegion: settings.region,
         }),
         201,
       );

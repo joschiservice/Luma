@@ -363,3 +363,28 @@ and grant only `luma_staff_runtime`. Do not grant customer domain roles or the i
 roles that own privileged support functions. The staff readiness check rejects unsafe
 runtime credentials. Configure server-only values from `apps/staff-api/.env.example`;
 OAuth secrets and database URLs must never appear in `VITE_*` configuration.
+
+## Regional staff access
+
+Every cell runs its own staff API and identity sessions, support grants and audit records.
+Staff admissions explicitly carry region scopes. The API returns `403` and records
+`staff.region.denied` when the operator lacks its cell’s scope; directory searches, grants
+and commands expose no customer data. Privileged support functions recheck this scope and
+the target workspace’s immutable placement, including when a grant remains valid.
+
+The global console reads `STAFF_REGIONAL_API_ORIGINS`, signs into each regional API
+independently and sends details and commands to the result’s owning region. Regional Google
+callbacks use that API’s origin. Cookies remain host-only with distinct signing secrets.
+Directory fanout is controlled by the PostHog `staff-regional-directory` rollout flag;
+this never relaxes regional authorization. Unavailable or out-of-scope regional searches
+remain visibly incomplete. Each answering region rate-limits and audits its own search.
+
+Opaque workspace ID resolution exposes region and status under directory admission and is
+audited. It exposes no customer name or email. Customer search indexes live in each cell;
+there is no cross-region database connection or registry of customer emails. Trigram indexes
+support substring matching; short searches remain bounded and can still require scanning.
+
+Production requires an explicit origin for the cell in `STAFF_REGIONAL_API_ORIGINS`.
+The global console serves public assets and configuration; private reads and authentication
+connect directly to that regional API with host-only cookies. Same-origin proxy fallback
+is limited to development.

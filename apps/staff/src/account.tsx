@@ -30,9 +30,10 @@ import {
 } from './account-deletion';
 import { AccountSecurityEvents } from './account-security';
 import { AccountStatusDialog, categoryLabel } from './account-status';
-import { staffApi } from './api';
+import { useRegionalStaffApi } from './api';
 import { Failure, Loading } from './feedback';
 import { accountOptions, sessionOptions } from './queries';
+import { staffRegion } from './regions';
 import { accountRoute } from './router';
 
 const dateTime = (value: string) => new Date(value).toLocaleString();
@@ -75,7 +76,11 @@ export function AccountPage() {
 
   return (
     <>
-      <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+      <Link
+        to="/"
+        search={{ region: staffRegion() }}
+        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+      >
         Back to directory
       </Link>
       {!grantId ? (
@@ -234,7 +239,7 @@ export function AccountPage() {
                     <Link
                       to="/workspaces/$workspaceId"
                       params={{ workspaceId: row.id }}
-                      search={{}}
+                      search={{ region: staffRegion() }}
                       className="staff-link"
                     >
                       {row.name}
@@ -370,6 +375,7 @@ function AccountAccessDialog({
   name: string;
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const navigate = useNavigate();
   const access = useMutation({
     mutationFn: (reason: string) => staffApi.grantAccount(userId, reason),
@@ -378,7 +384,7 @@ function AccountAccessDialog({
       await navigate({
         to: '/accounts/$userId',
         params: { userId },
-        search: { grantId: grant.id },
+        search: { region: staffRegion(), grantId: grant.id },
       });
     },
   });

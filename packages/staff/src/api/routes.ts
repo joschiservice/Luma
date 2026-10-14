@@ -18,6 +18,7 @@ declare module 'fastify' {
 const protectedRoutes = new Set([
   'GET /v1/staff/session',
   'GET /v1/staff/directory',
+  'GET /v1/staff/workspaces/:workspaceId/placement',
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
@@ -40,6 +41,7 @@ const protectedRoutes = new Set([
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
   'GET /v1/staff/directory': ['staff.directory.read'],
+  'GET /v1/staff/workspaces/:workspaceId/placement': ['staff.directory.read'],
   'POST /v1/staff/workspaces/:workspaceId/access': [
     'staff.workspace.inspect',
     'staff.directory.read',
@@ -246,7 +248,11 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           }
         }
       }
-      const url = new URL('/api' + request.url, staff.settings.publicOrigin);
+      const regionalOrigin =
+        staff.settings.regionalApiOrigins?.[staff.settings.region ?? 'AU'];
+      const url = regionalOrigin
+        ? new URL(request.url, regionalOrigin)
+        : new URL('/api' + request.url, staff.settings.publicOrigin);
       const authHeaders = headersFrom(request.headers);
       authHeaders.set('x-luma-staff-request-id', request.id);
       authHeaders.set('x-luma-staff-client-ip', request.ip);
@@ -311,6 +317,9 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
   const os = implement(staffContract).$context<HttpContext>();
   const router = os.router({
     config: os.config.handler(async () => ({
+      regionalDirectoryEnabled: await staff.regionalDirectoryEnabled(),
+      region: staff.settings.region ?? 'AU',
+      regionalApiOrigins: staff.settings.regionalApiOrigins ?? {},
       mode: staff.settings.mode,
       providerId: staff.settings.mode === 'google' ? ('google' as const) : null,
     })),
@@ -324,6 +333,13 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
         permissions: staffContext.permissions,
       };
     }),
+    workspacePlacement: os.workspacePlacement.handler(
+      async ({ context: { request }, input: { params } }) =>
+        staff.service.workspacePlacement(
+          context(request.staffContext),
+          params.workspaceId,
+        ),
+    ),
     directory: os.directory.handler(
       async ({ context: { request }, input: { query } }) =>
         await staff.service.directory(

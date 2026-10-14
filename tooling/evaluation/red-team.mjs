@@ -137,15 +137,19 @@ export function materializeScenario(spec, corpus, index = 0) {
 }
 
 /**
- * Generates bounded adversarial proposals through the sensitive EU zero-retention authoring
+ * Generates bounded adversarial proposals through the sensitive regional zero-retention authoring
  * route. The release check must be evaluated for a trusted tenant by the caller; disabled calls
  * never reach the model. Only scenario identifiers enter the model, never historical payloads.
  */
 export async function proposeRedTeamScenarios(
   corpus,
-  { gateway, enabled, trace, signal },
+  { gateway, enabled, trace, signal, dataRegion },
 ) {
   assert.equal(enabled, true, 'Workflow red teaming is disabled');
+  assert.ok(
+    ['EU', 'AU', 'US'].includes(dataRegion),
+    'A trusted cell region is required',
+  );
   const schema = {
     name: 'workflow_adversarial_scenarios',
     jsonSchema: {
@@ -179,7 +183,7 @@ export async function proposeRedTeamScenarios(
     profile: authoringModelProfile,
     dataPolicy: {
       classification: 'sensitive',
-      region: 'EU',
+      region: dataRegion,
       zeroDataRetention: true,
     },
     maxOutputTokens: 2048,

@@ -21,7 +21,7 @@ const context = (id) =>
       name: 'Evaluation fixture',
       slug: tenantId,
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
     builtInMembership(
       { id: randomUUID(), organizationId: tenantId, userId: id },
@@ -124,7 +124,7 @@ it('evaluates both exact versions with actual admission, SQL effect dedupe and c
         signal.throwIfAborted();
       }
       await db.owner.query(
-        "INSERT INTO organizations(id,name,slug,created_at,write_mode) VALUES($1::uuid,'Evaluation fixture',$2,now(),'writes_enabled')",
+        "INSERT INTO organizations(data_region,id,name,slug,created_at,write_mode) VALUES('AU',$1::uuid,'Evaluation fixture',$2,now(),'writes_enabled')",
         [current.tenantId, current.tenantId],
       );
       for (const id of [actorId, reviewerId]) {
@@ -152,7 +152,7 @@ it('evaluates both exact versions with actual admission, SQL effect dedupe and c
         temporal: {
           address: env.address,
           namespace: 'default',
-          dataRegion: 'EU',
+          dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
           taskQueue: `workflow-control-${randomUUID()}`,
         },
         observedAt: async () =>

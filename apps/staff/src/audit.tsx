@@ -19,6 +19,7 @@ import { type FormEvent, useState } from 'react';
 import { Failure, Loading } from './feedback';
 import { codeLabel, formatTime } from './health';
 import { type AuditFilters, auditOptions, sessionOptions } from './queries';
+import { staffRegion } from './regions';
 import { auditRoute } from './router';
 
 const eventLabels: Record<string, string> = {
@@ -145,7 +146,10 @@ export function AuditPage() {
                       </p>
                       <Link
                         to="/audit"
-                        search={{ staff: row.staff.email ?? row.staff.id }}
+                        search={{
+                          region: staffRegion(),
+                          staff: row.staff.email ?? row.staff.id,
+                        }}
                         className="staff-link"
                       >
                         Only this staff member
@@ -226,7 +230,7 @@ function Target({
           <Link
             to="/workspaces/$workspaceId"
             params={{ workspaceId: entry.workspace.id }}
-            search={{}}
+            search={{ region: staffRegion() }}
           >
             {entry.workspace.name ?? 'Deleted workspace'}
           </Link>
@@ -234,7 +238,7 @@ function Target({
             Workspace {entry.workspace.id.slice(0, 8)} ·{' '}
             <Link
               to="/audit"
-              search={{ workspace: entry.workspace.id }}
+              search={{ region: staffRegion(), workspace: entry.workspace.id }}
               className="staff-link"
             >
               Only this workspace
@@ -248,7 +252,7 @@ function Target({
             <Link
               to="/accounts/$userId"
               params={{ userId: entry.account.id }}
-              search={{}}
+              search={{ region: staffRegion() }}
             >
               {entry.account.name ?? entry.account.email}
             </Link>
@@ -259,7 +263,7 @@ function Target({
             Account {entry.account.email ?? entry.account.id.slice(0, 8)} ·{' '}
             <Link
               to="/audit"
-              search={{ account: entry.account.id }}
+              search={{ region: staffRegion(), account: entry.account.id }}
               className="staff-link"
             >
               Only this account
@@ -294,6 +298,7 @@ function AuditFiltersForm({ search }: { search: Search }) {
     if (workspaceInvalid || rangeInvalid) return;
     void navigate({
       search: {
+        region: staffRegion(),
         staff: values.staff.trim() || undefined,
         workspace: values.workspace.trim().toLowerCase() || undefined,
         account: values.account.trim() || undefined,
@@ -384,7 +389,7 @@ function AuditFiltersForm({ search }: { search: Search }) {
         <Button type="submit">Apply filters</Button>
         <Link
           to="/audit"
-          search={{}}
+          search={{ region: staffRegion() }}
           className={buttonVariants({ variant: 'ghost' })}
         >
           Clear filters

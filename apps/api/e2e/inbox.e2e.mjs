@@ -760,7 +760,7 @@ test('another workspace cannot read or act on this inbox’s threads, documents 
     {
       name: 'Other shop',
       slug: `other-${randomUUID().slice(0, 8)}`,
-      dataRegion: 'EU',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
     { cookie: outsider.cookie, status: 201 },
   );

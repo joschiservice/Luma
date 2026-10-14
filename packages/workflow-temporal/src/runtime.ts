@@ -41,6 +41,11 @@ import { NativeConnection, Worker } from '@temporalio/worker';
 import { z } from 'zod';
 
 import {
+  temporalDataConverter,
+  type TemporalKeyService,
+  type TemporalPayloadEncryption,
+} from './payload-codec.js';
+import {
   membershipSuspendedFailure,
   workspaceInactiveFailure,
 } from './workspace-pause.js';
@@ -51,7 +56,9 @@ export interface TemporalSettings {
   address: string;
   namespace: string;
   taskQueue: string;
-  dataRegion: 'EU';
+  dataRegion: TenantContext['dataRegion'];
+  payloadEncryption?: TemporalPayloadEncryption;
+  payloadKeyService?: TemporalKeyService;
   tls?: NativeConnectionOptions['tls'];
   apiKey?: string;
 }
@@ -62,7 +69,7 @@ export function validateSettings(settings: TemporalSettings) {
     address: z.string().min(1),
     namespace: z.string().min(1),
     taskQueue: z.string().min(1),
-    dataRegion: z.literal('EU'),
+    dataRegion: z.enum(['EU', 'AU', 'US']),
   }).parse(settings);
 }
 
@@ -102,16 +109,34 @@ export function workflowPath() {
 export function temporalActivities<T extends object>(
   activities: T,
   captureActivityError?: Observability['captureActivityError'],
+  dataRegion?: TemporalSettings['dataRegion'],
 ): T {
   return Object.fromEntries(
     Object.entries(activities).map(([name, fn]) => [
       name,
       async (...args: unknown[]) => {
         try {
+          if (
+            dataRegion &&
+            (!args[0] ||
+              typeof args[0] !== 'object' ||
+              !('dataRegion' in args[0]) ||
+              args[0].dataRegion !== dataRegion)
+          )
+            throw ApplicationFailure.nonRetryable(
+              'Workflow region rejected',
+              'WorkflowRegionRejected',
+            );
+
           return await (fn as (...args: unknown[]) => Promise<unknown>)(
             ...args,
           );
         } catch (error) {
+          if (
+            error instanceof ApplicationFailure &&
+            error.type === 'WorkflowRegionRejected'
+          )
+            throw error;
           if (error instanceof WorkspaceInactiveError)
             throw ApplicationFailure.nonRetryable(
               'Workspace is not active',
@@ -166,6 +191,7 @@ export async function createExceptionWorker(
   activities: ExceptionActivities,
 ) {
   validateSettings(settings);
+  const data = temporalDataConverter(settings);
   const connection = await NativeConnection.connect({
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),
@@ -177,10 +203,15 @@ export async function createExceptionWorker(
       namespace: settings.namespace,
       taskQueue: settings.taskQueue,
       workflowsPath: workflowPath(),
+      dataConverter: data.converter,
       plugins: settings.telemetry
         ? [new OpenTelemetryPlugin(settings.telemetry)]
         : [],
-      activities: temporalActivities(activities, settings.captureActivityError),
+      activities: temporalActivities(
+        activities,
+        settings.captureActivityError,
+        settings.dataRegion,
+      ),
       ...(settings.telemetry
         ? {
             interceptors: {
@@ -224,7 +255,10 @@ export async function createExceptionWorker(
     return {
       run: () => worker.run(),
       shutdown: () => worker.shutdown(),
-      close: () => connection.close(),
+      close: async () => {
+        data.close();
+        await connection.close();
+      },
     };
   } catch (error) {
     await connection.close();
@@ -240,6 +274,7 @@ export function createWorkflowCommands(
   client: Client,
   taskQueue: string,
   identity: Pick<IdentityService, 'refreshContext'>,
+  dataRegion?: TemporalSettings['dataRegion'],
 ) {
   /** Checks the permission before and after refreshing; reads pass `null` and need membership only. */
   async function scope(
@@ -255,6 +290,8 @@ export function createWorkflowCommands(
       fresh.actor.id !== context.actor.id
     )
       throw new WorkflowInputError('Workflow scope changed');
+    if (dataRegion && fresh.dataRegion !== dataRegion)
+      throw new WorkflowInputError('Workflow region rejected');
     const parsed = sourceSchema.parse(source);
 
     return {
@@ -276,14 +313,20 @@ export function createWorkflowCommands(
         .object({ id: z.string().uuid(), workflow: z.string().min(1).max(200) })
         .strict()
         .parse(shadow);
-      const workflowId = `shadow:${scoped.fresh.tenantId}:${parsed.id}`;
-      const shadowRequest = JSON.stringify([
-        scoped.fresh.tenantId,
-        scoped.fresh.actor.id,
-        scoped.source.kind,
-        scoped.source.id,
-        parsed.workflow,
-      ]);
+      const workflowId = `shadow-v1:${createHash('sha256')
+        .update(JSON.stringify([scoped.fresh.tenantId, parsed.id]))
+        .digest('hex')}`;
+      const shadowRequest = createHash('sha256')
+        .update(
+          JSON.stringify([
+            scoped.fresh.tenantId,
+            scoped.fresh.actor.id,
+            scoped.source.kind,
+            scoped.source.id,
+            parsed.workflow,
+          ]),
+        )
+        .digest('hex');
       try {
         await client.workflow.start('exceptionWorkflow', {
           workflowId,
@@ -292,11 +335,14 @@ export function createWorkflowCommands(
           args: [
             {
               tenantId: scoped.fresh.tenantId,
+              dataRegion: scoped.fresh.dataRegion,
               userId: scoped.fresh.actor.id,
               requestId: scoped.fresh.requestId,
               source: scoped.source,
               shadow: parsed,
-            } satisfies ExceptionWorkflowInput,
+            } satisfies ExceptionWorkflowInput & {
+              dataRegion: TemporalSettings['dataRegion'];
+            },
           ],
           workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
           workflowIdConflictPolicy: WorkflowIdConflictPolicy.FAIL,
@@ -319,8 +365,11 @@ export function createWorkflowCommands(
       resumeExpired = false,
     ) {
       const scoped = await scope(context, source, 'actions.propose');
-      const input: ExceptionWorkflowInput = {
+      const input: ExceptionWorkflowInput & {
+        dataRegion: TemporalSettings['dataRegion'];
+      } = {
         tenantId: scoped.fresh.tenantId,
+        dataRegion: scoped.fresh.dataRegion,
         userId: scoped.fresh.actor.id,
         requestId: scoped.fresh.requestId,
         source: scoped.source,
@@ -402,6 +451,7 @@ export async function createExceptionClient(
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   validateSettings(settings);
+  const data = temporalDataConverter(settings);
   const connection = await Connection.connect({
     connectTimeout: '2 seconds',
     address: settings.address,
@@ -411,11 +461,17 @@ export async function createExceptionClient(
   const client = new Client({
     connection,
     namespace: settings.namespace,
+    dataConverter: data.converter,
     plugins: settings.telemetry
       ? [new OpenTelemetryPlugin(settings.telemetry)]
       : [],
   });
-  const commands = createWorkflowCommands(client, settings.taskQueue, identity);
+  const commands = createWorkflowCommands(
+    client,
+    settings.taskQueue,
+    identity,
+    settings.dataRegion,
+  );
 
   return {
     ...commands,
@@ -423,7 +479,10 @@ export async function createExceptionClient(
       connection.withDeadline(Date.now() + 2000, () =>
         commands.progress(context, source),
       ),
-    close: () => connection.close(),
+    close: async () => {
+      data.close();
+      await connection.close();
+    },
   };
 }
 

@@ -133,7 +133,11 @@ export function createSalesTenantRelease(observability?: Observability) {
     const observation = observability.request(randomUUID());
     try {
       return await observability.flag(
-        observability.forTenant(observation.context, tenantId, 'EU'),
+        observability.forTenant(
+          observation.context,
+          tenantId,
+          observability.dataRegion ?? 'AU',
+        ),
         'luma-erp-orders',
         false,
       );

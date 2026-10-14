@@ -247,7 +247,7 @@ function fixture() {
           id: tenantId,
           name: 'Workspace',
           slug: 'workspace',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
           status: 'active',
         },
         builtInMembership(
@@ -480,7 +480,7 @@ describe('observability baseline', () => {
       await observability.flag(root.context, 'observability-test', true),
     ).toBe(true);
     expect(() =>
-      observability.forTenant(root.context, 'tenant', 'US' as 'EU'),
+      observability.forTenant(root.context, 'tenant', 'US' as 'AU'),
     ).toThrow();
     root.end();
     await observability.shutdown();
@@ -571,6 +571,8 @@ it('composes model-backed work with routes selected by startup configuration', a
     ['openai/gpt-4.1', 'openai'],
   ]) {
     const settings = readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       AI_GATEWAY_API_KEY: 'test-key',
       MODEL_GATEWAY_ROUTES: JSON.stringify({
         reasoning: {
@@ -631,17 +633,17 @@ it('composes the EU authoring route from startup configuration', async () => {
   const { readModelGatewayConfig } = await import('@luma/config');
   const { authoringModelProfile } = await import('@luma/platform');
   const { createModelGateway } = await import('@luma/platform/composition');
-  const model = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0';
+  const model = 'au.anthropic.claude-sonnet-4-5-20250929-v1:0';
   const env = {
     MODEL_GATEWAY_ROUTES: JSON.stringify({
       [authoringModelProfile]: {
-        adapter: 'bedrock-eu',
+        adapter: 'bedrock',
         model,
         providers: ['bedrock'],
         zeroDataRetention: true,
       },
     }),
-    MODEL_GATEWAY_BEDROCK_REGION: 'eu-central-1',
+    MODEL_GATEWAY_BEDROCK_REGION: 'ap-southeast-2',
     MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID: 'AKIAEXAMPLERUNTIME01',
     MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY: 'runtime-secret-access-key',
   };
@@ -668,7 +670,7 @@ it('composes the EU authoring route from startup configuration', async () => {
             models: [
               {
                 modelArn:
-                  'arn:aws:bedrock:eu-central-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
+                  'arn:aws:bedrock:ap-southeast-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
               },
             ],
           });
@@ -688,7 +690,7 @@ it('composes the EU authoring route from startup configuration', async () => {
     profile: authoringModelProfile,
     dataPolicy: {
       classification: 'sensitive',
-      region: 'EU',
+      region: 'AU',
       zeroDataRetention: true,
     },
     messages: [{ role: 'user', content: 'Describe a synthetic workflow.' }],
@@ -697,10 +699,10 @@ it('composes the EU authoring route from startup configuration', async () => {
   root.end();
   expect(result.output).toBe('draft');
   expect(destinations).toEqual([
-    'bedrock.eu-central-1.amazonaws.com/data-retention',
-    'bedrock.eu-central-1.amazonaws.com/logging/modelinvocations',
-    'bedrock.eu-central-1.amazonaws.com/inference-profiles/eu.anthropic.claude-sonnet-4-5-20250929-v1%3A0',
-    'bedrock-runtime.eu-central-1.amazonaws.com/model/eu.anthropic.claude-sonnet-4-5-20250929-v1%3A0/converse',
+    'bedrock.ap-southeast-2.amazonaws.com/data-retention',
+    'bedrock.ap-southeast-2.amazonaws.com/logging/modelinvocations',
+    'bedrock.ap-southeast-2.amazonaws.com/inference-profiles/au.anthropic.claude-sonnet-4-5-20250929-v1%3A0',
+    'bedrock-runtime.ap-southeast-2.amazonaws.com/model/au.anthropic.claude-sonnet-4-5-20250929-v1%3A0/converse',
   ]);
 
   const unconfigured = createModelGateway(
@@ -712,7 +714,7 @@ it('composes the EU authoring route from startup configuration', async () => {
       profile: authoringModelProfile,
       dataPolicy: {
         classification: 'sensitive',
-        region: 'EU',
+        region: 'AU',
         zeroDataRetention: true,
       },
       messages: [{ role: 'user', content: 'Describe a synthetic workflow.' }],
@@ -733,7 +735,7 @@ it('composes the EU authoring route from startup configuration', async () => {
       },
       observability,
     ),
-  ).toThrow('Bedrock region must be an AWS region in the EU');
+  ).toThrow('Bedrock region must match the cell jurisdiction');
   expect(() =>
     readModelGatewayConfig({
       ...env,

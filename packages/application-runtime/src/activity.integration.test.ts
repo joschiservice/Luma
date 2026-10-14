@@ -31,7 +31,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       name: 'Fixture',
       slug: 'fixture',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     builtInMembership(
       { id: 'membership', organizationId: tenant, userId: 'operator' },
@@ -66,6 +66,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     // The reader mirrors the API login, so row-level security applies to every read.
     const password = randomUUID();
     await admin.query(
@@ -497,7 +498,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     try {
       for (const id of [workspace, neighbour])
         await client.query(
-          "INSERT INTO organizations(id,name,slug,created_at) VALUES($1,'People',$2,now())",
+          "INSERT INTO organizations(data_region,id,name,slug,created_at) VALUES('AU',$1,'People',$2,now())",
           [id, `people-${id}`],
         );
       for (const [key, id] of Object.entries(people))
@@ -718,7 +719,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
           name: 'People',
           slug: `people-${workspace}`,
           status: 'active',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         builtInMembership(
           {

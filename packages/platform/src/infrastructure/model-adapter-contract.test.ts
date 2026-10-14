@@ -18,7 +18,7 @@ import {
   createRoutedModelGateway,
   ModelGatewayError,
 } from '../application/model-gateway.js';
-import { createBedrockEuModelAdapter } from './bedrock-eu-model-adapter.js';
+import { createBedrockModelAdapter } from './bedrock-model-adapter.js';
 import { createObservability } from './observability.js';
 import { createVercelModelAdapter } from './vercel-model-adapter.js';
 
@@ -138,7 +138,7 @@ const bedrockCredentials = {
 const bedrock: AdapterFixture = {
   name: 'Bedrock EU',
   route: {
-    adapter: 'bedrock-eu',
+    adapter: 'bedrock',
     model: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
     providers: ['bedrock'],
     zeroDataRetention: true,
@@ -150,7 +150,7 @@ const bedrock: AdapterFixture = {
   },
   secrets: Object.values(bedrockCredentials),
   createAdapter: (inference, timeoutMs) =>
-    createBedrockEuModelAdapter(
+    createBedrockModelAdapter(
       {
         region: 'eu-central-1',
         credentials: bedrockCredentials,

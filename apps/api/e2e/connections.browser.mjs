@@ -40,6 +40,8 @@ async function fixture(t) {
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('ada@example.test');
   await page

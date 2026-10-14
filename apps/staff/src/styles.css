@@ -258,3 +258,18 @@
   margin-bottom: 0.25rem;
   font-weight: 500;
 }
+
+.staff-directory-narrow {
+  display: none;
+}
+@media (max-width: 760px) {
+  .staff-directory-narrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+  }
+  .staff-directory-narrow > p {
+    flex-basis: 100%;
+  }
+}

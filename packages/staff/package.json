@@ -34,7 +34,8 @@
     "drizzle-orm": "0.45.2",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@luma/platform": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

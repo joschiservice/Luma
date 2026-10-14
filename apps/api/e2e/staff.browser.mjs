@@ -662,7 +662,15 @@ test('staff schedules, restores and erases an account, and history shows a forme
     .getByRole('button', { name: 'Sign in', exact: true })
     .click();
   await expect(customerPage).toHaveURL(new RegExp(workspace.id));
+  const activityLoaded = customerPage.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .includes(`/api/v1/organizations/${workspace.id}/activity?`) &&
+      response.status() === 200,
+  );
   await customerPage.goto(`/app/${workspace.id}/activity`);
+  await activityLoaded;
   await expect(customerPage.locator('body')).toContainText('Former member');
   await expect(customerPage.locator('body')).not.toContainText('leaver');
   await customerPage.screenshot({
@@ -928,13 +936,21 @@ test('rejected Google callbacks return to staff login with a sanitized failure m
   const { page, errors } = await fixture(t);
   let errorCallbackURL;
   await page.route('**/api/v1/staff/config', (route) =>
-    route.fulfill({ json: { mode: 'google', providerId: 'google' } }),
+    route.fulfill({
+      json: {
+        mode: 'google',
+        providerId: 'google',
+        region: 'AU',
+        regionalApiOrigins: {},
+        regionalDirectoryEnabled: false,
+      },
+    }),
   );
   await page.route('**/api/auth/sign-in/social', async (route) => {
     const body = route.request().postDataJSON();
     errorCallbackURL = body.errorCallbackURL;
     expect(errorCallbackURL).toBe(
-      `${new URL(page.url()).origin}/login?signInFailed=true`,
+      `${new URL(page.url()).origin}/login?signInFailed=true&region=AU`,
     );
     await route.fulfill({
       json: {
@@ -1011,5 +1027,93 @@ test('staff sign-in rate limits remain distinct for clients behind a trusted pro
     );
     expect(response.status()).toBe(index === 3 ? 429 : 401);
   }
+  expect(errors).toEqual([]);
+});
+
+test('regional staff directory keeps partial results and sends account access to the owning API', async ({
+  resources: t,
+}) => {
+  const { page, context, workspace, errors } = await fixture(t);
+  let ownerRequests = 0;
+  await page.route('**/api/v1/staff/config', async (route) => {
+    const actual = await route.fetch();
+    const config = await actual.json();
+    await route.fulfill({
+      json: {
+        ...config,
+        regionalDirectoryEnabled: true,
+        regionalApiOrigins: {
+          EU: 'https://eu.staff.example.test',
+          US: 'https://us.staff.example.test',
+        },
+      },
+    });
+  });
+  await page.route('https://us.staff.example.test/**', (route) =>
+    route.abort('failed'),
+  );
+  await page.route('https://eu.staff.example.test/**', async (route) => {
+    const source = new URL(route.request().url());
+    const origin = new URL(page.url()).origin;
+    const cors = {
+      'access-control-allow-origin': origin,
+      'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'content-type,x-luma-staff-activity',
+      'access-control-allow-methods': 'GET,POST,OPTIONS',
+    };
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: cors, body: '' });
+
+      return;
+    }
+    const response = await context.request.fetch(
+      new URL('/api' + source.pathname + source.search, origin).href,
+      {
+        method: route.request().method(),
+        headers: { origin },
+        ...(route.request().postData()
+          ? { data: route.request().postDataJSON() }
+          : {}),
+      },
+    );
+    if (source.pathname.includes('/accounts/')) ownerRequests++;
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), ...cors },
+    });
+  });
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('customer@example');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText('AU: Answered', { exact: true })).toBeVisible();
+  await expect(page.getByText('EU: Answered', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('US: Results incomplete', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Results incomplete. Some regions/),
+  ).toBeVisible();
+  const eu = page
+    .getByRole('table', { name: 'Matching customer accounts' })
+    .getByRole('row')
+    .filter({ has: page.getByText('EU', { exact: true }) });
+  await eu
+    .getByRole('link', { name: 'Open account customer@example.test' })
+    .click();
+  expect(new URL(page.url()).searchParams.get('region')).toBe('EU');
+  await page
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog
+    .getByLabel('Support reason or ticket reference')
+    .fill('Investigating regional support routing');
+  await dialog
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toContainText(workspace.name);
+  expect(ownerRequests).toBeGreaterThanOrEqual(2);
   expect(errors).toEqual([]);
 });

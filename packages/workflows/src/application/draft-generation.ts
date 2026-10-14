@@ -176,7 +176,6 @@ export interface GenerationOptions {
 // Authoring input contains tenant data. The policy is fixed here, after authorization.
 const dataPolicy = {
   classification: 'sensitive',
-  region: 'EU',
   zeroDataRetention: true,
 } as const;
 
@@ -235,6 +234,7 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
  * the run and is returned instead of thrown.
  */
 async function runGeneration<T, R>(request: {
+  dataRegion: TenantContext['dataRegion'];
   gateway: ModelGateway;
   trace: TraceContext;
   signal: AbortSignal;
@@ -272,7 +272,7 @@ async function runGeneration<T, R>(request: {
       const result = await untilAborted(
         request.gateway.generate(request.trace, {
           profile: authoringModelProfile,
-          dataPolicy,
+          dataPolicy: { ...dataPolicy, region: request.dataRegion },
           messages,
           output: request.output,
           maxOutputTokens: request.maxOutputTokens,
@@ -328,6 +328,7 @@ export interface GeneratedDraft extends GenerationSummary {
  * no answer was readable or the model failed; `failure` names the model error.
  */
 export async function generateDraft(request: {
+  dataRegion: TenantContext['dataRegion'];
   gateway: ModelGateway;
   trace: TraceContext;
   signal: AbortSignal;
@@ -352,6 +353,7 @@ export async function generateDraft(request: {
     };
   };
   const { best, ...run } = await runGeneration({
+    dataRegion: request.dataRegion,
     gateway: request.gateway,
     trace: request.trace,
     signal: request.signal,
@@ -761,6 +763,7 @@ export function createDraftGeneration(deps: {
       const vocabulary = await deps.drafts.vocabulary(context);
       const limit = deadline(options);
       const run = await generateDraft({
+        dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),
         signal: limit.signal,
@@ -877,6 +880,7 @@ export function createDraftGeneration(deps: {
       const vocabulary = await deps.drafts.vocabulary(context);
       const limit = deadline(options);
       const run = await generateDraft({
+        dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),
         signal: limit.signal,
@@ -1143,6 +1147,7 @@ export function createDraftGeneration(deps: {
         );
       const limit = deadline(options);
       const { best, ...run } = await runGeneration({
+        dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),
         signal: limit.signal,

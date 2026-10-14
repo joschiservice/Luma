@@ -19,7 +19,7 @@ function context(
       id: tenantId,
       name: 'Exports',
       slug: 'exports',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

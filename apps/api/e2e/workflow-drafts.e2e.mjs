@@ -43,7 +43,11 @@ it('saves, validates and publishes tenant drafts without activating them', async
       cookie: owner.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Authoring', slug: 'authoring', dataRegion: 'EU' },
+      body: {
+        name: 'Authoring',
+        slug: 'authoring',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await api.request(`/v1/organizations/${org.id}/members`, {
@@ -467,7 +471,11 @@ it('saves, validates and publishes tenant drafts without activating them', async
       cookie: outsider.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other-authoring', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other-authoring',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await api.request(`/v1/organizations/${other.id}/workflow-drafts/${id}`, {

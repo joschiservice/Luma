@@ -205,7 +205,7 @@ it('separately verifies resale stock and a lost-response refund without restocki
     payload: {
       name: 'Settlement isolation',
       slug: `settlement-${randomUUID()}`,
-      dataRegion: 'EU',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
   expect(other.statusCode, other.body).toBe(201);

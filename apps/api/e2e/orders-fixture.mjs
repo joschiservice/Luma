@@ -13,7 +13,11 @@ import { createTenantDatabase } from '@luma/platform/composition';
 export async function ordersFixture(t, f) {
   const context = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
-    { ...f.org, status: 'active', dataRegion: 'EU' },
+    {
+      ...f.org,
+      status: 'active',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+    },
     builtInMembership(
       { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
       'owner',

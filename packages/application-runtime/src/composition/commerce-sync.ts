@@ -38,6 +38,7 @@ import {
 import { createSupplierTerms } from '@luma/procurement/composition';
 import { Pool } from 'pg';
 
+import { assertCellRegion } from '../cell-region.js';
 import { createDetectionWorker } from './detection-worker.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createMailboxSyncWorker } from './mailbox-sync.js';
@@ -201,7 +202,7 @@ export function createCommerceSyncService(
  * detection. Failures
  * are written to stderr and reported through `observability` when supplied. Close it after
  * `run` resolves. With `modelSettings` and `observability`, mailbox reading extracts facts from
- * documents and supplier messages through the configured EU routes.
+ * documents and supplier messages through the configured regional routes.
  */
 export async function createDefaultCommerceSyncWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
@@ -227,6 +228,7 @@ export async function createDefaultCommerceSyncWorker(
       max: settings.concurrency * settings.workspaceConcurrency * 2 + 2,
     });
     resources.add(() => pool.end());
+    await assertCellRegion(pool, identitySettings.region ?? 'AU');
     const worker = createCommerceSyncWorker({
       database: createTenantDatabase(pool),
       identity: identity.service,
