@@ -31,7 +31,7 @@ test('changes a password, signs out devices and recovers through a single-use em
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Needs your attention', exact: true }),
+    page.getByRole('heading', { name: 'Needs you', exact: true }),
   ).toBeVisible();
   const security = `/app/${f.org.id}/settings/security`;
   await page.goto(security);
@@ -111,7 +111,7 @@ test('changes a password, signs out devices and recovers through a single-use em
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Needs your attention', exact: true }),
+    page.getByRole('heading', { name: 'Needs you', exact: true }),
   ).toBeVisible();
   await page.goto(security);
   await expect(sessions.getByRole('listitem')).toHaveCount(1);

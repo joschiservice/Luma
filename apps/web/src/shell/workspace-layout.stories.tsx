@@ -54,6 +54,23 @@ export const Desktop: Story = {
     const navigation = within(
       canvas.getByRole('navigation', { name: 'Workspace navigation' }),
     );
+    const records = navigation.getByRole('button', {
+      name: 'Records',
+    });
+    await expect(records).toHaveAttribute('aria-expanded', 'false');
+    await expect(
+      navigation.queryByRole('link', { name: 'Orders' }),
+    ).not.toBeInTheDocument();
+    records.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(records).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(navigation.getByRole('link', { name: 'Orders' }));
+    await expect(
+      navigation.getByRole('link', { name: 'Orders' }),
+    ).toHaveAttribute('aria-current', 'page');
+    await expect(
+      navigation.getByRole('button', { name: 'Records' }),
+    ).toHaveAttribute('aria-expanded', 'true');
     await userEvent.click(navigation.getByRole('link', { name: /^Issues/ }));
     await expect(canvas.getByRole('heading', { name: 'Issues' })).toBeVisible();
     await expect(
@@ -153,8 +170,12 @@ export const Mobile: Story = {
     await userEvent.click(menu);
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('link', { name: 'Apps' }));
-    await expect(canvas.getByRole('heading', { name: 'Apps' })).toBeVisible();
+    await userEvent.click(
+      within(dialog).getByRole('link', { name: 'Manage apps' }),
+    );
+    await expect(
+      canvas.getByRole('heading', { name: 'Manage apps' }),
+    ).toBeVisible();
     await waitFor(() =>
       expect(body.queryByRole('dialog')).not.toBeInTheDocument(),
     );

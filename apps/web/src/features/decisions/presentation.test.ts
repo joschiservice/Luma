@@ -31,6 +31,13 @@ it('says who a decision waits for and only asks the reader when they can act', (
     }),
   ).toEqual({ state: 'idle', label: 'View only' });
   expect(actionable({ response: 'check' })).toBe(true);
+  expect(
+    decisionStatus({ reason: 'manual_intervention', response: 'investigate' })
+      .label,
+  ).toBe('Manual step required');
+  expect(
+    decisionStatus({ reason: 'uncertainty', response: 'investigate' }).label,
+  ).toBe('Review evidence');
   expect(actionable({ response: 'awaiting_other' })).toBe(false);
 });
 

@@ -61,7 +61,7 @@ async function createWorkspace(page, name) {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
 
   return new URL(page.url()).pathname.split('/')[2];
 }
@@ -94,16 +94,14 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await heading(page, 'Sign in to Luma');
   await page.goto(`/app/${first}/exceptions`);
   await heading(page, 'Sign in to Luma');
-  // The list's view is not in the address; the member's remembered view decides it.
+  // A new member opens Issues on All open after authentication.
   expect(new URL(page.url()).searchParams.get('returnTo')).toBe(
     `/app/${first}/exceptions`,
   );
   await signIn(page);
   await heading(page, 'Issues');
   expect(new URL(page.url()).pathname).toBe(`/app/${first}/exceptions`);
-  await page
-    .getByRole('button', { name: 'Needs review', exact: true })
-    .waitFor();
+  await page.getByRole('button', { name: 'All open', exact: true }).waitFor();
   await page.goto('/app/workspaces/new');
   const second = await createWorkspace(page, 'South Studio');
   await page.goto('/app');
@@ -112,7 +110,7 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await page.waitForURL(`**/app/${first}/home*`);
   const tab = await context.newPage();
   await tab.goto(`/app/${second}/home`);
-  await heading(tab, 'Needs your attention');
+  await heading(tab, 'Needs you');
   expect(await page.locator('.workspace-switcher-name').textContent()).toBe(
     'North Studio',
   );
@@ -124,7 +122,7 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     .getByRole('menuitem', { name: 'South Studio', exact: true })
     .click();
   await page.waitForURL(`**/app/${second}/home*`);
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   // Deliver the previous workspace's access response after a browser-history switch.
   let release;
   let received;
@@ -148,7 +146,7 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await requested;
   await page.goBack();
   await page.waitForURL(`**/app/${first}/home*`);
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   release();
   await page.unroute(`**/api/v1/organizations/${second}/context`);
   expect(await page.locator('.workspace-switcher-name').textContent()).toBe(
@@ -159,7 +157,7 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     .getByRole('menuitem', { name: 'South Studio', exact: true })
     .click();
   await page.waitForURL(`**/app/${second}/home*`);
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   await page.setViewportSize({ width: 390, height: 844 });
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.focus();
@@ -170,8 +168,11 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     .poll(() => menu.evaluate((element) => element === document.activeElement))
     .toBe(true);
   await menu.click();
-  await page.getByRole('dialog').getByRole('link', { name: 'Apps' }).click();
-  await heading(page, 'Apps');
+  await page
+    .getByRole('dialog')
+    .getByRole('link', { name: 'Manage apps' })
+    .click();
+  await heading(page, 'Manage apps');
   await page.screenshot({ path: '/tmp/luma-30-mobile.png', fullPage: true });
   expect(
     await page.evaluate(
@@ -229,7 +230,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
   await page.unroute('**/api/v1/organizations');
   await page.getByRole('link', { name: 'Check workspace list' }).click();
   await page.getByRole('link', { name: 'Created once' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await db.owner.query(
     "UPDATE organizations SET status = 'suspended' WHERE id = $1",
@@ -270,7 +271,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
   expect(page.url()).toContain(`/app/${organizationId}/home`);
   await page.unroute('**/api/v1/organizations/*/context');
   await page.getByRole('button', { name: 'Try again' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   await page.route('**/api/auth/sign-out', (route) => route.abort('failed'));
   await page.goto('/sign-out');
   await heading(page, 'Sign-out not confirmed');
@@ -402,7 +403,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
   expect(page.url()).toContain(`/app/${id}/home`);
   await page.unroute('**/api/auth/get-session');
   await page.getByRole('button', { name: 'Try again' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   await page.goto('/sign-out');
   await heading(page, 'Sign in to Luma');
   // Registration can succeed without issuing a session under another account policy.
@@ -500,7 +501,7 @@ test('shows a suspended membership as Access suspended until it is reactivated',
     page.getByRole('link', { name: 'Kept access', exact: true }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Kept access', exact: true }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   expect(new URL(page.url()).pathname.split('/')[2]).toBe(kept);
   await page
     .getByRole('button', { name: 'Kept access. Switch workspace' })

@@ -128,7 +128,7 @@
   "identity_nav_operations": "Betrieb",
   "identity_nav_waiting_count": "{count, plural, one {{count, number} Eintrag wartet auf dich} other {{count, number} Einträge warten auf dich}}",
   "identity_nav_home": "Start",
-  "identity_nav_home_description": "Was deine Aufmerksamkeit braucht und was Luma gerade erledigt",
+  "identity_nav_home_description": "Überblick über deine Arbeit, offene Probleme und verbundene Systeme",
   "identity_nav_needs_you": "Wartet auf dich",
   "identity_nav_needs_you_description": "Genehmigungen, manuelle Schritte und Ergebnisprüfungen, die auf eine Person warten",
   "identity_nav_issues": "Probleme",
@@ -169,7 +169,7 @@
   "identity_nav_procurement": "Beschaffung",
   "identity_nav_procurement_description": "Lieferanten und Lieferantenbestellungen verwalten",
   "identity_nav_procurement_area": "die Beschaffung",
-  "identity_nav_apps": "Apps",
+  "identity_nav_apps": "Apps verwalten",
   "identity_nav_apps_description": "Apps installieren und verbundene Systeme verwalten",
   "identity_nav_sync": "Datenabgleich",
   "identity_nav_sync_description": "Importe, Abgleichstatus und Datenabdeckung für jedes verbundene System",
@@ -301,5 +301,7 @@
   "identity_staff_workspaces_empty": "Keine passenden Workspaces in antwortenden Regionen",
   "identity_staff_users_empty": "Keine passenden Personen in antwortenden Regionen",
   "identity_staff_region_column": "Region",
-  "identity_staff_region_unknown": "Die zuständige Region konnte nicht bestätigt werden. Öffne diesen Workspace aus einem regionalen Suchergebnis."
+  "identity_staff_region_unknown": "Die zuständige Region konnte nicht bestätigt werden. Öffne diesen Workspace aus einem regionalen Suchergebnis.",
+  "identity_nav_all_records": "Alle Datensätze",
+  "identity_nav_installed_apps": "Installierte Apps"
 }

@@ -286,7 +286,7 @@ export function presentCase(
   if (facts.reason === 'manual_intervention')
     return {
       ...base,
-      title: `${label} needs a manual step`,
+      title: summary ?? label,
       why:
         (current ? facts.manual_step : null) ??
         'Luma can’t make this change itself. A person has to take the next step.',
@@ -306,10 +306,7 @@ export function presentCase(
 
   return {
     ...base,
-    title:
-      facts.state === 'escalated'
-        ? `${label} was escalated`
-        : `${label} needs review`,
+    title: summary ?? label,
     why:
       facts.state === 'escalated'
         ? 'An operator escalated this issue. Luma won’t act on it until a person reviews it.'

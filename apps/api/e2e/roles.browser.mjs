@@ -96,6 +96,9 @@ test('creates a custom role, invites with it, restricts views and applies edits 
   const navigation = teammate.getByRole('navigation', {
     name: 'Workspace navigation',
   });
+  await navigation
+    .getByRole('button', { name: 'Records', exact: true })
+    .click();
   await navigation.getByRole('link', { name: 'Procurement' }).waitFor();
   expect(
     await navigation.getByRole('link', { name: 'Inventory' }).count(),

@@ -46,6 +46,7 @@ import { useDisplayTimezonePreference } from '../lib/display-timezone';
 import { isTypingTarget } from '../lib/keyboard';
 import { setThemePreference, useThemePreference } from '../lib/theme';
 import { PinCurrentPage, PinnedNavigation } from './pins';
+import { RecordsNavigation } from './records-navigation';
 import {
   destinationFor,
   type WorkspaceDestination,
@@ -77,6 +78,7 @@ function NavigationLink({
       data-label={label}
       to={`/app/$organizationId/${path}`}
       params={{ organizationId }}
+      search={destination.search ?? {}}
       activeOptions={{ exact, includeSearch: false }}
       activeProps={{ 'aria-current': 'page' }}
       onClick={close}
@@ -106,9 +108,10 @@ function Navigation({
   organizationId: string;
   close?: (() => void) | undefined;
 }) {
-  const onAppPage = useLocation({
-    select: (location) => appPagePattern.test(location.pathname),
-  });
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const onAppPage = appPagePattern.test(pathname);
+  const current = destinationFor(pathname);
+  const recordPath = current.group === 'records' ? current.path : null;
   const waiting = useQuery({
     ...decisionsOptions(organizationId, {}, 1),
     select: (list) => list.counts.views.all,
@@ -145,6 +148,9 @@ function Navigation({
         </h2>
         <ul className="sidebar-list">{group('operations').map(link)}</ul>
       </section>
+      <RecordsNavigation key={recordPath ?? 'closed'} active={!!recordPath}>
+        {group('records').map(link)}
+      </RecordsNavigation>
       <AppNavigation organizationId={organizationId} close={close} />
       <ul className="sidebar-list sidebar-list-end">
         {group('workspace').map(link)}
@@ -185,6 +191,7 @@ function useGoShortcuts(organizationId: string) {
         void navigate({
           to: `/app/$organizationId/${destination.path}`,
           params: { organizationId },
+          search: destination.search ?? {},
         });
 
         return;

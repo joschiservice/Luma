@@ -54,9 +54,9 @@ async function fixture(t) {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
-  await page.getByRole('link', { name: 'Apps', exact: true }).click();
+  await page.getByRole('link', { name: 'Manage apps', exact: true }).click();
   await page.getByText('No apps installed yet.', { exact: false }).waitFor();
   expect(appModules).toEqual([]);
 
@@ -173,7 +173,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   expect(
     await page
       .getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('link', { name: 'Apps', exact: true })
+      .getByRole('link', { name: 'Manage apps', exact: true })
       .getAttribute('aria-current'),
   ).toBe('page');
   await shop.getByText('Importing', { exact: true }).waitFor();
