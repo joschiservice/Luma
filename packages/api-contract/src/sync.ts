@@ -31,6 +31,26 @@ export const syncStreamSchema = z.object({
   status: syncStatusSchema,
   phase: z.enum(['backfill', 'incremental']),
   paused: z.boolean(),
+  waiting: z
+    .object({
+      reason: z.enum([
+        'orders',
+        'request_capacity',
+        'admission_unavailable',
+        'provider_cooldown',
+        'worker_capacity',
+        'connection_capacity',
+        'recent_changes',
+        'queued',
+      ]),
+      connections: z.array(
+        z.object({ connectionId: z.string().uuid(), label: z.string() }),
+      ),
+      observedAt: timestamp,
+      until: timestamp.nullable(),
+    })
+    .nullable()
+    .optional(),
   blocked: z
     .enum([
       'connection_inactive',

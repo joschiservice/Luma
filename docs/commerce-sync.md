@@ -223,6 +223,14 @@ also covers an unavailable coordinator. It releases the page lease without advan
 cursor, recording a failed provider read,
 or consuming a retry attempt. It preserves export checkpoints and retries when due.
 
+Data sync reports automatic waits separately from a person's pause. Admission advice is
+shown until the advised retry time or a new page claim. Capacity waits name only visible
+connections with unexpired page leases that exhaust the admitted workspace limit; reads
+on the same connection have a separate limit. The explanation is reevaluated from one
+tenant-scoped snapshot and clears when capacity is released. A due stream without an
+active page waits for the next sync pass. Waiting never establishes fresh coverage or a
+successful read, and imported progress remains visible.
+
 Full Shopify backfills of orders, products, inventory and permitted customers use Bulk
 Operations; recent windows, incremental reads and full checks stay paged.
 

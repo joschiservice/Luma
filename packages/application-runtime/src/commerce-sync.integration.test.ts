@@ -436,6 +436,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         cursor: string | null;
         attempts: number;
         error_code: string | null;
+        admission_wait_reason: string | null;
         blocked: string | null;
         history_from: Date | null;
         watermark: Date | null;
@@ -1211,6 +1212,13 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       pages: 1,
       waitingForExport: false,
     });
+    const waiting = (await service.overview(context())).connections
+      .find((item) => item.connectionId === shop)
+      ?.recordTypes.find((item) => item.recordType === 'orders')?.stream;
+    expect(waiting).toMatchObject({
+      status: 'waiting',
+      waiting: { reason: 'request_capacity', connections: [] },
+    });
     await due();
     await drain();
     expect(await stream('orders')).toMatchObject({
@@ -1218,6 +1226,11 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       attempts: 0,
       error_code: null,
     });
+    const resumed = (await service.overview(context())).connections
+      .find((item) => item.connectionId === shop)
+      ?.recordTypes.find((item) => item.recordType === 'orders')?.stream;
+    expect(resumed?.waiting).toBeNull();
+    expect((await stream('orders'))?.admission_wait_reason).toBeNull();
     expect(
       source.requests
         .filter(
@@ -1225,6 +1238,37 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
         .map((r) => r.cursor ?? null),
     ).toEqual([null, '2', '2']);
+  });
+
+  it('explains occupied workspace capacity and clears names after a lease is released', async () => {
+    const store = createSyncStore(db);
+    await runner.tick(tenant, 0);
+    const token = randomUUID();
+    const leased = await store.claim(tenant, token, 60_000, {
+      connectionId: erp,
+      workspaceConcurrency: 1,
+      connectionConcurrency: 1,
+    });
+    expect(leased).not.toBeNull();
+    const view = async () =>
+      (await service.overview(context())).connections
+        .find((item) => item.connectionId === shop)
+        ?.recordTypes.find((item) => item.recordType === 'orders')?.stream;
+    expect(await view()).toMatchObject({
+      status: 'waiting',
+      waiting: {
+        reason: 'worker_capacity',
+        connections: [{ connectionId: erp }],
+      },
+    });
+    await owner.query(
+      'UPDATE commerce_sync_streams SET lease_until=NULL,lease_token=NULL WHERE tenant_id=$1 AND id=$2',
+      [tenant, leased!.id],
+    );
+    expect(await view()).toMatchObject({
+      status: 'waiting',
+      waiting: { reason: 'queued', connections: [] },
+    });
   });
 
   it('resumes a failed page from its checkpoint', async () => {

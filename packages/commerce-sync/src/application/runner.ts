@@ -499,6 +499,10 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           now: now().toISOString(),
           deferred: true,
           deferReason: 'admission',
+          admissionWaitReason:
+            result.error.code === 'unavailable'
+              ? 'admission_unavailable'
+              : 'request_capacity',
           dueAt: new Date(
             +now() + Math.max(50, result.error.retryAfterMs ?? 1000),
           ).toISOString(),

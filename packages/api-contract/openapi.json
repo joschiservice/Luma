@@ -197037,6 +197037,71 @@
                                         "paused": {
                                           "type": "boolean"
                                         },
+                                        "waiting": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "reason": {
+                                                  "enum": [
+                                                    "orders",
+                                                    "request_capacity",
+                                                    "admission_unavailable",
+                                                    "provider_cooldown",
+                                                    "worker_capacity",
+                                                    "connection_capacity",
+                                                    "recent_changes",
+                                                    "queued"
+                                                  ],
+                                                  "type": "string"
+                                                },
+                                                "connections": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "connectionId": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "connectionId",
+                                                      "label"
+                                                    ]
+                                                  }
+                                                },
+                                                "observedAt": {
+                                                  "type": "string",
+                                                  "format": "date-time"
+                                                },
+                                                "until": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "format": "date-time"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "reason",
+                                                "connections",
+                                                "observedAt",
+                                                "until"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
                                         "blocked": {
                                           "anyOf": [
                                             {
@@ -197734,6 +197799,68 @@
                     },
                     "paused": {
                       "type": "boolean"
+                    },
+                    "waiting": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "reason": {
+                              "enum": [
+                                "orders",
+                                "request_capacity",
+                                "admission_unavailable",
+                                "provider_cooldown",
+                                "worker_capacity",
+                                "connection_capacity",
+                                "recent_changes",
+                                "queued"
+                              ],
+                              "type": "string"
+                            },
+                            "connections": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "connectionId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["connectionId", "label"]
+                              }
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "until": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "connections",
+                            "observedAt",
+                            "until"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "blocked": {
                       "anyOf": [
