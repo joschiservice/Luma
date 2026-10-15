@@ -17,6 +17,7 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
+import { IdentityError } from '../../lib/api-error';
 import {
   stockProtectionApi,
   stockProtectionOptions,
@@ -43,12 +44,31 @@ export function StockProtectionSettings({
   disabled: boolean;
 }) {
   const query = useQuery(stockProtectionOptions(organizationId));
-  if (query.isError || !query.data?.enabled) return null;
+  if (
+    query.error instanceof IdentityError &&
+    [401, 403, 404].includes(query.error.status)
+  )
+    return null;
+  if (query.isError && !query.data)
+    return (
+      <section>
+        <h2>{m.settings_protection_title()}</h2>
+        <Alert role="alert" tone="warning">
+          {m.settings_protection_settings_unavailable()}
+        </Alert>
+      </section>
+    );
+  if (!query.data?.enabled) return null;
 
   return (
     <section>
       <h2>{m.settings_protection_title()}</h2>
       <p>{m.settings_protection_help()}</p>
+      {query.isError ? (
+        <Alert role="alert" tone="warning">
+          {m.settings_protection_settings_unavailable()}
+        </Alert>
+      ) : null}
       {query.data.pairs.length ? (
         query.data.pairs.map((pair) => {
           const settings =
@@ -78,7 +98,7 @@ export function StockProtectionSettings({
               label={pair.label}
               settings={settings}
               active={active}
-              disabled={disabled || !query.data.canManage}
+              disabled={disabled || query.isError || !query.data.canManage}
               saved={() => query.refetch().then(() => undefined)}
             />
           );

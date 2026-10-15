@@ -687,5 +687,8 @@
   "settings_protection_ended": "Ended {time}.",
   "settings_protection_totals": "{count} SKUs protected over {minutes} minutes. Oversell exposure was observed on {skus} SKUs.",
   "settings_protection_reason_deferred": "Shopify deferred this request before dispatch. Luma will retry after fresh reads.",
-  "settings_protection_reason_inactive": "Product or inventory location is inactive."
+  "settings_protection_reason_inactive": "Product or inventory location is inactive.",
+  "settings_protection_reason_rejected": "The incident review was rejected. Further changes are withheld; existing holds stay until the sync replaces them or a new policy review authorizes release.",
+  "settings_protection_unavailable": "Stock protection status is unavailable. Refresh to check the current state.",
+  "settings_protection_settings_unavailable": "Stock protection settings could not be refreshed. Changes are paused until a current read is available."
 }

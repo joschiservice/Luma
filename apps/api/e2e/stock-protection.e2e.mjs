@@ -404,3 +404,77 @@ test.each([
     expect(f.mutations).toHaveLength(0);
   },
 );
+
+async function requestIncidentApproval(f) {
+  const workspace = (await f.f.request(f.f.owner, `${f.f.base}/settings`))
+    .workspace;
+  await f.f.request(
+    f.f.owner,
+    `${f.f.base}/settings/approvals`,
+    'PATCH',
+    f.f.command({
+      revision: workspace.policyRevision,
+      alwaysRequireApproval: true,
+    }),
+  );
+  await f.service.tick(f.actor, f.incidentId);
+
+  return f.f.identity.service.resolveWorkflowContext(
+    f.admin.id,
+    f.actor.tenantId,
+    'stock-protection-review',
+  );
+}
+
+test.each(['release', 'sync'])(
+  'expired incident approval renews once while %s remains independently verifiable',
+  async (method) => {
+    const f = await protectionFixture({ onTestFinished });
+    const admin = await requestIncidentApproval(f);
+    await f.service.control(admin, { id: f.incidentId, action: 'approve' });
+    await f.service.tick(f.actor, f.incidentId);
+    const original = (await f.view()).decisionId;
+    await f.f.db.owner.query(
+      "UPDATE policy_approvals SET document=jsonb_set(document,'{expiresAt}',to_jsonb($2::text)) WHERE tenant_id=$1",
+      [f.actor.tenantId, new Date(Date.now() - 1000).toISOString()],
+    );
+    await f.service.tick(f.actor, f.incidentId);
+    const pending = await f.view();
+    expect(pending.state).toBe('approval_required');
+    expect(pending.decisionId).not.toBe(original);
+    expect(f.mutations).toHaveLength(1);
+    await f.service.tick(f.actor, f.incidentId);
+    expect((await f.view()).decisionId).toBe(pending.decisionId);
+    if (method === 'sync') {
+      await f.changeAvailable(9);
+      await f.service.tick(f.actor, f.incidentId);
+      expect((await f.view()).positions[0].status).toBe('released_by_sync');
+      expect(f.mutations).toHaveLength(1);
+    } else {
+      await f.service.control(admin, { id: f.incidentId, action: 'approve' });
+      f.setAuthority(10);
+      await f.service.control(f.actor, { id: f.incidentId, action: 'release' });
+      await f.service.tick(f.actor, f.incidentId);
+      expect((await f.view()).positions[0]).toMatchObject({
+        status: 'released',
+        current: 10,
+      });
+      expect(f.mutations).toHaveLength(2);
+    }
+  },
+);
+
+test('rejecting the initial incident closes its pending holds and cannot be changed into an approval', async (t) => {
+  const f = await protectionFixture(t);
+  const admin = await requestIncidentApproval(f);
+  await f.service.control(admin, { id: f.incidentId, action: 'reject' });
+  expect((await f.view()).state).toBe('released');
+  expect((await f.view()).positions[0]).toMatchObject({
+    status: 'skipped',
+    reason: 'approval_rejected',
+    startedAt: null,
+  });
+  await f.service.control(admin, { id: f.incidentId, action: 'approve' });
+  expect((await f.service.tick(f.actor, f.incidentId)).done).toBe(true);
+  expect(f.mutations).toHaveLength(0);
+});

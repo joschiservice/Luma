@@ -687,5 +687,8 @@
   "settings_protection_ended": "Beendet am {time}.",
   "settings_protection_totals": "{count} Artikel über {minutes} Minuten geschützt. Bei {skus} Artikeln wurde ein Überverkaufsrisiko beobachtet.",
   "settings_protection_reason_deferred": "Shopify hat die Anfrage vor dem Versand zurückgestellt. Luma versucht es nach neuen Lesevorgängen erneut.",
-  "settings_protection_reason_inactive": "Produkt oder Bestandslagerort ist inaktiv."
+  "settings_protection_reason_inactive": "Produkt oder Bestandslagerort ist inaktiv.",
+  "settings_protection_reason_rejected": "Die Vorfallsfreigabe wurde abgelehnt. Weitere Änderungen sind gesperrt; bestehende Rückhaltungen bleiben, bis der Abgleich sie ersetzt oder eine neue Richtlinienprüfung die Freigabe erlaubt.",
+  "settings_protection_unavailable": "Der Status des Bestandsschutzes ist nicht verfügbar. Aktualisiere die Seite, um den aktuellen Stand zu prüfen.",
+  "settings_protection_settings_unavailable": "Die Bestandsschutzeinstellungen konnten nicht aktualisiert werden. Änderungen sind bis zu einem aktuellen Lesevorgang pausiert."
 }

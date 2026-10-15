@@ -15,21 +15,25 @@ export const stockProtectionOptions = (
     offset?: number;
     limit?: number;
   } = {},
-) =>
-  queryOptions({
+) => {
+  const body = {
+    ...filters,
+    offset: filters.offset ?? 0,
+    limit: filters.limit ?? 0,
+  };
+
+  return queryOptions({
     queryKey: [
       'private',
       'organization',
       organizationId,
       'stock-protection',
-      filters,
+      body,
     ],
     ...privateQueryDefaults,
     queryFn: ({ signal }) =>
-      stockProtectionApi.view(
-        { params: { organizationId }, body: filters },
-        { signal },
-      ),
+      stockProtectionApi.view({ params: { organizationId }, body }, { signal }),
     refetchInterval: 30000,
     retry: false,
   });
+};

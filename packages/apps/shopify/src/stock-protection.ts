@@ -662,29 +662,36 @@ export function createShopifyStockProtection(
       ).mode !== 'every_action'
     )
       return true;
+    const policyVersion = await policies.currentVersion(tenant.tenantId);
+    let renewal: string | null = null;
     if (record.view.decisionId) {
       const decision = await policies.decision(tenant, record.view.decisionId);
-      if (
-        decision?.policyVersion ===
-          (await policies.currentVersion(tenant.tenantId)) &&
-        decision.approval?.outcome === 'approved'
-      ) {
-        await store.update(tenant, record.view.id, (r) => {
-          if (r.view.state === 'approval_required') r.view.state = 'active';
-        });
+      if (decision?.policyVersion === policyVersion) {
+        if (decision.approval?.outcome === 'approved') {
+          if (Date.parse(decision.approval.expiresAt) > +now()) {
+            await store.update(tenant, record.view.id, (r) => {
+              if (r.view.state === 'approval_required') r.view.state = 'active';
+            });
 
-        return true;
+            return true;
+          }
+          // First-response approvals are immutable. Renew the incident review rather than
+          // requiring per-SKU reviews or reusing an expired approval for a later release.
+          renewal = decision.approval.id;
+        } else {
+          if (!decision.approval && record.view.state !== 'approval_required')
+            await store.update(tenant, record.view.id, (r) => {
+              r.view.state = 'approval_required';
+            });
+
+          return false;
+        }
       }
-      if (
-        decision?.policyVersion ===
-        (await policies.currentVersion(tenant.tenantId))
-      )
-        return false;
     }
     const action: ProposedAction = {
       schemaVersion: 1,
       id: stableId(
-        `${record.view.id}:batch:${await policies.currentVersion(tenant.tenantId)}`,
+        `${record.view.id}:batch:${policyVersion}${renewal ? `:renew:${renewal}` : ''}`,
       ),
       tenantId: tenant.tenantId,
       capability: 'inventory.protection.batch',
@@ -749,16 +756,14 @@ export function createShopifyStockProtection(
     if (overdue)
       await store.event(tenant, stableId(`${id}:escalated`), id, 'escalated');
     if (!(await released(tenant.tenantId))) return { done: false };
-    if (
-      record.view.mode !== 'preview' &&
-      !(await batchApproval(tenant, record))
-    )
-      return { done: false };
+    const approved =
+      record.view.mode === 'preview' || (await batchApproval(tenant, record));
     // One bounded batch gives API admission and other stores a turn between batches.
     const eligible = record.view.positions.filter(
       (p) =>
-        active.has(p.status) ||
-        (record!.view.mode === 'preview' && p.status === 'preview'),
+        (approved || p.startedAt !== null || p.actionId !== null) &&
+        (active.has(p.status) ||
+          (record!.view.mode === 'preview' && p.status === 'preview')),
     );
     const offset = (record.cursor ?? 0) % Math.max(1, eligible.length);
     const batch = [
@@ -770,6 +775,7 @@ export function createShopifyStockProtection(
     });
     for (const position of batch) {
       try {
+        if (!approved && !position.startedAt && !position.actionId) continue;
         let run = position.actionId
           ? await store.action(tenant, position.actionId)
           : null;
@@ -884,6 +890,7 @@ export function createShopifyStockProtection(
               Math.max(0, p.before! - current.source.available),
             );
         });
+        if (!approved) continue;
         if (record.view.mode === 'preview' && position.startedAt) {
           if (recovered)
             await store.update(tenant, id, (r) => {
@@ -990,7 +997,7 @@ export function createShopifyStockProtection(
           current,
           operation,
           quantity,
-          deferredFrom ? `${key}:deferred:${deferredFrom}` : key,
+          `${deferredFrom ? `${key}:deferred:${deferredFrom}` : key}:approval:${record.view.decisionId ?? 'preauthorized'}`,
         );
         await store.update(tenant, id, (r) => {
           const p = r.view.positions.find((p) => p.id === position.id)!;
@@ -1059,6 +1066,7 @@ export function createShopifyStockProtection(
     return {
       done,
       moreWork:
+        approved &&
         !done &&
         record.view.positions.some(
           (p) =>
@@ -1297,12 +1305,30 @@ export function createShopifyStockProtection(
             'CONFLICT',
             'This incident is not awaiting approval.',
           );
-        await policies.respond(
+        const response = await policies.respond(
           tenant,
           record.view.decisionId,
           parsed.action === 'approve' ? 'approved' : 'rejected',
           new Date(+now() + 86400000).toISOString(),
         );
+        if (response.outcome === 'approved')
+          await store.update(tenant, parsed.id, (r) => {
+            r.cursor = 0;
+            if (r.view.state === 'approval_required') r.view.state = 'active';
+          });
+        if (response.outcome === 'rejected')
+          await store.update(tenant, parsed.id, (r) => {
+            r.view.stopNew = true;
+            for (const p of r.view.positions) {
+              if (!active.has(p.status)) continue;
+              if (!p.startedAt && !p.actionId) p.status = 'skipped';
+              p.reason = 'approval_rejected';
+            }
+            if (!r.view.positions.some((p) => active.has(p.status))) {
+              r.view.state = 'released';
+              r.view.endedAt = now().toISOString();
+            } else r.view.state = 'active';
+          });
       } else
         await store.update(tenant, parsed.id, (r) => {
           if (parsed.action === 'extend') {

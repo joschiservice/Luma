@@ -34,6 +34,7 @@ const reasons: Record<string, () => string> = {
   untracked: m.settings_protection_reason_untracked,
   bundle: m.settings_protection_reason_bundle,
   inactive: m.settings_protection_reason_inactive,
+  approval_rejected: m.settings_protection_reason_rejected,
   native_stock: m.settings_protection_reason_native,
   active_correction: m.settings_protection_reason_correction,
   excluded: m.settings_protection_reason_excluded,
@@ -83,6 +84,8 @@ export function StockProtectionNotice({
     [401, 403, 404].includes(query.error.status)
   )
     return null;
+  if (query.isError && !query.data)
+    return <Alert tone="warning">{m.settings_protection_unavailable()}</Alert>;
   if (!query.data || (!query.data.enabled && !query.data.incidents.length))
     return null;
   const incidents = query.data.incidents.filter((i) =>

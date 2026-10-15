@@ -84,6 +84,22 @@ test('stock protection settings save Preview and remain usable on a narrow dark 
     body: await page.screenshot(),
     contentType: 'image/png',
   });
+  await page.route('**/stock-protection-view', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Unavailable',
+      }),
+    }),
+  );
+  await page.reload();
+  await expect(
+    page
+      .getByRole('alert')
+      .filter({ hasText: 'Stock protection settings could not be refreshed.' }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

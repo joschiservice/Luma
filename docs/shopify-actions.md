@@ -295,7 +295,9 @@ Stock protection is off by default and requires the tenant release and explicit 
 for one ERP → Shopify pair. Consent uses the policy epoch fence. It authorizes only
 persisted incident-owned holds, downward tightening and fresh-source releases within the
 per-SKU, per-incident and UTC-day caps. Always require approval adds one incident review;
-it does not create a decision for every SKU. Changing consent invalidates outstanding
+it does not create a decision for every SKU. An expired approval requires a fresh incident
+review, with a new intent identity for confirmed non-dispatches; uncertain writes retain
+their original identity. Changing consent invalidates outstanding
 policy decisions. Observe-only blocks releases as well as holds.
 
 Discovery stores candidate identities before provider reads. A durable workflow processes
