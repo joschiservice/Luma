@@ -35,7 +35,7 @@
   "decisions_status_awaiting_other": "Weitere Genehmigung nötig",
   "decisions_status_manual": "Manueller Schritt nötig",
   "decisions_status_expired": "Vorschlag abgelaufen",
-  "decisions_status_review": "Prüfung nötig",
+  "decisions_status_review": "Nachweise prüfen",
   "decisions_status_waiting_requester": "Wartet auf anfragende Person",
   "decisions_status_unconfirmed": "Ergebnis nicht bestätigt",
   "decisions_status_waiting_approver": "Wartet auf Genehmigung",

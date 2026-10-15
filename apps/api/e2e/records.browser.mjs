@@ -70,7 +70,9 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`/app/${fixture.org.id}/records`);
-  await page.getByRole('heading', { name: 'Records', exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'All records', exact: true })
+    .waitFor();
   await page.getByRole('link', { name: /#1000/ }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
   await page.getByRole('heading', { name: 'Data from sources' }).waitFor();
@@ -90,9 +92,11 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
-    .getByRole('link', { name: 'Records' })
+    .getByRole('link', { name: 'All records' })
     .click();
-  await page.getByRole('heading', { name: 'Records', exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'All records', exact: true })
+    .waitFor();
   const search = page.getByRole('searchbox', { name: 'Search records' });
   await search.fill('#1000');
   await search.press('Enter');

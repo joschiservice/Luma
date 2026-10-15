@@ -58,7 +58,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page
     .getByRole('heading', { name: 'Connect your first system.' })
@@ -87,7 +87,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await anonymous.close();
   const inbox = `/app/${organizationId}/exceptions`;
   await page.goto(inbox);
-  await page.getByText('No issues need your review', { exact: true }).waitFor();
+  await page
+    .getByText('No open issues in this view', { exact: true })
+    .waitFor();
   await page.getByText('No data received yet', { exact: true }).waitFor();
   await page.getByText('No active connections', { exact: true }).waitFor();
   await page.keyboard.press('Control+k');
@@ -95,7 +97,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page.getByRole('textbox', { name: 'Search workspace' }).fill('issue');
   await page
     .getByRole('navigation', { name: 'Search results' })
-    .getByRole('link', { name: 'Issues' })
+    .getByRole('link', { name: /^Issues\b/ })
     .click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -174,7 +176,15 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     });
     ids.push(result.incident.id);
   }
-  await page.getByRole('tab', { name: 'All open', exact: true }).click();
+  // A remembered attention view must not hide these unresolved issues on re-entry.
+  await page.getByRole('tab', { name: 'Needs attention', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Workspace navigation' })
+    .getByRole('link', { name: 'Issues', exact: true })
+    .click();
+  await expect(
+    page.getByRole('tab', { name: 'All open', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
   const issueRows = page
     .getByRole('list', { name: 'Issues', exact: true })
     .getByRole('listitem');
@@ -642,7 +652,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
       exact: true,
     })
     .waitFor();
-  await page.getByRole('tab', { name: 'Needs review', exact: true }).click();
+  await page.getByRole('tab', { name: 'Needs attention', exact: true }).click();
   await page
     .getByRole('heading', {
       name: 'The connection read needs investigation',
@@ -755,7 +765,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await services.diagnoses.run(tenant, ids[1]);
   await page.goto(`/app/${organizationId}/home`);
   const decisions = page
-    .getByRole('region', { name: 'Needs your attention' })
+    .getByRole('region', { name: 'Needs you' })
     .getByRole('list')
     .getByRole('link');
   // Handling totals come from the operations overview and disappear when it is unavailable.

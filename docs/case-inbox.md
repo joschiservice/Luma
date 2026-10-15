@@ -8,11 +8,11 @@ in [case decisions and progress](case-decisions.md).
 
 ## Attention and views
 
-- **Needs you** contains persisted approval state, uncertainty escalation and current,
+- **Needs attention** contains persisted approval state, uncertainty escalation and current,
   rule-produced manual recommendations. Severity and model hypotheses never create
   attention. The workspace [Needs you queue](needs-you.md) shows the same case attention
   next to workflow and app decisions.
-- **Active** includes failed and escalated cases.
+- **All open** is the default and includes every unresolved case, including failed and escalated cases. Main navigation opens it regardless of the remembered view; explicit saved-view links and the return from an issue preserve their context.
 - **History** includes verified resolutions and human dispositions, labeled separately.
 
 An empty attention queue never implies healthy operations. Coverage reports only whether

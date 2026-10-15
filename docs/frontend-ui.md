@@ -71,6 +71,8 @@ module and style of a feature into each route that uses one export.
 
 Top-level workspace pages are registered once in `workspaceDestinations` in the web shell. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record use `RecordHeader`: the breadcrumb reads “Section › Record” and is the only visible name, the `h1` stays for assistive technology, record actions go into the bar and the page opens with status flags and key facts. The section crumb returns to the list with its filters; when the reader arrived from another record, a back arrow before it returns there. Don't add a back link or a second title in the page. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
 
+Record destinations live in a collapsible Records section that expands on record pages; All records keeps cross-record search available inside it. Inbox and Workflows remain direct destinations. Installed app pages appear under Installed apps, separate from Manage apps.
+
 Home and sidebar pins are per-member layouts; see [workspace settings](workspace-settings.md#personal-layouts). Home's attention module and the sidebar count read the [Needs you queue](needs-you.md).
 
 ## Collection pages

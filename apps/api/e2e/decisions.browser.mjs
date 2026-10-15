@@ -54,7 +54,7 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   requester.on('pageerror', (error) => errors.push(error.message));
   await requester.goto(`/app/${f.manifest.organizationId}/home`);
   const attention = requester.getByRole('region', {
-    name: 'Needs your attention',
+    name: 'Needs you',
   });
   await expect(attention.getByText(title)).toHaveCount(0);
   await requester.goto(path);

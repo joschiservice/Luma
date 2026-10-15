@@ -123271,7 +123271,7 @@
             "schema": {
               "enum": ["needs_you", "active", "history"],
               "type": "string",
-              "default": "needs_you"
+              "default": "active"
             },
             "allowEmptyValue": true,
             "allowReserved": true
