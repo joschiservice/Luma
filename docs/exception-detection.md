@@ -75,6 +75,12 @@ unavailable source does not stop the others; failures retry on the next pass.
 [Case workflows](workflows.md#case-workflows) may start runs for these cases, but closure
 still needs this verification.
 
+Failed reads stay on Data sync until both five attempts and the configured retry window
+(default 15 minutes) are exhausted. This includes malformed responses and unavailable exports.
+The issue starts at Medium and becomes High after four retry windows (one hour by default).
+Authentication and permission failures open High issues immediately. A completed scan resets
+the failure streak; closing an issue still requires a fresh, complete scan.
+
 **Lost access.** A revoked or disconnected connection blocks its streams, so their reads
 stop failing and would look clear. When a provider revoked a connection or removed its
 grants (status `revoked` or `degraded` after it was last `active`, with no disconnect by a

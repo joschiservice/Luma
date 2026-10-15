@@ -251,6 +251,29 @@ describe('deterministic evidence-grounded diagnoses', () => {
     ]);
     expect(result.summary).toContain('uncertain');
   });
+  it('matches failed-read guidance to the error instead of suggesting credential repair for malformed responses', () => {
+    const malformed = diagnose(
+      snapshot('sync_failure', {
+        errorCode: 'invalid_response',
+        retryExhausted: true,
+      }),
+      corpus.now,
+    );
+    const access = diagnose(
+      snapshot('sync_failure', { errorCode: 'authentication' }),
+      corpus.now,
+    );
+    expect(JSON.stringify(malformed.nextSteps)).toContain(
+      'malformed responses',
+    );
+    expect(JSON.stringify(malformed.nextSteps)).not.toContain(
+      'authorization errors',
+    );
+    expect(JSON.stringify(access.nextSteps)).toContain(
+      'restore credentials or grants',
+    );
+    expect(JSON.stringify(access.nextSteps)).toContain('authorization errors');
+  });
   it('uses the escalation window for transient reads without requesting approval', () => {
     const value = snapshot('sync_failure', {
       errorCode: 'timeout',
