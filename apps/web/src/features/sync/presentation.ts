@@ -204,14 +204,17 @@ export function streamState(stream: SyncStreamView): {
     case 'failing':
       return { state: 'error', label: m.sync_state_failing() };
     case 'retrying':
-      return { state: 'attention', label: m.sync_state_retrying() };
+      return {
+        state: 'attention',
+        label:
+          stream.error?.code === 'rate_limited'
+            ? m.sync_state_retrying_rate_limit()
+            : m.sync_state_retrying(),
+      };
     case 'waiting':
       return {
         state: 'waiting',
-        label:
-          stream.waiting?.reason === 'orders' || !stream.waiting
-            ? m.sync_state_waiting_for_orders()
-            : m.sync_state_waiting(),
+        label: waitingLabel(stream.waiting?.reason),
       };
     case 'importing':
       return {
@@ -234,6 +237,24 @@ export function streamState(stream: SyncStreamView): {
       };
     default:
       return { state: 'verified', label: m.sync_state_up_to_date() };
+  }
+}
+
+function waitingLabel(
+  reason: NonNullable<SyncStreamView['waiting']>['reason'] | undefined,
+): string {
+  switch (reason) {
+    case undefined:
+    case 'orders':
+      return m.sync_state_waiting_for_orders();
+    case 'request_capacity':
+    case 'provider_cooldown':
+      return m.sync_state_waiting_rate_limit();
+    case 'worker_capacity':
+    case 'connection_capacity':
+      return m.sync_state_waiting_capacity();
+    default:
+      return m.sync_state_waiting();
   }
 }
 
