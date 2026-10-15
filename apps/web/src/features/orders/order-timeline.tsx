@@ -59,7 +59,11 @@ function historyLabel(entry: HistoryEntry) {
   return m.orders_history_refund();
 }
 
-/** Lists fulfillment work each source reports, linking each to its record; `from` is the order path. */
+/**
+ * Lists fulfillment work each source reports, linking each to its record; `from` is the order
+ * path. Without any, the section is its header with a badge that says whether no source
+ * reported fulfillment work or the reader can't view it.
+ */
 export function OrderFulfillments({
   detail,
   organizationId,
@@ -69,9 +73,24 @@ export function OrderFulfillments({
   organizationId: string;
   from: string;
 }) {
+  if (!detail.fulfillments.length)
+    return (
+      <OrderSection
+        title={m.orders_fulfillments_title()}
+        icon={Truck}
+        status={
+          <Badge>
+            {detail.hidden.includes('fulfillments')
+              ? m.orders_section_no_access()
+              : m.orders_section_none_reported()}
+          </Badge>
+        }
+      />
+    );
+
   return (
     <OrderSection title={m.orders_fulfillments_title()} icon={Truck}>
-      {detail.fulfillments.length ? (
+      {
         <ul className="order-list">
           {detail.fulfillments.map((item) => {
             const status = shipmentLabels[item.status] ?? item.status;
@@ -127,9 +146,7 @@ export function OrderFulfillments({
             );
           })}
         </ul>
-      ) : (
-        <p className="order-note">{m.orders_fulfillments_empty()}</p>
-      )}
+      }
     </OrderSection>
   );
 }

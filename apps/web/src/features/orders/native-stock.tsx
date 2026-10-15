@@ -5,27 +5,49 @@ import {
   parseExactQuantityInput,
 } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@luma/ui/components/primitives/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@luma/ui/components/primitives/dropdown-menu';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { unitOfMeasure } from '@luma/ui/lib/units';
+import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { Ellipsis, PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import type { z } from 'zod';
 
 import { contextOptions } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { OrderSection } from '../../shared/orders/order-section';
 import { inventoryOptions } from '../inventory/data';
 
 const api = createWebApiClient();
 
-/** Inspects exact remaining order holds and keeps independent reads separate from physical consumption. */
+/**
+ * Shows the stock Luma holds for the order and, for stock managers, reads shipments, consumes
+ * shipped units, releases holds and reserves stock. Independent shipment reads stay separate
+ * from physical consumption. Orders whose stock Luma doesn't keep show nothing.
+ */
 export function NativeOrderStock({
   organizationId,
   detail,
@@ -76,6 +98,7 @@ function OrderStockControls({
   const [quantity, setQuantity] = useState('1'),
     [lineId, setLineId] = useState(''),
     [locationId, setLocationId] = useState('');
+  const [reserving, setReserving] = useState(false);
   const [shortage, setShortage] = useState<string | null>(null),
     [expiryResult, setExpiryResult] = useState<{
       released: number;
@@ -266,160 +289,302 @@ function OrderStockControls({
         ]),
     ).values(),
   );
+  const reservations = query.data?.reservations ?? [];
+  // Orders whose stock Luma doesn't keep have neither demand nor holds, so there is nothing to show.
+  if (query.isPending || (!query.isError && !demand && !reservations.length))
+    return null;
+  const busy = read.isPending || operate.isPending;
+  const canReserve = manage && demand?.status === 'open' && editable;
+  const lineLabel = (lineId: string) =>
+    demand?.lines.find((line) => line.id === lineId)?.skuCode ??
+    detail.sources
+      .flatMap((source) => source.lines)
+      .find((line) => line.id === lineId)?.skuCode ??
+    m.common_not_reported();
+  const quantityLabel = (value: string, unit: string) =>
+    quantityWithUnit(formatExactQuantity(value), unit, value);
+  const notices = [
+    query.isError ? (
+      <Alert key="unavailable" tone="warning">
+        {m.inventory_native_stock_unavailable()}{' '}
+        <Button variant="outline" onClick={() => void query.refetch()}>
+          {m.common_retry()}
+        </Button>
+      </Alert>
+    ) : null,
+    proof ? (
+      <p key="proof" role="status" className="order-note">
+        {m.inventory_native_stock_proof()}{' '}
+        <WorkspaceDate value={proof.observedAt} />
+      </p>
+    ) : null,
+    shortage !== null ? (
+      <Alert key="shortage" role="status">
+        {m.inventory_native_stock_shortage({ quantity: shortage })}
+      </Alert>
+    ) : null,
+    expiryResult ? (
+      <Alert key="expiry" role="status">
+        {m.inventory_native_stock_expiry_result({
+          released: formatNumber(expiryResult.released),
+          blocked: formatNumber(expiryResult.blocked),
+        })}
+      </Alert>
+    ) : null,
+    read.error || operate.error ? (
+      <Alert key="error" tone="warning" role="alert">
+        {(read.error ?? operate.error)?.message}
+      </Alert>
+    ) : null,
+  ].filter(Boolean);
 
   return (
-    <Card className="inventory-section">
-      <h2>{m.inventory_native_stock_reservations_title()}</h2>
-      <p>{m.inventory_native_stock_reservations_note()}</p>
-      {query.isPending ? (
-        <p role="status">{m.inventory_native_stock_loading()}</p>
-      ) : query.isError ? (
-        <Alert tone="warning">
-          {m.inventory_native_stock_unavailable()}{' '}
-          <Button variant="outline" onClick={() => void query.refetch()}>
-            {m.common_retry()}
-          </Button>
-        </Alert>
-      ) : query.data?.reservations.length ? (
-        <DataTable
-          caption={m.inventory_native_stock_reservations_title()}
-          rows={query.data.reservations}
-          rowKey={(value) => value.id}
-          columns={[
-            {
-              key: 'line',
-              header: m.inventory_native_stock_line(),
-              cell: (value) =>
-                demand?.lines.find((line) => line.id === value.orderLineId)
-                  ?.skuCode ??
-                detail.sources
-                  .flatMap((source) => source.lines)
-                  .find((line) => line.id === value.orderLineId)?.skuCode ??
-                m.common_not_reported(),
-            },
-            {
-              key: 'location',
-              header: m.inventory_native_stock_location(),
-              cell: (value) => (
-                <Link
-                  to="/app/$organizationId/inventory"
-                  params={{ organizationId }}
-                  search={{ skuId: value.skuId, locationId: value.locationId }}
-                >
-                  {detail.fulfillments.find(
-                    (fulfillment) =>
-                      fulfillment.location?.locationId === value.locationId,
-                  )?.location?.name ?? m.inventory_native_stock_location()}
-                </Link>
-              ),
-            },
-            {
-              key: 'unit',
-              header: m.inventory_native_stock_unit(),
-              cell: (value) => unitOfMeasure(value.unit),
-            },
-            {
-              key: 'status',
-              header: m.inventory_native_stock_status(),
-              cell: (value) =>
-                value.state === 'active'
-                  ? m.inventory_native_stock_reserved()
-                  : value.state === 'consumed'
-                    ? m.inventory_native_stock_consumed()
-                    : value.state === 'expired'
-                      ? m.inventory_native_stock_expired()
-                      : m.inventory_native_stock_released(),
-            },
-            {
-              key: 'remaining',
-              header: m.inventory_native_stock_remaining(),
-              numeric: true,
-              cell: (value) => formatExactQuantity(value.remaining),
-            },
-            {
-              key: 'consumed',
-              header: m.inventory_native_stock_consumed(),
-              numeric: true,
-              cell: (value) => formatExactQuantity(value.consumed),
-            },
-            {
-              key: 'released',
-              header: m.inventory_native_stock_released(),
-              numeric: true,
-              cell: (value) => formatExactQuantity(value.released),
-            },
-            {
-              key: 'expires',
-              header: m.inventory_native_stock_expires(),
-              cell: (value) =>
-                value.expiresAt ? (
-                  <WorkspaceDate value={value.expiresAt} />
-                ) : (
-                  m.common_empty_value()
-                ),
-            },
-            {
-              key: 'release',
-              header: m.inventory_native_stock_release(),
-              cell: (value) =>
-                manage && value.state === 'active' ? (
+    <>
+      <OrderSection
+        title={m.orders_stock_title()}
+        icon={PackageCheck}
+        description={
+          reservations.length ? m.orders_stock_description() : undefined
+        }
+        status={
+          reservations.length || query.isError ? null : (
+            <Badge>{m.orders_section_none()}</Badge>
+          )
+        }
+        action={
+          manage && connectionId ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
                   <Button
-                    variant="outline"
-                    disabled={!proof || operate.isPending}
-                    onClick={() =>
-                      operate.mutate({ kind: 'release', id: value.id })
-                    }
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={m.orders_stock_actions()}
+                    title={m.orders_stock_actions()}
                   >
-                    {m.inventory_native_stock_release()}
+                    <Ellipsis aria-hidden="true" />
                   </Button>
-                ) : (
-                  m.common_empty_value()
-                ),
-            },
-          ]}
-        />
-      ) : (
-        <p>{m.inventory_native_stock_reservations_empty()}</p>
-      )}
-      {manage && connectionId ? (
-        <>
-          <div className="inventory-record-links">
-            <Button
-              variant="outline"
-              disabled={read.isPending || operate.isPending}
-              onClick={() => read.mutate()}
-            >
-              {m.inventory_native_stock_shipments()}
-            </Button>
-            <Button
-              disabled={!proof || operate.isPending || read.isPending}
-              onClick={() => operate.mutate({ kind: 'consume' })}
-            >
-              {m.inventory_native_stock_consume()}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={operate.isPending}
-              onClick={() => operate.mutate({ kind: 'expiry' })}
-            >
-              {m.inventory_native_stock_expiry()}
-            </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-auto min-w-64">
+                <DropdownMenuItem disabled={busy} onClick={() => read.mutate()}>
+                  {m.inventory_native_stock_shipments()}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!proof || busy || !reservations.length}
+                  onClick={() => operate.mutate({ kind: 'consume' })}
+                >
+                  {m.inventory_native_stock_consume()}
+                </DropdownMenuItem>
+                {canReserve ? (
+                  <DropdownMenuItem onClick={() => setReserving(true)}>
+                    {m.orders_stock_reserve_open()}
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={operate.isPending}
+                  onClick={() => operate.mutate({ kind: 'expiry' })}
+                >
+                  {m.inventory_native_stock_expiry()}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null
+        }
+      >
+        {reservations.length || notices.length ? (
+          <div className="order-stock">
+            {reservations.length ? (
+              <DataTable
+                caption={m.orders_stock_caption()}
+                rows={reservations}
+                rowKey={(value) => value.id}
+                density="compact"
+                columns={[
+                  {
+                    key: 'line',
+                    header: m.inventory_native_stock_line(),
+                    cell: (value) => (
+                      <span className="orders-cell-stack">
+                        <span>{lineLabel(value.orderLineId)}</span>
+                        <small>
+                          <Link
+                            to="/app/$organizationId/inventory"
+                            params={{ organizationId }}
+                            search={{
+                              skuId: value.skuId,
+                              locationId: value.locationId,
+                            }}
+                          >
+                            {detail.fulfillments.find(
+                              (fulfillment) =>
+                                fulfillment.location?.locationId ===
+                                value.locationId,
+                            )?.location?.name ??
+                              m.inventory_native_stock_location()}
+                          </Link>
+                        </small>
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'status',
+                    header: m.orders_stock_column_status(),
+                    cell: (value) => (
+                      <span className="orders-cell-stack">
+                        <span className="order-stock-status">
+                          {value.state === 'active'
+                            ? m.inventory_native_stock_reserved()
+                            : value.state === 'consumed'
+                              ? m.inventory_native_stock_consumed()
+                              : value.state === 'expired'
+                                ? m.inventory_native_stock_expired()
+                                : m.inventory_native_stock_released()}
+                        </span>
+                        {value.state === 'active' && value.expiresAt ? (
+                          <small>
+                            {rich(m.orders_stock_expires_note, {
+                              date: <WorkspaceDate value={value.expiresAt} />,
+                            })}
+                          </small>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'remaining',
+                    header: m.inventory_native_stock_remaining(),
+                    numeric: true,
+                    cell: (value) => {
+                      const notes = [
+                        Number(value.consumed) > 0
+                          ? m.orders_stock_consumed_note({
+                              quantity: quantityLabel(
+                                value.consumed,
+                                value.unit,
+                              ),
+                            })
+                          : null,
+                        Number(value.released) > 0
+                          ? m.orders_stock_released_note({
+                              quantity: quantityLabel(
+                                value.released,
+                                value.unit,
+                              ),
+                            })
+                          : null,
+                      ].filter((note) => note !== null);
+
+                      return (
+                        <span className="orders-cell-stack">
+                          <span>
+                            {quantityLabel(value.remaining, value.unit)}
+                          </span>
+                          {notes.map((note) => (
+                            <small key={note}>{note}</small>
+                          ))}
+                        </span>
+                      );
+                    },
+                  },
+                  ...(manage
+                    ? [
+                        {
+                          key: 'actions',
+                          header: (
+                            <span className="sr-only">
+                              {m.orders_lines_column_actions()}
+                            </span>
+                          ),
+                          cell: (value: (typeof reservations)[number]) =>
+                            value.state === 'active' ? (
+                              <span className="order-line-menu">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    render={
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label={m.orders_stock_row_actions({
+                                          line: lineLabel(value.orderLineId),
+                                        })}
+                                      >
+                                        <Ellipsis aria-hidden="true" />
+                                      </Button>
+                                    }
+                                  />
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-auto min-w-56"
+                                  >
+                                    <DropdownMenuItem
+                                      disabled={!proof || operate.isPending}
+                                      onClick={() =>
+                                        operate.mutate({
+                                          kind: 'release',
+                                          id: value.id,
+                                        })
+                                      }
+                                    >
+                                      {m.inventory_native_stock_release()}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </span>
+                            ) : null,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ) : null}
+            {manage && reservations.length && !proof ? (
+              <p className="order-note">{m.orders_stock_read_first()}</p>
+            ) : null}
+            {notices}
           </div>
-          {proof ? (
-            <Alert role="status">
-              {m.inventory_native_stock_proof()}{' '}
-              <WorkspaceDate value={proof.observedAt} />
-            </Alert>
-          ) : null}
-          {demand?.status === 'open' && editable ? (
+        ) : null}
+      </OrderSection>
+      {canReserve && demand ? (
+        <Dialog open={reserving} onOpenChange={setReserving}>
+          <DialogContent className="order-stock-dialog">
+            <DialogHeader>
+              <DialogTitle>{m.inventory_native_stock_allocate()}</DialogTitle>
+              <DialogDescription>
+                {m.inventory_native_stock_reservations_note()}
+              </DialogDescription>
+            </DialogHeader>
             <form
               className="native-stock-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                operate.mutate({ kind: 'allocate' });
+                operate.mutate(
+                  { kind: 'allocate' },
+                  { onSuccess: () => setReserving(false) },
+                );
               }}
             >
-              <fieldset disabled={operate.isPending || read.isPending}>
+              {proof ? (
+                <p className="order-note">
+                  {m.inventory_native_stock_proof()}{' '}
+                  <WorkspaceDate value={proof.observedAt} />
+                </p>
+              ) : (
+                <div className="order-stock-read">
+                  <p className="order-note">{m.orders_stock_read_first()}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => read.mutate()}
+                  >
+                    {m.inventory_native_stock_shipments()}
+                  </Button>
+                </div>
+              )}
+              <fieldset disabled={busy}>
                 <label>
                   {m.inventory_native_stock_line()}
                   <Select
@@ -454,7 +619,7 @@ function OrderStockControls({
                   />
                 </label>
                 {pool.data ? (
-                  <p>
+                  <p className="order-note">
                     {m.inventory_native_stock_available()}:{' '}
                     {pool.data.opened
                       ? formatExactQuantity(
@@ -465,9 +630,17 @@ function OrderStockControls({
                       : m.inventory_native_stock_unopened()}
                   </p>
                 ) : null}
+                {operate.error ? (
+                  <Alert tone="warning" role="alert">
+                    {operate.error.message}
+                  </Alert>
+                ) : null}
+              </fieldset>
+              <DialogFooter>
                 <Button
                   type="submit"
                   disabled={
+                    busy ||
                     !proof ||
                     !pool.data?.opened ||
                     pool.data.scope.mode === 'observe'
@@ -475,29 +648,11 @@ function OrderStockControls({
                 >
                   {m.inventory_native_stock_allocate()}
                 </Button>
-              </fieldset>
+              </DialogFooter>
             </form>
-          ) : null}
-        </>
+          </DialogContent>
+        </Dialog>
       ) : null}
-      {shortage !== null ? (
-        <Alert role="status">
-          {m.inventory_native_stock_shortage({ quantity: shortage })}
-        </Alert>
-      ) : null}
-      {expiryResult ? (
-        <Alert role="status">
-          {m.inventory_native_stock_expiry_result({
-            released: formatNumber(expiryResult.released),
-            blocked: formatNumber(expiryResult.blocked),
-          })}
-        </Alert>
-      ) : null}
-      {read.error || operate.error ? (
-        <Alert tone="warning" role="alert">
-          {(read.error ?? operate.error)?.message}
-        </Alert>
-      ) : null}
-    </Card>
+    </>
   );
 }

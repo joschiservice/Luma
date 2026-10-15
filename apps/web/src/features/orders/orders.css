@@ -75,6 +75,12 @@
   min-width: 0;
 }
 
+/* Rows align to their first line of text; the menu button is taller, so it centers on that line. */
+.order-line-menu {
+  display: inline-flex;
+  margin-block: -5px;
+}
+
 .order-line-menu-narrow,
 .order-line-remaining-narrow {
   display: none;
@@ -85,6 +91,10 @@
   .order-line-menu-narrow {
     display: block;
     margin-left: -6px;
+  }
+
+  .order-line-menu-narrow .order-line-menu {
+    margin-block: 0;
   }
 
   .order-line-quantity .order-line-remaining-narrow {
@@ -169,6 +179,13 @@ a.order-line-title:hover {
 
 .order-changes li > .orders-cell-stack {
   flex: 1 1 220px;
+}
+
+/* A badge after a section title, such as one saying the section has nothing to show. */
+.order-section-status {
+  display: inline-flex;
+  margin-left: 4px;
+  font-weight: 400;
 }
 
 /* One source choice for the sections that show a single source's report. */
@@ -470,6 +487,64 @@ a.order-line-title:hover {
   margin-block: 12px;
 }
 
+/* Stock reservations: the table, then the shipment read and results. */
+.order-stock {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.order-stock td small {
+  white-space: normal;
+}
+
+.order-stock-status {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.order-stock-dialog .native-stock-form,
+.order-stock-dialog .native-stock-form fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.order-stock-dialog .native-stock-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-stock-read {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.sales-record,
+.sales-record-accept {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.sales-record-accept p {
+  margin: 0;
+}
+
+.sales-record > *,
+.sales-record-form {
+  justify-self: stretch;
+}
+
+.sales-record-form fieldset > button[type='submit'] {
+  justify-self: start;
+}
+
 .order-history details {
   min-width: 0;
 }
@@ -573,10 +648,6 @@ a.order-line-title:hover {
 
 .order-plan-propose > [role='alert'] {
   grid-column: 1 / -1;
-}
-
-.order-source-context {
-  scroll-margin-top: 16px;
 }
 
 @media (max-width: 640px) {

@@ -8,6 +8,7 @@ import type {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardContent } from '@luma/ui/components/primitives/card';
 import {
@@ -32,6 +33,7 @@ import {
   useSearch,
 } from '@tanstack/react-router';
 import {
+  ClipboardList,
   Database,
   Ellipsis,
   Link2,
@@ -54,7 +56,7 @@ import { OrderSection } from '../../shared/orders/order-section';
 import { RecordFields } from '../adaptive/record-fields';
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
-import { OrderReturnCases } from '../returns/case-entry';
+import { OrderReturnsWithCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import {
   OrderChangePlanContent,
@@ -77,7 +79,7 @@ import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
 import { OrderFulfillments, OrderTimeline } from './order-timeline';
-import { SalesRecord } from './sales-record';
+import { SalesRecordPanel, useSalesRecordAccess } from './sales-record';
 import { OrderLines, SourceComparison, SourceSwitch } from './source-facts';
 import { OrderSummaryList } from './summary';
 
@@ -103,6 +105,7 @@ export function OrderPage() {
       });
   }, [query.data, orderId, organizationId, search, navigate]);
   const apps = useQuery(appsOptions(organizationId));
+  const salesAccess = useSalesRecordAccess(organizationId, query.data);
   const proposal = proposedChange(search);
   // Planned at the detail's read time, so every detail refresh reads the plan again.
   const plans = useQuery({
@@ -128,7 +131,6 @@ export function OrderPage() {
       params: { organizationId, orderId },
       search: { ...search, ...next },
       replace: true,
-      ...(next.edit ? { hash: `source-${next.edit}` } : {}),
     });
   const online = useSyncExternalStore(
     subscribe,
@@ -174,22 +176,26 @@ export function OrderPage() {
             organizationId={organizationId}
             kind="order"
             recordId={query.data.order.id}
-            frame={(content) => (
+            frame={(content, empty) => (
               <OrderSection
                 title={m.messaging_record_section_title()}
                 icon={Mail}
+                status={
+                  empty ? <Badge>{m.orders_section_none()}</Badge> : undefined
+                }
               >
-                {content}
+                {empty ? null : content}
               </OrderSection>
             )}
           />
         ) : null
       }
-      returnCases={
+      returns={(from) =>
         query.data ? (
-          <OrderReturnCases
+          <OrderReturnsWithCases
             organizationId={organizationId}
-            orderId={query.data.order.id}
+            detail={query.data}
+            from={from}
             sourceLabel={(connectionId) =>
               query.data.sources.find(
                 (source) => source.connectionId === connectionId,
@@ -216,6 +222,7 @@ export function OrderPage() {
             edit: undefined,
           }),
         openEdit: (connectionId) => changeSearch({ edit: connectionId }),
+        closeEdit: () => changeSearch({ edit: undefined }),
       }}
       workspace={
         query.data ? (
@@ -225,13 +232,22 @@ export function OrderPage() {
               recordType="order"
               recordId={query.data.order.id}
             />
-            <SalesRecord organizationId={organizationId} detail={query.data} />
             <NativeOrderStock
               organizationId={organizationId}
               detail={query.data}
             />
           </>
         ) : null
+      }
+      salesRecord={
+        salesAccess && query.data
+          ? () => (
+              <SalesRecordPanel
+                organizationId={organizationId}
+                detail={query.data}
+              />
+            )
+          : undefined
       }
       linkSuggestions={(open) =>
         query.data ? (
@@ -293,13 +309,17 @@ export interface OrderChangePlanState {
   clear: () => void;
   /** Opens the edit of the connection's app, prefilled from the plan's executable Luma step. */
   openEdit: (connectionId: string) => void;
+  /** Leaves the app's edit, so reloading the order doesn't open it again. */
+  closeEdit: () => void;
 }
 
 /** The panel open beside the order, with the line it was opened for. */
 type Sheet =
   | { kind: 'plan'; line?: string | undefined }
   | { kind: 'links'; line?: string | undefined }
-  | { kind: 'compare'; line: string };
+  | { kind: 'compare'; line: string }
+  | { kind: 'sales' }
+  | { kind: 'live'; connectionId: string };
 
 function lineTitle(detail: OrderDetail, key: string) {
   const line = detail.sources
@@ -309,19 +329,27 @@ function lineTitle(detail: OrderDetail, key: string) {
   return line?.title ?? line?.skuCode ?? m.orders_lines_untitled();
 }
 
-/** More order actions in the workspace bar: planning, source links and the raw records. */
+/**
+ * More order actions in the workspace bar: planning, source links, the Luma order record and
+ * the raw records.
+ */
 function OrderMenu({
   organizationId,
   orderId,
   here,
   plan,
   links,
+  sales,
+  live,
 }: {
   organizationId: string;
   orderId: string;
   here: string;
   plan?: (() => void) | undefined;
   links?: (() => void) | undefined;
+  sales?: (() => void) | undefined;
+  /** Each source whose app shows live details, with the action that opens them. */
+  live: { connectionId: string; label: string; open: () => void }[];
 }) {
   return (
     <DropdownMenu>
@@ -350,7 +378,21 @@ function OrderMenu({
             {m.orders_links_title()}
           </DropdownMenuItem>
         ) : null}
-        {plan || links ? <DropdownMenuSeparator /> : null}
+        {sales ? (
+          <DropdownMenuItem onClick={sales}>
+            <ClipboardList aria-hidden="true" />
+            {m.orders_sales_title()}
+          </DropdownMenuItem>
+        ) : null}
+        {live.map((item) => (
+          <DropdownMenuItem key={item.connectionId} onClick={item.open}>
+            <Radio aria-hidden="true" />
+            {m.orders_detail_live_title({ source: item.label })}
+          </DropdownMenuItem>
+        ))}
+        {plan || links || sales || live.length ? (
+          <DropdownMenuSeparator />
+        ) : null}
         <DropdownMenuItem
           render={
             <Link
@@ -387,8 +429,9 @@ export function OrderDetailView({
   links,
   linkSuggestions,
   messages,
-  returnCases,
+  returns,
   changePlan,
+  salesRecord,
 }: {
   organizationId: string;
   /** The connected page supplies the authorized assistant control. */
@@ -407,16 +450,22 @@ export function OrderDetailView({
   linkSuggestions?: ((open: () => void) => ReactNode) | undefined;
   /** Message threads linked to the order, framed as an order section. */
   messages?: ReactNode;
-  /** The order's return cases and the control to open one. */
-  returnCases?: ReactNode;
+  /** The order's returns with its return cases and the control to open one. */
+  returns?: ((from: string) => ReactNode) | undefined;
   /** Change plans for detected changes and the reader's proposal. */
   changePlan?: OrderChangePlanState | undefined;
+  /** Accepts the order into Luma or edits its Luma order record; absent without access. */
+  salesRecord?: (() => ReactNode) | undefined;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
   const [chosen, setChosen] = useState<string | null>(null);
-  // A link with a proposal opens its plan, unless it also opens an app's edit of the plan.
+  // A link to an app's edit opens that app's live details; a link with a proposal opens its plan.
   const [sheet, setSheet] = useState<Sheet | null>(() =>
-    changePlan?.proposal && !search.edit ? { kind: 'plan' } : null,
+    search.edit
+      ? { kind: 'live', connectionId: search.edit }
+      : changePlan?.proposal
+        ? { kind: 'plan' }
+        : null,
   );
   const returnPath = recordReturnPath(organizationId, search.from);
   const listSearch = {
@@ -442,6 +491,12 @@ export function OrderDetailView({
           return content ? [{ source, content }] : [];
         })
       : [];
+  const liveContext =
+    sheet?.kind === 'live'
+      ? contexts.find(
+          ({ source }) => source.connectionId === sheet.connectionId,
+        )
+      : undefined;
   const several = (detail?.sources.length ?? 0) > 1;
   const plannable = detail && changePlan ? planLines(detail) : [];
   const sourceLabel = (connectionId: string) =>
@@ -486,6 +541,15 @@ export function OrderDetailView({
                 plannable.length ? () => setSheet({ kind: 'plan' }) : undefined
               }
               links={links ? () => setSheet({ kind: 'links' }) : undefined}
+              sales={
+                salesRecord ? () => setSheet({ kind: 'sales' }) : undefined
+              }
+              live={contexts.map(({ source }) => ({
+                connectionId: source.connectionId,
+                label: source.label,
+                open: () =>
+                  setSheet({ kind: 'live', connectionId: source.connectionId }),
+              }))}
             />
           ) : null
         }
@@ -542,35 +606,21 @@ export function OrderDetailView({
               organizationId={organizationId}
               from={here}
             />
-            <OrderReturns
-              detail={detail}
-              organizationId={organizationId}
-              from={here}
-              cases={returnCases}
-            />
+            {returns ? (
+              returns(here)
+            ) : (
+              <OrderReturns
+                detail={detail}
+                organizationId={organizationId}
+                from={here}
+              />
+            )}
             <OrderCharges detail={detail} shown={shown} />
             {several || detail.differences.length ? (
               <SourceComparison detail={detail} />
             ) : null}
             {workspace}
             {messages}
-            {contexts.map(({ source, content }) => (
-              <div
-                key={source.connectionId}
-                id={`source-${source.connectionId}`}
-                className="order-source-context"
-              >
-                <OrderSection
-                  title={m.orders_detail_live_title({ source: source.label })}
-                  icon={Radio}
-                  description={m.orders_detail_live_description({
-                    source: source.label,
-                  })}
-                >
-                  {content}
-                </OrderSection>
-              </div>
-            ))}
             <OrderTimeline
               detail={detail}
               organizationId={organizationId}
@@ -592,9 +642,12 @@ export function OrderDetailView({
       )}
       {detail ? (
         <Dialog
-          open={sheet !== null}
+          // Live details open once the source's app has loaded them.
+          open={sheet !== null && (sheet.kind !== 'live' || !!liveContext)}
           onOpenChange={(open) => {
-            if (!open) setSheet(null);
+            if (open) return;
+            if (sheet?.kind === 'live' && search.edit) changePlan?.closeEdit();
+            setSheet(null);
           }}
         >
           <DialogContent placement="sheet" className="order-sheet">
@@ -624,7 +677,7 @@ export function OrderDetailView({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSheet(null);
+                          setSheet({ kind: 'live', connectionId });
                           changePlan.openEdit(connectionId);
                         }}
                       >
@@ -645,6 +698,37 @@ export function OrderDetailView({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="order-sheet-body">{links(sheet.line)}</div>
+              </>
+            ) : sheet?.kind === 'live' && liveContext ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {m.orders_detail_live_title({
+                      source: liveContext.source.label,
+                    })}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {m.orders_detail_live_description({
+                      source: liveContext.source.label,
+                    })}
+                  </DialogDescription>
+                </DialogHeader>
+                <div
+                  id={`source-${liveContext.source.connectionId}`}
+                  className="order-sheet-body"
+                >
+                  {liveContext.content}
+                </div>
+              </>
+            ) : sheet?.kind === 'sales' && salesRecord ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{m.orders_sales_title()}</DialogTitle>
+                  <DialogDescription>
+                    {m.orders_sales_description()}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="order-sheet-body">{salesRecord()}</div>
               </>
             ) : sheet?.kind === 'compare' ? (
               <>

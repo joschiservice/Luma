@@ -6,24 +6,23 @@ import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 
 import { contextOptions } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { OrderSection } from '../../shared/orders/order-section';
 
 const api = createWebApiClient();
 
-/** Shows released sales intake and records only to people with sales and import permission. */
-export function SalesRecord({
-  organizationId,
-  detail,
-}: {
-  organizationId: string;
-  detail: OrderDetail;
-}) {
+/**
+ * Whether the reader may keep Luma order records for the order: the feature is released to the
+ * workspace, the reader may manage sales and imports, and the order comes from Shopify or
+ * already has a Luma record.
+ */
+export function useSalesRecordAccess(
+  organizationId: string,
+  detail: OrderDetail | undefined,
+) {
   const context = useQuery(contextOptions(organizationId));
   const availability = useQuery({
     ...privateQueryDefaults,
@@ -34,14 +33,21 @@ export function SalesRecord({
   const permitted =
     context.data?.permissions.includes('sales.manage') &&
     context.data.permissions.includes('sync.manage');
-  if (!availability.data?.enabled || !permitted) return null;
 
-  return (
-    <ReleasedSalesRecord organizationId={organizationId} detail={detail} />
+  return Boolean(
+    availability.data?.enabled &&
+    permitted &&
+    detail?.sources.some(
+      (source) => source.system === 'shopify' || source.system === 'luma-erp',
+    ),
   );
 }
 
-function ReleasedSalesRecord({
+/**
+ * Accepts the order into Luma or edits its Luma order record, for a panel beside the order.
+ * Editing needs Luma ERP to be the authority for order lines and lifecycle.
+ */
+export function SalesRecordPanel({
   organizationId,
   detail,
 }: {
@@ -72,11 +78,11 @@ function ReleasedSalesRecord({
     },
   });
   const source = detail.sources.find((source) => source.system === 'shopify');
-  if (query.isPending) return <Alert>{m.orders_sales_loading()}</Alert>;
+  if (query.isPending) return <p role="status">{m.orders_sales_loading()}</p>;
   if (query.isError)
     return (
       <Alert tone="warning">
-        {m.orders_sales_unavailable()}
+        {m.orders_sales_unavailable()}{' '}
         <Button variant="outline" onClick={() => void query.refetch()}>
           {m.records_refresh()}
         </Button>
@@ -84,11 +90,8 @@ function ReleasedSalesRecord({
     );
   if (!query.data)
     return source ? (
-      <OrderSection
-        title={m.orders_sales_title()}
-        icon={ClipboardList}
-        description={m.orders_sales_intro()}
-      >
+      <div className="sales-record-accept">
+        <p>{m.orders_sales_intro()}</p>
         <Button
           disabled={accept.isPending}
           onClick={() => accept.mutate(source.connectionId)}
@@ -98,7 +101,7 @@ function ReleasedSalesRecord({
         {accept.isError ? (
           <Alert tone="warning">{m.orders_sales_error()}</Alert>
         ) : null}
-      </OrderSection>
+      </div>
     ) : null;
   const record = query.data;
   const editable = ['order_lifecycle', 'order_lines'].every((group) =>
@@ -163,7 +166,7 @@ function SalesEditor({
   });
 
   return (
-    <OrderSection title={m.orders_sales_title()} icon={ClipboardList}>
+    <div className="sales-record">
       {!editable ? <Alert>{m.orders_sales_authority()}</Alert> : null}
       <form
         className="sales-record-form"
@@ -223,9 +226,11 @@ function SalesEditor({
         {save.isError ? (
           <Alert tone="warning">{m.orders_sales_error()}</Alert>
         ) : null}
-        {save.isSuccess ? <Alert>{m.orders_sales_saved()}</Alert> : null}
+        {save.isSuccess ? (
+          <Alert role="status">{m.orders_sales_saved()}</Alert>
+        ) : null}
       </form>
-    </OrderSection>
+    </div>
   );
 }
 

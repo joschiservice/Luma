@@ -403,7 +403,6 @@
   "returns_case_error_access": "Du darfst in diesem Workspace keine Retouren ändern.",
   "returns_case_error_unconfirmed": "Luma konnte nicht bestätigen, ob das gespeichert wurde. Wiederhole, um dieselbe Anfrage sicher erneut zu senden.",
   "returns_case_order_title": "Retourenfälle",
-  "returns_case_order_empty": "Noch keine Retourenfälle.",
   "returns_case_order_item": "Retourenfall · {units, plural, one {{units, number} Einheit} other {{units, number} Einheiten}}",
   "returns_case_order_assignee": "{name} zugewiesen",
   "returns_case_order_nothing_left": "Jede Einheit dieser Bestellung ist bereits in einer Retoure.",
@@ -624,5 +623,6 @@
   "returns_preview_filter": "Nach {value} filtern",
   "returns_preview_unavailable": "Die Details der Retoure konnten nicht geladen werden.",
   "returns_preview_order": "Bestellung",
-  "returns_preview_items": "Artikel"
+  "returns_preview_items": "Artikel",
+  "returns_order_section_hidden": "Du kannst die Retouren und Erstattungen des Shops für diese Bestellung nicht sehen."
 }

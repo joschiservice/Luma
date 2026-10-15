@@ -181,8 +181,10 @@ test('opens an imported customer from an order, lists their imported orders and 
     [f.org.id, source.store, 'gid://shopify/Order/2001', customerId],
   );
 
-  // The order's source panel links to the source customer, which opens the imported profile.
+  // The order's live source details link to the source customer, which opens the imported profile.
   await page.goto(`/app/${f.org.id}/orders/${orderId}`);
+  await page.getByRole('button', { name: 'More order actions' }).click();
+  await page.getByRole('menuitem', { name: /^Live .* details$/ }).click();
   await page.getByRole('link', { name: 'Open customer in Luma' }).click();
   await page.waitForURL(`**/customers/${averyId}`);
   await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();

@@ -138,7 +138,7 @@ export function OrderJourney({
                         {m.orders_journey_observed()}{' '}
                         <WorkspaceDate value={event.observedAt} />
                         {event.actorId
-                          ? ` · ${m.orders_journey_actor({ actor: actorIndex.has(event.actorId) ? actorLabel(actorIndex.get(event.actorId)!) : event.actorId })}`
+                          ? ` · ${m.orders_journey_actor({ actor: actorIndex.has(event.actorId) ? actorLabel(actorIndex.get(event.actorId)!) : m.orders_journey_actor_unknown() })}`
                           : ''}
                       </small>
                       {timing?.durationMs !== null &&

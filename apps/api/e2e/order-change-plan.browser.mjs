@@ -74,6 +74,10 @@ test('previews a quantity plan, opens the Shopify edit prefilled and hands the w
   // Packing in JTL makes the change unsafe; the warehouse step is a person's.
   await fixture.packing();
   await page.reload();
+  // The link still opens the app's edit beside the order; closing it leaves the edit.
+  await expect(page.getByRole('dialog', { name: /^Live / })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/edit=/);
   await expect(lines.getByText('Not safe to change')).toBeVisible();
   await lines.getByRole('button', { name: /^Review plan/ }).click();
   await expect(

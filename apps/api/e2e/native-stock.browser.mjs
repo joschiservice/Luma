@@ -54,17 +54,21 @@ test('allocates and releases native stock through operator controls in light, da
   const stock = page.getByRole('table', { name: 'Native stock', exact: true });
   await expect(stock).toContainText('12');
   await page.goto(`/app/${f.owner.tenantId}/orders/${f.orderId}`);
-  await expect(
-    page.getByRole('heading', {
-      name: 'Native order reservations',
-      exact: true,
-    }),
-  ).toBeVisible();
-  const read = page.getByRole('button', {
-    name: 'Read shipments independently',
+  const section = page.getByRole('region', {
+    name: 'Stock reservations',
     exact: true,
   });
-  await read.focus();
+  // Nothing is reserved yet, so the section is its header with a badge and its actions.
+  await expect(section.getByRole('heading', { name: /None$/ })).toBeVisible();
+  const actions = section.getByRole('button', {
+    name: 'Stock reservation actions',
+  });
+  // The shipment read and reservation work by keyboard alone.
+  await actions.focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    page.getByRole('menuitem', { name: 'Read shipments independently' }),
+  ).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(
     page.getByText(
@@ -72,44 +76,47 @@ test('allocates and releases native stock through operator controls in light, da
       { exact: false },
     ),
   ).toBeVisible();
-  await page.getByRole('combobox', { name: 'Order line', exact: true }).click();
+  await actions.click();
+  await page.getByRole('menuitem', { name: 'Reserve stock…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reserve stock' });
+  await dialog
+    .getByRole('combobox', { name: 'Order line', exact: true })
+    .click();
   await page.getByRole('option').filter({ hasText: 'LUMA-001' }).click();
-  await page
+  await dialog
     .getByRole('combobox', { name: 'Stock location', exact: true })
     .click();
   await page
     .getByRole('option', { name: 'Main warehouse', exact: true })
     .click();
-  await page
+  await dialog
     .getByRole('textbox', { name: 'Quantity', exact: true })
     .fill('3.125001');
-  await page
+  await dialog
     .getByRole('button', { name: 'Reserve stock', exact: true })
     .click();
-  const reservations = page.getByRole('table', {
-    name: 'Native order reservations',
-    exact: true,
+  await expect(dialog).toHaveCount(0);
+  const reservations = section.getByRole('table', {
+    name: 'Stock held for this order, by line and location',
   });
   await expect(reservations).toContainText('3.125001');
   await expect(
     page.getByText('Unallocated demand: 0.874999', { exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Release remaining hold', exact: true })
+  await reservations
+    .getByRole('button', { name: 'Actions for LUMA-001', exact: true })
     .click();
-  await expect(reservations).toContainText('3.125001');
+  await page
+    .getByRole('menuitem', { name: 'Release remaining hold', exact: true })
+    .click();
+  await expect(reservations).toContainText('Released');
   await expect(
-    page.getByRole('button', { name: 'Release remaining hold', exact: true }),
+    reservations.getByRole('button', { name: 'Actions for LUMA-001' }),
   ).toHaveCount(0);
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(
-    page.getByRole('heading', {
-      name: 'Native order reservations',
-      exact: true,
-    }),
-  ).toBeVisible();
+  await expect(section.getByRole('heading', { level: 2 })).toBeVisible();
   expect(
     await page.evaluate(
       () =>

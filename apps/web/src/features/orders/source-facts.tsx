@@ -124,8 +124,19 @@ function LineItem({
   );
 }
 
-/** Units still to fulfill, emphasized while any remain. */
-function LineRemaining({ line, note }: { line: OrderLine; note?: boolean }) {
+/**
+ * Units still to fulfill, emphasized while any remain on an open order. A closed order has no
+ * fulfillment work left, so its unfulfilled units are stated without emphasis.
+ */
+function LineRemaining({
+  line,
+  open,
+  note,
+}: {
+  line: OrderLine;
+  open: boolean;
+  note?: boolean;
+}) {
   const remaining = line.remainingQuantity;
   if (remaining === null)
     return (
@@ -136,7 +147,7 @@ function LineRemaining({ line, note }: { line: OrderLine; note?: boolean }) {
   const quantity = formatQuantity(remaining, line.unit);
   const text = note ? m.orders_lines_remaining_note({ quantity }) : quantity;
 
-  return Number(remaining) > 0 ? (
+  return open && Number(remaining) > 0 ? (
     <strong className="order-line-remaining">{text}</strong>
   ) : (
     text
@@ -147,7 +158,7 @@ function LineRemaining({ line, note }: { line: OrderLine; note?: boolean }) {
  * Current units, with original and reduced units beneath when they say something more. Narrow
  * tables hide the remaining column, so the remaining units move beneath too.
  */
-function LineQuantity({ line }: { line: OrderLine }) {
+function LineQuantity({ line, open }: { line: OrderLine; open: boolean }) {
   const current = line.currentQuantity;
   const notes = [
     current === null || Number(current) !== Number(line.quantity)
@@ -175,7 +186,7 @@ function LineQuantity({ line }: { line: OrderLine }) {
         <small key={note}>{note}</small>
       ))}
       <small className="order-line-remaining-narrow">
-        <LineRemaining line={line} note />
+        <LineRemaining line={line} open={open} note />
       </small>
     </span>
   );
@@ -238,22 +249,24 @@ function LineMenu({
   if (!items.length) return null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={m.orders_lines_actions({ item: label })}
-          >
-            <Ellipsis aria-hidden="true" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-auto min-w-56">
-        {items}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <span className="order-line-menu">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={m.orders_lines_actions({ item: label })}
+            >
+              <Ellipsis aria-hidden="true" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
+          {items}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
   );
 }
 
@@ -282,6 +295,7 @@ function lineColumns({
   );
   const state = detail.order.comparisonState;
   const several = detail.sources.length > 1;
+  const open = detail.order.open !== false;
   const flags = (line: OrderLine) => {
     const badges = [
       line.comparisonKey && differing.has(line.comparisonKey) ? (
@@ -347,7 +361,7 @@ function lineColumns({
       key: 'quantity',
       header: m.orders_lines_column_quantity(),
       numeric: true,
-      cell: (line) => <LineQuantity line={line} />,
+      cell: (line) => <LineQuantity line={line} open={open} />,
     },
     // Luma computes the total on the server from the shown price and current units.
     ...(priced
@@ -378,7 +392,7 @@ function lineColumns({
       header: m.orders_lines_column_remaining(),
       numeric: true,
       hideOnNarrow: true,
-      cell: (line) => <LineRemaining line={line} />,
+      cell: (line) => <LineRemaining line={line} open={open} />,
     },
     ...(actions
       ? [

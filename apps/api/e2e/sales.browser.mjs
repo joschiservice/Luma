@@ -70,7 +70,15 @@ test('accepts and edits a Luma order with explicit authority in both themes and 
   );
   const page = await context.newPage();
   await page.goto(`/app/${f.org.id}/orders/${id}`);
-  await page
+  // The Luma order record opens from the order's actions, beside the order.
+  const openRecord = async () => {
+    await page.getByRole('button', { name: 'More order actions' }).click();
+    await page.getByRole('menuitem', { name: 'Luma order record' }).click();
+
+    return page.getByRole('dialog', { name: 'Luma order record' });
+  };
+  let form = await openRecord();
+  await form
     .getByRole('button', { name: 'Accept into Luma', exact: true })
     .click();
   await expect(
@@ -94,7 +102,7 @@ test('accepts and edits a Luma order with explicit authority in both themes and 
     });
   }
   await page.reload();
-  const form = page.locator('section[aria-label="Luma order record"]');
+  form = await openRecord();
   await expect(form.getByRole('button', { name: 'Save order' })).toBeEnabled();
   await form.getByLabel('MUG-176 · Current quantity').fill('1');
   await form.getByText('Shipping address', { exact: true }).first().click();

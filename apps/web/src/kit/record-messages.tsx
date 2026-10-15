@@ -6,8 +6,12 @@ export interface RecordMessagesProps {
   organizationId: string;
   kind: LinkedRecordKind;
   recordId: string;
-  /** Wraps the list in the record page's section, such as a card with the "Messages" title. */
-  frame: (content: ReactNode) => ReactNode;
+  /**
+   * Wraps the list in the record page's section, such as a card with the "Messages" title.
+   * `empty` is true once the record is known to have no threads, so the page can show the
+   * section's header alone.
+   */
+  frame: (content: ReactNode, empty: boolean) => ReactNode;
 }
 
 const RecordMessagesView = createContext<

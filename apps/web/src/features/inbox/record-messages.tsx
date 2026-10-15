@@ -112,5 +112,6 @@ export function RecordMessages({
       loading={query.isPending}
       error={failure ? m.messaging_record_failed() : undefined}
     />,
+    !failure && query.data?.items.length === 0,
   );
 }

@@ -62,6 +62,15 @@ async function confirmLink(page, f, button, reason) {
   await f.pilot.observe({ check: false });
 }
 
+/** Opens the live Starshipit details beside the order from the order's actions. */
+async function openLiveStarshipit(page) {
+  await page.getByRole('button', { name: 'More order actions' }).click();
+  await page.getByRole('menuitem', { name: /^Live .*STARSHIPIT/i }).click();
+  await expect(
+    page.getByRole('dialog', { name: /^Live .*STARSHIPIT/i }),
+  ).toBeVisible();
+}
+
 test('confirms source order and line identities, reviews the exact shipping correction, approves independently and verifies one provider write', async ({
   resources: t,
 }) => {
@@ -258,6 +267,7 @@ test('confirms source order and line identities, reviews the exact shipping corr
   await expect(
     observer.getByRole('region', { name: 'Current state', exact: true }),
   ).toBeVisible();
+  await openLiveStarshipit(observer);
   await expect(
     observer.getByRole('heading', {
       name: 'Correct unshipped shipping quantities',
@@ -275,6 +285,7 @@ test('shows a disabled shipping action release without offering an executable co
   });
   const page = await f.page();
   await page.goto(`/app/${f.tenantId}/orders/${f.shipping}`);
+  await openLiveStarshipit(page);
   const correction = page.locator(
     `#source-${f.manifest.connections.starshipit}`,
   );

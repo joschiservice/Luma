@@ -1,4 +1,4 @@
-import type { ReturnDetail } from '@luma/api-contract';
+import type { OrderDetail, ReturnDetail } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { StatePill } from '@luma/ui/components/primitives/state';
@@ -15,80 +15,108 @@ import {
   personName,
 } from './case-presentation';
 import { OpenCaseDialog } from './open-case-dialog';
+import { OrderReturns } from './order-returns';
 
 /**
- * Lists an order's return cases and opens a new one. Readers without access to returns see
- * nothing; the order page stays complete without it.
+ * Shows the order's returns and refunds with Luma's return cases beneath them, and puts
+ * opening a new case in the section header. Readers without access to return cases see the
+ * store's records alone; the order page stays complete without them.
  */
-export function OrderReturnCases({
+export function OrderReturnsWithCases({
   organizationId,
-  orderId,
+  detail,
+  from,
   sourceLabel,
 }: {
   organizationId: string;
-  orderId: string;
+  detail: OrderDetail;
+  from: string;
   sourceLabel: (connectionId: string) => string;
 }) {
+  const orderId = detail.order.id;
   const query = useQuery(orderReturnCasesOptions(organizationId, orderId));
   const [opening, setOpening] = useState(false);
-  if (query.error instanceof IdentityError && query.error.status === 403)
-    return null;
-  const data = query.data;
-  if (!data) return null;
-  const returnable = data.sources.some((source) =>
+  const data =
+    query.error instanceof IdentityError && query.error.status === 403
+      ? undefined
+      : query.data;
+  const returnable = data?.sources.some((source) =>
     source.lines.some((line) => line.returnable > 0),
   );
+  // Only an order with returns can have every unit in one; otherwise the note would mislead.
+  const nothingLeft =
+    data?.canManage &&
+    !returnable &&
+    (data.cases.length > 0 || detail.returns.length > 0);
 
   return (
-    <div className="returns-order-cases">
-      <h3>{m.returns_case_order_title()}</h3>
-      {data.cases.length ? (
-        <ul className="order-list">
-          {data.cases.map((item) => (
-            <li key={item.id}>
-              <Link
-                className="order-row-link"
-                to="/app/$organizationId/returns/cases/$caseId"
-                params={{ organizationId, caseId: item.id }}
-              >
-                <span className="returns-cell">
-                  <strong>
-                    {m.returns_case_order_item({ units: item.units })}
-                  </strong>
-                  <span>
-                    <StatePill state={caseStageStates[item.stage]}>
-                      {caseStageLabels[item.stage]}
-                    </StatePill>
-                  </span>
-                  <small>
-                    {sourceLabel(item.connectionId)}
-                    {item.assignee
-                      ? ` · ${m.returns_case_order_assignee({ name: personName(item.assignee) })}`
-                      : ''}
-                  </small>
-                </span>
-                <ChevronRight
-                  className="order-row-chevron"
-                  aria-hidden="true"
-                />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="order-note">{m.returns_case_order_empty()}</p>
-      )}
-      {data.canManage ? (
-        returnable ? (
-          <Button variant="outline" size="sm" onClick={() => setOpening(true)}>
-            <ClipboardCheck size={14} aria-hidden="true" />
-            {m.returns_case_open_action()}
-          </Button>
-        ) : (
-          <p className="order-note">{m.returns_case_order_nothing_left()}</p>
-        )
-      ) : null}
-      {opening ? (
+    <>
+      <OrderReturns
+        detail={detail}
+        organizationId={organizationId}
+        from={from}
+        cases={
+          data?.cases.length || nothingLeft ? (
+            <div className="returns-order-cases">
+              {data?.cases.length ? (
+                <>
+                  <h3>{m.returns_case_order_title()}</h3>
+                  <ul className="order-list">
+                    {data.cases.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          className="order-row-link"
+                          to="/app/$organizationId/returns/cases/$caseId"
+                          params={{ organizationId, caseId: item.id }}
+                        >
+                          <span className="returns-cell">
+                            <strong>
+                              {m.returns_case_order_item({ units: item.units })}
+                            </strong>
+                            <span>
+                              <StatePill state={caseStageStates[item.stage]}>
+                                {caseStageLabels[item.stage]}
+                              </StatePill>
+                            </span>
+                            <small>
+                              {sourceLabel(item.connectionId)}
+                              {item.assignee
+                                ? ` · ${m.returns_case_order_assignee({ name: personName(item.assignee) })}`
+                                : ''}
+                            </small>
+                          </span>
+                          <ChevronRight
+                            className="order-row-chevron"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {nothingLeft ? (
+                <p className="order-note">
+                  {m.returns_case_order_nothing_left()}
+                </p>
+              ) : null}
+            </div>
+          ) : null
+        }
+        action={
+          data?.canManage && returnable ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpening(true)}
+            >
+              <ClipboardCheck size={14} aria-hidden="true" />
+              {m.returns_case_open_action()}
+            </Button>
+          ) : null
+        }
+      />
+      {opening && data ? (
         <OpenCaseDialog
           organizationId={organizationId}
           orderId={orderId}
@@ -97,7 +125,7 @@ export function OrderReturnCases({
           close={() => setOpening(false)}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

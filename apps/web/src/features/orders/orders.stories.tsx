@@ -816,6 +816,7 @@ function DetailPreview({
     | 'inconclusive'
     | 'syncing'
     | 'restricted'
+    | 'empty'
     | undefined;
 }) {
   const [proposal, setProposal] = useState<OrderChangePlanQuery | null>(null);
@@ -834,6 +835,7 @@ function DetailPreview({
           setProposal({ kind: 'quantity', lineKey, quantity }),
         clear: () => setProposal(null),
         openEdit: () => {},
+        closeEdit: () => {},
       }}
       links={() => (
         <p className="order-note">
@@ -848,53 +850,57 @@ function DetailPreview({
           : undefined
       }
       detail={
-        state === 'restricted'
-          ? {
-              ...detail,
-              hidden: ['addresses'],
-              sources: detail.sources.map((source) => {
-                const restricted = { ...source };
-                delete restricted.addresses;
-
-                return restricted;
-              }),
-            }
-          : state === 'pending' || state === 'inconclusive'
+        state === 'empty'
+          ? { ...detail, fulfillments: [], returns: [] }
+          : state === 'restricted'
             ? {
                 ...detail,
-                order: {
-                  ...detail.order,
-                  differs: false,
-                  comparisonState: state,
-                },
+                hidden: ['addresses', 'fulfillments', 'returns'],
+                fulfillments: [],
+                returns: [],
+                sources: detail.sources.map((source) => {
+                  const restricted = { ...source };
+                  delete restricted.addresses;
+
+                  return restricted;
+                }),
               }
-            : state === 'syncing'
+            : state === 'pending' || state === 'inconclusive'
               ? {
                   ...detail,
-                  issues: [
-                    ...detail.issues,
-                    {
-                      id: '78787878-7878-4878-8878-787878787878',
-                      class: 'inventory_mismatch',
-                      state: 'resolved',
-                      severity: 'high',
-                      relationship: 'sku',
-                      needsYou: false,
-                      lastDetectedAt: '2026-09-28T08:40:00.000Z',
-                      occurrences: 54,
-                    },
-                  ],
-                  stockSync: [
-                    {
-                      skuId: '99999999-9999-4999-8999-999999999999',
-                      since: '2026-09-28T08:58:00.000Z',
-                      until: '2026-09-28T09:13:00.000Z',
-                    },
-                  ],
+                  order: {
+                    ...detail.order,
+                    differs: false,
+                    comparisonState: state,
+                  },
                 }
-              : state === 'ready' || state === 'offline'
-                ? detail
-                : undefined
+              : state === 'syncing'
+                ? {
+                    ...detail,
+                    issues: [
+                      ...detail.issues,
+                      {
+                        id: '78787878-7878-4878-8878-787878787878',
+                        class: 'inventory_mismatch',
+                        state: 'resolved',
+                        severity: 'high',
+                        relationship: 'sku',
+                        needsYou: false,
+                        lastDetectedAt: '2026-09-28T08:40:00.000Z',
+                        occurrences: 54,
+                      },
+                    ],
+                    stockSync: [
+                      {
+                        skuId: '99999999-9999-4999-8999-999999999999',
+                        since: '2026-09-28T08:58:00.000Z',
+                        until: '2026-09-28T09:13:00.000Z',
+                      },
+                    ],
+                  }
+                : state === 'ready' || state === 'offline'
+                  ? detail
+                  : undefined
       }
       sourceContext={(source) =>
         source.appId === 'shopify' ? (
@@ -1405,6 +1411,37 @@ export const RecordAddressesRestricted: Story = {
       section.getByText(/Addresses are customer data/),
     ).toBeVisible();
     await expect(section.queryByText('Hafenstraße 1')).toBeNull();
+    // Sections the reader can't view say so instead of reading as empty.
+    await expect(
+      canvas.getByRole('heading', { name: 'Fulfillments No access' }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('heading', { name: 'Returns and refunds No access' }),
+    ).toBeVisible();
+  },
+};
+
+/** Sections without records are their header alone, with a badge saying what was reported. */
+export const RecordEmptySections: Story = {
+  args: { page: 'detail', state: 'empty' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fulfillments = await canvas.findByRole('region', {
+      name: 'Fulfillments',
+    });
+    await expect(
+      within(fulfillments).getByRole('heading', {
+        name: 'Fulfillments None reported',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('heading', {
+        name: 'Returns and refunds None imported',
+      }),
+    ).toBeVisible();
+    await expect(
+      fulfillments.querySelector('[data-slot=card-content]'),
+    ).toBeNull();
   },
 };
 

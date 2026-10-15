@@ -403,7 +403,6 @@
   "returns_case_error_access": "You don’t have permission to change returns in this workspace.",
   "returns_case_error_unconfirmed": "Luma couldn’t confirm whether this was saved. Retry to send the same request again safely.",
   "returns_case_order_title": "Return cases",
-  "returns_case_order_empty": "No return cases yet.",
   "returns_case_order_item": "Return case · {units, plural, one {{units, number} unit} other {{units, number} units}}",
   "returns_case_order_assignee": "assigned to {name}",
   "returns_case_order_nothing_left": "Every unit of this order is already in a return.",
@@ -624,5 +623,6 @@
   "returns_preview_filter": "Filter by {value}",
   "returns_preview_unavailable": "The return’s details couldn’t be loaded.",
   "returns_preview_order": "Order",
-  "returns_preview_items": "Items"
+  "returns_preview_items": "Items",
+  "returns_order_section_hidden": "You can’t view this order’s store returns and refunds."
 }

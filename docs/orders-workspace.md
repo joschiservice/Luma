@@ -291,6 +291,14 @@ ordered units stay separate; source comparisons use mapped line business state. 
 reductions remain unknown. Outstanding units are never negative after refunds.
 Returns and refunds are order children (see [Returns workspace](returns-workspace.md)).
 
+A line's `currentTotal` is its current units times the unit price after discounts, or the
+plain unit price when the source reports no discounted one. The orders domain computes it
+exactly from canonical decimals; the web app never multiplies provider prices. It is null
+when the source doesn't report current units or a price, so it never reads as zero.
+
+The API returns an empty list for a detail section listed in `hidden`. The page must say the
+reader can't view that section, never that the source reported nothing.
+
 Delivery and charges show each source's commercial facts as that source reported them
 (order schema version 6, see [projection rules](commerce-projections.md)): currencies,
 amounts as placed and current, shipping lines, discounts, tax lines, tags and operational
@@ -306,7 +314,10 @@ imported (no read recorded them). Customer names, contact details and payment tr
 are not stored. For those, the web app mounts the owning app's `record` UI slot per source
 connection (see [workspace apps](apps.md)). The Shopify app reads the order live through its
 authorized `records` operation, so installed capabilities, granted scopes and protected
-customer data approval apply unchanged.
+customer data approval apply unchanged. The slot mounts only when the reader opens a
+source's live details beside the order, so viewing an order makes no live provider read. A
+change plan's hand-off to an app's edit sets `edit` in the order's search parameters, which
+opens that source's live details; closing them clears it.
 
 ## Maintained list projection
 
