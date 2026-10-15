@@ -177,5 +177,7 @@
   "decisions_automatic_running": "Luma führt dies aus",
   "decisions_open_purchase_order": "Bestellung öffnen",
   "decisions_proposal_changed": "Dieser Vorschlag hat sich während der Prüfung geändert",
-  "decisions_proposal_changed_help": "Prüfe die geänderten Werte vor deiner Antwort. Die vorherige Genehmigung deckt einen anderen Vorschlag nicht ab."
+  "decisions_proposal_changed_help": "Prüfe die geänderten Werte vor deiner Antwort. Die vorherige Genehmigung deckt einen anderen Vorschlag nicht ab.",
+  "decisions_waiting_others": "Wartet auf andere",
+  "decisions_waiting_empty": "Nichts wartet auf jemand anderen."
 }

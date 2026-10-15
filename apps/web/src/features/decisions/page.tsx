@@ -28,6 +28,7 @@ import {
   type CollectionSort,
   CollectionToolbar,
 } from '@luma/ui/components/primitives/collection-toolbar';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
@@ -322,6 +323,7 @@ export function NeedsYouView({
   controls = {},
   filtered = false,
   notices,
+  waiting,
   grouped,
   properties = decisionProperties,
   density = 'comfortable',
@@ -358,6 +360,7 @@ export function NeedsYouView({
   filtered?: boolean | undefined;
   /** Paging, repair and similar notices above the rows. */
   notices?: ReactNode;
+  waiting?: ReactNode;
   /** Groups to show instead of a flat list. */
   grouped?: NeedsYouGrouping | undefined;
   /** Row properties in display order. */
@@ -662,6 +665,7 @@ export function NeedsYouView({
                 )}
               </>
             ) : null}
+            {waiting}
           </div>
         }
         detail={
@@ -803,6 +807,25 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
     { q, cursor: search.cursor },
     timeZone,
   );
+  const [waitingOpen, setWaitingOpen] = useState(search.waiting ?? false);
+  const waitingScope = JSON.stringify([query.where, query.q]);
+  const [waitingPage, setWaitingPage] = useState<{
+    scope: string;
+    cursor: string;
+  }>();
+  const waitingCursor =
+    waitingPage?.scope === waitingScope ? waitingPage.cursor : undefined;
+  const waiting = useQuery({
+    ...decisionsOptions(organizationId, {
+      view: 'all',
+      scope: 'waiting',
+      where: query.where,
+      q: query.q,
+      limit: 100,
+      cursor: waitingCursor,
+    }),
+    enabled: ready && waitingOpen,
+  });
   const list = useQuery({
     ...decisionsOptions(organizationId, query),
     enabled: ready && !clientIssues.length,
@@ -1018,6 +1041,71 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
         ),
         onClear: clear,
       }}
+      waiting={
+        <Disclosure
+          open={waitingOpen}
+          onToggle={(event) => setWaitingOpen(event.currentTarget.open)}
+        >
+          <summary>{m.decisions_waiting_others()}</summary>
+          {waiting.isPending ? (
+            <p role="status">{m.decisions_loading_list()}</p>
+          ) : waiting.isError ? (
+            <p role="alert">{m.decisions_error_title()}</p>
+          ) : waiting.data ? (
+            <>
+              {waiting.data.items.length ? (
+                <ul className="decisions-waiting-list">
+                  {waiting.data.items.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        to="/app/$organizationId/needs-you"
+                        params={{ organizationId }}
+                        search={{ ...search, item: item.id }}
+                        resetScroll={false}
+                      >
+                        {item.title}
+                      </Link>
+                      <span>
+                        {decisionStatus(item).label}
+                        {item.reason === 'run' && item.requesterId
+                          ? ` · ${memberName(item.requesterId, memberList, self) ?? m.decisions_member_fallback()}`
+                          : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{m.decisions_waiting_empty()}</p>
+              )}
+              {waitingCursor ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => setWaitingPage(undefined)}
+                >
+                  {m.decisions_first_page()}
+                </Button>
+              ) : null}
+              {waiting.data.nextCursor ? (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setWaitingPage(
+                      waiting.data?.nextCursor
+                        ? {
+                            scope: waitingScope,
+                            cursor: waiting.data.nextCursor,
+                          }
+                        : undefined,
+                    )
+                  }
+                >
+                  {m.common_show_more()}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+        </Disclosure>
+      }
       filtered={!!q.trim() || state.where.conditions.length > 0}
       notices={
         failure && failure.kind !== 'unavailable' ? (
@@ -1099,11 +1187,11 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             members={memberList}
             self={self}
             assignmentAccess={
-              item.kind === 'human_task' ||
-              item.kind === 'case' ||
-              item.kind === 'return_case'
+              item.kind === 'human_task' || item.kind === 'return_case'
                 ? 'none'
-                : assignmentAccess
+                : item.owner.kind === 'case' && assignmentAccess === 'self'
+                  ? 'none'
+                  : assignmentAccess
             }
             now={now}
             assigning={assignment.isPending}

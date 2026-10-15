@@ -758,4 +758,103 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     await store.list(scoped, { ...range, limit: 100 });
     expect(queries).toBe(small);
   }, 60000);
+  it('groups business events before paging and retains steps without promoting routine checks', async () => {
+    const client = await owner.connect();
+    const proposal = randomUUID();
+    const quietProposal = randomUUID();
+    const otherProposal = randomUUID();
+    const ids: string[] = [];
+    try {
+      await client.query("SET session_replication_role='replica'");
+      const events = [
+        {
+          proposal,
+          action: 'policy.evaluated',
+          at: '2026-12-01T10:00:00Z',
+          details: {},
+        },
+        {
+          proposal,
+          action: 'execution.dispatched',
+          at: '2026-12-01T10:01:00Z',
+          details: { dispatch: 'accepted' },
+        },
+        {
+          proposal,
+          action: 'execution.verification_completed',
+          at: '2026-12-01T10:02:00Z',
+          details: { verification: 'passed' },
+        },
+        {
+          proposal: quietProposal,
+          action: 'workflow.step_recorded',
+          at: '2026-12-01T11:00:00Z',
+          details: {},
+        },
+        {
+          proposal: otherProposal,
+          action: 'case.reject',
+          at: '2026-12-01T09:00:00Z',
+          details: { outcome: 'reject' },
+        },
+      ];
+      for (const event of events) {
+        const id = randomUUID();
+        ids.push(id);
+        await client.query(
+          'INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document,created_at) VALUES($1::uuid,$2,$1::text,$3,$4,$5)',
+          [
+            id,
+            tenant,
+            event.proposal,
+            {
+              id,
+              tenantId: tenant,
+              eventType: event.action,
+              details: event.details,
+            },
+            event.at,
+          ],
+        );
+      }
+    } finally {
+      await client.query("SET session_replication_role='origin'");
+      client.release();
+    }
+    const store = createActivityStore(createTenantDatabase(reader));
+    const range = {
+      from: '2026-12-01T00:00:00Z',
+      to: '2026-12-02T00:00:00Z',
+      limit: 1,
+      view: 'business' as const,
+      detail: 'steps' as const,
+    };
+    const first = await store.list(context, range);
+    expect(first.items).toHaveLength(1);
+    expect(first.items[0]).toMatchObject({
+      id: ids[2],
+      outcome: 'verified',
+      steps: [{ id: ids[0] }, { id: ids[1] }],
+    });
+    expect(first.nextCursor).toBeTruthy();
+    const next = await store.list(context, {
+      ...range,
+      cursor: first.nextCursor!,
+    });
+    expect(next.items.map((event) => event.id)).toEqual([ids[4]]);
+    expect(next.nextCursor).toBeNull();
+    const raw = await store.list(context, {
+      ...range,
+      view: 'events',
+      limit: 100,
+    });
+    expect(raw.items.map((event) => event.id)).toEqual(
+      expect.arrayContaining(ids),
+    );
+    const foreign = await store.list(
+      { ...context, tenantId: randomUUID() },
+      { ...range, limit: 100 },
+    );
+    expect(foreign.items).toEqual([]);
+  });
 });

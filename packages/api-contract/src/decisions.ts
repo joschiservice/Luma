@@ -198,6 +198,12 @@ export const decisionItemSchema = z.object({
 });
 
 export const decisionQuerySchema = z.object({
+  scope: z
+    .enum(['actionable', 'waiting', 'all'])
+    .default('actionable')
+    .describe(
+      'Actionable work by default; waiting holds decisions that need someone else. Direct item reads include either scope.',
+    ),
   view: decisionViewSchema.default('all'),
   domain: decisionDomainSchema.optional(),
   reason: decisionReasonSchema.optional(),

@@ -4,6 +4,8 @@
   gap: 14px;
   max-width: 1240px;
   margin: 0 auto;
+  min-width: 0;
+  container-type: inline-size;
   font-size: 13px;
 }
 
@@ -87,11 +89,9 @@
 }
 
 .activity-event-copy small {
-  overflow: hidden;
   color: var(--foreground-subtle);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .activity-outcome {
@@ -102,7 +102,7 @@
 
 .activity-outcome small {
   color: var(--foreground-subtle);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .activity-event-chevron {
@@ -190,7 +190,7 @@
   font-size: 12px;
 }
 
-@media (max-width: 760px) {
+@container (max-width: 900px) {
   .activity-event-toggle {
     grid-template-columns: 16px minmax(0, 1fr) auto;
   }
@@ -207,4 +207,18 @@
   .activity-evidence dl {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.activity-event-copy strong {
+  overflow-wrap: anywhere;
+}
+.activity-record-link {
+  display: inline-block;
+  margin: 0 12px 10px;
+}
+.activity-steps {
+  display: grid;
+  gap: 8px;
+  margin-block: 0 16px;
+  padding-inline-start: 20px;
 }

@@ -23,10 +23,6 @@ import {
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { connectionHealthLabel } from '@luma/ui/lib/connection-health';
-import {
-  operatorCodeLabel,
-  operatorCodeMessages,
-} from '@luma/ui/lib/operator-code';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
@@ -41,8 +37,10 @@ import { useContext } from 'react';
 
 import { activityOptions } from '../../features/activity/data';
 import {
+  activityHref,
   activityLabel,
   activityState,
+  activityTitle,
 } from '../../features/activity/presentation';
 import { decisionsOptions } from '../../features/decisions/data';
 import {
@@ -438,11 +436,9 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
               </time>
               <StateDot state={activityState(event.outcome)} />
               <span className="home-timeline-text">
-                {event.summary
-                  ? operatorCodeMessages[event.summary]
-                    ? operatorCodeLabel(event.summary)
-                    : event.summary
-                  : activityLabel(event.action)}
+                <a href={activityHref(event, organizationId)}>
+                  {activityTitle(event)}
+                </a>
                 <small>
                   {event.system
                     ? m.home_activity_outcome_system({

@@ -22,6 +22,10 @@ type ActivityType =
   | 'access';
 
 export interface ActivityQuery {
+  /** Business groups hide routine checks and retain up to 100 authorized steps. */
+  view?: 'events' | 'business' | undefined;
+  /** Includes bounded earlier steps only when the reader opens the Activity page. */
+  detail?: 'summary' | 'steps' | undefined;
   from: string;
   to: string;
   q?: string | undefined;
@@ -58,6 +62,9 @@ export interface ActivityActor {
 }
 
 export interface ActivityEvent {
+  workflowRunId?: string | null;
+  resourceKind?: string | null;
+  steps?: ActivityEvent[];
   id: string;
   recordedAt: string;
   occurredAt: string | null;

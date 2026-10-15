@@ -551,3 +551,25 @@ export async function recordReceipt(
     body,
   });
 }
+
+/** Counts authorized purchasing proposals before they become purchase orders. */
+export const procurementProposalsOptions = (organizationId: string) =>
+  queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...procurementKey(organizationId), 'waiting-proposals'],
+    refetchInterval: 30_000,
+    queryFn: ({ signal }) =>
+      client.decisions.list(
+        {
+          params: { organizationId },
+          query: {
+            view: 'all',
+            scope: 'all',
+            domain: 'procurement',
+            reason: 'approval',
+            limit: 1,
+          },
+        },
+        { signal },
+      ),
+  });

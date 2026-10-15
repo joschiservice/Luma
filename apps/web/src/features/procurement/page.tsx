@@ -4,7 +4,7 @@ import type { PurchaseOrderList } from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Button } from '@luma/ui/components/primitives/button';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import {
   CollectionToolbar,
   CollectionViews,
@@ -12,7 +12,12 @@ import {
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
 import {
   ArrowUpRight,
   Building2,
@@ -25,6 +30,7 @@ import { useRef, useState } from 'react';
 import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import {
   ordersOptions,
+  procurementProposalsOptions,
   type ProcurementSearch,
   procurementTab,
   suppliersOptions,
@@ -100,6 +106,7 @@ export function ProcurementPage() {
   const purchasing = useQuery(
     purchasingOptions(organizationId, search.demandPeriodDays ?? 30),
   );
+  const proposals = useQuery(procurementProposalsOptions(organizationId));
   const [dialog, setDialog] = useState<'supplier' | 'order' | null>(null);
   const directory = useQuery({
     ...allSuppliersOptions(organizationId),
@@ -211,6 +218,24 @@ export function ProcurementPage() {
         </section>
         <ReplenishmentOverview organizationId={organizationId} />
       </div>
+      {proposals.data?.totalCount ? (
+        <Alert>
+          <Link
+            className={buttonVariants({ variant: 'ghost' })}
+            to="/app/$organizationId/needs-you"
+            params={{ organizationId }}
+            search={{
+              domain: 'procurement',
+              reason: 'approval',
+              waiting: true,
+            }}
+          >
+            {m.procurement_waiting_proposals({
+              count: proposals.data.totalCount,
+            })}
+          </Link>
+        </Alert>
+      ) : null}
       <div className="procurement-collection">
         {tab === 'purchasing' ? (
           <>
@@ -268,7 +293,13 @@ export function ProcurementPage() {
               <Empty>
                 <FileText size={30} aria-hidden="true" />
                 <h3>{m.procurement_list_orders_empty_title()}</h3>
-                <p>{m.procurement_list_orders_empty_body()}</p>
+                <p>
+                  {hasSuppliers
+                    ? m.procurement_list_orders_suppliers_ready()
+                    : directorySize.data
+                      ? m.procurement_list_orders_empty_body()
+                      : m.procurement_list_orders_checking_suppliers()}
+                </p>
                 {canManage ? (
                   <Button
                     variant="outline"

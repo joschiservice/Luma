@@ -1,6 +1,8 @@
 # Needs you decision queue
 
-Needs you lists every decision that waits on a person, whichever owner raised it. It is a
+Needs you lists decisions the reader can act on now, whichever owner raised them.
+Read-only decisions, approvals waiting on someone else and automatic execution belong in
+the collapsible Waiting on others section. Its items do not enter Home or sidebar counts. It is a
 read projection: each item points to the owner's authoritative decision, and responses go
 through that owner's review. The queue never approves, rejects or runs anything.
 
@@ -47,7 +49,8 @@ since; decisions without a deadline come last in both directions. Groups are are
 owner and cause (the owner's `group` key); a group is incomplete while an owner is
 unavailable. The older `domain` and `reason` parameters still work.
 
-View, area and reason counts follow the view and the older parameters only, never conditions
+Actionability is evaluated before counts, filtering, grouping and paging. Direct decision
+links can still open waiting items. View, area and reason counts follow the view and the older parameters only, never conditions
 or search, so Home's attention module and the sidebar count keep matching the queue. Keyset
 cursors bind the tenant, reader, view, conditions, search, sort and page size (or the group
 key within a group), and carry the first page's evaluation time so expiring items do not move

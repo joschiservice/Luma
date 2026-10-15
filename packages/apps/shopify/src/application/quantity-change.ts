@@ -246,6 +246,24 @@ export function createQuantityChangeWorkflow(deps: {
   return {
     version: deps.version,
     caseOwner: 'principal',
+    connections: async (context) =>
+      (await deps.connections(context))
+        .filter(
+          (connection) =>
+            connection.granted.includes('orders.read') ||
+            connection.granted.includes('fulfillment.read'),
+        )
+        .map((connection) => ({
+          id: connection.id,
+          label: connection.label,
+          system: connection.target.kind,
+          version: connection.version,
+          blockers:
+            connection.status === 'active'
+              ? []
+              : ['This connection is not active.'],
+          targets: [],
+        })),
     template: {
       trigger:
         'When detection confirms that an order line shows another quantity in Shopify than in the system that holds order-line authority',

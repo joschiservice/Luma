@@ -878,3 +878,10 @@ li.workflow-row {
   gap: 12px;
   margin: 4px 0;
 }
+
+.workflow-subject-field,
+.workflow-subject-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}

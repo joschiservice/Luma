@@ -21,6 +21,7 @@ export const activityOutcomeRules: readonly {
   },
   { field: 'verification', values: ['failed'], outcome: 'failed' },
   { field: 'state', values: ['failed'], outcome: 'failed' },
+  { field: 'outcome', values: ['denied'], outcome: 'failed' },
   { field: 'outcome', values: ['approved', 'approve'], outcome: 'approved' },
   { field: 'outcome', values: ['rejected', 'reject'], outcome: 'rejected' },
   { field: 'outcome', values: ['escalate'], outcome: 'escalated' },

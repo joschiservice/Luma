@@ -555,5 +555,18 @@
   "workflows_review_demand_recorded": "Bedarfsdaten gelesen am",
   "workflows_review_context_recorded": "Prüfdaten aufgezeichnet am",
   "workflows_review_context_note": "Die Reichweite ist eine Schätzung aus aufgezeichneten Verkäufen, keine Bedarfsprognose. Der vorgeschlagene Eingang ist kein bestätigter Zulauf. Vor der Erstellung werden Bestand, vorhandene Bestellungen und Berechtigung erneut geprüft. Jetzt wird nichts versendet. Nach den Workspace-Regeln kann diese Genehmigung auch den Versand des unveränderten Entwurfs an die geprüfte Lieferantenverbindung vor Ablauf der Genehmigung abdecken. Der Anfragende wählt beim Versand das Lieferdatum.",
-  "workflows_review_allowed": "Erlaubt"
+  "workflows_review_allowed": "Erlaubt",
+  "workflows_latest_unresolved": "Letzten Lauf prüfen",
+  "workflows_schedule_unavailable": "Geplante Starts für eigene Workflows sind noch nicht verfügbar. Wähle einen anderen Auslöser, um diesen Workflow auszuführen.",
+  "workflows_unit_inventory_cases": "{count, plural, one {{count, number} offenes Bestandsproblem} other {{count, number} offene Bestandsprobleme}}",
+  "workflows_unit_fulfillment_cases": "{count, plural, one {{count, number} offenes Versandproblem} other {{count, number} offene Versandprobleme}}",
+  "workflows_unit_sync_cases": "{count, plural, one {{count, number} offenes Verbindungsproblem} other {{count, number} offene Verbindungsprobleme}}",
+  "workflows_unit_quantity_cases": "{count, plural, one {{count, number} offene Mengenabweichung} other {{count, number} offene Mengenabweichungen}}",
+  "workflows_unit_open_supplier_orders": "{count, plural, one {{count, number} offene überfällige Lieferantenbestellung} other {{count, number} offene überfällige Lieferantenbestellungen}}",
+  "workflows_unit_refund_cases": "{count, plural, one {{count, number} Retoure wartet auf Erstattung} other {{count, number} Retouren warten auf Erstattung}}",
+  "workflows_unit_payment_cases": "{count, plural, one {{count, number} Bestellung wartet auf Zahlung} other {{count, number} Bestellungen warten auf Zahlung}}",
+  "workflows_record_search": "Datensätze suchen",
+  "workflows_record_select": "Datensatz auswählen",
+  "workflows_record_load_failed": "Datensätze konnten nicht geladen werden. Versuche es erneut.",
+  "workflows_record_none": "Keine passenden Datensätze. Versuche eine andere Suche."
 }

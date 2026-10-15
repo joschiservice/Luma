@@ -6,6 +6,7 @@ import {
   activityLabel,
   activityState,
   activitySystemOptions,
+  activityTitle,
 } from './presentation';
 
 it('reads activity codes as plain labels', () => {
@@ -71,4 +72,38 @@ it('names connections and shortens an applied connection that is not listed', ()
     value: '44444444-4444-4444-8444-444444444444',
     label: 'Connection 44444444',
   });
+});
+
+it('keeps prose and SKU punctuation while naming capability codes for business events', () => {
+  expect(
+    activityTitle({
+      type: 'verification',
+      action: 'execution.completed',
+      summary: 'Stock for LS-SAND-M matches JTL-Wawi again.',
+    }),
+  ).toBe('Stock for LS-SAND-M matches JTL-Wawi again.');
+  expect(
+    activityTitle({
+      type: 'verification',
+      action: 'execution.completed',
+      summary: 'orders.shipping-method.write',
+    }),
+  ).toBe('Change the order’s shipping method');
+  expect(
+    activityTitle({
+      type: 'verification',
+      action: 'workflow.verification',
+      summary: null,
+      actor: {
+        kind: 'luma',
+        id: null,
+        name: null,
+        email: null,
+        workflow: {
+          id: 'inventory-replenishment',
+          name: 'Replenish low stock',
+        },
+      },
+    }),
+  ).toBe('Replenish low stock');
 });

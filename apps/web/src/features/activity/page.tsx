@@ -75,10 +75,12 @@ import {
 import {
   activityChangeLabel,
   activityConnectionOptions,
+  activityHref,
   activityLabel,
   type ActivitySource,
   activityState,
   activitySystemOptions,
+  activityTitle,
 } from './presentation';
 
 const label = activityLabel;
@@ -476,8 +478,7 @@ export function ActivityView({
           refreshLabel={m.activity_refresh()}
         />
         <p className="activity-coverage">
-          {page ? `${page.coverage} ` : null}
-          {m.activity_search_help()}
+          {m.activity_intro()} <a href="/docs/activity">{m.activity_guide()}</a>
         </p>
         {offline ? (
           <Alert role="status" className="activity-notice">
@@ -560,7 +561,10 @@ export function ActivityView({
                           items[index - 1]?.proposalId)
                     }
                     organizationId={organizationId}
-                    expanded={filters.event === item.id}
+                    expanded={
+                      filters.event === item.id ||
+                      !!item.steps?.some((step) => step.id === filters.event)
+                    }
                     expand={() =>
                       change({
                         ...filters,
@@ -631,7 +635,6 @@ function ActivityRow({
   expand: () => void;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
-  const group = item.attemptId ?? item.proposalId;
 
   return (
     <li
@@ -649,27 +652,10 @@ function ActivityRow({
         </time>
         <StateDot state={activityState(item.outcome)} />
         <span className="activity-event-copy">
-          <strong>{activityLabel(item.action)}</strong>
-          {!related && group ? (
-            <small>
-              {item.type === 'procurement'
-                ? m.activity_row_group_purchase_order({ id: group })
-                : m.activity_row_group_attempt({ id: group })}
-            </small>
-          ) : null}
+          <strong>{activityTitle(item)}</strong>
           <small>
-            {m.activity_row_actor_system({
-              actor: actorLabel(item.actor),
-              system: item.system
-                ? providerName(item.system)
-                : m.activity_row_system_not_recorded(),
-            })}
-          </small>
-          <small>
-            {item.resource ??
-              item.exceptionId ??
-              item.connectionId ??
-              m.activity_row_workspace()}
+            {actorLabel(item.actor, { email: false })}
+            {item.system ? ` · ${providerName(item.system)}` : ''}
           </small>
         </span>
         <span className="activity-outcome">
@@ -686,8 +672,27 @@ function ActivityRow({
           aria-hidden="true"
         />
       </button>
+      <a
+        className="activity-record-link"
+        href={activityHref(item, organizationId)}
+      >
+        {m.activity_open_record()}
+      </a>
       {expanded ? (
         <div id={`event-${item.id}`} className="activity-evidence">
+          {item.steps?.length ? (
+            <ol className="activity-steps">
+              {item.steps.map((step) => (
+                <li key={step.id}>
+                  <WorkspaceDate value={step.recordedAt} />
+                  {' · '}
+                  {activityLabel(step.action)}
+                  {' · '}
+                  {activityLabel(step.outcome)}
+                </li>
+              ))}
+            </ol>
+          ) : null}
           <dl>
             <dt>{m.activity_detail_event_id()}</dt>
             <dd>{item.id}</dd>
