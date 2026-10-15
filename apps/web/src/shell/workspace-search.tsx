@@ -376,31 +376,34 @@ export function WorkspaceSearch({
               {m.identity_search_section_pages()}
             </p>
           ) : null}
-          {pages.map(({ path, label, Icon, description, domain, shortcut }) => (
-            <Link
-              key={path}
-              className="command-item"
-              to={`/app/$organizationId/${path}`}
-              params={{ organizationId }}
-              onClick={() => changeOpen(false)}
-            >
-              <span className="command-item-icon">
-                {domain ? (
-                  <DomainIcon domain={domain} size="sm" />
-                ) : (
-                  <Icon size={16} aria-hidden="true" />
-                )}
-              </span>
-              <span className="command-item-copy">
-                <strong>{label}</strong>
-                <span>{description}</span>
-              </span>
-              <span className="command-item-keys" aria-hidden="true">
-                <Kbd>G</Kbd>
-                <Kbd>{shortcut.toUpperCase()}</Kbd>
-              </span>
-            </Link>
-          ))}
+          {pages.map(
+            ({ path, label, Icon, description, domain, shortcut, search }) => (
+              <Link
+                key={path}
+                className="command-item"
+                to={`/app/$organizationId/${path}`}
+                params={{ organizationId }}
+                search={search ?? {}}
+                onClick={() => changeOpen(false)}
+              >
+                <span className="command-item-icon">
+                  {domain ? (
+                    <DomainIcon domain={domain} size="sm" />
+                  ) : (
+                    <Icon size={16} aria-hidden="true" />
+                  )}
+                </span>
+                <span className="command-item-copy">
+                  <strong>{label}</strong>
+                  <span>{description}</span>
+                </span>
+                <span className="command-item-keys" aria-hidden="true">
+                  <Kbd>G</Kbd>
+                  <Kbd>{shortcut.toUpperCase()}</Kbd>
+                </span>
+              </Link>
+            ),
+          )}
           {recordQuery.length >= 2 ? (
             <p className="command-section-label">
               {m.identity_search_section_records()}

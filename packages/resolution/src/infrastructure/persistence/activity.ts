@@ -92,9 +92,9 @@ const uuids = (values: string[]) =>
 // Subject reads scan only source rows whose exception or proposal can pass the final subject
 // filter. Plain columns keep both arms index-backed under row-level security; the second arm
 // skips rows the first arm already returned.
-const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($19::uuid[])
+const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($20::uuid[])
   UNION ALL SELECT * FROM workspace_activity_sources
-  WHERE proposal_id=ANY($20::uuid[]) AND (exception_id=ANY($19::uuid[])) IS NOT TRUE)`;
+  WHERE proposal_id=ANY($21::uuid[]) AND (exception_id=ANY($20::uuid[])) IS NOT TRUE)`;
 
 /**
  * Lists every exception and proposal ID through which a source row can reach the subject
@@ -156,7 +156,9 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         const key = createHash('sha256')
           .update(
             JSON.stringify([
-              'activity-v6',
+              'activity-v7',
+              query.view ?? 'events',
+              query.detail ?? 'summary',
               context.tenantId,
               restricted,
               query.from,
@@ -235,7 +237,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         LEFT JOIN playbook_versions wv ON wv.tenant_id=w.tenant_id AND wv.definition_id=w.definition_id AND wv.version=w.version
         WHERE s.tenant_id=$1 AND s.recorded_at >= $2::timestamptz AND s.recorded_at < $3::timestamptz
         AND (NOT s.restricted OR $4::boolean)
-        AND ($5::timestamptz IS NULL OR (s.recorded_at,s.id)<($5::timestamptz,$6::text))
+
       ), classified AS (
         SELECT e.*,connections.items AS connections,
         person.actor_name,person.actor_email,person.actor_member,
@@ -279,7 +281,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       )},
       'action',left(action,160),'type',type,'outcome',outcome,'exceptionId',issue_id,'proposalId',proposal_id,
       'attemptId',doc->>'attemptId','connectionId',COALESCE(conn_id,(connections->0->>'id')::uuid),'connections',COALESCE((SELECT jsonb_agg(value) FROM (SELECT value FROM jsonb_array_elements(connections) LIMIT 100) bounded),'[]'::jsonb),'system',left(system,100),'resource',left(resource,300),
-      'playbookId',left(playbook_id,200),'mode',CASE WHEN mode IN ('simulation','shadow','pilot') THEN mode ELSE 'unrecorded' END,
+      'workflowRunId',workflow_run_id,'resourceKind',resource_kind,'playbookId',left(playbook_id,200),'mode',CASE WHEN mode IN ('simulation','shadow','pilot') THEN mode ELSE 'unrecorded' END,
       'executionState',left(details->>'state',100),'verificationPhase',left(details->>'phase',40),'failureCode',left(details->>'failureCode',100),'summary',left(summary,300),'dispatch',left(details->>'dispatch',100),'verification',left(details->>'verification',100),
       'evidenceRefs',COALESCE((SELECT jsonb_agg(left(ref,500)) FROM (SELECT value #>> '{}' AS ref FROM jsonb_array_elements(CASE WHEN jsonb_typeof(doc->'evidenceRefs')='array' THEN doc->'evidenceRefs' ELSE '[]'::jsonb END) WHERE jsonb_typeof(value)='string' LIMIT 100) refs),'[]'::jsonb)) AS item
       FROM classified WHERE ($7::text IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'system'=$7)) AND ($8::uuid IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'id'=$8::text))
@@ -288,9 +290,17 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       AND ($13::text[] IS NULL OR issue_id::text=ANY($13) OR workflow_run_id=ANY($14) OR proposal_id::text=ANY($14)
         OR (resource_kind='order' AND resource=ANY($15)))
       ) o WHERE ${actorMatchSql('o.item')}
-      ORDER BY o.sort_at DESC,o.sort_id DESC LIMIT $12
-      ), access AS (${accessEventsSql})
-      SELECT at,item FROM (SELECT * FROM operational UNION ALL SELECT * FROM access) events
+      ), access AS (${accessEventsSql}), events AS (
+        SELECT *, CASE WHEN $19::boolean THEN COALESCE(item->>'exceptionId',item->>'workflowRunId',item->>'proposalId',sort_id) ELSE sort_id END AS group_key,
+          NOT $19::boolean OR ((item->>'action' NOT IN ('workflow.step_recorded','policy.evaluated','execution.verification_pending','exception.verification_attempt') OR (item->>'action'='policy.evaluated' AND item->>'outcome'='failed')) AND item->>'verificationPhase' IS DISTINCT FROM 'pending') AS meaningful
+        FROM (SELECT * FROM operational UNION ALL SELECT * FROM access) all_events
+      ), ranked AS (
+        SELECT *, row_number() OVER (PARTITION BY group_key ORDER BY meaningful DESC,sort_at DESC,sort_id DESC) AS position FROM events
+      )
+      SELECT at, CASE WHEN $19::boolean AND ${query.detail === 'steps' ? 'true' : 'false'} THEN item || jsonb_build_object('steps',
+        COALESCE((SELECT jsonb_agg(step.item ORDER BY step.sort_at,step.sort_id) FROM
+          (SELECT e.item,e.sort_at,e.sort_id FROM events e WHERE e.group_key=ranked.group_key AND e.sort_id<>ranked.sort_id ORDER BY e.sort_at DESC,e.sort_id DESC LIMIT 100) step),'[]'::jsonb)) ELSE item END AS item
+      FROM ranked WHERE position=1 AND meaningful AND ($5::timestamptz IS NULL OR (sort_at,sort_id)<($5::timestamptz,$6::text))
       ORDER BY sort_at DESC,sort_id DESC LIMIT $12`,
           [
             context.tenantId,
@@ -311,6 +321,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             actors ? actors.people : null,
             actors?.luma ?? false,
             actors?.workflows ?? false,
+            query.view === 'business',
             ...(linked ? [linked.issueIds, linked.proposalIds] : []),
           ],
         );

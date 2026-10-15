@@ -5,8 +5,8 @@ import type { ReactElement } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs';
 
 const views = [
-  { value: 'needs_you', label: m.issues_view_needs_review, icon: Inbox },
   { value: 'active', label: m.issues_view_open, icon: CircleDot },
+  { value: 'needs_you', label: m.issues_view_needs_review, icon: Inbox },
   { value: 'history', label: m.issues_view_history, icon: History },
 ] as const;
 

@@ -157,3 +157,12 @@
   gap: 0.25rem;
   min-width: 0;
 }
+
+.inventory-native-stock > [data-slot='button'] {
+  justify-self: start;
+}
+.inventory-native-stock > label {
+  display: grid;
+  gap: 6px;
+  max-width: 360px;
+}

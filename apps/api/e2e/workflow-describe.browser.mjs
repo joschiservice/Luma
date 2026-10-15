@@ -51,7 +51,7 @@ test('drafts a workflow from a description and applies a reviewed change', async
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
 
   await page.goto(`/app/${tenantId}/workflows/new`);

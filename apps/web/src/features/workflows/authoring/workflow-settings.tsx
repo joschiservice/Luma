@@ -1,18 +1,15 @@
 import type {
   AuthoringVocabulary,
   DraftValidation,
-  WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
+import { Alert } from '@luma/ui/components/primitives/alert';
 import { Card } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
-import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
-import { useContext, useState } from 'react';
 
 import { diagnosticsAt, type FieldType } from './draft-model';
 import { Field, FieldListEditor, ScalarInput } from './step-forms';
@@ -21,79 +18,6 @@ const triggerFields: Record<string, string> = {
   event: 'eventType',
   exception: 'issueType',
 };
-
-/**
- * Edits a one-time start in workspace time and reports it as a UTC instant. A local time that
- * doesn't exist, such as one skipped by a clock change, is shown as a problem and not reported.
- */
-function ScheduleField({
-  at,
-  diagnostics,
-  readOnly,
-  onChange,
-}: {
-  at: string;
-  diagnostics: WorkflowDiagnostic[];
-  readOnly: boolean;
-  onChange(at: string): void;
-}) {
-  const timeZone = useContext(WorkspaceTimezone);
-  const [rejected, setRejected] = useState<{ text: string; message: string }>();
-  const stored = Number.isNaN(Date.parse(at))
-    ? ''
-    : workspaceDateValue(new Date(at), timeZone, true).slice(0, 16);
-  const problem: WorkflowDiagnostic[] = rejected
-    ? [
-        {
-          severity: 'error',
-          code: 'schedule_time',
-          stepIndex: null,
-          stepId: null,
-          field: 'applicability.trigger.at',
-          message: rejected.message,
-          detail: '',
-        },
-      ]
-    : [];
-
-  return (
-    <Field
-      label={m.authoring_settings_schedule()}
-      hint={m.authoring_settings_schedule_hint({ timeZone })}
-      diagnostics={[...problem, ...diagnostics]}
-    >
-      {(props) => (
-        <Input
-          {...props}
-          type="datetime-local"
-          disabled={readOnly}
-          value={rejected?.text ?? stored}
-          onChange={(event) => {
-            const text = event.target.value;
-            if (!text) {
-              setRejected(undefined);
-              onChange('');
-
-              return;
-            }
-            try {
-              onChange(workspaceInstant(text, timeZone));
-              setRejected(undefined);
-            } catch (error) {
-              setRejected({
-                text,
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : m.ui_time_error_invalid(),
-              });
-            }
-          }}
-        />
-      )}
-    </Field>
-  );
-}
 
 /** Edits name, trigger, subject, inputs and evidence for the whole workflow. */
 export function WorkflowSettings({
@@ -230,30 +154,22 @@ export function WorkflowSettings({
                   },
                 });
               }}
-              options={vocabulary.triggers.map((item) => ({
-                value: item.kind,
-                label: item.executable
-                  ? item.label
-                  : m.authoring_option_limited({ option: item.label }),
-              }))}
+              options={vocabulary.triggers
+                .filter(
+                  (item) =>
+                    item.kind !== 'schedule' || trigger.kind === 'schedule',
+                )
+                .map((item) => ({
+                  value: item.kind,
+                  label: item.executable
+                    ? item.label
+                    : m.authoring_option_limited({ option: item.label }),
+                }))}
             />
           )}
         </Field>
         {trigger.kind === 'schedule' ? (
-          <ScheduleField
-            at={trigger.at}
-            diagnostics={at('applicability.trigger.at')}
-            readOnly={readOnly}
-            onChange={(next) =>
-              onChange({
-                ...content,
-                applicability: {
-                  ...content.applicability,
-                  trigger: { ...trigger, at: next },
-                },
-              })
-            }
-          />
+          <Alert tone="warning">{m.workflows_schedule_unavailable()}</Alert>
         ) : null}
         {trigger.kind in triggerFields ? (
           <Field
@@ -267,26 +183,42 @@ export function WorkflowSettings({
             )}
           >
             {(props) => (
-              <Input
-                {...props}
+              <Select
+                aria-label={
+                  trigger.kind === 'event'
+                    ? m.authoring_settings_event()
+                    : m.authoring_settings_issue_type()
+                }
+                {...(props['aria-describedby']
+                  ? { 'aria-describedby': props['aria-describedby'] }
+                  : {})}
                 disabled={readOnly}
-                value={String(
-                  (trigger as Record<string, unknown>)[
-                    triggerFields[trigger.kind]!
-                  ] ?? '',
-                )}
-                onChange={(event) =>
+                value={
+                  trigger.kind === 'event'
+                    ? trigger.eventType
+                    : trigger.kind === 'exception'
+                      ? trigger.issueType
+                      : ''
+                }
+                options={triggerEntry?.options ?? []}
+                onValueChange={(value) => {
+                  if (
+                    !value ||
+                    (trigger.kind !== 'event' && trigger.kind !== 'exception')
+                  )
+                    return;
                   onChange({
                     ...content,
                     applicability: {
                       ...content.applicability,
-                      trigger: {
-                        ...trigger,
-                        [triggerFields[trigger.kind]!]: event.target.value,
-                      } as typeof trigger,
+                      trigger:
+                        trigger.kind === 'event'
+                          ? { kind: 'event', eventType: value }
+                          : { kind: 'exception', issueType: value },
                     },
-                  })
-                }
+                    context: { ...content.context, kind: value },
+                  });
+                }}
               />
             )}
           </Field>
@@ -437,16 +369,23 @@ export function WorkflowSettings({
               <Input
                 {...props}
                 type="number"
-                min="1"
-                max="300"
+                min="0.0166666667"
+                max="5"
+                step="any"
                 disabled={readOnly}
-                value={content.context.maxAgeSeconds}
+                value={content.context.maxAgeSeconds / 60}
                 onChange={(event) =>
                   onChange({
                     ...content,
                     context: {
                       ...content.context,
-                      maxAgeSeconds: Number(event.target.value || 1),
+                      maxAgeSeconds: Math.max(
+                        1,
+                        Math.min(
+                          300,
+                          Math.round(Number(event.target.value) * 60),
+                        ),
+                      ),
                     },
                   })
                 }

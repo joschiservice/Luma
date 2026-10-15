@@ -37,7 +37,12 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   const errors = [];
+  const disabledViewRequests = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (request) => {
+    if (request.url().includes('/adaptive/views'))
+      disabledViewRequests.push(request.url());
+  });
   await page.goto('/sign-up');
   await page.getByRole('radio', { name: /Australia/ }).check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -53,7 +58,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page
     .getByRole('heading', { name: 'Connect your first system.' })
@@ -82,7 +87,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await anonymous.close();
   const inbox = `/app/${organizationId}/exceptions`;
   await page.goto(inbox);
-  await page.getByText('No issues need your review', { exact: true }).waitFor();
+  await page
+    .getByText('No open issues in this view', { exact: true })
+    .waitFor();
   await page.getByText('No data received yet', { exact: true }).waitFor();
   await page.getByText('No active connections', { exact: true }).waitFor();
   await page.keyboard.press('Control+k');
@@ -90,7 +97,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page.getByRole('textbox', { name: 'Search workspace' }).fill('issue');
   await page
     .getByRole('navigation', { name: 'Search results' })
-    .getByRole('link', { name: 'Issues' })
+    .getByRole('link', { name: /^Issues\b/ })
     .click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -169,7 +176,15 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     });
     ids.push(result.incident.id);
   }
-  await page.getByRole('tab', { name: 'All open', exact: true }).click();
+  // A remembered attention view must not hide these unresolved issues on re-entry.
+  await page.getByRole('tab', { name: 'Needs attention', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Workspace navigation' })
+    .getByRole('link', { name: 'Issues', exact: true })
+    .click();
+  await expect(
+    page.getByRole('tab', { name: 'All open', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
   const issueRows = page
     .getByRole('list', { name: 'Issues', exact: true })
     .getByRole('listitem');
@@ -260,7 +275,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .click();
   await page.getByRole('option').filter({ hasText: 'Ada' }).first().click();
   await expect(
-    detailPane.getByText('Case owner: Ada', { exact: true }),
+    detailPane
+      .getByRole('region', { name: 'Case owner', exact: true })
+      .getByText('Ada', { exact: true }),
   ).toBeVisible();
   const ownerApi = `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}/owner`;
   const owned = await (
@@ -278,7 +295,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .getByRole('button', { name: 'Clear owner', exact: true })
     .click();
   await expect(
-    detailPane.getByText('Case owner: Unassigned', { exact: true }),
+    detailPane
+      .getByRole('region', { name: 'Case owner', exact: true })
+      .getByText('Unassigned', { exact: true }),
   ).toBeVisible();
 
   await page.getByText('Live updates', { exact: true }).waitFor();
@@ -593,6 +612,39 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .toBe(true);
   expect(await issueInbox.evaluate((el) => el.scrollTop)).toBe(scroll);
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${inbox}/${ids[0]}/detail?view=active`);
+  await expect(
+    page.getByRole('button', { name: 'Review change', exact: true }),
+  ).toHaveCount(0);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const colorScheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme });
+      await page
+        .getByRole('button', { name: 'View supporting evidence', exact: true })
+        .click();
+      const back = page.getByRole('button', {
+        name: 'Back to issue',
+        exact: true,
+      });
+      await expect(back).toBeInViewport();
+      const heading = page
+        .getByRole('heading', { name: 'Supporting evidence', exact: true })
+        .filter({ visible: true });
+      await expect(heading).toBeInViewport();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `/tmp/luma-352-evidence-${width}-${colorScheme}.png`,
+      });
+      await back.click();
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`${inbox}/${ids[0]}?view=active&class=sync_failure`);
   await page
     .getByRole('heading', {
@@ -600,7 +652,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
       exact: true,
     })
     .waitFor();
-  await page.getByRole('tab', { name: 'Needs review', exact: true }).click();
+  await page.getByRole('tab', { name: 'Needs attention', exact: true }).click();
   await page
     .getByRole('heading', {
       name: 'The connection read needs investigation',
@@ -713,7 +765,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await services.diagnoses.run(tenant, ids[1]);
   await page.goto(`/app/${organizationId}/home`);
   const decisions = page
-    .getByRole('region', { name: 'Needs your attention' })
+    .getByRole('region', { name: 'Needs you' })
     .getByRole('list')
     .getByRole('link');
   // Handling totals come from the operations overview and disappear when it is unavailable.
@@ -800,4 +852,5 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     fullPage: true,
   });
   expect(errors).toEqual([]);
+  expect(disabledViewRequests).toEqual([]);
 });

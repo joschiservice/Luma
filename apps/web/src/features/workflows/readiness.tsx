@@ -79,6 +79,16 @@ export function ReadinessPills({
       >
         {readinessLabels[readiness.state]()}
       </StatePill>
+      {(readiness.waiting.count ?? 0) > 0 ? (
+        <StatePill state="approval">
+          {m.workflows_waiting_count({ count: readiness.waiting.count ?? 0 })}
+        </StatePill>
+      ) : null}
+      {readiness.outcomes?.latest?.state === 'unresolved' ? (
+        <StatePill state="attention">
+          {m.workflows_latest_unresolved()}
+        </StatePill>
+      ) : null}
     </span>
   );
 }
@@ -208,6 +218,13 @@ export function RepairLink({
 
 // The server names coverage units in English; known units get localized plurals.
 const unitCounts: Record<string, (inputs: { count: number }) => string> = {
+  'open inventory mismatch case': m.workflows_unit_inventory_cases,
+  'open stuck fulfillment case': m.workflows_unit_fulfillment_cases,
+  'open sync failure case': m.workflows_unit_sync_cases,
+  'open order quantity mismatch case': m.workflows_unit_quantity_cases,
+  'open overdue supplier order': m.workflows_unit_open_supplier_orders,
+  'open return waiting for a refund': m.workflows_unit_refund_cases,
+  'open order with a pending payment': m.workflows_unit_payment_cases,
   'stock position': m.workflows_unit_stock_positions,
   order: m.workflows_unit_orders,
   run: m.workflows_unit_runs,

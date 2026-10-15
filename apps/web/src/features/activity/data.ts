@@ -379,6 +379,8 @@ export function activityOptions(
 ) {
   const range = activityRange(filters, new Date(), timeZone);
   const query = {
+    view: 'business' as const,
+    detail: head ? ('summary' as const) : ('steps' as const),
     from: workspaceInstant(range.from, timeZone),
     to: workspaceInstant(nextCalendarDay(range.to), timeZone),
     ...(filters.q ? { q: filters.q } : {}),

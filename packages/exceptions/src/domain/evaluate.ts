@@ -70,26 +70,18 @@ export function evaluate(
         return f.scanComplete
           ? result('clear', 'read_succeeded')
           : result('defer', 'incomplete_evidence');
-      if (
-        [
-          'authentication',
-          'permission_denied',
-          'invalid_response',
-          'export_unavailable',
-          'unsupported_capability',
-          'unsupported_version',
-        ].includes(f.errorCode ?? '')
-      )
+      if (['authentication', 'permission_denied'].includes(f.errorCode ?? ''))
         return detect('high', 'hard_read_failure');
-      if (
-        ['transient', 'timeout', 'rate_limited'].includes(f.errorCode ?? '')
-      ) {
-        if (age(f.firstFailureAt) < 0)
-          return result('defer', 'future_evidence');
+      if (f.errorCode) {
+        const elapsed = age(f.firstFailureAt);
+        if (elapsed < 0) return result('defer', 'future_evidence');
+        if (!f.retryExhausted || elapsed < t.syncFailureSeconds)
+          return result('clear', 'retry_window_open');
 
-        return f.retryExhausted && age(f.firstFailureAt) >= t.syncFailureSeconds
-          ? detect('medium', 'retry_window_exhausted')
-          : result('clear', 'retry_window_open');
+        return detect(
+          elapsed >= t.syncFailureSeconds * 4 ? 'high' : 'medium',
+          'retry_window_exhausted',
+        );
       }
 
       return result('defer', 'unclassified_error');

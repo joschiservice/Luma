@@ -12,8 +12,9 @@ import {
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import { seedMetricOrders } from './metrics-fixture.mjs';
 
-test('starts a scoped native workflow, preserves uncertain retries and cancels a scheduled start on mobile', async ({
+test('starts a scoped native workflow, preserves uncertain retries and withholds unavailable scheduled starts on mobile', async ({
   resources: t,
 }) => {
   const port = await availablePort(),
@@ -57,9 +58,20 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
 
+  const actor = (
+    await db.owner.query('SELECT user_id FROM memberships WHERE tenant_id=$1', [
+      tenantId,
+    ])
+  ).rows[0].user_id;
+  const seedOrder = await seedMetricOrders(t, {
+    db,
+    owner: { id: actor },
+    org: { id: tenantId, name: 'Workflow studio', slug: 'workflow-studio' },
+  });
+  await seedOrder(42);
   const { digest, format, ...source } = resolutionWorkflow(
     compilePlaybook(shippingMethodPlaybook),
   );
@@ -101,7 +113,8 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
   await page.getByRole('combobox', { name: 'Version', exact: true }).click();
   await page.getByRole('option', { name: 'v0.1.0', exact: true }).click();
   const form = page.getByRole('region', { name: 'Trigger', exact: true });
-  await form.getByLabel('order ID').fill('order-1042');
+  await form.getByRole('combobox', { name: 'Choose a record' }).click();
+  await page.getByRole('option', { name: '#1042', exact: true }).click();
   await form.getByLabel('shippingMethodId').fill('standard');
   for (const field of ['diagnosisReady', 'methodMapped']) {
     await form.getByRole('combobox', { name: field }).click();
@@ -123,7 +136,9 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
     .getByRole('button', { name: 'Start workflow', exact: true })
     .click();
   await form.getByRole('button', { name: 'Retry same request' }).waitFor();
-  expect(await form.getByLabel('order ID').isDisabled()).toBe(true);
+  expect(
+    await form.getByRole('combobox', { name: 'Choose a record' }).isDisabled(),
+  ).toBe(true);
   await form.getByRole('button', { name: 'Retry same request' }).click();
   await form
     .getByText('Run started. Follow its progress and approvals in Recent runs.')
@@ -150,41 +165,20 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
   await page.getByRole('option', { name: 'Rules', exact: true }).click();
-  await form.getByLabel('order ID').fill('order-2042');
-  await form.getByLabel('shippingMethodId').fill('standard');
-  for (const field of ['diagnosisReady', 'methodMapped']) {
-    await form.getByRole('combobox', { name: field }).click();
-    await page.getByRole('option', { name: 'True', exact: true }).click();
-  }
+  await expect(
+    form.getByText(
+      'Scheduled starts for custom workflows are not available yet. Choose another trigger to run this workflow.',
+    ),
+  ).toBeVisible();
+  await expect(
+    form.getByRole('button', { name: 'Schedule start', exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({ path: '/tmp/luma67-browser/triggers-mobile.png' });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await form
-    .getByRole('button', { name: 'Schedule start', exact: true })
-    .click();
-  await form
-    .getByText('Start scheduled. You can cancel it from Recent runs.')
-    .waitFor();
-  await page
-    .getByRole('button', { name: 'Cancel scheduled start', exact: true })
-    .click();
-  await page
-    .getByText('The scheduled start was cancelled.', { exact: true })
-    .first()
-    .waitFor();
-  await page.reload();
-  await page
-    .getByText('The scheduled start was cancelled.', { exact: true })
-    .first()
-    .waitFor();
-  expect(
-    await page
-      .getByRole('button', { name: 'Cancel scheduled start', exact: true })
-      .count(),
-  ).toBe(0);
 
   const process = compileProcessWorkflow({
     schemaVersion: 2,

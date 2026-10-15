@@ -160,6 +160,26 @@
   margin-top: auto;
 }
 
+.sidebar-list[hidden] {
+  display: none;
+}
+
+.sidebar-records-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sidebar-records-chevron {
+  margin-left: auto;
+}
+
+.sidebar-records-toggle[aria-expanded='true'] .sidebar-records-chevron {
+  transform: rotate(90deg);
+}
+
 .sidebar-section {
   display: grid;
   gap: 2px;
@@ -462,6 +482,10 @@
   height: 34px;
   margin-inline: auto;
   padding: 0;
+}
+
+.desk[data-sidebar='collapsed'] .sidebar-records-chevron {
+  display: none;
 }
 
 .desk[data-sidebar='collapsed'] .sidebar-link-count {

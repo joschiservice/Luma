@@ -60,6 +60,16 @@ function IssueWorkspace({
     <IssuePageLayout
       item={item}
       back={
+        <Link
+          to="/app/$organizationId/exceptions/$exceptionId"
+          params={{ organizationId, exceptionId }}
+          search={search}
+          aria-label={m.exceptions_back_label()}
+        >
+          <ArrowLeft size={16} aria-hidden="true" /> {m.exceptions_back_text()}
+        </Link>
+      }
+      links={
         <>
           {item ? (
             <RecordAssistance
@@ -68,15 +78,7 @@ function IssueWorkspace({
               label={caseLabel(item.class)}
             />
           ) : null}
-          <Link
-            to="/app/$organizationId/exceptions/$exceptionId"
-            params={{ organizationId, exceptionId }}
-            search={search}
-            aria-label={m.exceptions_back_label()}
-          >
-            <ArrowLeft size={16} aria-hidden="true" />{' '}
-            {m.exceptions_back_text()}
-          </Link>
+
           {item?.subject.kind === 'sku' ? (
             <Link
               to="/app/$organizationId/inventory"
@@ -165,7 +167,11 @@ function IssueWorkspace({
       }
       refresh={<RefreshButton onClick={observation.restart} />}
       canReview={Boolean(
-        item && observation.snapshot.data?.review.permittedDecisions.length,
+        item &&
+        observation.snapshot.data?.review.proposal &&
+        observation.snapshot.data.review.permittedDecisions.some(
+          (decision) => decision === 'approve' || decision === 'reject',
+        ),
       )}
       actions={
         item ? (

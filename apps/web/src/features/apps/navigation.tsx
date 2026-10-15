@@ -33,7 +33,7 @@ export function AppNavigation({
   return (
     <section className="sidebar-section" aria-labelledby="nav-apps">
       <h2 className="sidebar-section-label" id="nav-apps">
-        {m.apps_title()}
+        {m.identity_nav_installed_apps()}
       </h2>
       <ul className="sidebar-list">
         {pages.map((app) => (

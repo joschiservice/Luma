@@ -166,9 +166,9 @@
         "scanComplete": false
       },
       "expected": {
-        "decision": "detect",
-        "severity": "high",
-        "reason": "hard_read_failure"
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
       }
     },
     {
@@ -258,9 +258,9 @@
         "errorCode": "internal"
       },
       "expected": {
-        "decision": "defer",
+        "decision": "clear",
         "severity": null,
-        "reason": "unclassified_error"
+        "reason": "retry_window_open"
       }
     },
     {
@@ -1438,6 +1438,342 @@
         "decision": "detect",
         "severity": "high",
         "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "sync-invalid_response-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "invalid_response",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-invalid_response-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "invalid_response",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-invalid_response-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "invalid_response",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-invalid_response-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "invalid_response",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-export_unavailable-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "export_unavailable",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-export_unavailable-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "export_unavailable",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-export_unavailable-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "export_unavailable",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-export_unavailable-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "export_unavailable",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-timeout-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-timeout-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-timeout-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-timeout-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-internal-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "internal",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-internal-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "internal",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-internal-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "internal",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-internal-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "internal",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-unavailable-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unavailable",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-unavailable-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unavailable",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-unavailable-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unavailable",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-unavailable-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unavailable",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-unsupported_version-single",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unsupported_version",
+        "firstFailureAt": "2026-09-17T12:00:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-unsupported_version-retrying",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unsupported_version",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-unsupported_version-exhausted",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unsupported_version",
+        "firstFailureAt": "2026-09-17T11:45:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-unsupported_version-persistent",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "unsupported_version",
+        "firstFailureAt": "2026-09-17T11:00:00Z",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "retry_window_exhausted"
       }
     }
   ]

@@ -387,13 +387,28 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
             'The requested scan did not complete successfully.',
           ),
         );
+      const accessError =
+        decision.reason === 'access_lost' ||
+        ['authentication', 'permission_denied'].includes(f.errorCode ?? '');
+      const incompatible = [
+        'unsupported_capability',
+        'unsupported_version',
+        'invalid_input',
+      ].includes(f.errorCode ?? '');
       hypothesis(
-        'connection_access_or_provider',
-        'Access configuration or provider availability may explain the failed read.',
-        [
-          'Inspect credential ownership and grants for access errors.',
-          'Check provider status, adapter version and retry-after advice.',
-        ],
+        accessError
+          ? 'connection_access_or_provider'
+          : incompatible
+            ? 'adapter_compatibility'
+            : 'provider_read_failure',
+        accessError
+          ? 'The provider rejected access to this connection.'
+          : incompatible
+            ? 'The provider and adapter may not support the same read contract.'
+            : 'Provider availability or an incomplete response may explain the failed read.',
+        accessError
+          ? ['Inspect credential ownership and grants.']
+          : ['Check provider status, adapter version and retry-after advice.'],
       );
       if (decision.reason === 'access_lost')
         result.facts.push(
@@ -402,20 +417,21 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
             'The provider rejected Luma’s credentials or grants, so the connection stopped reading.',
           ),
         );
-      immediate = ['hard_read_failure', 'access_lost'].includes(
-        decision.reason,
-      );
+      immediate = accessError || incompatible;
       step(
         immediate ? 'manual_intervention' : 'read_investigate',
         'restore_complete_scan',
-        immediate
-          ? 'Ask the connection owner to inspect grants, credentials or adapter compatibility.'
-          : 'Request a read-only refresh after provider retry-after and backoff.',
+        accessError
+          ? 'Ask the connection owner to restore credentials or grants.'
+          : incompatible
+            ? 'Ask the connection owner to check adapter compatibility and the supported read capability.'
+            : f.errorCode === 'invalid_response'
+              ? 'Retry the read after backoff. If malformed responses persist, ask the connection owner to inspect the provider response and adapter compatibility.'
+              : 'Request a read-only refresh after provider retry-after and backoff.',
         'Luma will check again. A successful full read confirms that this connection has recovered.',
-        [
-          'Do not repeatedly retry authorization errors.',
-          'Respect provider retry-after and read limits.',
-        ],
+        accessError
+          ? ['Do not repeatedly retry authorization errors.']
+          : ['Respect provider retry-after and read limits.'],
       );
       break;
     }

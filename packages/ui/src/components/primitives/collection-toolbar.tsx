@@ -280,7 +280,7 @@ export function CollectionToolbar({
               ),
             )}
             {conditions ? <ConditionFilters {...conditions} /> : null}
-            {offered.length ? (
+            {offered.length && !conditions ? (
               <ResponsivePopover
                 title={m.common_filters()}
                 open={open === 'sheet'}

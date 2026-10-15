@@ -90,7 +90,7 @@ function IssuesExample({
       };
   const [page, setPage] = useState(1);
   const [view, setView] = useState<'needs_you' | 'active' | 'history'>(
-    'needs_you',
+    'active',
   );
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   // The page's quick filters: each is one "is any of" condition on its catalog field.
@@ -498,15 +498,15 @@ export const ViewNavigation: Story = {
   args: { selectedInitially: false },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const review = canvas.getByRole('tab', { name: 'Needs review' });
+    const review = canvas.getByRole('tab', { name: 'Needs attention' });
     const open = canvas.getByRole('tab', { name: 'All open' });
-    await expect(review).toHaveAttribute('aria-selected', 'true');
-    review.focus();
-    await userEvent.keyboard('{ArrowRight}');
-    await expect(open).toHaveFocus();
-    await expect(review).toHaveAttribute('aria-selected', 'true');
-    await userEvent.keyboard('{Enter}');
     await expect(open).toHaveAttribute('aria-selected', 'true');
+    open.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await expect(review).toHaveFocus();
+    await expect(open).toHaveAttribute('aria-selected', 'true');
+    await userEvent.keyboard('{Enter}');
+    await expect(review).toHaveAttribute('aria-selected', 'true');
     await userEvent.click(canvas.getByRole('tab', { name: 'History' }));
     await expect(canvas.getByRole('tab', { name: 'History' })).toHaveAttribute(
       'aria-selected',

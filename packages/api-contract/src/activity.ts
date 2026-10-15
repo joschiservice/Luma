@@ -53,6 +53,8 @@ const activityActorParameter = z
 
 export const activityQuerySchema = z
   .object({
+    view: z.enum(['events', 'business']).default('events'),
+    detail: z.enum(['summary', 'steps']).default('summary'),
     from: z.string().datetime(),
     to: z.string().datetime(),
     q: z.string().trim().max(200).optional(),
@@ -96,6 +98,8 @@ export const activityActorSchema = z.object({
 });
 
 const activityEventSchema = z.object({
+  workflowRunId: z.string().uuid().nullable().optional(),
+  resourceKind: z.string().nullable().optional(),
   id: z.string().max(200),
   recordedAt: z.string().datetime(),
   occurredAt: z.string().datetime().nullable(),
@@ -130,7 +134,13 @@ const activityEventSchema = z.object({
 
 export const activityPageSchema = z.object({
   visibility: z.enum(['member', 'admin']),
-  items: z.array(activityEventSchema).max(100),
+  items: z
+    .array(
+      activityEventSchema.extend({
+        steps: z.array(activityEventSchema).max(100).optional(),
+      }),
+    )
+    .max(100),
   nextCursor: z.string().nullable(),
   coverage: z.string(),
 });
@@ -139,6 +149,6 @@ export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 
 export type ActivityActor = z.infer<typeof activityActorSchema>;
 
-export type ActivityEvent = z.infer<typeof activityEventSchema>;
+export type ActivityEvent = z.infer<typeof activityPageSchema>['items'][number];
 
 export type ActivityPage = z.infer<typeof activityPageSchema>;

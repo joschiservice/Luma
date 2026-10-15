@@ -121,6 +121,41 @@ const content: WorkflowDraftContent = {
 };
 
 describe('authoring vocabulary', () => {
+  it('offers only installed trigger choices and deduplicates contributions', () => {
+    const installed = mergeVocabulary(
+      [
+        {
+          triggers: [
+            {
+              kind: 'event',
+              executable: true,
+              options: [
+                { value: 'supplier.overdue', label: 'Supplier order overdue' },
+              ],
+            },
+          ],
+        },
+        {
+          triggers: [
+            {
+              kind: 'event',
+              executable: false,
+              options: [
+                { value: 'supplier.overdue', label: 'Supplier order overdue' },
+              ],
+            },
+          ],
+        },
+      ],
+      { runtime: 'test', limits },
+    );
+    expect(
+      installed.triggers.find((entry) => entry.kind === 'event')?.options,
+    ).toEqual([{ value: 'supplier.overdue', label: 'Supplier order overdue' }]);
+    expect(
+      installed.triggers.find((entry) => entry.kind === 'exception')?.options,
+    ).toBeUndefined();
+  });
   it('keeps unsupported entries visible with the reason they cannot run', () => {
     expect(vocabulary.triggers.find((item) => item.kind === 'manual')).toEqual(
       expect.objectContaining({ executable: true, reason: null }),

@@ -26,7 +26,7 @@ it('drops invalid deep-link filters and converts older ones into conditions', ()
     state: 'bad',
   });
   expect(hasLegacyFilters(invalid)).toBe(false);
-  expect(caseView(invalid.view)).toBe('needs_you');
+  expect(caseView(invalid.view)).toBe('active');
 
   const owner = '6f8a1c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b';
   const legacy = inboxSearch.parse({
@@ -54,10 +54,10 @@ it('drops invalid deep-link filters and converts older ones into conditions', ()
   ).toEqual({ match: 'all', conditions: [{ field: 'owner', op: 'empty' }] });
 });
 
-it('reads built-in views and falls back to Needs review for saved views', () => {
+it('reads built-in views and defaults missing segments to All open', () => {
   expect(caseView('history')).toBe('history');
-  expect(caseView('6f8a1c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b')).toBe('needs_you');
-  expect(caseView(undefined)).toBe('needs_you');
+  expect(caseView('6f8a1c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b')).toBe('active');
+  expect(caseView(undefined)).toBe('active');
 });
 
 it('retains failed and escalated work in active, and only explicit attention in needs you', () => {
@@ -76,6 +76,10 @@ it('retains failed and escalated work in active, and only explicit attention in 
     freshness: 'stale',
   };
   const none = { match: 'all' as const, conditions: [] };
+  expect(matchesView(item, { segment: null, where: none })).toBe(true);
+  expect(
+    caseListQuery(builtinState(issuesCatalog, 'active'), { q: '' }, 'UTC').view,
+  ).toBe('active');
   expect(matchesView(item, { segment: 'needs_you', where: none })).toBe(false);
   expect(matchesView(item, { segment: 'active', where: none })).toBe(true);
   expect(

@@ -555,5 +555,18 @@
   "workflows_review_demand_recorded": "Demand evidence read at",
   "workflows_review_context_recorded": "Review facts recorded at",
   "workflows_review_context_note": "Cover is an estimate based on recorded sales, not a demand forecast. Proposed receipt is not confirmed incoming stock. Stock, existing orders and permission are checked again before the draft is created. Nothing is sent now. Under the workspace rules, this approval can also cover sending the unchanged draft to the reviewed supplier connection before the approval expires. The requester chooses the delivery date when sending.",
-  "workflows_review_allowed": "Allowed"
+  "workflows_review_allowed": "Allowed",
+  "workflows_latest_unresolved": "Latest run needs review",
+  "workflows_schedule_unavailable": "Scheduled starts for custom workflows are not available yet. Choose another trigger to run this workflow.",
+  "workflows_unit_inventory_cases": "{count, plural, one {{count, number} open stock mismatch issue} other {{count, number} open stock mismatch issues}}",
+  "workflows_unit_fulfillment_cases": "{count, plural, one {{count, number} open fulfillment delay issue} other {{count, number} open fulfillment delay issues}}",
+  "workflows_unit_sync_cases": "{count, plural, one {{count, number} open connection issue} other {{count, number} open connection issues}}",
+  "workflows_unit_quantity_cases": "{count, plural, one {{count, number} open quantity difference issue} other {{count, number} open quantity difference issues}}",
+  "workflows_unit_open_supplier_orders": "{count, plural, one {{count, number} open overdue supplier order} other {{count, number} open overdue supplier orders}}",
+  "workflows_unit_refund_cases": "{count, plural, one {{count, number} return waiting for a refund} other {{count, number} returns waiting for a refund}}",
+  "workflows_unit_payment_cases": "{count, plural, one {{count, number} order waiting for payment} other {{count, number} orders waiting for payment}}",
+  "workflows_record_search": "Search records",
+  "workflows_record_select": "Choose a record",
+  "workflows_record_load_failed": "Records could not be loaded. Try again.",
+  "workflows_record_none": "No matching records. Try another search."
 }

@@ -106,6 +106,7 @@ describe('case decisions', () => {
     });
     const item = presentCase(stale, owner, asOf);
     expect(item.subject.detail).toBeNull();
+    expect(item.title).not.toBe(stale.summary);
     expect(item.why).not.toContain('JTL');
     const current = presentCase(
       { ...stale, valid_until: '2026-09-30T09:30:00.000Z' },
@@ -113,7 +114,24 @@ describe('case decisions', () => {
       asOf,
     );
     expect(current.why).toBe('Correct the stock in JTL.');
+    expect(current.title).toBe(stale.summary);
     expect(current.response).toBe('investigate');
+  });
+
+  it('keeps the issue summary recognizable when manual work becomes evidence review', () => {
+    const manual = presentCase(
+      facts({ reason: 'manual_intervention' }),
+      owner,
+      asOf,
+    );
+    const uncertain = presentCase(
+      facts({ reason: 'uncertainty' }),
+      owner,
+      asOf,
+    );
+    expect(manual.title).toBe(facts({}).summary);
+    expect(uncertain.title).toBe(manual.title);
+    expect(uncertain.response).toBe('investigate');
   });
 
   it('labels impact honestly and maps subjects to operational areas', () => {

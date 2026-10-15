@@ -49,6 +49,12 @@ test('creates, reviews and lists procurement records with saved views and safe r
   await page
     .getByRole('button', { name: 'New purchase order', exact: true })
     .waitFor();
+  await expect(
+    page.getByText(
+      'Your suppliers are ready. Create a draft order or review the proposals waiting for approval.',
+      { exact: true },
+    ),
+  ).toBeVisible();
   await page
     .getByRole('button', { name: 'New purchase order', exact: true })
     .click();
@@ -82,6 +88,18 @@ test('creates, reviews and lists procurement records with saved views and safe r
   await page
     .getByRole('heading', { name: 'PO-2026-001', exact: true })
     .waitFor();
+  await expect(
+    page
+      .locator('section[aria-labelledby="order-lines"]')
+      .getByRole('columnheader'),
+  ).toHaveText([
+    'Item',
+    'Ordered',
+    'Confirmed',
+    'Received',
+    'Expected',
+    'Unit cost',
+  ]);
   expect(
     (
       await f.api.request(`${f.root}/purchase-orders`, {

@@ -211,6 +211,24 @@ export function StockDetailView({
                 />
               ) : null
             ) : null}
+            {position ? (
+              <Button
+                variant="ghost"
+                render={
+                  <Link
+                    to="/app/$organizationId/inventory/transfers"
+                    params={{ organizationId }}
+                    search={{
+                      skuId: position.skuId,
+                      locationId: position.locationId,
+                    }}
+                  />
+                }
+                nativeButton={false}
+              >
+                {m.inventory_transfer_nav()}
+              </Button>
+            ) : null}
             <RefreshButton
               refreshing={refreshing}
               onClick={refresh}
@@ -239,22 +257,6 @@ export function StockDetailView({
       ) : null}
       {detail && position ? (
         <>
-          <Button
-            variant="outline"
-            render={
-              <Link
-                to="/app/$organizationId/inventory/transfers"
-                params={{ organizationId }}
-                search={{
-                  skuId: position.skuId,
-                  locationId: position.locationId,
-                }}
-              />
-            }
-            nativeButton={false}
-          >
-            {m.inventory_transfer_nav()}
-          </Button>
           <section
             className="inventory-explanation"
             aria-labelledby="stock-explanation"

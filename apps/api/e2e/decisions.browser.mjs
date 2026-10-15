@@ -54,20 +54,19 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   requester.on('pageerror', (error) => errors.push(error.message));
   await requester.goto(`/app/${f.manifest.organizationId}/home`);
   const attention = requester.getByRole('region', {
-    name: 'Needs your attention',
+    name: 'Needs you',
   });
-  await attention.getByText(title).waitFor();
-  await attention
-    .getByRole('link', { name: 'View all: Needs your attention' })
-    .click();
-  await requester.waitForURL(`**${path}`);
-  const requested = requester.getByRole('link', { name: title });
-  await requested.getByText('Waiting for another approver').waitFor();
-  await requester
-    .getByRole('navigation', { name: 'Workspace navigation' })
-    .getByRole('link', { name: /Needs you/ })
-    .getByText(/waiting for you/)
-    .waitFor({ state: 'attached' });
+  await expect(attention.getByText(title)).toHaveCount(0);
+  await requester.goto(path);
+  await requester.getByText('Waiting on others', { exact: true }).click();
+  const requested = requester.getByRole('link', { name: title, exact: true });
+  await expect(requested).toBeVisible();
+  await expect(
+    requester
+      .locator('li')
+      .filter({ has: requested })
+      .getByText('Waiting for another approver'),
+  ).toBeVisible();
 
   // A different admin opens it, takes it and reads the exact change before approving.
   const approver = await (await contextFor(f.approverCookie)).newPage();
@@ -160,7 +159,13 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   await approver.waitForURL((url) => !url.searchParams.has('item'));
 
   // Narrow screens show one pane without horizontal scrolling.
-  await requester.setViewportSize({ width: 375, height: 812 });
+  await requester.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    requester.getByRole('button', { name: 'Filters', exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (await requester.locator('.decisions-toolbar').boundingBox()).height,
+  ).toBeLessThan(280);
   await requester.screenshot({
     path: '/tmp/luma78-needs-you-mobile.png',
     fullPage: true,

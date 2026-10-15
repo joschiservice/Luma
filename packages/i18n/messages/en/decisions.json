@@ -33,9 +33,9 @@
   "decisions_status_run": "Ready for you to run",
   "decisions_status_check": "Check the outcome",
   "decisions_status_awaiting_other": "Waiting for another approver",
-  "decisions_status_manual": "Needs a manual step",
+  "decisions_status_manual": "Manual step required",
   "decisions_status_expired": "Proposal expired",
-  "decisions_status_review": "Needs review",
+  "decisions_status_review": "Review evidence",
   "decisions_status_waiting_requester": "Waiting for the requester",
   "decisions_status_unconfirmed": "Outcome not confirmed",
   "decisions_status_waiting_approver": "Waiting for an approver",
@@ -177,5 +177,7 @@
   "decisions_automatic_running": "Luma is running this",
   "decisions_open_purchase_order": "Open purchase order",
   "decisions_proposal_changed": "This proposal changed during review",
-  "decisions_proposal_changed_help": "Review the changed values before answering. The previous approval does not cover a different proposal."
+  "decisions_proposal_changed_help": "Review the changed values before answering. The previous approval does not cover a different proposal.",
+  "decisions_waiting_others": "Waiting on others",
+  "decisions_waiting_empty": "Nothing is waiting on someone else."
 }

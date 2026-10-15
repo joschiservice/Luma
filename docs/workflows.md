@@ -182,7 +182,8 @@ evidence of ownership; admission resolves and authorizes the resource itself.
   batches, so a crash leaves a start pending and downtime drops nothing.
   `advance_workflow_schedules()` returns only a count, never cross-tenant data, and cannot
   dispatch. Cancellation takes the same row lock and succeeds only while pending. Scheduled
-  starts are recorded but do not run custom workflows yet.
+  starts are recorded but do not run custom workflows yet. The authoring and start forms
+  therefore hide scheduling; existing scheduled definitions explain this limitation.
 - A start that comes due while its workspace is suspended or closed becomes `skipped` and
   never runs, so reactivation does not fire missed starts. Starts due after reactivation
   run at their time. Worker downtime is different: an active workspace's late starts still

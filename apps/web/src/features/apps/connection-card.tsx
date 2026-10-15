@@ -75,7 +75,9 @@ export function ConnectionCard({
   useEffect(() => {
     if (window.location.hash === `#connection-${connection.id}`) {
       const element = document.getElementById(`connection-${connection.id}`);
-      element?.scrollIntoView({ block: 'center' });
+      element
+        ?.closest('.connections-section')
+        ?.scrollIntoView({ block: 'start' });
       element?.focus({ preventScroll: true });
     }
   }, [connection.id]);

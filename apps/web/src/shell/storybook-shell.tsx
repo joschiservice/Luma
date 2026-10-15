@@ -9,6 +9,7 @@ import { WorkspaceSwitcher } from '@luma/ui/components/workspace/workspace-switc
 import { type ReactNode, useState } from 'react';
 
 import appStyles from '../styles.css?inline';
+import { RecordsNavigation } from './records-navigation';
 import { workspaceDestinations } from './workspace-destinations';
 import { WorkspaceLayout } from './workspace-layout';
 
@@ -129,6 +130,14 @@ export function StoryShell({
                   .map((item) => link(item, close))}
               </ul>
             </section>
+            <RecordsNavigation
+              key={current.group === 'records' ? current.path : 'closed'}
+              active={current.group === 'records'}
+            >
+              {workspaceDestinations
+                .filter((item) => item.group === 'records')
+                .map((item) => link(item, close))}
+            </RecordsNavigation>
             <ul className="sidebar-list sidebar-list-end">
               {workspaceDestinations
                 .filter((item) => item.group === 'workspace')

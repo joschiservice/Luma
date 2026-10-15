@@ -456,7 +456,7 @@ test('stuck-fulfillment candidates carry the source references their import mapp
   ).toEqual([]);
 });
 
-test('malformed shop responses open a sync failure that closes after a complete scan', async (t) => {
+test('sustained malformed shop responses escalate after retries and close only after a complete scan', async (t) => {
   const f = await setupSimulator(t);
   const actor = await f.pilot.operator();
   const syncCases = async () =>
@@ -467,7 +467,7 @@ test('malformed shop responses open a sync failure that closes after a complete 
   await f.pilot.detect();
   expect(await syncCases()).toEqual([]);
 
-  // A response Luma cannot read is a hard failure and needs no retry window.
+  // One unreadable response stays in automatic retry handling.
   await f.call('runs/operations/control', {
     action: 'fault',
     rule: {
@@ -479,14 +479,33 @@ test('malformed shop responses open a sync failure that closes after a complete 
   });
   await f.pilot.observe({ check: false });
   await f.pilot.detect();
+  expect(await syncCases()).toEqual([]);
+  for (let attempt = 1; attempt < 5; attempt++)
+    await f.pilot.observe({ check: false });
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET failing_since=now()-interval '16 minutes'
+     WHERE tenant_id=$1 AND connection_id=$2 AND error_code IS NOT NULL`,
+    [f.manifest.organizationId, f.manifest.connections.shopify],
+  );
+  await f.pilot.detect();
   const [opened, ...others] = await syncCases();
   expect(others).toEqual([]);
   expect(opened).toMatchObject({
-    severity: 'high',
+    severity: 'medium',
     subject: {
       subjectId: f.manifest.connections.shopify,
       scope: ['products.read'],
     },
+  });
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET failing_since=now()-interval '61 minutes'
+     WHERE tenant_id=$1 AND connection_id=$2 AND error_code IS NOT NULL`,
+    [f.manifest.organizationId, f.manifest.connections.shopify],
+  );
+  await f.pilot.detect();
+  expect((await syncCases())[0]).toMatchObject({
+    id: opened.id,
+    severity: 'high',
   });
 
   // Recovery alone does not close the case; a complete scan after detection does.

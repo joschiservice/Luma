@@ -1,5 +1,5 @@
 {
-  "connections_page_title": "Apps",
+  "connections_page_title": "Manage apps",
   "connections_result_connected": "Connection ready.",
   "connections_result_failed": "Authorization didn’t finish. Open the app and try again.",
   "connections_status_pending": "Awaiting validation",

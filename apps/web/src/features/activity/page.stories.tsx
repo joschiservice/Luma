@@ -172,7 +172,9 @@ export const History: Story = {
     ).toBeVisible();
     await expect(canvas.getByText('Luma · JTL Cloud')).toBeVisible();
     await userEvent.click(
-      await canvas.findByRole('button', { name: /Change attempt finished/ }),
+      await canvas.findByRole('button', {
+        name: /Change the order’s shipping method.*Outcome unclear/,
+      }),
     );
     await expect(
       canvas.getByText('Inconclusive', { exact: true }),

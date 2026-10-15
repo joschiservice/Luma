@@ -56,7 +56,14 @@ it('lists replenishment approvals in Needs you and follows decisions made on the
   const id = `replenishment:${run.id}`;
 
   // The principal who started the run sees it but needs a different approver.
-  const own = await queue();
+  const actionable = await queue();
+  expect(actionable.items.map((item) => item.id)).not.toContain(id);
+  expect(
+    actionable.items.every((item) =>
+      ['decide', 'run', 'check', 'investigate'].includes(item.response),
+    ),
+  ).toBe(true);
+  const own = await queue('?scope=waiting');
   expect(own.sources).toEqual(
     expect.arrayContaining([
       { id: 'cases', label: 'Issues', state: 'available' },
@@ -118,12 +125,12 @@ it('lists replenishment approvals in Needs you and follows decisions made on the
     { decisionId: id, assigneeId: null, revision: 0 },
     { status: 409 },
   );
-  const mine = await queue('?view=mine');
+  const mine = await queue('?view=mine&scope=waiting');
   expect(mine.items.map((item) => item.id)).toContain(id);
   expect(mine.items.find((item) => item.id === id).assignment.revision).toBe(1);
   expect(mine.counts.views.mine).toBeGreaterThanOrEqual(1);
   expect(
-    (await queue('?view=unassigned')).items.map((i) => i.id),
+    (await queue('?view=unassigned&scope=waiting')).items.map((i) => i.id),
   ).not.toContain(id);
   await assign(
     {
@@ -139,9 +146,11 @@ it('lists replenishment approvals in Needs you and follows decisions made on the
   );
 
   // Pages keep their filters; a cursor from other filters is rejected.
-  const first = await queue('?limit=1');
+  const first = await queue('?limit=1&scope=waiting');
   if (first.nextCursor) {
-    const second = await queue(`?limit=1&cursor=${first.nextCursor}`);
+    const second = await queue(
+      `?limit=1&scope=waiting&cursor=${first.nextCursor}`,
+    );
     expect(second.offset).toBe(1);
     expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
     await queue(`?limit=1&view=mine&cursor=${first.nextCursor}`, {
@@ -215,8 +224,9 @@ it('projects a case approval for each reader and drops it once the case desk dec
       test: randomBytes(32).toString('base64'),
     }),
   };
+  const password = randomUUID();
   const manifest = await seedPilot(
-    { seedPassword: randomUUID() },
+    { seedPassword: password },
     env,
     directory,
     'approval-required',
@@ -268,6 +278,52 @@ it('projects a case approval for each reader and drops it once the case desk dec
   expect(Date.parse(item.deadline)).toBeLessThanOrEqual(
     Date.parse(review.proposal.expiresAt),
   );
+
+  const signedIn = await pilot.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: { origin: 'http://127.0.0.1:3000' },
+    payload: { email: 'pilot-operator@example.test', password },
+  });
+  expect(signedIn.statusCode, signedIn.body).toBe(200);
+  const cookie = []
+    .concat(signedIn.headers['set-cookie'])
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  const assignmentUrl = `/v1/organizations/${manifest.organizationId}/decisions/assignments`;
+  const take = await pilot.app.inject({
+    method: 'POST',
+    url: assignmentUrl,
+    headers: { cookie, origin: 'http://127.0.0.1:3000' },
+    payload: { decisionId: id, assigneeId: approver.actor.id, revision: 0 },
+  });
+  expect(take.statusCode, take.body).toBe(200);
+  const assigned = await find(approver);
+  expect(assigned.assignment).toMatchObject({
+    assigneeId: approver.actor.id,
+    revision: 1,
+  });
+  expect(
+    (await pilot.detection.cases.get(approver, source.id)).owner.userId,
+  ).toBe(approver.actor.id);
+  const release = await pilot.app.inject({
+    method: 'POST',
+    url: assignmentUrl,
+    headers: { cookie, origin: 'http://127.0.0.1:3000' },
+    payload: { decisionId: id, assigneeId: null, revision: 1 },
+  });
+  expect(release.statusCode, release.body).toBe(200);
+  expect((await find(approver)).assignment).toMatchObject({
+    assigneeId: null,
+    revision: 2,
+  });
+  const staleAssignment = await pilot.app.inject({
+    method: 'POST',
+    url: assignmentUrl,
+    headers: { cookie, origin: 'http://127.0.0.1:3000' },
+    payload: { decisionId: id, assigneeId: approver.actor.id, revision: 1 },
+  });
+  expect(staleAssignment.statusCode, staleAssignment.body).toBe(409);
 
   await respond(pilot, manifest, client, 'approve');
   // The approval leaves the queue at once. The case may stay for other inbox attention rules,

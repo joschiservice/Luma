@@ -128,7 +128,7 @@
   "identity_nav_operations": "Operations",
   "identity_nav_waiting_count": "{count, plural, one {{count, number} item waiting for you} other {{count, number} items waiting for you}}",
   "identity_nav_home": "Home",
-  "identity_nav_home_description": "What needs your attention and what Luma is handling",
+  "identity_nav_home_description": "Overview of your work, current issues and connected systems",
   "identity_nav_needs_you": "Needs you",
   "identity_nav_needs_you_description": "Approvals, manual steps, and result checks waiting for a person",
   "identity_nav_issues": "Issues",
@@ -169,7 +169,7 @@
   "identity_nav_procurement": "Procurement",
   "identity_nav_procurement_description": "Manage suppliers and purchase orders",
   "identity_nav_procurement_area": "procurement",
-  "identity_nav_apps": "Apps",
+  "identity_nav_apps": "Manage apps",
   "identity_nav_apps_description": "Install apps and manage connected systems",
   "identity_nav_sync": "Data sync",
   "identity_nav_sync_description": "Imports, sync status, and record coverage for each connected system",
@@ -301,5 +301,7 @@
   "identity_staff_workspaces_empty": "No matching workspaces in responding regions",
   "identity_staff_users_empty": "No matching users in responding regions",
   "identity_staff_region_column": "Region",
-  "identity_staff_region_unknown": "The owning region could not be confirmed. Open this workspace from a regional directory result."
+  "identity_staff_region_unknown": "The owning region could not be confirmed. Open this workspace from a regional directory result.",
+  "identity_nav_all_records": "All records",
+  "identity_nav_installed_apps": "Installed apps"
 }

@@ -115,6 +115,8 @@ export interface CaseWorkflowAdapter {
    * responsible. An existing owner is kept. Cases only.
    */
   caseOwner?: 'principal';
+  /** Installed connections this adapter reads or changes; never grants execution scope. */
+  connections?(context: TenantContext): Promise<WorkflowDetail['connections']>;
   /** Plain-language titles and descriptions keyed by step ID. */
   stepCopy: Record<string, { title: string; description: string }>;
   /** Workspace prerequisites. Unmet ones block turning the workflow on. */
@@ -458,7 +460,7 @@ export function createCaseWorkflows(deps: {
     const found = adapter(id);
     const { version } = found;
     // An unreadable source shows as unknown here instead of failing the workflow list.
-    const [activations, requirements, runs, open, policyVersion] =
+    const [activations, requirements, runs, open, policyVersion, connections] =
       await Promise.all([
         deps.store.list(context),
         caseRequirements(context, found),
@@ -467,6 +469,7 @@ export function createCaseWorkflows(deps: {
           .open(context)
           .catch(() => null),
         deps.policies.currentVersion(context.tenantId),
+        found.connections?.(context) ?? Promise.resolve([]),
       ]);
     const mine = activations.filter((item) => item.definitionId === id);
     const active = mine.find((item) => item.active);
@@ -539,7 +542,9 @@ export function createCaseWorkflows(deps: {
         purpose: version.definition.intent,
         category: version.definition.category,
         capability: presented.capability,
-        systems: [],
+        systems: [
+          ...new Set(connections.map((connection) => connection.system)),
+        ],
         availableVersion: version.version,
         status: !available
           ? 'unavailable'
@@ -608,7 +613,7 @@ export function createCaseWorkflows(deps: {
         },
       ],
       activations: mine.map(view),
-      connections: [],
+      connections,
       principalId: context.actor.id,
       canManage: hasPermission(context, 'workflows.publish'),
       policyVersion,

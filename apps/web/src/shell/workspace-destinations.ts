@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 /** Where a destination appears in the sidebar. */
-type DestinationGroup = 'core' | 'operations' | 'workspace';
+type DestinationGroup = 'core' | 'operations' | 'records' | 'workspace';
 
 /** Workspace route segments that appear in navigation. */
 type DestinationPath =
@@ -60,6 +60,8 @@ export type WorkspaceDestination = {
   domain?: Domain;
   /** Second key of the `G` navigation shortcut, such as `h` for G then H. */
   shortcut: string;
+  /** Explicit entry view; keeps main navigation independent of remembered filters. */
+  search?: { view: 'active' };
   /** The permission needed to open the page; without one, every member can open it. */
   permission?: string;
   /** What the page shows, for the no-access explanation, in the active language. */
@@ -124,15 +126,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: m.identity_nav_issues_description,
     group: 'core',
     shortcut: 'i',
+    search: { view: 'active' },
     permission: 'issues.read',
     area: m.identity_nav_issues_area,
   }),
   destination({
     path: 'records',
-    label: m.identity_nav_records,
+    label: m.identity_nav_all_records,
     Icon: Database,
     description: m.identity_nav_records_description,
-    group: 'core',
+    group: 'records',
     shortcut: 'r',
   }),
   destination({
@@ -179,7 +182,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_orders,
     Icon: Receipt,
     description: m.identity_nav_orders_description,
-    group: 'operations',
+    group: 'records',
     domain: 'orders',
     shortcut: 'o',
     permission: 'orders.read',
@@ -190,7 +193,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_customers,
     Icon: Users,
     description: m.identity_nav_customers_description,
-    group: 'operations',
+    group: 'records',
     domain: 'customers',
     shortcut: 'u',
     permission: 'customers.read',
@@ -201,7 +204,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_products,
     Icon: Package,
     description: m.identity_nav_products_description,
-    group: 'operations',
+    group: 'records',
     domain: 'products',
     shortcut: 'k',
     permission: 'products.read',
@@ -212,7 +215,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_returns,
     Icon: Undo2,
     description: m.identity_nav_returns_description,
-    group: 'operations',
+    group: 'records',
     domain: 'returns',
     shortcut: 't',
     permission: 'returns.read',
@@ -223,7 +226,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_inventory,
     Icon: Boxes,
     description: m.identity_nav_inventory_description,
-    group: 'operations',
+    group: 'records',
     domain: 'inventory',
     shortcut: 'y',
     permission: 'inventory.read',
@@ -234,7 +237,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_fulfillment,
     Icon: Truck,
     description: m.identity_nav_fulfillment_description,
-    group: 'operations',
+    group: 'records',
     domain: 'fulfillment',
     shortcut: 'f',
     permission: 'fulfillment.read',
@@ -256,7 +259,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     label: m.identity_nav_procurement,
     Icon: ShoppingCart,
     description: m.identity_nav_procurement_description,
-    group: 'operations',
+    group: 'records',
     domain: 'procurement',
     shortcut: 'p',
     permission: 'procurement.read',
