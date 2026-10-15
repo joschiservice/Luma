@@ -3310,7 +3310,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     expect(clear.incident?.state).toBe('detected');
     const uncertain = request('uncertain');
     if (uncertain.input.exceptionClass === 'sync_failure')
-      uncertain.input.facts.errorCode = 'internal';
+      uncertain.input.facts.errorCode = null;
     expect(
       (await services.exceptions.ingest(context(), uncertain)).reviewRequired,
     ).toBe(false);
@@ -3410,7 +3410,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   it('emits a review task without inventing an incident for prolonged uncertainty', async () => {
     const uncertain = request();
     if (uncertain.input.exceptionClass === 'sync_failure')
-      uncertain.input.facts.errorCode = 'internal';
+      uncertain.input.facts.errorCode = null;
     await services.exceptions.ingest(context(), uncertain);
     now = new Date(now.getTime() + 1800_000);
     const result = await services.exceptions.ingest(context(), uncertain);
