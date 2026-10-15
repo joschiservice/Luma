@@ -7,6 +7,7 @@ import type {
 } from '@luma/api-contract';
 import {
   formatDate,
+  formatList,
   formatNumber,
   formatRelativeTime,
 } from '@luma/i18n/format';
@@ -200,7 +201,13 @@ export function streamState(stream: SyncStreamView): {
     case 'retrying':
       return { state: 'attention', label: m.sync_state_retrying() };
     case 'waiting':
-      return { state: 'waiting', label: m.sync_state_waiting_for_orders() };
+      return {
+        state: 'waiting',
+        label:
+          stream.waiting?.reason === 'orders' || !stream.waiting
+            ? m.sync_state_waiting_for_orders()
+            : m.sync_state_waiting(),
+      };
     case 'importing':
       return {
         state: 'running',
@@ -222,6 +229,37 @@ export function streamState(stream: SyncStreamView): {
       };
     default:
       return { state: 'verified', label: m.sync_state_up_to_date() };
+  }
+}
+
+/** Explains a current scheduler wait using only the server's scoped evidence. */
+export function waitingStatement(stream: SyncStreamView): string | null {
+  if (stream.status !== 'waiting') return null;
+  const waiting = stream.waiting;
+  if (!waiting) return m.sync_stream_starts_after_orders();
+  switch (waiting.reason) {
+    case 'orders':
+      return m.sync_stream_starts_after_orders();
+    case 'request_capacity':
+      return m.sync_wait_request_capacity();
+    case 'admission_unavailable':
+      return m.sync_wait_admission_unavailable();
+    case 'provider_cooldown':
+      return m.sync_wait_provider_cooldown();
+    case 'recent_changes':
+      return m.sync_wait_recent_changes();
+    case 'connection_capacity':
+      return m.sync_wait_connection_capacity();
+    case 'worker_capacity':
+      return waiting.connections.length
+        ? m.sync_wait_worker_connections({
+            connections: formatList(
+              waiting.connections.map((connection) => connection.label),
+            ),
+          })
+        : m.sync_wait_worker_capacity();
+    case 'queued':
+      return m.sync_wait_queued();
   }
 }
 
@@ -404,6 +442,15 @@ export function overallState(overview: SyncOverview): {
       title: m.sync_overall_paused_title(),
       detail: m.sync_overall_paused_detail(),
     };
+  if (
+    importing.length &&
+    importing.every((stream) => ['waiting', 'paused'].includes(stream.status))
+  )
+    return {
+      state: 'waiting',
+      title: m.sync_overall_waiting_title(),
+      detail: m.sync_overall_waiting_detail(),
+    };
   if (importing.length)
     return {
       state: 'running',
@@ -424,6 +471,12 @@ export function overallState(overview: SyncOverview): {
       state: 'attention',
       title: m.sync_overall_retrying_title(),
       detail: m.sync_overall_retrying_detail({ count: retrying }),
+    };
+  if (streams.some((stream) => stream.status === 'waiting'))
+    return {
+      state: 'waiting',
+      title: m.sync_overall_waiting_title(),
+      detail: m.sync_overall_waiting_detail(),
     };
   const latest = streams
     .map((stream) => stream.lastSuccessAt)

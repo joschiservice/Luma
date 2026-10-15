@@ -41,6 +41,11 @@ type StreamRow = {
   suspended_scan: SyncStream['scan'];
   live_due_at: Date | null;
   provider_due_at: Date | null;
+  lease_until: Date | null;
+  lease_workspace_concurrency: number | null;
+  lease_connection_concurrency: number | null;
+  admission_wait_reason: 'request_capacity' | 'admission_unavailable' | null;
+  admission_wait_at: Date | null;
   full_requested: boolean;
   watermark: Date | null;
   history_from: Date | null;
@@ -93,6 +98,16 @@ function stream(row: StreamRow): SyncStream {
     recentHistoryCompletedAt: iso(row.recent_history_completed_at),
     liveDueAt: iso(row.live_due_at),
     providerDueAt: iso(row.provider_due_at),
+    leaseUntil: iso(row.lease_until),
+    leaseWorkspaceConcurrency: row.lease_workspace_concurrency,
+    leaseConnectionConcurrency: row.lease_connection_concurrency,
+    admissionWait:
+      row.admission_wait_reason && row.admission_wait_at
+        ? {
+            reason: row.admission_wait_reason,
+            observedAt: row.admission_wait_at.toISOString(),
+          }
+        : null,
     fullRequested: row.full_requested,
     watermark: iso(row.watermark),
     historyFrom: iso(row.history_from),
@@ -301,7 +316,9 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               LIMIT 1 FOR UPDATE SKIP LOCKED
             )
             UPDATE commerce_sync_streams s SET lease_token=$2,
-              lease_until=now()+($3::integer*interval '1 millisecond'),updated_at=now()
+              lease_until=now()+($3::integer*interval '1 millisecond'),updated_at=now(),
+              lease_workspace_concurrency=$6,lease_connection_concurrency=$5,
+              admission_wait_reason=NULL,admission_wait_at=NULL
             FROM candidate c WHERE s.tenant_id=$1 AND s.id=c.id RETURNING s.*`,
             [
               tenantId,
@@ -500,7 +517,8 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           return false;
         if (page.deferred) {
           await tx.query(
-            `UPDATE commerce_sync_streams SET cursor=$4,due_at=$5,scan_waiting=CASE WHEN $6='admission' THEN scan_waiting ELSE true END,lease_token=NULL,lease_until=NULL
+            `UPDATE commerce_sync_streams SET cursor=$4,due_at=$5,scan_waiting=CASE WHEN $6='admission' THEN scan_waiting ELSE true END,lease_token=NULL,lease_until=NULL,
+              admission_wait_reason=$7,admission_wait_at=CASE WHEN $7::text IS NULL THEN NULL ELSE $8::timestamptz END
             WHERE tenant_id=$1 AND id=$2 AND lease_token=$3`,
             [
               tenantId,
@@ -509,6 +527,8 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               page.nextCursor,
               page.dueAt ?? page.now,
               page.deferReason ?? 'export',
+              page.admissionWaitReason ?? null,
+              page.now,
             ],
           );
 
@@ -903,7 +923,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               scan_since=NULL,scan_created_since=NULL,recent_history_from=NULL,recent_history_completed_at=NULL,suspended_scan=NULL,live_due_at=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
               principal_id=$3,blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
               lease_token=NULL,lease_until=NULL,due_at=now(),attempts=0,error_code=NULL,error_message=NULL,
-              error_at=NULL,failing_since=NULL,version=version+1,updated_at=now()
+              error_at=NULL,failing_since=NULL,admission_wait_reason=NULL,admission_wait_at=NULL,version=version+1,updated_at=now()
             WHERE tenant_id=$1 AND id=$2`,
             values,
           );
@@ -912,6 +932,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             `UPDATE commerce_sync_streams SET paused=false,principal_id=$3,
               blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
               full_requested=full_requested OR $4,due_at=LEAST(COALESCE(due_at,now()),now()),
+              admission_wait_reason=NULL,admission_wait_at=NULL,
               version=version+1,updated_at=now()
             WHERE tenant_id=$1 AND id=$2`,
             [...values, command.kind === 'reconcile'],

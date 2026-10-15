@@ -301,5 +301,17 @@
   "sync_links_title_line": "Quellen für {line}",
   "sync_link_coverage_sku": "{linked} von {total} SKU-Datensätzen systemübergreifend verknüpft",
   "sync_link_coverage_order": "{linked} von {total} Auftragsdatensätzen systemübergreifend verknüpft",
-  "sync_link_coverage_monitoring": "Verknüpfte SKUs ermöglichen Bestandsvergleiche, sobald Lagerorte verknüpft und Quelldaten aktuell sind. Unverknüpfte Datensätze werden nicht verglichen."
+  "sync_link_coverage_monitoring": "Verknüpfte SKUs ermöglichen Bestandsvergleiche, sobald Lagerorte verknüpft und Quelldaten aktuell sind. Unverknüpfte Datensätze werden nicht verglichen.",
+  "sync_state_waiting": "Wartet",
+  "sync_wait_request_capacity": "Wartet auf Kapazität für Anfragen. Luma versucht es automatisch erneut.",
+  "sync_wait_admission_unavailable": "Die Planung der Lesezugriffe ist vorübergehend nicht verfügbar. Luma versucht es automatisch erneut.",
+  "sync_wait_provider_cooldown": "Die Quelle hat Luma gebeten, vor weiteren Lesezugriffen zu warten.",
+  "sync_wait_connection_capacity": "Wartet, bis andere Lesezugriffe über diese Verbindung abgeschlossen sind.",
+  "sync_wait_worker_connections": "Wartet auf Synchronisierungskapazität. Wird gerade synchronisiert: {connections}.",
+  "sync_wait_worker_capacity": "Wartet auf Synchronisierungskapazität. Andere Lesezugriffe laufen.",
+  "sync_wait_queued": "Wartet auf den nächsten Synchronisierungsdurchlauf.",
+  "sync_overall_waiting_title": "Wartet auf Synchronisierung",
+  "sync_overall_waiting_detail": "Luma fährt automatisch fort, sobald die wartenden Synchronisierungen ausgeführt werden können.",
+  "sync_wait_recent_changes": "Wartet, während aktuelle Änderungen über diese Verbindung synchronisiert werden.",
+  "sync_coverage_sources_waiting": "{count} von {total} Quellen warten"
 }

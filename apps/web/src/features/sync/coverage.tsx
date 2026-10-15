@@ -18,6 +18,7 @@ import {
   recordTypes,
   scanProgress,
   streamState,
+  waitingStatement,
 } from './presentation';
 
 export interface CoverageItem {
@@ -86,7 +87,11 @@ export function coverageItems(
         state: state.state,
         text,
         problem:
-          stream.error || stream.blocked || stream.paused ? state.label : null,
+          stream.status === 'waiting'
+            ? waitingStatement(stream)
+            : stream.error || stream.blocked || stream.paused
+              ? state.label
+              : null,
         importing,
         olderOnly: !!recent,
         progress,
@@ -117,7 +122,10 @@ export function coverageSummary(
   now = Date.now(),
 ): { state: OperationalState; text: string } {
   const total = items.length;
-  const problems = items.filter((item) => item.problem);
+  const problems = items.filter(
+    (item) => item.problem && item.state !== 'waiting',
+  );
+  const waiting = items.filter((item) => item.state === 'waiting');
   const importing = items.filter((item) => item.importing);
   const limited = items.filter((item) => item.historyFrom);
   const parts: string[] = [];
@@ -132,6 +140,18 @@ export function coverageSummary(
   else if (problems.length)
     parts.push(
       m.sync_coverage_sources_attention({ count: problems.length, total }),
+    );
+
+  if (waiting.length === 1)
+    parts.push(
+      m.sync_coverage_source_problem({
+        source: waiting[0]!.label,
+        problem: waiting[0]!.problem ?? m.sync_state_waiting(),
+      }),
+    );
+  else if (waiting.length)
+    parts.push(
+      m.sync_coverage_sources_waiting({ count: waiting.length, total }),
     );
 
   const older = importing.filter((item) => item.olderOnly);

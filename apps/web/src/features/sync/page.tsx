@@ -80,6 +80,7 @@ import {
   streamState,
   triggers,
   unavailableReason,
+  waitingStatement,
 } from './presentation';
 
 /** Connects the Data sync page to workspace-scoped queries and sync commands. */
@@ -420,9 +421,10 @@ function StreamRow({
   const [confirm, setConfirm] = useState(false);
   const now = Date.parse(asOf);
   const state = streamState(stream);
-  const progress = ['importing', 'syncing'].includes(stream.status)
+  const progress = ['importing', 'syncing', 'waiting'].includes(stream.status)
     ? scanProgress(type, stream)
     : null;
+  const waiting = waitingStatement(stream);
   const coverage = coverageStatement(type, stream);
   const noun = recordTypes[type].noun;
   const label = m.sync_stream_label({
@@ -438,21 +440,24 @@ function StreamRow({
       <RecordType type={type} />
       <div className="sync-stream-status">
         <StatePill state={state.state}>{state.label}</StatePill>
+        {waiting ? <small className="sync-stream-note">{waiting}</small> : null}
         {progress ? (
           <div className="sync-stream-progress">
-            <Progress
-              value={progress.value}
-              label={
-                stream.scan?.kind === 'backfill'
-                  ? m.sync_stream_progress_backfill({
-                      type: recordTypes[type].title,
-                    })
-                  : m.sync_stream_progress_sync({
-                      type: recordTypes[type].title,
-                    })
-              }
-              valueText={progress.text}
-            />
+            {stream.status !== 'waiting' ? (
+              <Progress
+                value={progress.value}
+                label={
+                  stream.scan?.kind === 'backfill'
+                    ? m.sync_stream_progress_backfill({
+                        type: recordTypes[type].title,
+                      })
+                    : m.sync_stream_progress_sync({
+                        type: recordTypes[type].title,
+                      })
+                }
+                valueText={progress.text}
+              />
+            ) : null}
             <small>{progress.text}</small>
           </div>
         ) : null}
@@ -478,9 +483,19 @@ function StreamRow({
         ) : (
           <span>{m.sync_stream_not_synced()}</span>
         )}
-        {stream.status === 'waiting' ? (
-          <small>{m.sync_stream_starts_after_orders()}</small>
-        ) : stream.nextRunAt && !stream.scan ? (
+        {stream.status === 'waiting' &&
+        stream.waiting?.until &&
+        [
+          'request_capacity',
+          'admission_unavailable',
+          'provider_cooldown',
+        ].includes(stream.waiting.reason) ? (
+          <small title={stream.waiting.until}>
+            {m.sync_stream_next_retry({
+              time: soon(stream.waiting.until, now),
+            })}
+          </small>
+        ) : stream.status !== 'waiting' && stream.nextRunAt && !stream.scan ? (
           <small title={stream.nextRunAt}>
             {startsNow
               ? m.sync_stream_starting_now()

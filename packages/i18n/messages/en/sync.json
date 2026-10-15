@@ -301,5 +301,17 @@
   "sync_links_title_line": "Sources for {line}",
   "sync_link_coverage_sku": "{linked} of {total} SKU records linked across systems",
   "sync_link_coverage_order": "{linked} of {total} order records linked across systems",
-  "sync_link_coverage_monitoring": "Linked SKUs support stock comparisons once locations are linked and source reads are current. Unlinked records are not compared."
+  "sync_link_coverage_monitoring": "Linked SKUs support stock comparisons once locations are linked and source reads are current. Unlinked records are not compared.",
+  "sync_state_waiting": "Waiting",
+  "sync_wait_request_capacity": "Waiting for request capacity. Luma retries automatically.",
+  "sync_wait_admission_unavailable": "Read scheduling is temporarily unavailable. Luma retries automatically.",
+  "sync_wait_provider_cooldown": "The source asked Luma to wait before reading more records.",
+  "sync_wait_connection_capacity": "Waiting for other reads from this connection to finish.",
+  "sync_wait_worker_connections": "Waiting for sync capacity. Currently syncing: {connections}.",
+  "sync_wait_worker_capacity": "Waiting for sync capacity. Other reads are running.",
+  "sync_wait_queued": "Waiting for the next sync pass.",
+  "sync_overall_waiting_title": "Waiting to sync",
+  "sync_overall_waiting_detail": "Luma continues automatically when the waiting syncs can run.",
+  "sync_wait_recent_changes": "Waiting while recent changes from this connection sync.",
+  "sync_coverage_sources_waiting": "{count} of {total} sources are waiting"
 }

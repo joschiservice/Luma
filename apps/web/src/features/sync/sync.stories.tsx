@@ -18,11 +18,13 @@ import {
   importing,
   organizationId,
   recentHistory,
+  waiting,
 } from './sync-fixtures';
 
 const overviews: Record<string, SyncOverview | undefined> = {
   importing,
   recentHistory,
+  waiting,
   current,
   attention,
   empty: { ...importing, connections: [], runs: [] },
@@ -152,5 +154,32 @@ export const RecentHistoryAvailable: Story = {
 
 export const RecentHistoryDark: Story = {
   args: { state: 'recentHistory' },
+  globals: { theme: 'dark' },
+};
+
+export const Waiting: Story = {
+  args: { state: 'waiting' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: 'Waiting to sync' }),
+    ).toBeVisible();
+    await expect(
+      canvas.getAllByText(/Waiting for sync capacity. Currently syncing:/)[0],
+    ).toBeVisible();
+    await expect(canvas.getByText('1,240 of 3,100 orders')).toBeVisible();
+    await expect(
+      canvas.getByText(
+        'Waiting for request capacity. Luma retries automatically.',
+      ),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('progressbar', { name: 'Orders history import' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const WaitingDark: Story = {
+  args: { state: 'waiting' },
   globals: { theme: 'dark' },
 };
