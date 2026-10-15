@@ -5,3 +5,13 @@
   color: var(--foreground-subtle);
   font-size: 12px;
 }
+
+.case-owner-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.case-owner-controls > p {
+  margin: 0;
+}

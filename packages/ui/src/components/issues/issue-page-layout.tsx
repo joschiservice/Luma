@@ -22,6 +22,7 @@ import { useIssueNavigation } from './use-issue-navigation';
 export function IssuePageLayout({
   item,
   back,
+  links,
   refresh,
   children,
   actions,
@@ -29,6 +30,8 @@ export function IssuePageLayout({
 }: {
   item?: CaseDetail | undefined;
   back: ReactNode;
+  /** Contextual destinations below the workspace breadcrumb. */
+  links?: ReactNode;
   refresh?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
@@ -91,6 +94,14 @@ export function IssuePageLayout({
             </div>
           }
         >
+          {links ? (
+            <nav
+              className="issue-page-links"
+              aria-label={m.issues_details_sources()}
+            >
+              {links}
+            </nav>
+          ) : null}
           <div className="issue-page-workspace">
             {item ? (
               <>

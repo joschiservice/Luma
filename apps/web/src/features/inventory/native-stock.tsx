@@ -13,13 +13,16 @@ import {
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
-import { Card } from '@luma/ui/components/primitives/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+} from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { unitOfMeasure } from '@luma/ui/lib/units';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { z } from 'zod';
@@ -264,12 +267,11 @@ export function NativeStockPool({
   });
 
   return (
-    <Card className="inventory-section">
-      <h2>{m.inventory_native_stock_title()}</h2>
-      <p>
-        {m.inventory_native_stock_note()} ·{' '}
-        {unitOfMeasure(detail.position.unit)}
-      </p>
+    <Card className="inventory-section inventory-native-stock">
+      <CardHeader>
+        <CardTitle as="h2">{m.inventory_native_stock_title()}</CardTitle>
+      </CardHeader>
+      <p>{m.inventory_native_stock_note()}</p>
       <label>
         {m.inventory_native_stock_source()}
         <Select

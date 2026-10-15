@@ -21,6 +21,7 @@ const CollectionContext = createContext<{
   active: string | null;
   outlet: HTMLDivElement | null;
   headerOutlet: HTMLElement | null;
+  inWorkspaceBar: boolean;
   issueTitle?: string | undefined;
   open: (id: string) => void;
   close: () => void;
@@ -56,9 +57,13 @@ export function IssueDetailViews({
 
   useLayoutEffect(() => {
     if (active) {
-      headerOutlet
-        ?.querySelector<HTMLElement>('h2')
-        ?.focus({ preventScroll: true });
+      const title = headerOutlet?.querySelector<HTMLElement>('h2');
+      (title?.getClientRects().length
+        ? title
+        : root.current?.querySelector<HTMLElement>(
+            '.issue-collection-body-heading h2',
+          )
+      )?.focus({ preventScroll: true });
       for (const position of previous.current?.positions ?? []) {
         position.element.scrollTop = 0;
       }
@@ -106,6 +111,7 @@ export function IssueDetailViews({
         active,
         outlet,
         headerOutlet,
+        inWorkspaceBar: !!headerTarget,
         issueTitle,
         open,
         close: () => setActive(null),
@@ -284,6 +290,20 @@ function CollectionView<T extends { id: string }>({
             context.headerOutlet,
           )
         : null}
+      {context?.inWorkspaceBar ? (
+        <div className="issue-collection-body-heading">
+          <h2 tabIndex={-1}>{title}</h2>
+          <span>
+            {events
+              ? hasMore
+                ? m.issues_collection_events_loaded(count)
+                : m.issues_collection_events_count(count)
+              : hasMore
+                ? m.issues_collection_evidence_loaded(count)
+                : m.issues_collection_evidence_count(count)}
+          </span>
+        </div>
+      ) : null}
       <p className="case-caption">{m.issues_newest_first()}</p>
       <div className="issue-collection-filters">
         {filters.map((filter) => (

@@ -37,7 +37,12 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   const errors = [];
+  const disabledViewRequests = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (request) => {
+    if (request.url().includes('/adaptive/views'))
+      disabledViewRequests.push(request.url());
+  });
   await page.goto('/sign-up');
   await page.getByRole('radio', { name: /Australia/ }).check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -260,7 +265,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .click();
   await page.getByRole('option').filter({ hasText: 'Ada' }).first().click();
   await expect(
-    detailPane.getByText('Case owner: Ada', { exact: true }),
+    detailPane
+      .getByRole('region', { name: 'Case owner', exact: true })
+      .getByText('Ada', { exact: true }),
   ).toBeVisible();
   const ownerApi = `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}/owner`;
   const owned = await (
@@ -278,7 +285,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .getByRole('button', { name: 'Clear owner', exact: true })
     .click();
   await expect(
-    detailPane.getByText('Case owner: Unassigned', { exact: true }),
+    detailPane
+      .getByRole('region', { name: 'Case owner', exact: true })
+      .getByText('Unassigned', { exact: true }),
   ).toBeVisible();
 
   await page.getByText('Live updates', { exact: true }).waitFor();
@@ -593,6 +602,39 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .toBe(true);
   expect(await issueInbox.evaluate((el) => el.scrollTop)).toBe(scroll);
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${inbox}/${ids[0]}/detail?view=active`);
+  await expect(
+    page.getByRole('button', { name: 'Review change', exact: true }),
+  ).toHaveCount(0);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const colorScheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme });
+      await page
+        .getByRole('button', { name: 'View supporting evidence', exact: true })
+        .click();
+      const back = page.getByRole('button', {
+        name: 'Back to issue',
+        exact: true,
+      });
+      await expect(back).toBeInViewport();
+      const heading = page
+        .getByRole('heading', { name: 'Supporting evidence', exact: true })
+        .filter({ visible: true });
+      await expect(heading).toBeInViewport();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `/tmp/luma-352-evidence-${width}-${colorScheme}.png`,
+      });
+      await back.click();
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`${inbox}/${ids[0]}?view=active&class=sync_failure`);
   await page
     .getByRole('heading', {
@@ -800,4 +842,5 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     fullPage: true,
   });
   expect(errors).toEqual([]);
+  expect(disabledViewRequests).toEqual([]);
 });
