@@ -40,6 +40,7 @@ import { scopedFollowUpsContract } from './contracts/scoped-follow-ups.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { sourceEnvironmentsContract } from './contracts/source-environments.js';
+import { stockProtectionContract } from './contracts/stock-protection.js';
 import { supplierEmailContract } from './contracts/supplier-email.js';
 import { syncContract } from './contracts/sync.js';
 import { systemContract } from './contracts/system.js';
@@ -77,6 +78,7 @@ type ApiContract = {
   exceptions: typeof exceptionsContract;
   identity: typeof identityContract;
   settings: typeof settingsContract;
+  stockProtection: typeof stockProtectionContract;
   roles: typeof rolesContract;
   connections: typeof connectionsContract;
   apps: typeof appsContract;
@@ -132,6 +134,7 @@ export const apiContract: ApiContract = {
   exceptions: exceptionsContract,
   identity: identityContract,
   settings: settingsContract,
+  stockProtection: stockProtectionContract,
   roles: rolesContract,
   connections: connectionsContract,
   apps: appsContract,
@@ -319,3 +322,5 @@ export * from './adaptive-packages.js';
 export * from './action-diff.js';
 
 export * from './scoped-autonomy.js';
+
+export * from './stock-protection.js';

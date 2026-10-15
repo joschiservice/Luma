@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'cin7/2';
+export const adapterVersion = 'cin7/3';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -40,7 +40,8 @@ const observation = <T extends z.ZodTypeAny>(resource: string, data: T) =>
       kind: z.enum(['snapshot', 'tombstone']),
       observedAt: timestamp,
       sourceUpdatedAt: timestamp.nullable(),
-      sourceRevision: z.null(),
+      sourceRevision:
+        resource === 'sku' ? z.string().regex(/^[a-f0-9]{64}$/) : z.null(),
       adapterVersion: z.literal(adapterVersion),
       schemaVersion: z.literal(1),
       data,

@@ -251,6 +251,12 @@ export interface OrderQuantitySources {
 
 export interface DetectionMonitorOptions {
   sources: DetectionSources;
+  /** Cross-owner read of a currently owned hold for this exact authority/store pair. */
+  protection?(
+    context: TenantContext,
+    positionId: string,
+    mapping: InventoryMapping,
+  ): Promise<{ id: string; available: string; observedAt: string } | null>;
   /** Order line quantity checks; without them, order quantity cases are neither opened nor verified. */
   orders?: OrderQuantitySources;
   capabilities: Pick<CapabilityReader, 'read'>;
@@ -397,6 +403,12 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
   ) {
     return createInventoryMonitor({
       capabilities,
+      ...(options.protection
+        ? {
+            protection: (context: TenantContext) =>
+              options.protection!(context, positionId, mapping),
+          }
+        : {}),
       mapping,
       configuration,
       hash,

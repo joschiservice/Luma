@@ -119,6 +119,11 @@ export function createAppRegistry(
           : [],
       ),
     /** Lists the case workflows installed apps contribute. */
+    /** Lists durable incident services; each service still checks installation and release. */
+    stockProtection: () =>
+      [...apps.values()].flatMap((a) =>
+        a.stockProtection ? [a.stockProtection] : [],
+      ),
     workflowSources: () => [...apps.values()].flatMap((a) => a.workflows ?? []),
     /**
      * Registers app-owned routes after host identity guards are attached. Tenant routes must

@@ -39,6 +39,7 @@ import { createCorrectionQuery } from './infrastructure/inventory-correction-que
 import { createCorrectionStore } from './infrastructure/inventory-correction-store.js';
 import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
 import { shopifyRequestBudget } from './infrastructure/request-budget.js';
+import { createShopifyStockProtection } from './stock-protection.js';
 
 /** Composes Shopify correction with the platform's persistent Action Admission, policy and audit services. */
 export function createShopifyInventoryCorrection(
@@ -140,6 +141,11 @@ export function createShopifyInventoryCorrection(
     eligible?: () => Promise<boolean>,
     nativeRun?: CorrectionRun,
     allowInactiveStorage = false,
+    protection?: {
+      holdId?: string;
+      backgroundRead?: boolean;
+      includeCollections?: boolean;
+    },
   ) {
     const current = await credential(tenant, connectionId, capability);
     const shop = current.connection.target.shop!;
@@ -150,9 +156,16 @@ export function createShopifyInventoryCorrection(
       budget: shopifyRequestBudget(
         context,
         current.connection,
-        'foreground',
+        protection?.holdId || protection?.backgroundRead
+          ? 'incremental'
+          : 'foreground',
         tenant.dataRegion,
+        // Background point reads use separate clients; wait for the reserved foreground
+        // balance to refill between them instead of restarting the whole action forever.
+        protection?.holdId || protection?.backgroundRead ? 10000 : undefined,
       ),
+      ...(protection?.holdId ? { holdId: protection.holdId } : {}),
+      includeCollections: protection?.includeCollections ?? false,
       tenantId: tenant.tenantId,
       connectionId,
       shop,
@@ -283,10 +296,35 @@ export function createShopifyInventoryCorrection(
     tenant: TenantContext,
     target: CorrectionRun['target'],
     receiptProof = false,
+    force = false,
+    includeCollections = false,
+    precondition = false,
   ) => {
     // Stock moves while people decide; read stale sources again before judging them.
-    await context.refreshStock?.(tenant, target.positionId);
-    const authority = await query.authority(tenant, target, receiptProof);
+    const startedAt = Date.now();
+    await context.refreshStock?.(
+      tenant,
+      target.positionId,
+      force ? 0 : undefined,
+      force
+        ? {
+            connectionId: target.sourceConnectionId,
+            readPurpose: 'incremental',
+          }
+        : undefined,
+    );
+    const authority = await query.authority(
+      tenant,
+      target,
+      receiptProof,
+      force,
+    );
+    if (force && Date.parse(authority.source.observedAt) < startedAt)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'A new complete ERP stock read could not be confirmed. Existing holds remain unchanged.',
+      );
     const snapshot = await (
       await provider(
         tenant,
@@ -295,6 +333,7 @@ export function createShopifyInventoryCorrection(
         undefined,
         undefined,
         !!target.nativeAllocation,
+        { backgroundRead: force && !precondition, includeCollections },
       )
     ).read(authority.inventoryItemId, authority.locationId);
     // The source revision identifies the authoritative ERP value, independent of which read
@@ -456,6 +495,21 @@ export function createShopifyInventoryCorrection(
 
   return {
     ...service,
+    protection: createShopifyStockProtection(context, {
+      read: (tenant, target, includeCollections, precondition) =>
+        read(tenant, target, false, true, includeCollections, precondition),
+      provider: (tenant, connectionId, holdId, eligible) =>
+        provider(
+          tenant,
+          connectionId,
+          'inventory.available.reconcile',
+          eligible,
+          undefined,
+          false,
+          { holdId },
+        ),
+      authorize,
+    }),
     /** Resolves immutable manual receipt evidence and the live stock baseline before governed approval. */
     async receiptPreview(tenant: TenantContext, input: unknown) {
       tenant = await context.refreshContext(tenant);

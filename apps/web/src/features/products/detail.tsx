@@ -36,6 +36,7 @@ import {
 import { IncomingStockSection } from '../../shared/procurement/incoming-stock';
 import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
 import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity, StockState } from '../inventory/presentation';
 import { recordReturnPath } from '../records/data';
@@ -94,6 +95,10 @@ export function ProductPage() {
       refresh={() => void query.refetch()}
       purchasing={
         <>
+          <StockProtectionNotice
+            organizationId={organizationId}
+            skuId={skuId}
+          />
           {query.data ? (
             <RecordFields
               organizationId={organizationId}

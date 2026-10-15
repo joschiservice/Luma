@@ -2,7 +2,7 @@
 
 The Shopify app offers governed writes for **returns**, **fulfillment recovery** (release a hold,
 reopen, or move remaining items), **inventory corrections** (set Shopify's available
-quantity from a selected JTL ERP source or an explicit manual purchase receipt) and **order quantity edits** (change quantities of
+quantity from a selected JTL or Cin7 Core ERP source or an explicit manual purchase receipt) and **order quantity edits** (change quantities of
 unfulfilled order lines), and **shipment publishing** (record an independently observed physical
 dispatch or update its tracking). They run as exact, persisted previews that
 someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
@@ -73,10 +73,10 @@ the variant flag and recipe membership requires native product read access. Unre
 metadata prevents dispatch; catalog context alone never authorizes a write.
 
 Permission: `shopify:inventory_corrections.apply`. Luma supports one source-of-truth
-policy: a JTL ERP source the requester selects supplies the available quantity, and
+policy: a JTL or Cin7 Core ERP source the requester selects supplies the available quantity, and
 Shopify is the destination. Luma never writes ERP stock, accepts a manually entered
 quantity, sums sources, applies deltas, or treats a source as authoritative merely
-because its quantity differs. JTL remains a read-only reference.
+because its quantity differs. Both ERPs remain read-only references.
 
 - Both sources must be active, installed, readable and mapped to the same canonical SKU,
   location and `each` unit, each with exactly one unscoped SKU and location mapping.
@@ -288,3 +288,42 @@ Shopify reads are bounded to five fulfillment orders with twenty lines each and 
 than five shipments with twenty lines and twenty tracking identities each. A collection
 truncated at any bound prevents eligibility or verification. These limits keep the review
 within Shopify's synchronous query budget; larger orders need review directly in Shopify.
+
+## Incident stock protection
+
+Stock protection is off by default and requires the tenant release and explicit consent
+for one ERP → Shopify pair. Consent uses the policy epoch fence. It authorizes only
+persisted incident-owned holds, downward tightening and fresh-source releases within the
+per-SKU, per-incident and UTC-day caps. Always require approval adds one incident review;
+it does not create a decision for every SKU. Changing consent invalidates outstanding
+policy decisions. Observe-only blocks releases as well as holds.
+
+Discovery stores candidate identities before provider reads. A durable workflow processes
+bounded batches, rechecking authority, current complete reads, mapped location, tracked
+inventory, sell-through-zero policy and bundle eligibility before dispatch. No hold is
+placed while Luma's own stock reads are failing. Exclusions and skipped positions retain
+their reasons. Native stock and unresolved corrections cannot share ownership with a hold.
+
+Each write has its own immutable execution intent and `inventory.available.protect`
+capability. It uses Shopify's absolute available quantity CAS, shared request admission,
+provider idempotency and `luma://inventory-holds/<holdId>` attribution. One confirmed CAS
+conflict can produce one fresh recomputation. An uncertain dispatch never produces a
+replacement intent. Verification requires a new complete read on both sides and exact
+adjustment proof; a matching number alone does not establish authorship.
+
+A fresh Shopify quantity different from the held value ends ownership for that SKU in
+this incident. Matching ERP stock is recorded as released by sync; another value is an
+outside change. Neither can be re-held. Only an ERP decrease below the still-owned held
+value permits tightening, and only downward. A release uses fresh ERP stock and CAS against
+the held quantity, never the pre-incident Shopify value.
+
+At the default six-hour limit, holds remain and the incident asks for help. An explicit
+setting can instead request verified releases. Turning protection off requires a choice
+between release and keeping existing holds until verified sync recovery. Disconnection,
+uninstallation, missing authority and failed reads keep affected positions unknown rather
+than claiming release. Historical incidents remain readable after uninstallation.
+
+Unit-hours measure withheld quantity over observed hold time. Observed oversell exposure
+records when ERP stock fell below the pre-hold Shopify figure; it does not prove that a
+sale would have occurred or that an oversell was prevented. Notification identities are
+one transition per incident and use the existing issue email preferences and suppression.

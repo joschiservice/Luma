@@ -103,6 +103,8 @@ export const createRunSchema = z.object({
    * days start faster, which matters most on Cin7 with its request limit.
    */
   historyDays: z.number().min(0).max(14).optional(),
+  /** Optional per-run merchant stock-sync cadence; zero disables scheduled pushes. */
+  stockSyncEveryMs: z.number().int().min(0).max(86400000).optional(),
   /** Chaos preset name or a complete profile. */
   chaos: z.union([name, chaosProfileSchema]).default('realistic'),
   /** Runs start in real time; paused runs only change through controls. */
@@ -181,6 +183,8 @@ export const injectIncidentSchema = z
     /** Client-chosen UUID; repeating it returns the existing incident without another change. */
     id: z.string().uuid(),
     kind: incidentKindSchema,
+    /** Share of the store catalogue stalled; defaults to all SKUs. */
+    sharePercent: z.number().int().min(1).max(100).optional(),
     instance: name.optional(),
     /** SKU code, order name or numeric record ID, depending on the kind. */
     target: z.string().min(1).max(120).optional(),

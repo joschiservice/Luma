@@ -1,9 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import type { AppDefinition } from '@luma/app-host';
 import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
 import {
   createProcessWorker,
+  type StockProtectionWorkflowInput,
   type TemporalSettings,
 } from '@luma/workflow-temporal';
 import type {
@@ -31,6 +33,13 @@ export async function createReplenishmentWorker(
   codeProcesses?: ReturnType<typeof createCodeProcesses>,
   caseWorkflows?: CaseWorkflows,
   coordination?: ReturnType<typeof createCoordination>,
+  stockProtection?: {
+    services: NonNullable<AppDefinition['stockProtection']>[];
+    start(
+      context: import('@luma/identity').TenantContext,
+      incidentId: string,
+    ): Promise<void>;
+  },
 ) {
   const select = (run: ProcessRun) =>
     run.definitionId === 'inventory-replenishment'
@@ -52,6 +61,29 @@ export async function createReplenishmentWorker(
   const worker = await createProcessWorker(
     { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
     activities,
+    stockProtection
+      ? {
+          stockProtectionTick: async (input: StockProtectionWorkflowInput) => {
+            const context = await identity.resolveWorkflowContext(
+              input.userId,
+              input.tenantId,
+              'stock-protection',
+            );
+            if (context.dataRegion !== input.dataRegion)
+              throw new Error('Stock protection region changed');
+            const results = await Promise.all(
+              stockProtection.services.map((service) =>
+                service.tick(context, input.incidentId),
+              ),
+            );
+
+            return {
+              done: results.every((result) => result.done),
+              moreWork: results.some((result) => result.moreWork),
+            };
+          },
+        }
+      : undefined,
   );
   const stop = new AbortController();
 
@@ -80,6 +112,36 @@ export async function createReplenishmentWorker(
               'Replenishment check could not complete; retrying.',
               error,
             );
+          }
+        }
+        if (stockProtection) {
+          const scopes = await pool.query<{
+            tenant_id: string;
+            principal_id: string;
+          }>('SELECT * FROM detection_worker_scopes()');
+          for (const scope of scopes.rows) {
+            try {
+              const context = await identity.resolveWorkflowContext(
+                scope.principal_id,
+                scope.tenant_id,
+                'stock-protection-discovery',
+              );
+              for (const service of stockProtection.services)
+                for (const incident of await service.discover(context)) {
+                  const principal = await identity.resolveWorkflowContext(
+                    incident.principalId,
+                    scope.tenant_id,
+                    'stock-protection-start',
+                  );
+                  await stockProtection.start(principal, incident.id);
+                }
+            } catch (error) {
+              if (!pausesBackgroundWork(error))
+                console.error(
+                  'Stock protection discovery is unavailable; retrying.',
+                  error,
+                );
+            }
           }
         }
         if (caseWorkflows) {

@@ -37,6 +37,8 @@ import {
 } from '../../kit/identity/permissions';
 import { regionLabel } from '../../kit/identity/region';
 import { settingsApi, settingsOptions } from '../../kit/settings/data';
+import { stockProtectionOptions } from '../../shared/stock-protection/data';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import {
   CommandFeedback,
   useSettingsCommand,
@@ -49,6 +51,7 @@ import { SectionHeading } from './section-heading';
 import { SecuritySettings } from './security';
 import { SourceAuthoritySettings } from './source-authority';
 import { SourceEnvironmentSettings } from './source-environments';
+import { StockProtectionSettings } from './stock-protection';
 import { SupportAccessSettings } from './support-access';
 import { TeamSettings } from './team';
 
@@ -294,6 +297,10 @@ export function SettingsView({
                     disabled={
                       !can('workspace.approval_policy.manage') || !online
                     }
+                  />
+                  <StockProtectionSettings
+                    organizationId={organizationId}
+                    disabled={!online || supportView}
                   />
                   <ScopedAutonomySettings
                     organizationId={organizationId}
@@ -999,6 +1006,12 @@ function WriteModeForm({
   organizationId: string;
   disabled: boolean;
 }) {
+  const protection = useQuery(stockProtectionOptions(organizationId));
+  const [acknowledgeStockHolds, setAcknowledgeStockHolds] = useState(false);
+  const activeStockHolds =
+    protection.data?.incidents.some(
+      (i) => (i.heldCount ?? 0) + (i.uncertainCount ?? 0) > 0,
+    ) ?? false;
   const command = useSettingsCommand(organizationId);
   const [draft, setDraft] = useState<{
     enabled: boolean;
@@ -1028,6 +1041,7 @@ function WriteModeForm({
                 commandId,
                 revision: draft?.revision ?? data.workspace.revision,
                 writeMode: enabled ? 'writes_enabled' : 'observe_only',
+                acknowledgeStockHolds,
               },
             });
             setDraft(null);
@@ -1046,7 +1060,31 @@ function WriteModeForm({
             })
           }
         />
-        <Button type="submit" disabled={disabled || command.locked || !draft}>
+        {!enabled && activeStockHolds ? (
+          <Alert tone="warning">
+            <p>{m.settings_protection_disable_help()}</p>
+            <StockProtectionNotice organizationId={organizationId} />
+            <label>
+              <input
+                type="checkbox"
+                checked={acknowledgeStockHolds}
+                onChange={(event) =>
+                  setAcknowledgeStockHolds(event.target.checked)
+                }
+              />{' '}
+              {m.settings_protection_keep()}
+            </label>
+          </Alert>
+        ) : null}
+        <Button
+          type="submit"
+          disabled={
+            disabled ||
+            command.locked ||
+            !draft ||
+            (!enabled && activeStockHolds && !acknowledgeStockHolds)
+          }
+        >
           {m.common_save()}
         </Button>
         <CommandFeedback command={command} />

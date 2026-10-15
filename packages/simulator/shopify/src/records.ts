@@ -254,6 +254,8 @@ export interface CustomerData {
 }
 
 export interface ProductData {
+  tags?: string[];
+  collections?: string[];
   title: string;
   vendor: string;
   productType: string;
@@ -264,6 +266,7 @@ export interface ProductData {
 }
 
 export interface ProductVariantData {
+  inventoryPolicy?: 'DENY' | 'CONTINUE';
   requiresComponents?: boolean;
   product: string;
   sku: string;

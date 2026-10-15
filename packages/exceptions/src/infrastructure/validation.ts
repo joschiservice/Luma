@@ -110,6 +110,7 @@ export const factSchemas = {
       tolerance: decimal.refine((value) => !value.startsWith('-')),
       mismatchSince: timestamp.nullable().optional(),
       syncStalled: z.boolean().optional(),
+      protectedAvailable: decimal.optional(),
     })
     .strict(),
   order_quantity_mismatch: z

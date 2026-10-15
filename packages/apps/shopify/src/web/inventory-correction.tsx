@@ -101,7 +101,10 @@ export function ShopifyInventoryCorrection({
         setCandidates(values);
         const shops = values.filter((v) => v.provider === 'shopify'),
           erps = values.filter(
-            (v) => v.provider === 'jtl' || v.provider === 'native_stock',
+            (v) =>
+              v.provider === 'jtl' ||
+              v.provider === 'cin7' ||
+              v.provider === 'native_stock',
           );
         setConnectionId((previous) =>
           shops.some((shop) => shop.connectionId === previous)
@@ -249,7 +252,10 @@ export function ShopifyInventoryCorrection({
   const shops = candidates?.filter((v) => v.provider === 'shopify') ?? [],
     erps =
       candidates?.filter(
-        (v) => v.provider === 'jtl' || v.provider === 'native_stock',
+        (v) =>
+          v.provider === 'jtl' ||
+          v.provider === 'cin7' ||
+          v.provider === 'native_stock',
       ) ?? [];
   const blockerReason = data
     ? correctionBlockerReason(

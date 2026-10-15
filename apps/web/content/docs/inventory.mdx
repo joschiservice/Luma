@@ -191,3 +191,37 @@ prove physical warehouse stock. Use an independent warehouse source for physical
 and ledger changes. To hand stock authority back, clear holds and pending effects, restore
 and verify the full native baseline, and obtain a separate ownership review. Activation and
 other stock states need their own authorized actions.
+
+## Protect stock during a stalled sync
+
+When stock protection is available for your workspace, an Admin or Owner can configure it
+under **Settings → Approvals → Stock protection**. Choose the Shopify store and start with
+**Preview**. Preview records which positions would be held without writing to Shopify.
+Choose **On** to authorize incident holds within your limits. **Always require approval**
+still requires one review for the incident.
+
+Protection starts only after Luma confirms that the ERP stock sync has stalled and Luma
+can still read both systems. It protects tracked, mapped at-risk stock. Items that can sell
+when out of stock, bundles, native stock, excluded products and positions with unresolved
+corrections are not protected. The incident lists the reason for each exclusion.
+
+The buffer lowers Shopify's available stock once. A further ERP decrease can tighten the
+hold downward. A sale, manual edit, return or another app changing the held value ends
+Luma's ownership; Luma leaves that value alone for the rest of the incident. When the sync
+recovers, releases use fresh ERP stock, not the number from before the hold. Accepted
+writes stay unverified until independent reads confirm them.
+
+Home, Inventory and the affected product show the incident. Open it to review ERP, held
+and Shopify quantities, release one SKU or all holds, or extend the deadline. At the time
+limit Luma keeps holds and asks for help unless you explicitly selected release at the
+limit. Issue emails report placement, partial failures, the deadline and release.
+
+Turning protection off or switching to Preview asks whether to release current holds or
+keep them until recovery. Observe-only blocks releases too: release first if you want
+stock returned immediately. Disconnecting Shopify or uninstalling its app cannot restore
+stock; affected holds stay unknown until access or the merchant sync restores them.
+
+Shopify inventory history identifies these adjustments with
+`luma://inventory-holds/<holdId>`. The incident summary records duration, held SKUs,
+unit-hours withheld and observed oversell exposure. Exposure is evidence of risk, not proof
+of a prevented sale.

@@ -121,6 +121,7 @@ export interface InventoryDetectionInput {
   agreement?: StockAgreement;
   /** The open stock sync stall case that covers this pair, if any, and when it was first detected. */
   stall?: { exceptionId: string; detectedAt: string };
+  protection?: { id: string; available: string; observedAt: string };
 }
 
 /** Builds inventory facts and evidence for detection and independent verification. */
@@ -154,6 +155,11 @@ export function inventoryRequest(
     evidenceTenantId: context.tenantId,
     subjectId: mapping.skuId,
     evidenceRefs: [
+      ...(input.protection
+        ? [
+            `inventory-hold:${input.protection.id}:${input.protection.available}`,
+          ]
+        : []),
       left.id,
       right.id,
       mappingKey,
@@ -189,6 +195,9 @@ export function inventoryRequest(
     sellingSource: mapping.sellingSource,
     tolerance: configuration.inventoryTolerance,
     ...(agreement ? { mismatchSince: agreement.mismatchSince } : {}),
+    ...(input.protection
+      ? { protectedAvailable: input.protection.available }
+      : {}),
     ...(input.stall ? { syncStalled: true } : {}),
   };
   const stallKey = input.stall
@@ -222,6 +231,27 @@ export function inventoryRequest(
     evidence: [
       inventoryEvidence(left),
       inventoryEvidence(right),
+      ...(input.protection
+        ? [
+            {
+              key: `inventory-hold:${input.protection.id}:${input.protection.available}`,
+              tenantId: context.tenantId,
+              connectionId:
+                mapping.sellingSource === 'left'
+                  ? mapping.left.source.connectionId
+                  : mapping.right.source.connectionId,
+              source: null,
+              sourceUpdatedAt: null,
+              adapterVersion: 'stock-protection/1',
+              schemaVersion: 1 as const,
+              observedAt: input.protection.observedAt,
+              facts: {
+                holdId: input.protection.id,
+                available: input.protection.available,
+              },
+            },
+          ]
+        : []),
       mappingEvidence,
       ...(agreement && agreementKey
         ? [

@@ -1411,6 +1411,34 @@
         "severity": "high",
         "reason": "oversell_risk"
       }
+    },
+    {
+      "id": "inventory-protection-hold",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "9",
+        "rightAvailable": "7",
+        "protectedAvailable": "7"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "within_tolerance"
+      }
+    },
+    {
+      "id": "inventory-protection-oversell",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "9",
+        "rightAvailable": "12",
+        "protectedAvailable": "12"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
     }
   ]
 }

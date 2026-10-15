@@ -815,6 +815,17 @@ interface OutboundMessage {
 }
 
 interface CapabilityContract {
+  /** Places, tightens or releases an incident-owned stock hold through exact CAS. */
+  'inventory.available.protect': {
+    input: {
+      inventoryItemId: string;
+      locationId: string;
+      expectedRevision: string;
+      expectedAvailable: number;
+      available: number;
+    };
+    output: WriteReceipt;
+  };
   /** Corrects one approved item/location's available stock using provider CAS and idempotency. */
   'inventory.available.reconcile': {
     input: {

@@ -162,6 +162,14 @@ export function evaluate(
         f.authority !== f.sellingSource &&
         (f.sellingSource === 'left' ? difference > 0n : difference < 0n);
       // A stalled sync already has its case; a gap that can't oversell waits for the sync to run.
+      if (
+        f.protectedAvailable !== undefined &&
+        !oversell &&
+        decimalUnits(
+          f.sellingSource === 'left' ? f.leftAvailable : f.rightAvailable,
+        ) === decimalUnits(f.protectedAvailable)
+      )
+        return result('clear', 'within_tolerance');
       if (f.syncStalled && !oversell) return result('defer', 'sync_stalled');
       // A gap Luma saw open only recently is usually a sale still syncing. It waits unless the
       // storefront oversells a material share of the authority's stock.

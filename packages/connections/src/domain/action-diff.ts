@@ -56,6 +56,7 @@ interface Intent {
 // not an automatic undo endpoint; compensation always needs a separately reviewed action.
 const semantics: Record<string, ActionDiff['reversibility']> = {
   'inventory.available.reconcile': 'compensatable',
+  'inventory.available.protect': 'compensatable',
   'inventory.write': 'compensatable',
   'orders.shipping-method.write': 'compensatable',
   'orders.quantity.edit': 'compensatable',

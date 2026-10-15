@@ -3,6 +3,7 @@ import type { ReadCapability } from './capabilities.js';
 export type InstallationCapability =
   | ReadCapability
   | 'inventory.available.reconcile'
+  | 'inventory.available.protect'
   | 'orders.shipping-method.write'
   | 'orders.quantity.edit'
   | 'orders.quantity.update'

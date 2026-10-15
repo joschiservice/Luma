@@ -115,6 +115,7 @@ export async function injectIncident(world: World, input: InjectIncident) {
     const shopName = firstShop(world, input.instance).name;
     const incident = await stallStockSync(world, shopName, 'injected', {
       id: input.id,
+      sharePercent: input.sharePercent,
     });
     if (!incident)
       throw new Error(`The stock sync to ${shopName} is already stalled`);

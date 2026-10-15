@@ -124,6 +124,14 @@ export function createClient(options: ShopifyTransportOptions): {
         if (response.status === 429) {
           const advised = retryAfterMs(response.headers.get('retry-after'));
           await feedback.cooldown(advised ?? 1000);
+          if (!queryDocument.test(query))
+            throw new ConnectorError({
+              code: 'rate_limited',
+              effect: 'none',
+              retry: 'after_delay',
+              retryAfterMs: advised ?? 1000,
+              dispatch: 'not_dispatched',
+            });
           fail('rate_limited', advised);
         }
         if (response.status >= 500) fail('transient', 1000);
@@ -200,6 +208,18 @@ export function createClient(options: ShopifyTransportOptions): {
             )
           : 1000;
         await feedback.cooldown(advised);
+        if (
+          !queryDocument.test(query) &&
+          !envelope.data &&
+          codes.every((code) => code === 'THROTTLED')
+        )
+          throw new ConnectorError({
+            code: 'rate_limited',
+            effect: 'none',
+            retry: 'after_delay',
+            retryAfterMs: advised,
+            dispatch: 'not_dispatched',
+          });
         fail(
           'rate_limited',
           cost

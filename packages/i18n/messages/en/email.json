@@ -91,5 +91,13 @@
   "email_morning_brief_case_verified": "Verified: {label}",
   "email_morning_brief_case_ongoing": "Ongoing: {label}",
   "email_morning_brief_open": "Open Home",
-  "email_morning_brief_unavailable": "Unavailable for your access"
+  "email_morning_brief_unavailable": "Unavailable for your access",
+  "email_protection_subject": "Stock protection update for {store}",
+  "email_protection_preview": "Review the stock protection incident.",
+  "email_protection_heading": "Stock protection",
+  "email_protection_placed": "Luma placed stock holds for {store} because its ERP stock sync stalled. Open the incident for every held and unprotected SKU.",
+  "email_protection_partial": "Some stock holds for {store} could not be confirmed. Luma keeps uncertain writes for reconciliation and does not resend them.",
+  "email_protection_escalated": "Stock holds for {store} reached their time limit. Review the incident to release them or keep them longer.",
+  "email_protection_released": "Stock protection for {store} has ended. Review the verified releases, outside changes and incident summary.",
+  "email_protection_action": "Review stock protection"
 }

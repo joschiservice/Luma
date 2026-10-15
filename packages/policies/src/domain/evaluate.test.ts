@@ -161,3 +161,81 @@ it('requires a review and accepts self-approval only when the independent rule i
     ).reason,
   ).toBe('approval_rejected');
 });
+
+it('explicit stock-protection consent preserves mandatory approval, permissions and rejection', () => {
+  const intent = {
+    ...action('medium'),
+    capability: 'inventory.available.protect',
+  };
+  const capability = {
+    available: true,
+    minimumRisk: 'medium' as const,
+    permission: 'actions.execute',
+  };
+  const access = new Set(['actions.execute']);
+  expect(
+    evaluatePolicy(
+      intent,
+      capability,
+      access,
+      'owner',
+      now,
+      null,
+      false,
+      true,
+      true,
+    ).outcome,
+  ).toBe('allowed');
+  expect(
+    evaluatePolicy(
+      intent,
+      capability,
+      access,
+      'owner',
+      now,
+      null,
+      true,
+      true,
+      true,
+    ).outcome,
+  ).toBe('approval_required');
+  expect(
+    evaluatePolicy(
+      intent,
+      capability,
+      new Set(),
+      'owner',
+      now,
+      null,
+      false,
+      true,
+      true,
+    ).outcome,
+  ).toBe('denied');
+  expect(
+    evaluatePolicy(
+      intent,
+      capability,
+      access,
+      'owner',
+      now,
+      {
+        id: 'reject',
+        decisionId: 'decision',
+        correlationId: 'request',
+        tenantId: intent.tenantId,
+        proposalId: intent.id,
+        actionHash: 'a'.repeat(64),
+        policyVersion: 'v0.1',
+        requesterId: 'owner',
+        approverId: 'admin',
+        outcome: 'rejected',
+        expiresAt: intent.expiresAt,
+        createdAt: new Date(now).toISOString(),
+      },
+      false,
+      true,
+      true,
+    ).reason,
+  ).toBe('approval_rejected');
+});

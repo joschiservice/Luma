@@ -106,6 +106,7 @@ export const settingsContract = {
           .extend({
             revision: z.number().int().nonnegative(),
             writeMode: z.enum(['observe_only', 'writes_enabled']),
+            acknowledgeStockHolds: z.boolean().optional(),
           })
           .strict(),
       }),

@@ -63,6 +63,17 @@ const suites = {
       'workflow|playbooks|code-steps|replenishment|order-quantity-change',
     ],
   ],
+  'stock-protection': [
+    [
+      '--filter',
+      '@luma/api',
+      'test:e2e',
+      'stock-protection.e2e.mjs',
+      'stock-sync-stall.e2e.mjs',
+      'shopify-inventory.e2e.mjs',
+    ],
+    ['--filter', '@luma/api', 'test:browser', 'stock-protection.browser.mjs'],
+  ],
   purchasing: [
     [
       '--filter',

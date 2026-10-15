@@ -1157,7 +1157,17 @@ type LineItem implements Node {
   variantTitle: String
 }
 
+type Collection implements Node {
+  id: ID!
+}
+type CollectionConnection {
+  nodes: [Collection!]!
+  pageInfo: PageInfo!
+}
+
 type Product implements Node {
+  tags: [String!]!
+  collections(first: Int): CollectionConnection!
   id: ID!
   priceRangeV2: ProductPriceRangeV2!
   publishedAt: DateTime
@@ -1211,7 +1221,13 @@ type ProductVariantEdge {
   node: ProductVariant!
 }
 
+enum ProductVariantInventoryPolicy {
+  DENY
+  CONTINUE
+}
+
 type ProductVariant implements Node {
+  inventoryPolicy: ProductVariantInventoryPolicy!
   requiresComponents: Boolean!
   productVariantComponents(
     first: Int

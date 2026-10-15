@@ -19,10 +19,12 @@ export function createPolicies(
   appendEvidence: PolicyDependencies['appendEvidence'],
   autonomy?: PolicyDependencies['autonomy'],
   coveredApproval?: PolicyDependencies['coveredApproval'],
+  stockProtection?: PolicyDependencies['stockProtection'],
 ) {
   return createPolicyService({
     autonomy,
     coveredApproval,
+    stockProtection,
     repository: createPolicyRepository(db),
     refreshContext,
     appendEvidence,
@@ -54,3 +56,7 @@ export {
   reserveAutonomy,
   completeAutonomy,
 } from './infrastructure/scoped-autonomy.js';
+
+export { createStockProtectionConsent } from './infrastructure/stock-protection.js';
+
+export { createStockProtectionAdmission } from './infrastructure/stock-protection.js';

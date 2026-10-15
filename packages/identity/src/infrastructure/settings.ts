@@ -106,6 +106,13 @@ function transaction(
   });
 
   return {
+    activeStockHolds: async () =>
+      !!(
+        await tx.query(
+          `SELECT 1 FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p WHERE i.tenant_id=$1 AND p->>'status' IN ('held','tightened','unknown','releasing') AND (p->>'startedAt' IS NOT NULL OR (p->>'status'='unknown' AND p->>'actionId' IS NOT NULL)) AND p->>'endedAt' IS NULL LIMIT 1`,
+          [tenantId],
+        )
+      ).rowCount,
     async member(userId) {
       const row = (
         await tx.query<MembershipRow>(

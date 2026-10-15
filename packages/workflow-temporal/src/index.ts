@@ -12,3 +12,5 @@ export {
   createProcessWorker,
   processWorkflowId,
 } from './process-runtime.js';
+
+export type { StockProtectionWorkflowInput } from './stock-protection-workflow.js';

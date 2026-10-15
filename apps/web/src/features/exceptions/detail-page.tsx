@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { connectionsOptions } from '../../kit/connections/data';
 import { RecordAssistance } from '../../kit/record-assistance';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { CaseOrderChangePlan } from '../orders/change-plan';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
@@ -186,6 +187,12 @@ function IssueWorkspace({
         ) : null
       }
     >
+      {item?.class === 'stock_sync_stall' ? (
+        <StockProtectionNotice
+          organizationId={organizationId}
+          incidentId={exceptionId}
+        />
+      ) : null}
       <LiveCaseDetail observation={observation} expanded />
       {item ? (
         <CaseOrderChangePlan

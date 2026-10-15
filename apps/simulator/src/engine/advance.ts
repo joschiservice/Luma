@@ -21,7 +21,12 @@ import {
   placeWholesaleOrder,
   settlePayment,
 } from './orders.js';
-import { checkFreezes, syncStock } from './stock.js';
+import {
+  checkFreezes,
+  checkStockSyncStalls,
+  stallStockSync,
+  syncStock,
+} from './stock.js';
 import {
   closeIncident,
   type EngineEvent,
@@ -161,6 +166,18 @@ async function providerIncidents(world: World) {
       await closeIncident(world, window.incident, 'Provider recovered');
   }
   if (!world.live) return;
+  const stallRate = world.run.chaos.incidents['stock-sync-stall'] ?? 0;
+  if (unit(world.run.seed, 'stock-sync-stall', world.now) < stallRate / 1440) {
+    const random = keyedRandom(
+      world.run.seed,
+      'stock-sync-stall-target',
+      world.now,
+    );
+    const shop = random.pick(world.model.shops);
+    await stallStockSync(world, shop.name, 'emerged', {
+      durationMs: random.int(20, 60) * minute,
+    });
+  }
   for (const kind of [
     'provider-outage',
     'shipping-provider-outage',
@@ -223,6 +240,7 @@ async function everyMinute(world: World) {
     world.run.state.nextStockSync = world.now + every;
   }
   await checkFreezes(world);
+  await checkStockSyncStalls(world);
   await providerIncidents(world);
 }
 

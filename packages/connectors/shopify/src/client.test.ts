@@ -65,3 +65,46 @@ describe('Shopify client errors', () => {
     expect(f.fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+it.each(['http', 'graphql'])(
+  'retains %s throttling as a confirmed non-dispatch and never resends the mutation',
+  async (kind) => {
+    const f = fixture();
+    f.fetch.mockResolvedValueOnce(
+      kind === 'http'
+        ? new Response('', { status: 429, headers: { 'retry-after': '0' } })
+        : Response.json({ errors: [{ extensions: { code: 'THROTTLED' } }] }),
+    );
+    await expect(
+      f.request(
+        'mutation Set { inventorySetQuantities { userErrors { message } } }',
+        {},
+      ),
+    ).rejects.toMatchObject({
+      failure: {
+        code: 'rate_limited',
+        effect: 'none',
+        retry: 'after_delay',
+        dispatch: 'not_dispatched',
+      },
+    });
+    expect(f.fetch).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('does not treat a partial throttled mutation response as a confirmed non-dispatch', async () => {
+  const f = fixture();
+  f.fetch.mockResolvedValueOnce(
+    Response.json({
+      data: { result: {} },
+      errors: [{ extensions: { code: 'THROTTLED' } }],
+    }),
+  );
+  await expect(
+    f.request(
+      'mutation Set { inventorySetQuantities { userErrors { message } } }',
+      {},
+    ),
+  ).rejects.not.toMatchObject({ failure: { dispatch: 'not_dispatched' } });
+  expect(f.fetch).toHaveBeenCalledTimes(1);
+});

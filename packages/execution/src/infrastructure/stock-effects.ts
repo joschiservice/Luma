@@ -24,3 +24,34 @@ export function createUnsettledStockEffectReader(db: TenantDatabase) {
     );
   };
 }
+
+/** Reads durable failure classification; a retry still requires independent proof of non-dispatch. */
+export function createExecutionFailureReader(db: TenantDatabase) {
+  return async (
+    context: TenantContext,
+    proposalId: string,
+  ): Promise<{
+    code: string;
+    effect: 'none' | 'unknown';
+    retry: 'never' | 'after_delay' | 'reconcile';
+  } | null> => {
+    requireTenant(context, context.tenantId);
+
+    return db.transaction(
+      context.tenantId,
+      async (tx) =>
+        (
+          await tx.query<{
+            document: {
+              code: string;
+              effect: 'none' | 'unknown';
+              retry: 'never' | 'after_delay' | 'reconcile';
+            };
+          }>(
+            'SELECT document FROM execution_failures WHERE tenant_id=$1 AND proposal_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1',
+            [context.tenantId, proposalId],
+          )
+        ).rows[0]?.document ?? null,
+    );
+  };
+}

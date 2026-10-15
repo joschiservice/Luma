@@ -72,4 +72,7 @@ export { parseEvidence, parseVerification };
 
 export { parseAdmissionReference };
 
-export { createUnsettledStockEffectReader } from './infrastructure/stock-effects.js';
+export {
+  createUnsettledStockEffectReader,
+  createExecutionFailureReader,
+} from './infrastructure/stock-effects.js';

@@ -374,8 +374,9 @@ resets the uncertainty window instead of escalating. Oversell risk still detects
 **Likely causes:** the merchant's stock connector stopped, paused, lost access or fell behind.
 Luma does not read the connector itself, so the cause is a hypothesis.
 
-**Safe resolution:** a person restarts or repairs the stock sync. Luma has no write for this
-class; correcting individual products first can be overwritten when the sync resumes.
+**Safe resolution:** a person restarts or repairs the stock sync. Opted-in [stock protection](shopify-actions.md#incident-stock-protection) can hold at-risk
+Shopify stock while the sync is stalled. Correcting individual products outside that ownership
+can be overwritten when the sync resumes.
 
 **Verification:** postcondition `equivalent_inventory_agrees`. The lagging products named in
 the latest detection are reread from both sides and must agree, and the stored history must

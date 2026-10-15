@@ -73,6 +73,25 @@ describe('stock refresh', () => {
     );
   });
 
+  it('forces only the incident authority through background admission without rereading Shopify', async () => {
+    const f = fixture([source('erp', 0), source('shopify', 0)], (id) =>
+      page([observation(id)]),
+    );
+    expect(
+      await f.refresh.refresh(context, 'position', 0, {
+        connectionId: 'erp',
+        readPurpose: 'incremental',
+      }),
+    ).toBe(1);
+    expect(f.capabilities.read).toHaveBeenCalledExactlyOnceWith(
+      context,
+      expect.objectContaining({
+        connectionId: 'erp',
+        readPurpose: 'incremental',
+      }),
+    );
+  });
+
   it('keeps the stored report when a source cannot be read', async () => {
     const f = fixture([source('down', 300)], () => ({
       ok: false,

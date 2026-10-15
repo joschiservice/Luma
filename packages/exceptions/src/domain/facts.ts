@@ -122,6 +122,8 @@ interface FactMap {
      * the sync instead of opening its own case. Absent on earlier input.
      */
     syncStalled?: boolean;
+    /** The held selling quantity from an active, pair-scoped incident. */
+    protectedAvailable?: string;
   };
   order_quantity_mismatch: Common & {
     /** Canonical line ID, or a mapped SKU that occurs once per source, as comparisons match lines. */

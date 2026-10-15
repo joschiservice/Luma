@@ -32,6 +32,8 @@ const freezeKey = (shopName: string, variant: string) =>
 interface Stall {
   incident: string;
   shop: string;
+  variants?: string[];
+  until?: number;
 }
 
 /**
@@ -68,9 +70,9 @@ function listings(world: World, variantId: string) {
 export async function syncStock(world: World, limit = 2_000) {
   const store = world.store(worldInstance);
   const page = await store.page({ kind: 'dirty', limit });
-  const stalled = new Set(
+  const stalled = new Map(
     (await store.page<Stall>({ kind: 'stall', limit: 100 })).items.map(
-      (item) => item.data.shop,
+      (item) => [item.data.shop, item.data] as const,
     ),
   );
   for (const record of page.items) {
@@ -81,7 +83,8 @@ export async function syncStock(world: World, limit = 2_000) {
     for (const listing of listings(world, record.id)) {
       if (await store.get('freeze', freezeKey(listing.shop, record.id)))
         continue;
-      if (stalled.has(listing.shop)) {
+      const stall = stalled.get(listing.shop);
+      if (stall && (!stall.variants || stall.variants.includes(record.id))) {
         await store.put(
           'stall-pending',
           freezeKey(listing.shop, record.id),
@@ -248,7 +251,11 @@ export async function stallStockSync(
   world: World,
   shopName: string,
   origin: Incident['origin'],
-  options: { id?: string | undefined } = {},
+  options: {
+    id?: string | undefined;
+    sharePercent?: number | undefined;
+    durationMs?: number | undefined;
+  } = {},
 ) {
   const store = world.store(worldInstance);
   if (await store.get('stall', shopName)) return undefined;
@@ -269,12 +276,30 @@ export async function stallStockSync(
         label: shopInstance.shop.name,
       },
     ],
-    detail: {},
+    detail: { sharePercent: options.sharePercent ?? 100 },
   });
+  const variants = world.model.catalog.variants
+    .filter((v) => listings(world, v.id).some((l) => l.shop === shopName))
+    .map((v) => v.id);
   await store.put(
     'stall',
     shopName,
-    { incident: incident.id, shop: shopName } satisfies Stall,
+    {
+      incident: incident.id,
+      shop: shopName,
+      ...(options.sharePercent !== undefined && options.sharePercent < 100
+        ? {
+            variants: variants.slice(
+              0,
+              Math.max(
+                1,
+                Math.ceil((variants.length * options.sharePercent) / 100),
+              ),
+            ),
+          }
+        : {}),
+      ...(options.durationMs ? { until: world.now + options.durationMs } : {}),
+    } satisfies Stall,
     { updatedAt: world.now },
   );
 
@@ -314,5 +339,18 @@ export async function resumeStockSync(world: World, incident: Incident) {
         ),
       });
     }
+  }
+}
+
+/** Resumes naturally emerged stalls at their recorded deadline and flushes pending ERP changes. */
+export async function checkStockSyncStalls(world: World) {
+  const store = world.store(worldInstance);
+  for (const row of (await store.page<Stall>({ kind: 'stall', limit: 100 }))
+    .items) {
+    if (row.data.until === undefined || row.data.until > world.now) continue;
+    const incident = await store.get<Incident>('incident', row.data.incident);
+    if (!incident) continue;
+    await resumeStockSync(world, incident.data);
+    await closeIncident(world, incident.id, 'Merchant stock sync resumed');
   }
 }

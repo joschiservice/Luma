@@ -63,8 +63,15 @@ export function createStockRefreshService(options: {
   });
 
   return {
-    refresh: (context: TenantContext, positionId: string) =>
-      refresh.refresh(context, positionId).then(() => undefined),
+    refresh: (
+      context: TenantContext,
+      positionId: string,
+      maxAgeMs?: number,
+      options?: Parameters<typeof refresh.refresh>[3],
+    ) =>
+      refresh
+        .refresh(context, positionId, maxAgeMs, options)
+        .then(() => undefined),
     close: commerce.close,
   };
 }
@@ -147,6 +154,35 @@ export function createScheduledDetection(options: {
   const buildMonitor = (configuration: Configuration) =>
     createDetectionMonitor({
       sources,
+      protection: (context, positionId, mapping) =>
+        options.database.transaction(context.tenantId, async (tx) => {
+          const selling =
+            mapping.sellingSource === 'left' ? mapping.left : mapping.right;
+          const authority =
+            mapping.authority === 'left'
+              ? mapping.left
+              : mapping.authority === 'right'
+                ? mapping.right
+                : null;
+          if (!authority) return null;
+          const row = (
+            await tx.query<{
+              id: string;
+              available: string;
+              observedAt: string;
+            }>(
+              `SELECT p->>'id' AS id,p->>'held' AS available,p->>'startedAt' AS "observedAt" FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p WHERE i.tenant_id=$1 AND i.connection_id=$2 AND i.source_connection_id=$3 AND p->>'positionId'=$4 AND p->>'status' IN ('held','tightened','releasing','unknown') AND p->>'startedAt' IS NOT NULL AND p->>'endedAt' IS NULL ORDER BY i.created_at DESC LIMIT 1`,
+              [
+                context.tenantId,
+                selling.source.connectionId,
+                authority.source.connectionId,
+                positionId,
+              ],
+            )
+          ).rows[0];
+
+          return row ?? null;
+        }),
       orders: {
         ...quantities,
         refresh: (context, orderId, maxAgeMs) =>

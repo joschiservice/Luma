@@ -18,6 +18,7 @@ export const featureFlags = [
   'operational-morning-brief',
   'action-review-diffs',
   'scoped-autonomy',
+  'stock-protection',
   'resolution-insights',
   'active-diagnosis',
   'workflow-improvements',

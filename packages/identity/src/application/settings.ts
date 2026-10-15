@@ -27,6 +27,8 @@ export interface InvitationRecord extends WorkspaceInvitation {
 }
 
 export interface SettingsTransaction {
+  /** Reads active provider holds while the workspace mode-change fence is held. */
+  activeStockHolds?(): Promise<boolean>;
   /** Reads the current membership and grants after acquiring the workspace mutation lock. */
   member(userId: string): Promise<Membership | null>;
   /** Reads a built-in or custom role of this workspace, including archived roles. */
@@ -323,6 +325,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         commandId: string;
         revision: number;
         writeMode: 'observe_only' | 'writes_enabled';
+        acknowledgeStockHolds?: boolean | undefined;
       },
     ) {
       requireChangesAllowed(context);
@@ -337,6 +340,15 @@ export function createSettingsService(deps: SettingsDependencies) {
         const before = (await tx.snapshot(context.actor.id)).workspace;
         if (before.revision !== input.revision)
           conflict('Write settings changed. Refresh before saving.');
+        if (
+          input.writeMode === 'observe_only' &&
+          before.writeMode !== 'observe_only' &&
+          (await tx.activeStockHolds?.()) &&
+          !input.acknowledgeStockHolds
+        )
+          conflict(
+            'Active stock holds exist. Release them first or acknowledge that observe-only also blocks releases.',
+          );
         if (before.writeMode !== input.writeMode) {
           const after = {
             ...before,

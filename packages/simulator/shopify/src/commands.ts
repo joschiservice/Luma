@@ -55,6 +55,8 @@ export function command(
   value: ShopifyCommand,
 ): Promise<ShopifyCommandResult> {
   switch (value.kind) {
+    case 'inventory-policy':
+      return setInventoryPolicy(context, value);
     case 'bundle-recipe':
       return replaceBundleRecipe(context, value);
     case 'inventory-transfer':
@@ -359,6 +361,25 @@ async function replaceBundleRecipe(
   );
   if (product) await save(context, 'Product', product.id, product.data);
   notify(context, 'products/update', 'Product', parent.data.product);
+
+  return { id: value.variant, gid: gid('ProductVariant', value.variant) };
+}
+
+/** Changes the merchant's sell-through-zero setting for eligibility journeys. */
+async function setInventoryPolicy(
+  context: ShopifyContext,
+  value: Command<'inventory-policy'>,
+): Promise<ShopifyCommandResult> {
+  const variant = await load<ProductVariantData>(
+    context,
+    'ProductVariant',
+    value.variant,
+  );
+  if (!variant) throw new Error('Variant not found');
+  await save(context, 'ProductVariant', value.variant, {
+    ...variant.data,
+    inventoryPolicy: value.policy,
+  });
 
   return { id: value.variant, gid: gid('ProductVariant', value.variant) };
 }

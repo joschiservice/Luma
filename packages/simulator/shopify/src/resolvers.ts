@@ -782,6 +782,7 @@ const resolvers: Record<string, TypeResolvers> = {
       load(context, 'ProductVariant', line.data.variant),
   }),
   ProductVariant: on<ProductVariantData>({
+    inventoryPolicy: (variant) => variant.data.inventoryPolicy ?? 'DENY',
     requiresComponents: (variant) => variant.data.requiresComponents ?? false,
     productVariantComponents: (variant, args, context) => {
       requireNativeRead(context, 'products');
@@ -814,6 +815,16 @@ const resolvers: Record<string, TypeResolvers> = {
     price: (variant) => money(variant.data.price),
   }),
   Product: on<ProductData>({
+    tags: (product) => product.data.tags ?? [],
+    collections: (product) => ({
+      nodes: (product.data.collections ?? []).map((id) => ({ id })),
+      pageInfo: {
+        hasNextPage: false,
+        hasPreviousPage: false,
+        startCursor: null,
+        endCursor: null,
+      },
+    }),
     priceRangeV2: (product, _args, context) => ({
       minVariantPrice: {
         amount: decimal(product.data.minPrice),

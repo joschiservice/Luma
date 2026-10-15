@@ -8,6 +8,14 @@ const preferencesLink = `${origin}/app/${tenant}/settings/notifications`;
 
 /** Realistic sample data for every email, used by the preview server and the render tests. */
 export const samples = {
+  stock_protection: {
+    kind: 'stock_protection',
+    stage: 'placed',
+    store: 'Shopify AU',
+    workspace,
+    preferencesLink,
+    link: `${origin}/app/${tenant}/exceptions/9a7c5e3b-2d1f-4b8e-8c6a-4e2d0b9f7a5c/detail`,
+  },
   morning_brief: {
     kind: 'morning_brief',
     workspace,

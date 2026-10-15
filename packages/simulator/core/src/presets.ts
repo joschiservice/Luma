@@ -25,7 +25,7 @@ const realisticIncidents = {
   'refund-missing': 0,
   'payment-stuck': 0,
   'supplier-silent': 0,
-  'stock-sync-stall': 0,
+  'stock-sync-stall': 0.1,
   'supplier-split-delivery-mail': 0,
   'customer-delay-mail': 0,
   'order-quantity-change': 0,

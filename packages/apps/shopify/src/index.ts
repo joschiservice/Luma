@@ -395,7 +395,12 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       );
     },
     workflows,
+    stockProtection: corrections.protection,
     async uninstalled({ tenantId, transaction }) {
+      await transaction.query(
+        `UPDATE shopify_stock_protection_incidents SET document=jsonb_set(jsonb_set(jsonb_set(document,'{view,state}','"unknown"'::jsonb),'{view,stopNew}','true'::jsonb),'{view,positions}',(SELECT COALESCE(jsonb_agg(CASE WHEN p->>'status' IN ('pending','held','tightened','unknown','releasing') THEN p || '{"status":"unknown","reason":"read_or_admission_unavailable"}'::jsonb ELSE p END),'[]'::jsonb) FROM jsonb_array_elements(document->'view'->'positions') p)) WHERE tenant_id=$1 AND document->'view'->>'state'<>'released'`,
+        [tenantId],
+      );
       if (config)
         await transaction.query(
           'DELETE FROM shopify_oauth_states WHERE tenant_id=$1',

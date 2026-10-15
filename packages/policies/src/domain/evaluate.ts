@@ -26,6 +26,7 @@ export function evaluatePolicy(
   approval: Approval | null = null,
   alwaysRequireApproval = false,
   requireIndependentApproval = true,
+  stockProtectionPreauthorized = false,
 ): Pick<PolicyDecision, 'outcome' | 'reason'> {
   let outcome: PolicyDecision['outcome'] = 'allowed';
   let reason: PolicyDecision['reason'] = 'authorized';
@@ -47,8 +48,11 @@ export function evaluatePolicy(
     reason = 'approval_rejected';
   } else if (
     alwaysRequireApproval ||
-    action.risk !== 'low' ||
-    capability.minimumRisk !== 'low'
+    (!(
+      stockProtectionPreauthorized &&
+      action.capability === 'inventory.available.protect'
+    ) &&
+      (action.risk !== 'low' || capability.minimumRisk !== 'low'))
   ) {
     const bound =
       approval &&

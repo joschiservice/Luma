@@ -1,4 +1,9 @@
-import type { OrderChangePlans } from '@luma/api-contract';
+import type {
+  OrderChangePlans,
+  StockProtectionIncident,
+  StockProtectionSettings,
+  StockProtectionView,
+} from '@luma/api-contract';
 import type {
   AuthorityReader,
   ConnectionProvider,
@@ -142,6 +147,25 @@ export interface AppDefinition {
    * governed proposal, approval, admission and verification path.
    */
   workflows?: CaseWorkflowAdapter[];
+  /** Incident automation persists intent before starting its durable lifecycle; effects use shared admission. */
+  stockProtection?: {
+    view(context: TenantContext, input?: unknown): Promise<StockProtectionView>;
+    save(
+      context: TenantContext,
+      input: unknown,
+    ): Promise<StockProtectionSettings>;
+    control(
+      context: TenantContext,
+      input: unknown,
+    ): Promise<StockProtectionIncident>;
+    discover(
+      context: TenantContext,
+    ): Promise<{ id: string; principalId: string }[]>;
+    tick(
+      context: TenantContext,
+      incidentId: string,
+    ): Promise<{ done: boolean; moreWork?: boolean }>;
+  };
   /**
    * Registers app-owned HTTP handlers. Each tenant route declares `config.access`; the host
    * checks installation and that permission before the handler runs.
@@ -176,6 +200,7 @@ export interface AppFactoryContext {
     tenantId: string,
     flag:
       | 'scoped-autonomy'
+      | 'stock-protection'
       | 'supplier-purchasing-terms'
       | 'purchasing-stock-booking'
       | 'purchasing-order-changes'
@@ -211,7 +236,15 @@ export interface AppFactoryContext {
    * Rereads a stock position's stale sources through installed capabilities and stores them as
    * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
    */
-  refreshStock?(context: TenantContext, positionId: string): Promise<void>;
+  refreshStock?(
+    context: TenantContext,
+    positionId: string,
+    maxAgeMs?: number,
+    options?: {
+      connectionId?: string;
+      readPurpose?: 'foreground' | 'incremental' | 'history';
+    },
+  ): Promise<void>;
   /** Lists actual downstream shipment references for a Shopify order; choosing one never implies dispatch eligibility. */
   shipmentDispatchOptions?(
     context: TenantContext,

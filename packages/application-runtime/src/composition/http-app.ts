@@ -418,6 +418,19 @@ export function buildApp(
       requestId: request.id,
     });
   });
+  const stockProtection = (request: import('fastify').FastifyRequest) => {
+    if (!request.tenantContext)
+      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+    const service = dependencies.appRegistry?.stockProtection()[0];
+    if (!service)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Stock protection is unavailable.',
+      );
+
+    return { service, context: request.tenantContext };
+  };
   const os = implement(apiContract).$context<HttpContext>();
   registerContractRoutes(
     app,
@@ -558,6 +571,29 @@ export function buildApp(
       ),
       insights: insightRoutes(dependencies.insights),
       assistant: assistantRoutes(dependencies.assistant),
+      stockProtection: os.stockProtection.router({
+        view: os.stockProtection.view.handler(
+          async ({ context: { request }, input: { body } }) => {
+            const s = stockProtection(request);
+
+            return s.service.view(s.context, body);
+          },
+        ),
+        save: os.stockProtection.save.handler(
+          async ({ context: { request }, input: { body } }) => {
+            const s = stockProtection(request);
+
+            return s.service.save(s.context, body);
+          },
+        ),
+        control: os.stockProtection.control.handler(
+          async ({ context: { request }, input: { body } }) => {
+            const s = stockProtection(request);
+
+            return s.service.control(s.context, body);
+          },
+        ),
+      }),
       scopedAutonomy: scopedAutonomyRoutes(dependencies.scopedAutonomy),
       scopedFollowUps: scopedFollowUpRoutes(dependencies.governedFollowUps),
     }),
