@@ -49,3 +49,13 @@ export function activityOutcome(
     )?.outcome ?? 'recorded'
   );
 }
+
+/**
+ * Outcomes that ask a person to look: a failed step, a result Luma couldn't establish and an
+ * escalation. Approvals, rejections and verified results are decisions or confirmations instead.
+ */
+export const activityAttentionOutcomes: readonly ActivityOutcome[] = [
+  'escalated',
+  'failed',
+  'uncertain',
+];

@@ -50,6 +50,14 @@ function humanize(value: string) {
   return value.replaceAll(/[_-]/g, ' ').replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Every issue class Luma names, with its name in the active language. */
+export function namedIssueKinds(): { class: string; label: string }[] {
+  return Object.entries(kinds).map(([kind, { label }]) => ({
+    class: kind,
+    label: label(),
+  }));
+}
+
 /** Describes what kind of problem an issue is, with its domain landmark. */
 export function issueKind(item: Pick<CaseSummary, 'class'>): IssueKind {
   const kind = kinds[item.class];

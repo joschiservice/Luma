@@ -67,6 +67,18 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
       (i) => i.verification === 'passed',
     ),
   ).toBe(true);
+  // Several outcomes match any of them; unknown outcomes are rejected.
+  const either = (await read({ outcome: 'uncertain,approved', limit: '100' }))
+    .body.items;
+  expect(new Set(either.map((i) => i.outcome))).toEqual(
+    new Set(['uncertain', 'approved']),
+  );
+  await read({ outcome: 'approved,success' }, owner.cookie, 400);
+  // Events name the kind of issue they concern.
+  expect(either[0]).toMatchObject({
+    exceptionId: fixture.exceptionId,
+    issueClass: 'workflow_failure',
+  });
   expect((await read({ system: 'shopify' })).body.items).toEqual([]);
   expect(
     (await read({ system: 'jtl-cloud', connectionId: fixture.connectionId }))
@@ -509,6 +521,83 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
   ).toMatchObject({
     outcome: 'manually_disposed',
     connections: [{ id: fixture.connectionId, system: 'jtl-cloud' }],
+  });
+  const every = async (extra) => {
+    const items = [];
+    let cursor;
+    do {
+      const page = (
+        await read({ limit: '100', ...extra, ...(cursor ? { cursor } : {}) })
+      ).body;
+      items.push(...page.items);
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    return items;
+  };
+  // Counts equal what the business view lists with each outcome filter.
+  const counts = (
+    await api.request(
+      `/v1/organizations/${tenantId}/activity/counts?${new URLSearchParams({ from, to, outcome: 'verified' })}`,
+      { cookie: owner.cookie },
+    )
+  ).body;
+  expect(counts.total).toBe((await every({ view: 'business' })).length);
+  expect(counts.attention).toBe(
+    (await every({ view: 'business', outcome: 'escalated,failed,uncertain' }))
+      .length,
+  );
+  expect(counts.attention).toBeGreaterThan(0);
+  expect(counts.outcomes.verified).toBe(
+    (await every({ view: 'business', outcome: 'verified' })).length,
+  );
+  // An event opens its group, even as an earlier step, but never with a page cursor.
+  const step = first.items.at(-1).id;
+  const opened = (
+    await read({ view: 'business', detail: 'steps', event: step })
+  ).body;
+  expect(opened.items).toHaveLength(1);
+  expect(opened.nextCursor).toBeNull();
+  expect([
+    opened.items[0].id,
+    ...opened.items[0].steps.map((event) => event.id),
+  ]).toContain(step);
+  await read({ event: step, cursor: first.nextCursor }, owner.cookie, 400);
+  // Exports write every matching event once, with the reader's names, and are audited.
+  const exportBody = {
+    query: { from, to },
+    headings: { outcome: 'Outcome' },
+    values: { 'outcome:verified': 'Verified' },
+    truncated: 'More events match.',
+  };
+  const events = await every({});
+  const exported = (
+    await api.request(`/v1/organizations/${tenantId}/activity/export`, {
+      method: 'POST',
+      cookie: owner.cookie,
+      body: exportBody,
+    })
+  ).body;
+  expect(exported).toMatchObject({ rows: events.length, truncated: false });
+  expect(exported.csv.trimEnd().split('\r\n')).toHaveLength(events.length + 1);
+  expect(exported.csv).toContain('Verified');
+  expect(exported.csv).not.toContain('must-not-appear');
+  const audited = await db.owner.query(
+    "SELECT document FROM audit_entries WHERE tenant_id=$1 AND document->>'eventType'='collections.exported'",
+    [tenantId],
+  );
+  expect(audited.rows.map((row) => row.document.details)).toEqual([
+    expect.objectContaining({
+      domain: 'activity',
+      rows: String(events.length),
+    }),
+  ]);
+  // Members without export permission can read activity but not export it.
+  await api.request(`/v1/organizations/${tenantId}/activity/export`, {
+    method: 'POST',
+    cookie: member.cookie,
+    body: exportBody,
+    status: 403,
   });
   await db.owner.query(
     'DELETE FROM memberships WHERE tenant_id=$1 AND user_id=$2',

@@ -11,18 +11,18 @@ import {
 const person = '33333333-3333-4333-8333-333333333333';
 
 describe('activity URL state', () => {
-  it('preserves supported filters and position', () => {
+  it('preserves supported filters and the open event', () => {
     const value = {
       from: '2026-09-01',
       to: '2026-09-22',
       q: 'Order 1042',
       type: 'verification',
-      outcome: 'uncertain',
       system: 'jtl-cloud',
-      cursor: 'abc',
       event: 'event',
     };
-    expect(parseActivityFilters(value)).toMatchObject(value);
+    expect(
+      parseActivityFilters({ ...value, outcome: 'uncertain', cursor: 'abc' }),
+    ).toEqual({ ...value, outcome: ['uncertain'], connectionId: undefined });
   });
   it('discards invalid dates, overlong ranges and unsupported filters', () => {
     expect(
@@ -71,13 +71,18 @@ describe('activity view conditions', () => {
       last: { amount: 6, unit: 'day' as const },
       system: 'jtl-cloud',
       type: 'procurement' as const,
-      outcome: 'verified' as const,
+      outcome: ['failed' as const, 'uncertain' as const],
       actor: ['me', 'luma', person],
     };
     const where = {
       match: 'all' as const,
       conditions: activityConditions(filters),
     };
+    expect(where.conditions).toContainEqual({
+      field: 'outcome',
+      op: 'any_of',
+      value: ['failed', 'uncertain'],
+    });
     expect(where.conditions).toContainEqual({
       field: 'actor',
       op: 'any_of',
@@ -110,9 +115,18 @@ describe('activity view conditions', () => {
     );
     expect(issues.map((issue) => issue.index).sort()).toEqual([0, 2, 3, 5]);
     expect(filters).toEqual({
-      outcome: 'verified',
+      outcome: ['verified'],
       last: { amount: 2, unit: 'month' },
     });
+    // Outcomes the API doesn't know need repair rather than a broader read.
+    expect(
+      activityFiltersOf({
+        match: 'all',
+        conditions: [
+          { field: 'outcome', op: 'any_of', value: ['verified', 'success'] },
+        ],
+      }).issues,
+    ).toEqual([expect.objectContaining({ index: 0 })]);
     expect(
       activityFiltersOf(
         {
@@ -145,8 +159,8 @@ describe('activity view conditions', () => {
         type: 'procurement',
         from: '2026-09-01',
         to: '2026-09-22',
+        outcome: 'failed',
         q: 'run-1',
-        cursor: 'stale',
       }),
     ).toEqual({
       q: 'run-1',
@@ -159,6 +173,7 @@ describe('activity view conditions', () => {
             value: { from: '2026-09-01', to: '2026-09-22' },
           },
           { field: 'type', op: 'any_of', value: ['procurement'] },
+          { field: 'outcome', op: 'any_of', value: ['failed'] },
         ],
       },
     });

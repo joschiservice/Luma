@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { useContext } from 'react';
 
-import { activityOptions } from '../../features/activity/data';
+import { activityHeadOptions } from '../../features/activity/data';
 import {
   activityHref,
   activityLabel,
@@ -59,6 +59,7 @@ import {
   stageStates,
   workStages,
 } from '../../features/returns/presentation';
+import { providerName } from '../../features/sync/presentation';
 import { homeModules } from '../../kit/home/preferences';
 import { useNow } from '../../kit/live/now';
 
@@ -414,9 +415,7 @@ export function ConnectionsModule({
 /** Lists the latest recorded decisions, actions and verifications. */
 export function ActivityModule({ organizationId }: { organizationId: string }) {
   const timeZone = useContext(WorkspaceTimezone);
-  const activity = useQuery(
-    activityOptions(organizationId, {}, true, timeZone),
-  );
+  const activity = useQuery(activityHeadOptions(organizationId, {}, timeZone));
 
   return (
     <>
@@ -443,7 +442,7 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
                   {event.system
                     ? m.home_activity_outcome_system({
                         outcome: activityLabel(event.outcome),
-                        system: event.system,
+                        system: providerName(event.system),
                       })
                     : activityLabel(event.outcome)}
                 </small>

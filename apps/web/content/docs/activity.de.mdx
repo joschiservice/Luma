@@ -9,16 +9,28 @@ Die Aktivität kann nur gelesen werden. Um etwas zu genehmigen, erneut zu versuc
 
 ## Einen Eintrag lesen [#read-an-entry]
 
-Die Einträge stehen mit dem neuesten zuerst, sortiert danach, wann Luma sie erfasst hat. Jeder zeigt:
+Die Einträge sind nach Tagen gruppiert, mit dem neuesten zuerst, sortiert danach, wann Luma sie erfasst hat. Die Uhrzeiten folgen der Zeitzone des Workspace, die neben jedem Tag steht. Jeder Eintrag zeigt:
 
-- Wann er erfasst wurde und was geschah, etwa **Änderung genehmigt**, **Änderung gesendet** oder **Problem gelöst**.
+- Was geschah, etwa **Änderung genehmigt**, **Änderung gesendet** oder **Problem gelöst**.
+- Worauf er sich bezieht: die Art des Problems, etwa **Fulfillment-Verzögerung**, den Datensatz oder die Rolle oder Einstellung, die sich geändert hat.
 - Wer gehandelt hat und in welchem System. Handeln kann eine Person, Luma selbst, der Luma-Support oder ein Dienst. Der Luma-Support erscheint, wenn das Support-Team von Luma den Zugriff einer Person auf den Workspace geändert hat. Personen erscheinen mit ihrem Namen, in den Details auch mit ihrer E-Mail-Adresse. Wer den Workspace verlassen hat, erscheint mit dem damaligen Namen und dem Hinweis „ehemaliges Mitglied“. Hat ein Workflow gehandelt, nennt der Eintrag den Workflow und die Person, für die er läuft.
-- Worauf er sich bezieht: einen Datensatz, ein Problem oder eine Verbindung, oder **Workspace** bei Änderungen am ganzen Workspace.
 - Sein Ergebnis, etwa **Genehmigt**, **Von Shopify angenommen**, **Bestätigt**, **Ergebnis unklar** oder **Manuell abgeschlossen**. Einträge aus einer Simulation, einem Pilot oder einem [Workflow-Test](/docs/shadow-mode) sind gekennzeichnet, damit du sie nicht mit echter Arbeit verwechselst.
 
-Wähle einen Eintrag, um die Einzelheiten zu sehen: den Grund, die vorgeschlagene Änderung, wann er stattfand und erfasst wurde, den Status der Anfrage, das Prüfergebnis und die Nachweise, die Luma aufbewahrt hat. Links führen zum Problem und seinen Nachweisen, zum Workflow, zur Lieferantenbestellung oder zu den Apps. Einträge, die zum selben Änderungsversuch oder zur selben Lieferantenbestellung gehören, sind gruppiert, sodass du eine Änderung von der Genehmigung bis zur Prüfung verfolgen kannst.
+Die Schritte eines Problems, einer Workflow-Ausführung oder einer Änderung bleiben in einem Eintrag zusammen, der zeigt, wie viele Schritte er hat. So verfolgst du eine Änderung von der Genehmigung bis zur Prüfung.
 
-Ein Eintrag kann früher stattgefunden haben, als er erfasst wurde, etwa wenn ein System eine Änderung spät bestätigt. Er erscheint dann oben, sobald er erfasst ist, mit beiden Zeiten in den Einzelheiten.
+Wähle einen Eintrag, um seine Einzelheiten neben der Liste zu öffnen. Auf dem Smartphone füllen sie den Bildschirm. Die Einzelheiten zeigen:
+
+- Das Ergebnis und was es belegt und was nicht.
+- Eine Schaltfläche zum Problem und seinen Nachweisen, zum Workflow, zur Lieferantenbestellung oder zu den Apps, wo du handeln kannst.
+- Was Luma erfasst hat, etwa die vorgeschlagene Änderung, die Verbindungen, den Status der Anfrage und das Prüfergebnis. Was Luma nicht erfasst hat, wird weggelassen.
+- **Was passiert ist**: die Schritte, die zum Eintrag geführt haben, der älteste zuerst. Routineschritte, etwa bestandene Genehmigungsregeln und nur gestartete Prüfungen, bleiben ausgeblendet, bis du **Routineschritte anzeigen** wählst. Die **Details** jedes Schritts zeigen seine eigenen Angaben, Nachweise und seine ID.
+- Die Nachweise, die Luma aufbewahrt hat, und unter **Datensatz-IDs** die Kennungen, die du bei Rückfragen zum Eintrag angeben kannst.
+
+Um einen Eintrag zu teilen, wähle in seinen Einzelheiten **Link zu diesem Ereignis kopieren**. Der Link öffnet denselben Eintrag in derselben Ansicht, auch wenn er älter ist als die Einträge, die die Liste zuerst zeigt. Schließen die Filter oder der Zeitraum des Links den Eintrag aus, sagen die Einzelheiten das.
+
+Ein Eintrag kann früher stattgefunden haben, als er erfasst wurde, etwa wenn ein System eine Änderung spät bestätigt. Er erscheint dann oben, sobald er erfasst ist, und seine Einzelheiten zeigen, wann er stattfand.
+
+Drücke **J** und **K**, um durch die Einträge zu gehen, **Leertaste**, um die Einzelheiten zu öffnen oder zu schließen, **Esc**, um sie zu schließen, **/**, um zu suchen, und **?**, um alle Tastenkürzel zu sehen.
 
 ## Genehmigt, erledigt und bestätigt unterscheiden [#tell-approved-done-and-verified-apart]
 
@@ -32,16 +44,19 @@ Jeder Schritt ist ein eigener Eintrag, und keiner schließt den nächsten ein:
 
 ## Filtern und suchen [#filter-and-search]
 
+**Alle**, **Zu prüfen** und **Bestätigt** über der Liste setzen den Ergebnisfilter mit einem Klick. **Zu prüfen** zeigt fehlgeschlagene Schritte, unklare Ergebnisse und Eskalationen. **Bestätigt** zeigt Ergebnisse, die eine separate, aktuelle Abfrage bestätigt hat. Jede Ansicht zeigt, wie viele Einträge sie unter den übrigen Filtern enthält, sodass du auf einen Blick siehst, ob etwas zu prüfen ist.
+
 Nutze die Filter über der Liste:
 
 - **Erfasst**: der Zeitraum, standardmäßig **Letzte 30 Tage**. Ein Zeitraum kann bis zu 366 Tage umfassen. Datumsangaben folgen der Zeitzone des Workspace.
 - **Ereignistyp**: Problem, Entscheidung, Änderung, Prüfung, Abschluss, Verbindung, Beschaffung oder Team und Einstellungen.
-- **Ergebnis**, **System** und **Verbindung**.
+- **Ergebnis**: Wähle mehrere, um Einträge mit einem davon zu sehen.
+- **System** und **Verbindung**.
 - **Erfasst von**: **Ich**, **Luma**, **Workflows** oder Personen in deinem Workspace. Wähle mehrere, um zu sehen, was eine davon getan hat. **Luma** umfasst den Luma-Support. Eine Person trifft auch auf die Workflows zu, die für sie handeln. In einer geteilten Ansicht meint **Ich** die Person, die sie öffnet.
 
 **Heute**, **Letzte 7 Tage** und **Letzte 30 Tage** bleiben relativ: Eine mit **Letzte 7 Tage** gespeicherte Ansicht zeigt bei jedem Öffnen die letzten 7 Tage. Ein eigener Zeitraum bleibt fest.
 
-Die Suche findet Problem-IDs, Datensatzreferenzen, Aktionscodes, Namen und E-Mail-Adressen von Personen, Workflow-Namen und IDs von Workflow-Ausführungen. Filter und Suche sind Teil der Adresse, sodass du einen Link auf dieselbe Ansicht teilen kannst.
+Die Suche findet Problem-IDs, Arten von Problemen wie **Fulfillment-Verzögerung**, Datensatzreferenzen, Aktionscodes, Namen und E-Mail-Adressen von Personen, Workflow-Namen und IDs von Workflow-Ausführungen. Filter und Suche sind Teil der Adresse, sodass du einen Link auf dieselbe Ansicht teilen kannst.
 
 ## Ansichten speichern und teilen [#save-and-share-views]
 
@@ -49,7 +64,13 @@ Die Suche findet Problem-IDs, Datensatzreferenzen, Aktionscodes, Namen und E-Mai
 
 Eine geteilte Ansicht zeigt nie mehr, als die Person sehen darf, die sie öffnet. Ohne **Eingeschränkte Aktivität ansehen** bleibt eine auf Zugriffsänderungen gefilterte Ansicht für sie leer.
 
-Mit **Ältere Ereignisse** und **Neueste Ereignisse** blätterst du durch die Ergebnisse. Kommen beim Lesen neue Einträge hinzu, bringt dich **Neue Ereignisse verfügbar. Neueste anzeigen** zurück nach oben.
+## Aktivität exportieren [#export-activity]
+
+Wähle **Als CSV exportieren**, um alle erfassten Schritte herunterzuladen, die zu den Filtern und der Suche passen, je eine Zeile und die neuesten zuerst, mit Zeit, Aktion, Ergebnis, erfassender Person, Datensatz, System und IDs. Überschriften und Namen stehen in deiner Sprache. Ein Export enthält bis zu 5.000 Zeilen; passen mehr, sagen das die Datei und die Seite, und du kannst die Filter oder den Zeitraum eingrenzen, um den Rest zu exportieren. Du brauchst **Listen exportieren**, und jeder Export wird ohne seinen Inhalt im Audit-Protokoll erfasst. Exporte erscheinen in der Aktivität als **Liste exportiert**.
+
+## Ältere und neue Einträge [#older-and-new-entries]
+
+Die Liste zeigt zuerst die neuesten 30 Einträge. **Ältere Ereignisse anzeigen** fügt ältere darunter an. Kommen beim Lesen neue Einträge hinzu, bleibt die Liste, wo sie ist, und oben erscheint eine Schaltfläche wie **2 neue Ereignisse anzeigen**; wähle sie, um sie hinzuzufügen.
 
 ## Eingeschränkte Aktivität [#restricted-activity]
 
@@ -58,6 +79,7 @@ Personen mit **Eingeschränkte Aktivität ansehen** sehen zusätzlich Änderunge
 ## Wenn die Liste leer ist oder nicht lädt [#when-the-list-is-empty-or-cant-load]
 
 - **Keine Aktivität in den letzten 30 Tagen**: In diesem Zeitraum wurde nichts erfasst. Wähle einen früheren Zeitraum, um ältere Aktivität zu sehen.
+- **Nichts zu prüfen**: Im Zeitraum ist kein Schritt fehlgeschlagen, unklar geblieben oder eskaliert worden.
 - **Keine Aktivität passt zu diesen Filtern**: Wähle einen anderen Zeitraum oder setze die Filter zurück. Änderungen, die Luma nicht erfasst hat, etwa direkt in Shopify vorgenommene Bearbeitungen, erscheinen hier nie.
-- **Die Aktivität konnte nicht aktualisiert werden. Die angezeigten Ereignisse sind möglicherweise veraltet.**: Wähle **Aktivität aktualisieren**. Kann Luma einen Teil des Protokolls nicht lesen, meldet die Seite einen Fehler, statt eine Liste mit fehlenden Einträgen zu zeigen.
+- **Die Aktivität konnte nicht aktualisiert werden. Die angezeigten Ereignisse sind möglicherweise veraltet.**: Wähle **Erneut versuchen** oder **Aktivität aktualisieren**. Kann Luma einen Teil des Protokolls nicht lesen, meldet die Seite einen Fehler, statt eine Liste mit fehlenden Einträgen zu zeigen.
 - **Dein Zugriff auf diesen Workspace hat sich geändert**: Deine Rolle oder Mitgliedschaft wurde geändert. Bitte eine Person mit der Rolle Inhaber um Zugriff.

@@ -432,7 +432,7 @@ function Option({
   );
 }
 
-/** Every offered filter with its values listed under a heading, for a sheet or a docked panel. */
+/** Every offered filter with its values listed under a heading, for the small-screen sheet. */
 export function FilterFields({
   filters,
   className,
@@ -461,35 +461,6 @@ function FilterSection({ filter }: { filter: CollectionFilter }) {
       </h3>
       <FilterEditor filter={filter} inline />
     </section>
-  );
-}
-
-/**
- * Lays a collection out beside a docked panel that lists every filter and its values, so one
- * click applies a value. The panel shows on wide screens only; below that the toolbar inside
- * `children` must be rendered with `panel` so it offers the same filters as pills. Reserve the
- * panel for feeds with five or more filters that are combined to investigate; tables and split
- * views keep the toolbar pills.
- */
-export function CollectionFilterPanel({
-  filters,
-  children,
-}: {
-  filters: readonly CollectionFilter[];
-  children: ReactNode;
-}) {
-  const id = useId();
-
-  return (
-    <div className="collection-panel-layout">
-      <aside className="collection-filter-panel" aria-labelledby={id}>
-        <h2 id={id} className="collection-filter-panel-title">
-          {m.common_filters()}
-        </h2>
-        <FilterFields filters={filters} />
-      </aside>
-      <div className="collection-panel-main">{children}</div>
-    </div>
   );
 }
 

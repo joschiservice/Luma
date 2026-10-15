@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { compilePlaybook, playbookHash } from '@luma/workflows/composition';
@@ -104,12 +106,66 @@ export function createWorkspacePeople(db: TenantDatabase) {
     );
 }
 
-/** Composes the workspace activity reader with refreshed membership. */
+/** The audit entry an activity export appends, shaped as the audit log stores it. */
+interface ActivityExportAuditEntry {
+  id: string;
+  tenantId: string;
+  eventKey: string;
+  eventType: string;
+  schemaVersion: 1;
+  occurredAt: string;
+  actor: { kind: 'user'; id: string };
+  correlationId: string;
+  proposalId: string;
+  actionHash: string;
+  evidenceRefs: string[];
+  details: Record<string, string>;
+}
+
+/**
+ * Composes the workspace activity reader with refreshed membership. Each export is appended to
+ * `audit` as a list export of the `activity` domain, with its size but without its values;
+ * without an audit log, exports are refused.
+ */
 export function createWorkspaceActivity(
   db: TenantDatabase,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  audit?: { append(entry: ActivityExportAuditEntry): Promise<void> },
 ) {
-  return createActivityService(createActivityStore(db), refreshContext);
+  return createActivityService(
+    createActivityStore(db),
+    refreshContext,
+    audit
+      ? {
+          record: async (_context, entry) => {
+            const details = {
+              domain: 'activity',
+              rows: String(entry.rows),
+              truncated: String(entry.truncated),
+              filters: String(entry.filters),
+            };
+            await audit.append({
+              id: entry.id,
+              tenantId: entry.tenantId,
+              eventKey: `collection-export:${entry.id}`,
+              eventType: 'collections.exported',
+              schemaVersion: 1,
+              occurredAt: entry.occurredAt,
+              actor: { kind: 'user', id: entry.actorId },
+              correlationId: entry.id,
+              proposalId: entry.id,
+              actionHash: createHash('sha256')
+                .update(JSON.stringify(details))
+                .digest('hex'),
+              evidenceRefs: [],
+              details,
+            });
+          },
+          id: randomUUID,
+          now: () => new Date(),
+        }
+      : undefined,
+  );
 }
 
 /** Composes persistent Shadow evaluations without an execution registry. */

@@ -137,9 +137,8 @@ function chipped(filter: CollectionFilter) {
  * per filter, page actions and sort. Without views, Refresh ends the second row. Every offered
  * filter is visible: unset filters are quiet pills that open their values in one click, applied
  * filters are chips that edit the value and remove it. On small screens unset pills give way to
- * one Filters button that lists every filter in a sheet. With `panel`, the collection sits in a
- * `CollectionFilterPanel`; on wide screens the toolbar then shows only applied chips. With
- * `conditions`, advanced conditions follow the quick filters as chips, and "+ Filter" opens the
+ * one Filters button that lists every filter in a sheet. With `conditions`, advanced conditions
+ * follow the quick filters as chips, and "+ Filter" opens the
  * condition builder on every screen size. `display` holds the display menu, placed before Sort.
  * The toolbar owns no filter state: every change is reported to the caller, which owns the URL
  * and fetching.
@@ -153,7 +152,6 @@ export function CollectionToolbar({
   sort,
   actions,
   display,
-  panel = false,
   onClear,
   onRefresh,
   refreshing = false,
@@ -170,8 +168,6 @@ export function CollectionToolbar({
   actions?: ReactNode;
   /** The display menu, such as `CollectionDisplay`; placed before Sort. */
   display?: ReactNode;
-  /** The filters are also listed in a docked `CollectionFilterPanel`. */
-  panel?: boolean;
   /** Clears search and every removable filter; shown while any is applied. */
   onClear?: (() => void) | undefined;
   onRefresh: () => void;
@@ -220,11 +216,7 @@ export function CollectionToolbar({
   }
 
   return (
-    <div
-      className={cn('collection-toolbar', className)}
-      data-panel={panel || undefined}
-      ref={root}
-    >
+    <div className={cn('collection-toolbar', className)} ref={root}>
       {views ? (
         <div className="collection-toolbar-views">
           {views}

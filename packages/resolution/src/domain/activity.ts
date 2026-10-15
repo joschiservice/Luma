@@ -32,13 +32,21 @@ export interface ActivityQuery {
   system?: string | undefined;
   connectionId?: string | undefined;
   type?: ActivityType | undefined;
-  outcome?: ActivityOutcome | undefined;
+  /** Keeps events with any of these outcomes. */
+  outcome?: readonly ActivityOutcome[] | undefined;
   /**
    * Keeps events recorded by any of these actors: user IDs, `luma` for Luma itself and Luma
    * support, `workflow` for events a workflow run recorded. The service resolves `me` to the
    * reader's user ID before the store reads.
    */
   actor?: readonly string[] | undefined;
+  /**
+   * Issue classes whose names match the search text in the reader's language; events of these
+   * classes match the search too.
+   */
+  searchIssueClasses?: readonly string[] | undefined;
+  /** Reads only the business group, or the event, with this ID instead of a page. */
+  event?: string | undefined;
   limit: number;
   cursor?: string | undefined;
   /** Keeps only events for these linked issues, workflow runs or order references. */
@@ -64,6 +72,8 @@ export interface ActivityActor {
 export interface ActivityEvent {
   workflowRunId?: string | null;
   resourceKind?: string | null;
+  /** The class of the issue the event concerns, such as `stuck_fulfillment`. */
+  issueClass?: string | null;
   steps?: ActivityEvent[];
   id: string;
   recordedAt: string;
@@ -96,3 +106,14 @@ export interface ActivityPage {
   nextCursor: string | null;
   coverage: string;
 }
+
+/**
+ * How many business groups match the filters, without the outcome filter: in total, with an
+ * outcome that asks a person to look, and per outcome. A group counts under every outcome one of
+ * its meaningful events has, as the outcome filter would list it.
+ */
+export type ActivityCounts = {
+  total: number;
+  attention: number;
+  outcomes: Partial<Record<ActivityOutcome, number>>;
+};

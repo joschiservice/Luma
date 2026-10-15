@@ -26,11 +26,28 @@ Cursors bind the tenant, whether the reader has restricted access, dates, filter
 size; a change returns 400. Clients check for new records with a separate first-page read, so
 new rows never shift the page being read.
 
-Search is a case-insensitive literal substring over issue ID, persisted target reference,
-action label, actor ID, the actor's name and current email, workflow name and workflow run ID.
-It does not search raw payloads or free-form audit details.
+The Activity page appends older pages below the loaded ones and keeps no cursor in the URL. A
+link to an event the loaded list doesn't hold reads that event's group alone with `event`,
+under the same filters; an empty result means the filters or date range exclude it. New events
+are offered, not inserted: the page polls the first page every 30 seconds and shows them only
+when the reader asks, by reading every loaded page again.
 
-`actor` keeps events recorded by any of up to 20 actors: user IDs, `luma` (actor kinds Luma
+Counts read the business groups each outcome would list, ignoring the outcome filter, so the
+quick views can show how many events each holds. A group counts under every outcome one of its
+non-routine events has, matching what the outcome filter lists. Counting evaluates every event
+in the date range, as a page read already does before it limits, so the page reads counts only
+when the filters change, on refresh and when the poll sees a new event.
+
+Search is a case-insensitive literal substring over issue ID, issue class (with underscores
+read as spaces), persisted target reference, action label, actor ID, the actor's name and
+current email, workflow name and workflow run ID. Issue names are translated in the web, so the
+client also sends `searchIssueClasses`, the classes whose names in the reader's language
+contain the search text; events of those classes match too. Search does not cover raw payloads
+or free-form audit details.
+
+`outcome` keeps events with any of the named outcomes. The filter applies before grouping, so
+a group appears under the outcome of its newest event that the filter admits. `actor` keeps
+events recorded by any of up to 20 actors: user IDs, `luma` (actor kinds Luma
 and Luma support), `workflow` (events with a workflow) and `me`. The service resolves `me` to the
 reader before the store reads, so one shared view names each reader's own events. The filter
 compares against the attribution the row shows, so a person also matches workflow runs that act
@@ -41,12 +58,24 @@ already admitted: restricted events still need `activity.read_restricted`.
 
 The Activity page keeps its filters as view conditions on `activityCatalog`, so they can be
 saved, shared and remembered; search text, the page cursor and the open event stay in the URL
-only. The API takes one value per filter except actors, so a condition with several values, a
-repeated field or "match any" of several conditions needs repair rather than a broader read.
+only. The API takes one value per filter except outcomes and actors, so a condition with
+several values, a repeated field or "match any" of several conditions needs repair rather than
+a broader read. The **Needs a look** and **Verified** quick views are outcome conditions
+(escalated, failed and uncertain; verified), so they save and share like any other filter.
 Recorded-time presets are stored as `within_last` and resolved to calendar days in the
 workspace time zone on each read; custom ranges are stored as `between` days. Saved Activity
-views have no metrics, charts, actions or export, because the view engine has no Activity
-reader.
+views have no metrics, charts or actions, because the view engine has no Activity reader.
+
+## Export
+
+Activity exports through its own endpoint rather than the view engine. It needs
+`lists.export` as well as `activity.read`, refuses read-only support views, and writes every
+event the filters match in the event view, one row per immutable record, up to 5,000 rows; a
+longer result is cut off and says so. Visibility is the list's, so restricted events need
+`activity.read_restricted`. The server writes recorded codes; the client sends headings and
+names for the codes it knows in the reader's language, and codes without a name stay as
+recorded. Each export appends a `collections.exported` audit entry for the `activity` domain
+with its row count, whether it was cut off and how many filters applied, never its values.
 
 ## Attribution
 
@@ -76,7 +105,10 @@ neither action parameters nor display numbers establish an activity association.
 
 Issue-level events resolve connections from persisted proposals, source evidence and
 connection subjects, so system and connection filters also find resolutions and escalations.
-Raw documents, credentials, grants and unrestricted audit details never enter the response.
+They also carry the issue's class from the already joined issue record, so a row can say what
+it concerns without a per-row read. Record references that are storage IDs are not shown as
+names. Raw documents, credentials, grants and unrestricted audit details never enter the
+response.
 
 A source read failure fails the page instead of silently omitting that source.
 
@@ -89,7 +121,9 @@ A source read failure fails the page instead of silently omitting that source.
 - Unaccepted issue verification stays uncertain even when its observed result passed.
   Pending and completed verification records keep separate immutable event IDs.
 - Proposal and attempt references associate related events; each immutable record remains
-  independently expandable. Playbook provenance identifies pilot records; absent
+  independently expandable. The page hides routine steps, rule checks that passed and checks
+  that only started, until the reader shows them; a started check reads as waiting, not as an
+  unclear result. Playbook provenance identifies pilot records; absent
   execution-mode provenance is reported as unrecorded.
 
 ## Coverage

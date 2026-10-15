@@ -1344,54 +1344,6 @@
   border-top: 0;
 }
 
-/* Docked filter panel: shown beside the collection on wide screens only. */
-.collection-panel-layout {
-  display: grid;
-  gap: 20px;
-  min-width: 0;
-}
-
-.collection-panel-main {
-  display: grid;
-  gap: 14px;
-  align-content: start;
-  min-width: 0;
-}
-
-.collection-filter-panel {
-  display: none;
-}
-
-.collection-filter-panel-title {
-  margin: 0 0 10px;
-  padding-inline: 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-@media (min-width: 1180px) {
-  .collection-panel-layout {
-    grid-template-columns: 224px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .collection-filter-panel {
-    position: sticky;
-    top: 16px;
-    display: block;
-    max-height: calc(100dvh - 32px);
-    overflow: auto;
-    padding: 12px 8px;
-    border-radius: var(--radius-panel);
-    background: var(--surface-raised);
-    box-shadow: var(--shadow-panel);
-  }
-
-  .collection-toolbar[data-panel] .collection-filter-pill {
-    display: none;
-  }
-}
-
 @media (max-width: 760px) {
   .collection-toolbar-search,
   .collection-toolbar-filters {

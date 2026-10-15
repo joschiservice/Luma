@@ -85,7 +85,7 @@ List pages bind keys with `useListKeyboard`. Its shortcuts never fire while typi
 
 The toolbar and list sit directly on the page, which the shell already insets; don't wrap them in a raised panel. Tables use the framed `DataTable`, and row lists that aren't tables use the same thin border and row dividers, as in the Workflows library. Summaries above a list, such as Procurement's commitments, form one bordered band rather than separate raised cards.
 
-Use `CollectionFilterPanel` only for a narrow feed with five or more filters that people combine to investigate, as in Activity. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
+Use `CollectionViews` for button views; link-based views can keep `Tabs`.
 
 ### List layout and preview
 

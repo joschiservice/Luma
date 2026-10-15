@@ -480,6 +480,30 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       subjects: { issueIds: ['not-a-uuid'], runIds: [], orderRefs: [] },
     });
     expect(none.items).toEqual([]);
+
+    // Search finds issue classes by their code's words, and by names the client resolved.
+    const named = 'Fulfillment delay';
+    expect((await store.list(context, { ...window, q: named })).items).toEqual(
+      [],
+    );
+    const byName = await store.list(context, {
+      ...window,
+      q: named,
+      searchIssueClasses: ['stuck_fulfillment'],
+    });
+    expect(byName.items.map((item) => item.id)).toContain(
+      expected['given issue'],
+    );
+    expect(
+      byName.items.every((item) => item.issueClass === 'stuck_fulfillment'),
+    ).toBe(true);
+    const byWords = await store.list(context, {
+      ...window,
+      q: 'stuck fulfillment',
+    });
+    expect(byWords.items.map((item) => item.id)).toEqual(
+      byName.items.map((item) => item.id),
+    );
   }, 60000);
 
   it('names current and former members without reading other workspaces', async () => {
@@ -843,6 +867,43 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     });
     expect(next.items.map((event) => event.id)).toEqual([ids[4]]);
     expect(next.nextCursor).toBeNull();
+    // Several outcomes match any of them; one outcome keeps only its events.
+    const outcomes = await store.list(context, {
+      ...range,
+      limit: 100,
+      outcome: ['rejected', 'verified'],
+    });
+    expect(outcomes.items.map((event) => event.id)).toEqual([ids[2], ids[4]]);
+    const rejected = await store.list(context, {
+      ...range,
+      limit: 100,
+      outcome: ['rejected'],
+    });
+    expect(rejected.items.map((event) => event.id)).toEqual([ids[4]]);
+    // An event opens its group, even as an earlier step; a group of routine steps never lists.
+    const opened = await store.list(context, { ...range, event: ids[0] });
+    expect(opened.items).toEqual([
+      expect.objectContaining({
+        id: ids[2],
+        steps: [{ id: ids[0] }, { id: ids[1] }].map((step) =>
+          expect.objectContaining(step),
+        ),
+      }),
+    ]);
+    expect(opened.nextCursor).toBeNull();
+    expect(
+      (await store.list(context, { ...range, event: ids[3] })).items,
+    ).toEqual([]);
+    // Counts equal what each outcome filter lists, whatever the query's own outcome.
+    const counts = await store.counts(context, {
+      ...range,
+      outcome: ['verified'],
+    });
+    expect(counts).toMatchObject({
+      total: 2,
+      attention: 0,
+      outcomes: { verified: 1, rejected: 1 },
+    });
     const raw = await store.list(context, {
       ...range,
       view: 'events',

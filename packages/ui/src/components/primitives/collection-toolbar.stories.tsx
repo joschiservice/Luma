@@ -5,10 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import type { ConditionWhere } from '../../lib/collection-conditions';
 import { CollectionDisplay } from './collection-display';
-import {
-  type CollectionFilter,
-  CollectionFilterPanel,
-} from './collection-filters';
+import { type CollectionFilter } from './collection-filters';
 import { orderColumns, orderFields } from './collection-story-fixtures';
 import { CollectionToolbar, CollectionViews } from './collection-toolbar';
 
@@ -31,12 +28,9 @@ interface State {
 
 function Toolbar({
   initial,
-  panel = false,
   advanced = false,
 }: {
   initial?: Partial<State>;
-  /** Also lists the filters in a docked panel, as Activity does. */
-  panel?: boolean;
   /** Adds the condition builder and the display menu. */
   advanced?: boolean;
 }) {
@@ -149,7 +143,6 @@ function Toolbar({
             />
           ) : undefined
         }
-        panel={panel}
         sort={{
           value: state.sort,
           options: [
@@ -181,11 +174,7 @@ function Toolbar({
     </div>
   );
 
-  return panel ? (
-    <CollectionFilterPanel filters={filters}>{toolbar}</CollectionFilterPanel>
-  ) : (
-    toolbar
-  );
+  return toolbar;
 }
 
 const meta = {
@@ -360,47 +349,6 @@ export const Narrow: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Edit Status filter: Completed' }),
     ).toBeVisible();
-  },
-};
-
-export const FilterPanel: Story = {
-  args: { panel: true, initial: { status: 'open' } },
-  globals: { viewport: { value: 'desktop' } },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const panel = within(
-      canvas.getByRole('complementary', { name: 'Filters' }),
-    );
-
-    // Every value is one click away; applied values also stay as chips by the results.
-    await expect(
-      canvas.queryByRole('button', { name: 'Add Source filter' }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(
-      within(panel.getByRole('region', { name: 'Status' })).getByRole(
-        'button',
-        { name: 'Completed' },
-      ),
-    );
-    await expect(
-      canvas.getByRole('button', { name: 'Edit Status filter: Completed' }),
-    ).toBeVisible();
-    await userEvent.click(
-      within(panel.getByRole('region', { name: 'Placed' })).getByRole(
-        'button',
-        { name: 'Last 30 days' },
-      ),
-    );
-    await expect(applied(canvasElement)).toHaveTextContent(
-      '"from":"2026-09-07","to":"2026-10-06"',
-    );
-    await userEvent.click(
-      within(panel.getByRole('region', { name: 'Status' })).getByRole(
-        'button',
-        { name: 'Any' },
-      ),
-    );
-    await expect(applied(canvasElement)).not.toHaveTextContent('"status"');
   },
 };
 

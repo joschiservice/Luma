@@ -1,6 +1,9 @@
 import {
   activityCatalog,
+  type ActivityEvent,
+  type ActivityExportRequest,
   activityOutcomes,
+  type ActivityPage,
   type ActivityQuery,
   activityTypes,
   type CollectionCondition,
@@ -13,12 +16,17 @@ import {
   workspaceDateValue,
   workspaceInstant,
 } from '@luma/ui/lib/timezone';
-import { queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+} from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { collectionSearchShape } from '../../kit/collections/state';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { activitySearchIssueClasses } from './presentation';
 
 /** The recorded-time period a view keeps relative, such as the last 7 days. */
 interface ActivityPeriod {
@@ -26,10 +34,12 @@ interface ActivityPeriod {
   unit: CollectionGranularity;
 }
 
+type ActivityOutcome = ActivityEvent['outcome'];
+
 /**
- * What the Activity list shows: its filters, which views keep as conditions, and the search,
- * page position and open event, which stay in the URL only. Dates are workspace calendar days;
- * `last` keeps a relative period instead, so a saved "Last 7 days" stays the last 7 days.
+ * What the Activity list shows: its filters, which views keep as conditions, and the search and
+ * open event, which stay in the URL only. Dates are workspace calendar days; `last` keeps a
+ * relative period instead, so a saved "Last 7 days" stays the last 7 days.
  */
 export interface ActivityFilters {
   from?: string | undefined;
@@ -39,12 +49,12 @@ export interface ActivityFilters {
   system?: ActivityQuery['system'];
   connectionId?: string | undefined;
   type?: ActivityQuery['type'];
-  outcome?: ActivityQuery['outcome'];
+  /** Outcomes, matching any. */
+  outcome?: readonly ActivityOutcome[] | undefined;
   /** User IDs, `me`, `luma` or `workflow`. */
   actor?: readonly string[] | undefined;
-  cursor?: string | undefined;
+  /** The event open in the preview. */
   event?: string | undefined;
-  latest?: string | undefined;
 }
 
 const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,6 +67,8 @@ const day = (v: unknown) => (isDay(v) ? v : undefined);
 const text = (v: unknown, max: number) =>
   typeof v === 'string' ? v.slice(0, max) : undefined;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isOutcome = (value: unknown): value is ActivityOutcome =>
+  activityOutcomes.includes(value as ActivityOutcome);
 
 /** Keeps supported search fields and ignores malformed URL values. Dates are workspace calendar days. */
 export function parseActivityFilters(
@@ -81,14 +93,8 @@ export function parseActivityFilters(
     type: activityTypes.includes(value.type as ActivityQuery['type'] & string)
       ? (value.type as ActivityQuery['type'])
       : undefined,
-    outcome: activityOutcomes.includes(
-      value.outcome as ActivityQuery['outcome'] & string,
-    )
-      ? (value.outcome as ActivityQuery['outcome'])
-      : undefined,
-    cursor: text(value.cursor, 2048),
+    outcome: isOutcome(value.outcome) ? [value.outcome] : undefined,
     event: text(value.event, 200),
-    latest: text(value.latest, 200),
   };
 }
 
@@ -103,17 +109,15 @@ const legacyKeys = [
 ] as const;
 
 /**
- * URL state of the Activity page: the shared view keys, search text, the page cursor, the
- * newest event when paging started and the open event. Filters of older links are accepted and
- * rewritten into conditions by the route.
+ * URL state of the Activity page: the shared view keys, search text and the open event. Filters
+ * of older links are accepted and rewritten into conditions by the route; their page cursors are
+ * dropped, because the list loads older events below the newest instead of paging.
  */
 export const activitySearch = z
   .object({
     ...collectionSearchShape,
     q: z.string().max(200).optional().catch(undefined),
-    cursor: z.string().max(2048).optional().catch(undefined),
     event: z.string().max(200).optional().catch(undefined),
-    latest: z.string().max(200).optional().catch(undefined),
     from: z.string().optional().catch(undefined),
     to: z.string().optional().catch(undefined),
     system: z.string().optional().catch(undefined),
@@ -140,8 +144,6 @@ export function withoutLegacyActivityFilters(
   const legacy = parseActivityFilters(search);
   const next: ActivitySearch = { ...search };
   for (const key of legacyKeys) delete next[key];
-  delete next.cursor;
-  delete next.latest;
   const conditions = activityConditions(legacy);
   if (!conditions.length) return next;
   const fields = new Set(conditions.map((condition) => condition.field));
@@ -159,7 +161,7 @@ export function withoutLegacyActivityFilters(
 
 /** Whether the URL says what to show, so the page must not restore the remembered view. */
 export function namesActivityState(search: ActivitySearch) {
-  return Boolean(search.q || search.cursor || search.event || search.latest);
+  return Boolean(search.q || search.event);
 }
 
 /** Shifts a calendar day by whole days, weeks or months. */
@@ -173,7 +175,7 @@ function shiftDay(value: string, amount: number, unit: CollectionGranularity) {
 
 /**
  * Expresses the filters as the view's conditions: the recorded time as a relative period or a
- * calendar range, one value for system, connection, type and outcome, and any actors.
+ * calendar range, one value for system, connection and type, and any outcomes and actors.
  */
 export function activityConditions(
   filters: ActivityFilters,
@@ -197,7 +199,12 @@ export function activityConditions(
   one('system', filters.system);
   one('connection', filters.connectionId);
   one('type', filters.type);
-  one('outcome', filters.outcome);
+  if (filters.outcome?.length)
+    conditions.push({
+      field: 'outcome',
+      op: 'any_of',
+      value: [...filters.outcome],
+    });
   if (filters.actor?.length)
     conditions.push({
       field: 'actor',
@@ -226,8 +233,8 @@ const single = (condition: CollectionCondition) =>
 
 /**
  * Reads the view's conditions back into filters. Activity's API takes one value per filter,
- * except actors, and a recorded-time period of at most 366 days, so anything else, repeated
- * fields and "match any" of several conditions are issues the page offers to remove.
+ * except outcomes and actors, and a recorded-time period of at most 366 days, so anything else,
+ * repeated fields and "match any" of several conditions are issues the page offers to remove.
  */
 export function activityFiltersOf(
   where: CollectionWhere,
@@ -293,19 +300,28 @@ export function activityFiltersOf(
 
         return problem('This filter is not supported');
       }
+      case 'outcome': {
+        const values = Array.isArray(condition.value) ? condition.value : [];
+        if (
+          condition.op !== 'any_of' ||
+          !values.length ||
+          !values.every(isOutcome)
+        )
+          return problem('Choose outcomes');
+        filters.outcome = [...new Set(values)];
+
+        return;
+      }
       case 'system':
       case 'connection':
-      case 'type':
-      case 'outcome': {
+      case 'type': {
         const value = single(condition);
         if (!value) return problem('Choose one value');
         if (condition.field === 'system') filters.system = value;
         else if (condition.field === 'connection') {
           if (!uuid.test(value)) return problem('Choose a connection');
           filters.connectionId = value;
-        } else if (condition.field === 'type')
-          filters.type = value as ActivityFilters['type'];
-        else filters.outcome = value as ActivityFilters['outcome'];
+        } else filters.type = value as ActivityFilters['type'];
 
         return;
       }
@@ -370,28 +386,56 @@ export function activityRange(
 
 const api = createWebApiClient();
 
-/** Loads one bounded activity page; URL cursors retain browsing position across issue navigation. */
-export function activityOptions(
-  organizationId: string,
-  filters: ActivityFilters,
-  head = false,
-  timeZone = 'UTC',
-) {
+/** Events per read: the list's first screen and each "Show older events". */
+const activityPageSize = 30;
+
+/**
+ * The filters as API parameters, with the recorded time resolved to workspace days. Search also
+ * names the issue kinds whose names, in the reader's language, contain the search text.
+ */
+function activityFilterQuery(filters: ActivityFilters, timeZone: string) {
   const range = activityRange(filters, new Date(), timeZone);
-  const query = {
-    view: 'business' as const,
-    detail: head ? ('summary' as const) : ('steps' as const),
+  const classes = filters.q ? activitySearchIssueClasses(filters.q) : [];
+
+  return {
     from: workspaceInstant(range.from, timeZone),
     to: workspaceInstant(nextCalendarDay(range.to), timeZone),
     ...(filters.q ? { q: filters.q } : {}),
+    ...(classes.length ? { searchIssueClasses: classes.join(',') } : {}),
     ...(filters.system ? { system: filters.system } : {}),
     ...(filters.connectionId ? { connectionId: filters.connectionId } : {}),
     ...(filters.type ? { type: filters.type } : {}),
-    ...(filters.outcome ? { outcome: filters.outcome } : {}),
+    ...(filters.outcome?.length
+      ? { outcome: [...filters.outcome].sort().join(',') }
+      : {}),
     ...(filters.actor?.length ? { actor: filters.actor.join(',') } : {}),
-    limit: 30,
-    ...(!head && filters.cursor ? { cursor: filters.cursor } : {}),
   };
+}
+
+/** The business-view request for the filters, without page position. */
+function activityQuery(
+  filters: ActivityFilters,
+  detail: 'summary' | 'steps',
+  timeZone: string,
+) {
+  return {
+    view: 'business' as const,
+    detail,
+    ...activityFilterQuery(filters, timeZone),
+    limit: activityPageSize,
+  };
+}
+
+/**
+ * Reads the newest events without their steps. Home lists them, and the Activity page polls it
+ * every 30 seconds and on focus to offer new events without moving the list being read.
+ */
+export function activityHeadOptions(
+  organizationId: string,
+  filters: ActivityFilters,
+  timeZone = 'UTC',
+) {
+  const query = activityQuery(filters, 'summary', timeZone);
 
   return queryOptions({
     queryKey: [
@@ -399,14 +443,128 @@ export function activityOptions(
       'organization',
       organizationId,
       'activity',
-      head ? 'head' : 'page',
+      'head',
       query,
     ],
     ...privateQueryDefaults,
-    refetchOnWindowFocus: head ? 'always' : false,
+    refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
-    refetchInterval: head ? 30_000 : false,
+    refetchInterval: 30_000,
     queryFn: ({ signal }) =>
       api.activity.list({ params: { organizationId }, query }, { signal }),
+  });
+}
+
+/**
+ * Reads the Activity list with each event's earlier steps, newest first; each further page
+ * continues from the previous page's cursor, so older events append below the ones being read.
+ * A refetch reads every loaded page again from the newest.
+ */
+export function activityFeedOptions(
+  organizationId: string,
+  filters: ActivityFilters,
+  timeZone = 'UTC',
+) {
+  const query = activityQuery(filters, 'steps', timeZone);
+
+  return infiniteQueryOptions({
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'activity',
+      'feed',
+      query,
+    ],
+    ...privateQueryDefaults,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: 'always',
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page: ActivityPage) => page.nextCursor ?? undefined,
+    queryFn: ({ signal, pageParam }): Promise<ActivityPage> =>
+      api.activity.list(
+        {
+          params: { organizationId },
+          query: { ...query, ...(pageParam ? { cursor: pageParam } : {}) },
+        },
+        { signal },
+      ),
+  });
+}
+
+/**
+ * Reads the group holding one event with its steps, under the list's filters, for an event a
+ * link opened that the loaded list doesn't hold. An empty page means the filters exclude it.
+ */
+export function activityEventOptions(
+  organizationId: string,
+  filters: ActivityFilters,
+  event: string,
+  timeZone = 'UTC',
+) {
+  const query = { ...activityQuery(filters, 'steps', timeZone), event };
+
+  return queryOptions({
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'activity',
+      'event',
+      query,
+    ],
+    ...privateQueryDefaults,
+    queryFn: ({ signal }) =>
+      api.activity.list({ params: { organizationId }, query }, { signal }),
+  });
+}
+
+/**
+ * Counts the groups each quick view would list under the filters, without the outcome filter.
+ * `latest` is the newest event the page knows of, so the counts follow new events.
+ */
+export function activityCountsOptions(
+  organizationId: string,
+  filters: ActivityFilters,
+  latest: string | undefined,
+  timeZone = 'UTC',
+) {
+  const query = activityFilterQuery(
+    { ...filters, outcome: undefined },
+    timeZone,
+  );
+
+  return queryOptions({
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'activity',
+      'counts',
+      query,
+      latest ?? null,
+    ],
+    ...privateQueryDefaults,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    queryFn: ({ signal }) =>
+      api.activity.counts({ params: { organizationId }, query }, { signal }),
+  });
+}
+
+/**
+ * Exports every recorded event that matches the filters as CSV, with headings and names for
+ * recorded codes in the reader's language. The API checks export permission, caps the rows and
+ * records the export in the audit log.
+ */
+export function exportActivity(
+  organizationId: string,
+  filters: ActivityFilters,
+  labels: Omit<ActivityExportRequest, 'query'>,
+  timeZone = 'UTC',
+) {
+  return api.activity.export({
+    params: { organizationId },
+    body: { query: activityFilterQuery(filters, timeZone), ...labels },
   });
 }

@@ -5,8 +5,15 @@ import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ActivityStore } from '../../application/activity.js';
-import type { ActivityEvent, ActivityQuery } from '../../domain/activity.js';
-import { activityOutcomeRules } from '../../domain/activity-outcome.js';
+import type {
+  ActivityCounts,
+  ActivityEvent,
+  ActivityQuery,
+} from '../../domain/activity.js';
+import {
+  activityAttentionOutcomes,
+  activityOutcomeRules,
+} from '../../domain/activity-outcome.js';
 import { actorSql, personSql, uuidPattern } from './actors.js';
 
 const coverage =
@@ -75,7 +82,7 @@ const accessEventsSql = `SELECT * FROM (SELECT x.created_at AS sort_at,x.sort_id
           AND user_id=CASE WHEN e.after_value->>'userId' ~ ${uuidPattern} THEN (e.after_value->>'userId')::uuid END) subject ON true
         WHERE $4::boolean AND e.tenant_id=$1 AND e.created_at>=$2::timestamptz AND e.created_at<$3::timestamptz
         AND $7::text IS NULL AND $8::uuid IS NULL AND $13::text[] IS NULL
-        AND ($9::text IS NULL OR $9::text='access') AND ($10::text IS NULL OR $10::text='recorded')
+        AND ($9::text IS NULL OR $9::text='access') AND ($10::text[] IS NULL OR 'recorded'=ANY($10::text[]))
         AND ($5::timestamptz IS NULL OR (e.created_at<=$5::timestamptz AND (e.created_at,'access:'||e.id::text)<($5::timestamptz,$6::text)))
       ) x
       WHERE ($11::text='' OR position(lower($11) in lower(concat_ws(' ',x.event_type,x.target_id,x.actor_id::text,x.actor_name,x.actor_email,x.summary)))>0)
@@ -92,9 +99,9 @@ const uuids = (values: string[]) =>
 // Subject reads scan only source rows whose exception or proposal can pass the final subject
 // filter. Plain columns keep both arms index-backed under row-level security; the second arm
 // skips rows the first arm already returned.
-const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($20::uuid[])
+const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($21::uuid[])
   UNION ALL SELECT * FROM workspace_activity_sources
-  WHERE proposal_id=ANY($21::uuid[]) AND (exception_id=ANY($20::uuid[])) IS NOT TRUE)`;
+  WHERE proposal_id=ANY($22::uuid[]) AND (exception_id=ANY($21::uuid[])) IS NOT TRUE)`;
 
 /**
  * Lists every exception and proposal ID through which a source row can reach the subject
@@ -145,74 +152,69 @@ async function readLinkedKeys(
   return result.rows[0]!;
 }
 
-/** Reads canonical durable events without per-issue queries or raw payload exposure. */
-export function createActivityStore(db: TenantDatabase): ActivityStore {
-  return {
-    list: (context, query) =>
-      db.transaction(context.tenantId, async (tx) => {
-        // Cursors bind to the visibility they were minted with, so a page link stops working
-        // once restricted access is removed.
-        const restricted = hasPermission(context, 'activity.read_restricted');
-        const key = createHash('sha256')
-          .update(
-            JSON.stringify([
-              'activity-v7',
-              query.view ?? 'events',
-              query.detail ?? 'summary',
-              context.tenantId,
-              restricted,
-              query.from,
-              query.to,
-              query.q ?? '',
-              query.system ?? '',
-              query.connectionId ?? '',
-              query.type ?? '',
-              query.outcome ?? '',
-              query.actor ?? null,
-              query.limit,
-              query.subjects ?? null,
-            ]),
-          )
-          .digest('hex');
-        let after: { at: string; id: string } | null = null;
-        if (query.cursor) {
-          try {
-            const bytes = Buffer.from(query.cursor, 'base64url');
-            if (bytes.toString('base64url') !== query.cursor)
-              throw new Error('Encoding');
-            const value = z
-              .object({
-                context: z.string(),
-                at: z.string().datetime(),
-                id: z.string().min(1).max(200),
-              })
-              .strict()
-              .parse(JSON.parse(bytes.toString()));
-            if (value.context !== key) throw new Error('Context');
-            after = value;
-          } catch {
-            throw Object.assign(
-              new Error(
-                'This page link no longer matches the activity filters. Start from the first page.',
-              ),
-              { statusCode: 400, expose: true },
-            );
-          }
-        }
-        const linked = query.subjects
-          ? await readLinkedKeys(tx, context.tenantId, query, query.subjects)
-          : null;
-        const actors = query.actor
-          ? {
-              people: query.actor.filter(
-                (value) => value !== 'luma' && value !== 'workflow',
-              ),
-              luma: query.actor.includes('luma'),
-              workflows: query.actor.includes('workflow'),
-            }
-          : null;
-        const result = await tx.query<{ item: ActivityEvent; at: string }>(
-          `
+/** What one read of the activity events returns. */
+type ActivityRead =
+  | { kind: 'page'; after: { at: string; id: string } | null }
+  | { kind: 'event'; id: string }
+  | { kind: 'counts' };
+
+/** The steps of the selected group, oldest first, when the reader asked for them. */
+const itemSql = (query: ActivityQuery) =>
+  `CASE WHEN $19::boolean AND ${query.detail === 'steps' ? 'true' : 'false'} THEN item || jsonb_build_object('steps',
+        COALESCE((SELECT jsonb_agg(step.item ORDER BY step.sort_at,step.sort_id) FROM
+          (SELECT e.item,e.sort_at,e.sort_id FROM events e WHERE e.group_key=ranked.group_key AND e.sort_id<>ranked.sort_id ORDER BY e.sort_at DESC,e.sort_id DESC LIMIT 100) step),'[]'::jsonb)) ELSE item END`;
+
+// Each read ends differently: a page after the cursor, the group holding one event, or the
+// number of groups per outcome. Groups only list when one of their events is meaningful. A
+// lookup or count passes its value as the last parameter.
+const finalSql = (query: ActivityQuery, read: ActivityRead, last: number) =>
+  read.kind === 'page'
+    ? `SELECT at, ${itemSql(query)} AS item
+      FROM ranked WHERE position=1 AND meaningful AND ($5::timestamptz IS NULL OR (sort_at,sort_id)<($5::timestamptz,$6::text))
+      ORDER BY sort_at DESC,sort_id DESC LIMIT $12`
+    : read.kind === 'event'
+      ? `SELECT at, ${itemSql(query)} AS item
+      FROM ranked WHERE position=1 AND meaningful AND group_key IN (SELECT group_key FROM events WHERE sort_id=$${last}::text) LIMIT 1`
+      : `SELECT
+        (SELECT count(DISTINCT group_key) FROM events WHERE meaningful)::int AS total,
+        (SELECT count(DISTINCT group_key) FROM events WHERE meaningful AND item->>'outcome'=ANY($${last}::text[]))::int AS attention,
+        COALESCE((SELECT jsonb_object_agg(outcome,groups) FROM (SELECT item->>'outcome' AS outcome,count(DISTINCT group_key)::int AS groups
+          FROM events WHERE meaningful GROUP BY 1) c),'{}'::jsonb) AS outcomes`;
+
+/** Most rows one read may consider: an export, or the access events a count or lookup scans. */
+const readCap = 100_000;
+
+/**
+ * Reads activity events under the reader's visibility and filters. Pages read one more event than
+ * asked, so the caller knows whether another page follows; lookups and counts consider every
+ * event in the date range.
+ */
+async function readActivity<Row extends Record<string, unknown>>(
+  tx: SqlTransaction,
+  context: Parameters<ActivityStore['list']>[0],
+  query: ActivityQuery,
+  read: ActivityRead,
+) {
+  const restricted = hasPermission(context, 'activity.read_restricted');
+  const outcomes = query.outcome?.length
+    ? [...new Set(query.outcome)].sort()
+    : null;
+  const linked = query.subjects
+    ? await readLinkedKeys(tx, context.tenantId, query, query.subjects)
+    : null;
+  const actors = query.actor
+    ? {
+        people: query.actor.filter(
+          (value) => value !== 'luma' && value !== 'workflow',
+        ),
+        luma: query.actor.includes('luma'),
+        workflows: query.actor.includes('workflow'),
+      }
+    : null;
+  const after = read.kind === 'page' ? read.after : null;
+
+  return tx.query<Row>(
+    `
       WITH enriched AS (
         SELECT s.*,COALESCE(eo.document->'automation',eo.document->'resolution'->'automation') AS actor_automation,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
@@ -225,7 +227,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         w.id::text AS workflow_run_id,
         CASE WHEN r.id IS NOT NULL OR w.id IS NOT NULL THEN COALESCE(r.definition_id,w.definition_id) END AS workflow_id,
         COALESCE(v.document->'definition'->>'name',wv.document->'definition'->>'name') AS workflow_name,
-        s.doc->'details' AS details
+        s.doc->'details' AS details,
+        e.document->>'exceptionClass' AS issue_class
         FROM ${linked ? linkedSources : 'workspace_activity_sources'} s
         LEFT JOIN exception_outbox eo ON eo.tenant_id=s.tenant_id AND eo.id::text=s.id AND s.doc->>'eventType' LIKE 'exception.%'
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
@@ -281,12 +284,13 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       )},
       'action',left(action,160),'type',type,'outcome',outcome,'exceptionId',issue_id,'proposalId',proposal_id,
       'attemptId',doc->>'attemptId','connectionId',COALESCE(conn_id,(connections->0->>'id')::uuid),'connections',COALESCE((SELECT jsonb_agg(value) FROM (SELECT value FROM jsonb_array_elements(connections) LIMIT 100) bounded),'[]'::jsonb),'system',left(system,100),'resource',left(resource,300),
-      'workflowRunId',workflow_run_id,'resourceKind',resource_kind,'playbookId',left(playbook_id,200),'mode',CASE WHEN mode IN ('simulation','shadow','pilot') THEN mode ELSE 'unrecorded' END,
+      'workflowRunId',workflow_run_id,'resourceKind',resource_kind,'issueClass',left(issue_class,100),'playbookId',left(playbook_id,200),'mode',CASE WHEN mode IN ('simulation','shadow','pilot') THEN mode ELSE 'unrecorded' END,
       'executionState',left(details->>'state',100),'verificationPhase',left(details->>'phase',40),'failureCode',left(details->>'failureCode',100),'summary',left(summary,300),'dispatch',left(details->>'dispatch',100),'verification',left(details->>'verification',100),
       'evidenceRefs',COALESCE((SELECT jsonb_agg(left(ref,500)) FROM (SELECT value #>> '{}' AS ref FROM jsonb_array_elements(CASE WHEN jsonb_typeof(doc->'evidenceRefs')='array' THEN doc->'evidenceRefs' ELSE '[]'::jsonb END) WHERE jsonb_typeof(value)='string' LIMIT 100) refs),'[]'::jsonb)) AS item
       FROM classified WHERE ($7::text IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'system'=$7)) AND ($8::uuid IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'id'=$8::text))
-      AND ($9::text IS NULL OR type=$9) AND ($10::text IS NULL OR outcome=$10)
-      AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',actor_name,actor_email,workflow_name,workflow_run_id)))>0)
+      AND ($9::text IS NULL OR type=$9) AND ($10::text[] IS NULL OR outcome=ANY($10::text[]))
+      AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',actor_name,actor_email,workflow_name,workflow_run_id,replace(issue_class,'_',' '))))>0
+        OR issue_class=ANY($20::text[]))
       AND ($13::text[] IS NULL OR issue_id::text=ANY($13) OR workflow_run_id=ANY($14) OR proposal_id::text=ANY($14)
         OR (resource_kind='order' AND resource=ANY($15)))
       ) o WHERE ${actorMatchSql('o.item')}
@@ -297,33 +301,117 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       ), ranked AS (
         SELECT *, row_number() OVER (PARTITION BY group_key ORDER BY meaningful DESC,sort_at DESC,sort_id DESC) AS position FROM events
       )
-      SELECT at, CASE WHEN $19::boolean AND ${query.detail === 'steps' ? 'true' : 'false'} THEN item || jsonb_build_object('steps',
-        COALESCE((SELECT jsonb_agg(step.item ORDER BY step.sort_at,step.sort_id) FROM
-          (SELECT e.item,e.sort_at,e.sort_id FROM events e WHERE e.group_key=ranked.group_key AND e.sort_id<>ranked.sort_id ORDER BY e.sort_at DESC,e.sort_id DESC LIMIT 100) step),'[]'::jsonb)) ELSE item END AS item
-      FROM ranked WHERE position=1 AND meaningful AND ($5::timestamptz IS NULL OR (sort_at,sort_id)<($5::timestamptz,$6::text))
-      ORDER BY sort_at DESC,sort_id DESC LIMIT $12`,
-          [
-            context.tenantId,
-            query.from,
-            query.to,
-            restricted,
-            after?.at ?? null,
-            after?.id ?? null,
-            query.system ?? null,
-            query.connectionId ?? null,
-            query.type ?? null,
-            query.outcome ?? null,
-            query.q ?? '',
-            query.limit + 1,
-            query.subjects?.issueIds ?? null,
-            query.subjects?.runIds ?? [],
-            query.subjects?.orderRefs ?? [],
-            actors ? actors.people : null,
-            actors?.luma ?? false,
-            actors?.workflows ?? false,
-            query.view === 'business',
-            ...(linked ? [linked.issueIds, linked.proposalIds] : []),
-          ],
+      ${finalSql(query, read, linked ? 23 : 21)}`,
+    [
+      context.tenantId,
+      query.from,
+      query.to,
+      restricted,
+      after?.at ?? null,
+      after?.id ?? null,
+      query.system ?? null,
+      query.connectionId ?? null,
+      query.type ?? null,
+      outcomes,
+      query.q ?? '',
+      read.kind === 'page' ? query.limit + 1 : readCap,
+      query.subjects?.issueIds ?? null,
+      query.subjects?.runIds ?? [],
+      query.subjects?.orderRefs ?? [],
+      actors ? actors.people : null,
+      actors?.luma ?? false,
+      actors?.workflows ?? false,
+      read.kind === 'counts' || query.view === 'business',
+      query.searchIssueClasses?.length ? [...query.searchIssueClasses] : [],
+      ...(linked ? [linked.issueIds, linked.proposalIds] : []),
+      ...(read.kind === 'event'
+        ? [read.id]
+        : read.kind === 'counts'
+          ? [[...activityAttentionOutcomes]]
+          : []),
+    ],
+  );
+}
+
+/** Reads canonical durable events without per-issue queries or raw payload exposure. */
+export function createActivityStore(db: TenantDatabase): ActivityStore {
+  return {
+    list: (context, query) =>
+      db.transaction(context.tenantId, async (tx) => {
+        // Cursors bind to the visibility they were minted with, so a page link stops working
+        // once restricted access is removed.
+        const restricted = hasPermission(context, 'activity.read_restricted');
+        // Sorted and deduplicated, so the same outcomes in another order share cursors.
+        const outcomes = query.outcome?.length
+          ? [...new Set(query.outcome)].sort()
+          : null;
+        const key = createHash('sha256')
+          .update(
+            JSON.stringify([
+              'activity-v9',
+              query.view ?? 'events',
+              query.detail ?? 'summary',
+              context.tenantId,
+              restricted,
+              query.from,
+              query.to,
+              query.q ?? '',
+              query.searchIssueClasses ?? null,
+              query.system ?? '',
+              query.connectionId ?? '',
+              query.type ?? '',
+              outcomes,
+              query.actor ?? null,
+              query.limit,
+              query.subjects ?? null,
+            ]),
+          )
+          .digest('hex');
+        let after: { at: string; id: string } | null = null;
+        if (query.cursor) {
+          try {
+            const bytes = Buffer.from(query.cursor, 'base64url');
+            if (bytes.toString('base64url') !== query.cursor)
+              throw new Error('Encoding');
+            const value = z
+              .object({
+                context: z.string(),
+                at: z.string().datetime(),
+                id: z.string().min(1).max(200),
+              })
+              .strict()
+              .parse(JSON.parse(bytes.toString()));
+            if (value.context !== key) throw new Error('Context');
+            after = value;
+          } catch {
+            throw Object.assign(
+              new Error(
+                'This page link no longer matches the activity filters. Start from the first page.',
+              ),
+              { statusCode: 400, expose: true },
+            );
+          }
+        }
+        if (query.event) {
+          const found = await readActivity<{ item: ActivityEvent; at: string }>(
+            tx,
+            context,
+            query,
+            { kind: 'event', id: query.event },
+          );
+
+          return {
+            visibility: restricted ? 'admin' : 'member',
+            items: found.rows.map((row) => row.item),
+            coverage,
+            nextCursor: null,
+          };
+        }
+        const result = await readActivity<{ item: ActivityEvent; at: string }>(
+          tx,
+          context,
+          query,
+          { kind: 'page', after },
         );
         const rows = result.rows.slice(0, query.limit);
         const last = rows.at(-1);
@@ -342,6 +430,22 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
                   }),
                 ).toString('base64url')
               : null,
+        };
+      }),
+    counts: (context, query) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const result = await readActivity<ActivityCounts>(
+          tx,
+          context,
+          { ...query, outcome: undefined, event: undefined },
+          { kind: 'counts' },
+        );
+        const row = result.rows[0];
+
+        return {
+          total: row?.total ?? 0,
+          attention: row?.attention ?? 0,
+          outcomes: row?.outcomes ?? {},
         };
       }),
   };

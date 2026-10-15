@@ -1,224 +1,280 @@
-/* Activity: recorded actions, decisions and results with bounded provenance. */
+/* Activity: recorded actions, decisions and results by day, with the open event beside them. */
 .activity-page {
   display: grid;
   gap: 14px;
-  max-width: 1240px;
+  max-width: 1440px;
   margin: 0 auto;
   min-width: 0;
-  container-type: inline-size;
+}
+
+/* While an event is open, both panes scroll within the viewport. */
+.activity-split[data-open] {
+  height: max(480px, calc(100dvh - 190px));
+}
+
+.activity-feed {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+}
+
+/* New events wait above the list until the reader asks for them. */
+.activity-new {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
+}
+
+.activity-new > button {
+  box-shadow: var(--shadow-panel);
+}
+
+.activity-day {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.activity-day-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 6px 2px;
+  background: var(--surface);
   font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
-.activity-notice {
-  margin: 0;
+.activity-day-heading small {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 400;
 }
 
-.activity-coverage {
-  margin: 0;
-  max-width: 90ch;
+.activity-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-more {
+  display: flex;
+  justify-content: center;
+  padding-block: 4px 12px;
   color: var(--foreground-subtle);
   font-size: 12px;
 }
 
-/* Timeline */
-.activity-list {
+.activity-more p {
   margin: 0;
-  padding: 4px;
-  list-style: none;
-  border-radius: var(--radius-panel);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-panel);
 }
 
-.activity-event {
-  position: relative;
-  border-radius: var(--radius-control);
-}
-
-.activity-event + .activity-event {
-  margin-top: 1px;
-}
-
-.activity-event-toggle {
-  display: grid;
-  grid-template-columns: 150px 16px minmax(0, 1fr) auto 16px;
-  align-items: start;
-  gap: 12px;
+.activity-more > [data-slot='alert'] {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--radius-control);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--duration-fast);
 }
 
-.activity-event-toggle:hover {
-  background: var(--surface-hover);
+/* The open event */
+.activity-detail {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
 }
 
-.activity-event-toggle[aria-expanded='true'] {
-  background: var(--surface-selected);
+.activity-detail > a {
+  justify-self: start;
 }
 
-.activity-event-toggle:focus-visible {
-  outline-offset: -2px;
-}
-
-.activity-event-toggle > time {
-  padding-top: 1px;
+.activity-detail-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   color: var(--foreground-subtle);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.activity-event-toggle > .lu-state-dot {
-  margin-top: 1px;
+.activity-detail-subject {
+  margin: -8px 0 0;
+  color: var(--foreground-muted);
+  font-size: 13px;
 }
 
-.activity-event-copy {
+.activity-detail-section {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.activity-detail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.activity-detail-section-head > h3 {
+  margin: 0;
+}
+
+.activity-detail-missing {
+  display: grid;
+  gap: 4px;
+  color: var(--foreground-muted);
+  font-size: 13px;
+}
+
+.activity-detail-missing h3,
+.activity-detail-missing p {
+  margin: 0;
+}
+
+.activity-detail-missing h3 {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+/* Steps read top to bottom, joined by a line through their state dots. */
+.activity-steps {
+  /* Keeps the dots above their line without lifting them over the sticky preview header. */
+  isolation: isolate;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-steps > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.activity-steps > li > .lu-state-dot {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+}
+
+.activity-steps > li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: -2px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--line);
+}
+
+.activity-step {
   display: grid;
   gap: 1px;
   min-width: 0;
 }
 
-.activity-event-copy strong {
-  font-size: 13.5px;
-  font-weight: 500;
+.activity-step-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: 13px;
   line-height: 19px;
 }
 
-.activity-event-copy small {
+.activity-step-title strong {
+  font-weight: 500;
+}
+
+.activity-step-title span,
+.activity-step-meta {
   color: var(--foreground-subtle);
   font-size: 12px;
+}
+
+.activity-step-meta {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
-.activity-outcome {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
+.activity-steps > li[data-routine] .activity-step-title strong {
+  color: var(--foreground-muted);
+  font-weight: 400;
 }
 
-.activity-outcome small {
-  color: var(--foreground-subtle);
+.activity-steps > li[data-current] .activity-step-title strong {
+  font-weight: 600;
+}
+
+.activity-step-details {
+  margin-top: 2px;
+}
+
+.activity-step-details > summary {
+  padding-block: 2px;
   font-size: 12px;
 }
 
-.activity-event-chevron {
-  margin-top: 3px;
-  color: var(--foreground-faint);
-  transition: transform var(--duration-fast);
+.activity-step-details[open] {
+  display: grid;
+  gap: 8px;
 }
 
-.activity-event-toggle[aria-expanded='true'] .activity-event-chevron {
-  transform: rotate(180deg);
-}
-
-/* Events from one attempt or purchase order read as a group. */
-.activity-grouped::before {
-  content: '';
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 0;
-  width: 2px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--signal) 35%, transparent);
-}
-
-.activity-grouped:not(.activity-related) {
-  margin-top: 6px;
+.activity-facts {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
 .activity-evidence {
-  margin: 4px 12px 10px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--surface-sunken);
-}
-
-.activity-evidence dl {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: 6px 16px;
+  gap: 4px;
   margin: 0;
-  font-size: 12.5px;
+  padding: 0;
+  list-style: none;
 }
 
-.activity-evidence dt {
-  color: var(--foreground-subtle);
-}
-
-.activity-evidence dd {
-  margin: 0;
+.activity-evidence code,
+.activity-ids-list code {
+  font-size: 12px;
   overflow-wrap: anywhere;
+  user-select: all;
 }
 
-.activity-evidence ul {
+.activity-ids-list {
+  display: grid;
+  gap: 6px;
   margin: 0;
-  padding-left: 16px;
 }
 
-.activity-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 16px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-
-.activity-links a {
-  color: var(--signal-text);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.activity-links a:hover {
-  text-decoration: underline;
-}
-
-.activity-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+.activity-ids-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
   gap: 12px;
+}
+
+.activity-ids-list dt {
   color: var(--foreground-subtle);
   font-size: 12px;
 }
 
-@container (max-width: 900px) {
-  .activity-event-toggle {
-    grid-template-columns: 16px minmax(0, 1fr) auto;
-  }
+.activity-ids-list dd {
+  margin: 0;
+  min-width: 0;
+}
 
-  .activity-event-toggle > time {
-    grid-column: 2 / -1;
-    grid-row: 2;
-  }
-
-  .activity-event-chevron {
-    display: none;
-  }
-
-  .activity-evidence dl {
+@container (max-width: 520px) {
+  .activity-ids-list > div {
     grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
-}
-
-.activity-event-copy strong {
-  overflow-wrap: anywhere;
-}
-.activity-record-link {
-  display: inline-block;
-  margin: 0 12px 10px;
-}
-.activity-steps {
-  display: grid;
-  gap: 8px;
-  margin-block: 0 16px;
-  padding-inline-start: 20px;
 }

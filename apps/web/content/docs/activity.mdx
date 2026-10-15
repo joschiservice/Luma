@@ -9,16 +9,28 @@ Activity is read-only. To approve, retry or check something, open the issue, pur
 
 ## Read an entry
 
-Entries are listed newest first, by when Luma recorded them. Each one shows:
+Entries are grouped by day, newest first, by when Luma recorded them. Times use the workspace time zone, which is named beside each day. Each entry shows:
 
-- When it was recorded, and what happened, such as **Change approved**, **Change sent** or **Issue resolved**.
+- What happened, such as **Change approved**, **Change sent** or **Issue resolved**.
+- What it concerns: the kind of issue, such as **Fulfillment delay**, the record, or the role or setting that changed.
 - Who acted and in which system. An actor is a person, Luma itself, Luma support or a service. Luma support appears when Luma’s support team changed someone’s access to the workspace. People are shown by name, and their details show their email. Someone who has left the workspace is shown with the name they had then, marked as a former member. When a Workflow acted, the entry names the Workflow and the person it runs for.
-- What it concerns: a record, an issue or a connection, or **Workspace** for workspace-wide changes.
 - Its outcome, such as **Approved**, **Accepted by Shopify**, **Verified**, **Outcome unclear** or **Closed manually**. Entries from a simulation, pilot or [workflow test](/docs/shadow-mode) are labeled so you don’t mistake them for live work.
 
-Select an entry to see its details: the reason, the proposed change, when it occurred and was recorded, the request status, the check result and the evidence Luma kept. Links take you to the issue and its evidence, the Workflow, the purchase order or Apps. Entries that belong to the same change attempt or purchase order are grouped, so you can follow one change from approval to check.
+The steps of one issue, Workflow run or change are kept together in one entry, which shows how many steps it has, so you can follow a change from approval to check.
 
-An entry can occur earlier than it was recorded, for example when a system confirms a change late. It then appears at the top when it’s recorded, with both times in its details.
+Select an entry to open its details beside the list. On a phone, they fill the screen. The details show:
+
+- The outcome and what it does and doesn’t prove.
+- A button to the issue and its evidence, the Workflow, the purchase order or Apps, where you can act.
+- What Luma recorded, such as the proposed change, the connections, the request status and the check result. Facts Luma didn’t record are left out.
+- **What happened**: the steps that led to the entry, oldest first. Routine steps, such as approval rules that passed and checks that only started, stay hidden until you choose **Show routine steps**. Each step’s **Details** show its own facts, evidence and ID.
+- The evidence Luma kept, and under **Record IDs** the identifiers to quote when you ask about the entry.
+
+To share an entry, choose **Copy link to this event** in its details. The link opens the same entry in the same view, even when it’s older than the entries the list shows first. If the link’s filters or date range leave the entry out, the details say so.
+
+An entry can occur earlier than it was recorded, for example when a system confirms a change late. It then appears at the top when it’s recorded, and its details show when it occurred.
+
+Press **J** and **K** to move through the entries, **Space** to open or close the details, **Esc** to close them, **/** to search and **?** to see every shortcut.
 
 ## Tell approved, done and verified apart
 
@@ -32,16 +44,19 @@ Each step is its own entry, and none implies the next:
 
 ## Filter and search
 
+**All**, **Needs a look** and **Verified** above the list are quick ways to set the outcome filter. **Needs a look** shows failed steps, unclear results and escalations. **Verified** shows results a separate, fresh read confirmed. Each shows how many entries it holds under the other filters, so you see at a glance whether anything needs a look.
+
 Use the filters above the list:
 
 - **Recorded**: the date range, **Last 30 days** by default. A range can cover up to 366 days. Dates use the workspace time zone.
 - **Event type**: Issue, Decision, Change, Check, Resolution, Connection, Procurement, or Team and settings.
-- **Outcome**, **System** and **Connection**.
+- **Outcome**: choose several to see entries with any of them.
+- **System** and **Connection**.
 - **Recorded by**: **Me**, **Luma**, **Workflows** or people in your workspace. Choose several to see what any of them did. **Luma** includes Luma support. A person also matches the Workflows that act for them. In a shared view, **Me** means whoever opens it.
 
 **Today**, **Last 7 days** and **Last 30 days** stay relative: a view saved with **Last 7 days** shows the last 7 days whenever you open it. A custom range stays fixed.
 
-Search matches issue IDs, record references, action codes, people’s names and emails, Workflow names and Workflow run IDs. Filters and search are part of the address, so you can share a link to the same view.
+Search matches issue IDs, kinds of issue such as **Fulfillment delay**, record references, action codes, people’s names and emails, Workflow names and Workflow run IDs. Filters and search are part of the address, so you can share a link to the same view.
 
 ## Save and share views
 
@@ -49,7 +64,13 @@ Use the view menu above the list to keep a combination of filters: choose **Save
 
 A shared view never shows more than the person opening it may see. Without **View restricted activity**, a view filtered to access changes stays empty for them.
 
-Use **Older events** and **Latest events** to page through the results. When new entries arrive while you read, **New events available. Show latest** brings you back to the top.
+## Export activity
+
+Choose **Export as CSV** to download every recorded step that matches the filters and search, one row each and newest first, with its time, action, outcome, who recorded it, the record, the system and its IDs. Headings and names are in your language. An export holds up to 5,000 rows; when more match, the file and the page say so, and you can narrow the filters or the date range to export the rest. You need **Export lists**, and every export is recorded in the audit log without its contents. Exports appear in Activity as **List exported**.
+
+## Older and new entries
+
+The list shows the latest 30 entries first. **Show older events** adds older ones below. When new entries arrive while you read, the list stays where it is and a button such as **Show 2 new events** appears at the top; choose it to add them.
 
 ## Restricted activity
 
@@ -58,6 +79,7 @@ People with **View restricted activity** also see changes to access and connecti
 ## When the list is empty or can’t load
 
 - **No activity in the last 30 days**: nothing was recorded in that period. Choose an earlier date range to see older activity.
+- **Nothing needs a look**: no step failed, ended unclear or was escalated in the date range.
 - **No activity matches these filters**: try another date range or clear the filters. Changes Luma didn’t record, such as edits made directly in Shopify, never appear here.
-- **Activity couldn’t be updated. The events shown may be out of date.**: choose **Refresh activity**. If Luma can’t read part of the log, the page reports an error instead of showing a list with entries missing.
+- **Activity couldn’t be updated. The events shown may be out of date.**: choose **Retry** or **Refresh activity**. If Luma can’t read part of the log, the page reports an error instead of showing a list with entries missing.
 - **Your access to this workspace changed**: your role or membership changed. Ask a workspace owner for access.

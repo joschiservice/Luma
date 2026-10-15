@@ -1696,7 +1696,11 @@ export function createApplicationServices(
       cases: detection.cases,
       desk,
       playbooks: library,
-      activity: createWorkspaceActivity(database, identity.refreshContext),
+      activity: createWorkspaceActivity(
+        database,
+        identity.refreshContext,
+        createAuditLog(database),
+      ),
       measurements: createResolutionMeasurements(
         database,
         identity.refreshContext,
