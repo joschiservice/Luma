@@ -84,6 +84,11 @@ export type ShipmentStatus =
  */
 export type ShopifyCommand =
   | {
+      kind: 'inventory-policy';
+      variant: string;
+      policy: 'DENY' | 'CONTINUE';
+    }
+  | {
       kind: 'bundle-recipe';
       variant: string;
       requiresComponents: boolean;

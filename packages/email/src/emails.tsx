@@ -45,6 +45,14 @@ export type Email =
       link: string;
       preferencesLink: string;
     }
+  | {
+      kind: 'stock_protection';
+      stage: 'placed' | 'partial_failure' | 'escalated' | 'released';
+      store: string;
+      workspace: string;
+      link: string;
+      preferencesLink: string;
+    }
   | { kind: 'test'; workspace: string; preferencesLink: string }
   | {
       kind: 'issue' | 'connection';
@@ -250,6 +258,35 @@ export function emailContent(
           </EmailLayout>
         ),
       };
+    case 'stock_protection': {
+      const body = {
+        placed: m.email_protection_placed,
+        partial_failure: m.email_protection_partial,
+        escalated: m.email_protection_escalated,
+        released: m.email_protection_released,
+      }[email.stage];
+
+      return {
+        subject: m.email_protection_subject({ store: email.store }, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_protection_preview({}, o)}
+            heading={m.email_protection_heading({}, o)}
+            reason={{
+              kind: 'workspace',
+              workspace: email.workspace,
+              preferencesLink: email.preferencesLink,
+            }}
+          >
+            <Paragraph>{body({ store: email.store }, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_protection_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
     case 'issue':
     case 'connection': {
       const text =

@@ -16,7 +16,9 @@ Sections a role cannot change say which permission they need. Team and role muta
 ## Detection limits
 
 Workspace settings control stock tolerance, the ordinary stock confirmation window, the
-shorter oversell window and the fulfillment progress limit. Oversell risk defaults to two
+shorter oversell window, the fulfillment progress limit and the stalled stock sync limits
+(how long a change may stay missing from a store, how many products and what share of recent
+changes must be behind). A save without the stall limits keeps their stored values. Oversell risk defaults to two
 minutes; other stock gaps default to thirty minutes. Zero confirms stock gaps immediately.
 Stock mismatches require current, complete, comparable evidence. Each evaluation records its
 configuration, and issue details show the limits used. A setting change requires fresh

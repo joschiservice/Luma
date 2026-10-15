@@ -243,7 +243,12 @@ export function createCin7Connector(
             kind,
             observedAt,
             sourceUpdatedAt,
-            sourceRevision: null,
+            sourceRevision:
+              capability === 'inventory.read'
+                ? createHash('sha256')
+                    .update(JSON.stringify({ external, data, kind }))
+                    .digest('hex')
+                : null,
             adapterVersion,
             schemaVersion: 1,
             data,

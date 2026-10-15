@@ -1,6 +1,13 @@
 import type { CaseSummary } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
-import { GitBranch, Package, Receipt, Truck, Unplug } from 'lucide-react';
+import {
+  GitBranch,
+  Package,
+  Receipt,
+  RefreshCwOff,
+  Truck,
+  Unplug,
+} from 'lucide-react';
 
 import { issueKind, sourceLabel } from './case-presentation';
 
@@ -10,6 +17,7 @@ const icons: Record<string, typeof Package> = {
   stuck_fulfillment: Truck,
   workflow_failure: GitBranch,
   order_quantity_mismatch: Receipt,
+  stock_sync_stall: RefreshCwOff,
 };
 
 /** Displays the affected item, issue type, and source systems. */

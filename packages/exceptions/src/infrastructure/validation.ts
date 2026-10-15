@@ -109,6 +109,8 @@ export const factSchemas = {
       sellingSource: z.enum(['left', 'right']),
       tolerance: decimal.refine((value) => !value.startsWith('-')),
       mismatchSince: timestamp.nullable().optional(),
+      syncStalled: z.boolean().optional(),
+      protectedAvailable: decimal.optional(),
     })
     .strict(),
   order_quantity_mismatch: z
@@ -147,6 +149,29 @@ export const factSchemas = {
           facts.quantities.length,
       'Every source reports one quantity entry',
     ),
+  stock_sync_stall: z
+    .object({
+      ...common,
+      connectionIds: z.tuple([z.string().min(1), z.string().min(1)]),
+      lagging: z.number().int().nonnegative(),
+      followed: z.number().int().nonnegative(),
+      sampled: z.number().int().nonnegative(),
+      confirmed: z.number().int().nonnegative(),
+      overselling: z.number().int().nonnegative(),
+      laggingSince: timestamp.nullable(),
+      oldestReadAt: timestamp.nullable(),
+      latestReadAt: timestamp.nullable(),
+      readsCurrent: z.boolean(),
+    })
+    .strict()
+    .refine(
+      (facts) =>
+        facts.connectionIds[0] !== facts.connectionIds[1] &&
+        facts.confirmed <= facts.sampled &&
+        facts.overselling <= facts.confirmed &&
+        facts.sampled <= facts.lagging,
+      'Stall counts must be consistent',
+    ),
   workflow_failure: z
     .object({
       ...common,
@@ -180,6 +205,9 @@ const thresholdsSchema = z
     propagationSeconds: z.number().int().nonnegative(),
     oversellPropagationSeconds: z.number().int().nonnegative().optional(),
     oversellGuardPercent: z.number().int().min(0).max(100),
+    stallSeconds: z.number().int().positive().optional(),
+    stallMinPositions: z.number().int().positive().optional(),
+    stallSharePercent: z.number().int().min(0).max(100).optional(),
   })
   .strict();
 
@@ -270,6 +298,7 @@ const resolutionSchema = z.discriminatedUnion('kind', [
                 'stuck_fulfillment',
                 'inventory_mismatch',
                 'order_quantity_mismatch',
+                'stock_sync_stall',
                 'workflow_failure',
               ]),
               subject: z
@@ -305,7 +334,9 @@ export const detectionBoundary = {
     } else if (input.exceptionClass === 'order_quantity_mismatch') {
       z.string().uuid().parse(input.facts.lineKey);
       z.array(z.string().uuid()).parse(input.facts.connectionIds);
-    } else if (input.exceptionClass === 'stuck_fulfillment')
+    } else if (input.exceptionClass === 'stock_sync_stall')
+      z.array(z.string().uuid()).parse(input.facts.connectionIds);
+    else if (input.exceptionClass === 'stuck_fulfillment')
       z.string().uuid().parse(input.facts.connectionId);
     if (
       input.exceptionClass === 'workflow_failure' &&

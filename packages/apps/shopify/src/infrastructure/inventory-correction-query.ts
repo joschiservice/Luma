@@ -202,7 +202,7 @@ export function createCorrectionQuery(
             row.installed &&
             row.readable &&
             !row.deleted &&
-            ['shopify', 'jtl'].includes(row.provider),
+            ['shopify', 'jtl', 'cin7'].includes(row.provider),
         )
         .filter((row) => !native.length || row.provider === 'shopify')
         .map(({ connectionId, label, provider, available, observedAt }) => ({
@@ -219,7 +219,22 @@ export function createCorrectionQuery(
       context: TenantContext,
       target: z.infer<typeof correctionTarget>,
       receiptProof = false,
+      protection = false,
     ) {
+      if (!protection) {
+        const held = await database.transaction(context.tenantId, (tx) =>
+          tx.query(
+            `SELECT 1 FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p WHERE i.tenant_id=$1 AND i.connection_id=$2 AND p->>'positionId'=$3 AND p->>'status' IN ('pending','held','tightened','releasing','unknown') LIMIT 1`,
+            [context.tenantId, target.connectionId, target.positionId],
+          ),
+        );
+        if (held.rowCount)
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Stock protection owns this position. Release the hold before correcting stock.',
+          );
+      }
       const authority = await sourceAuthority?.read(context);
       if (target.receipt) {
         if (
@@ -314,7 +329,7 @@ export function createCorrectionQuery(
       );
       if (
         stockAuthority?.connectionId !== target.sourceConnectionId ||
-        sellingAuthority?.connectionId !== target.connectionId
+        (!protection && sellingAuthority?.connectionId !== target.connectionId)
       )
         throw new IdentityError(
           409,
@@ -336,7 +351,7 @@ export function createCorrectionQuery(
         );
       if (
         shopify.provider !== 'shopify' ||
-        erp.provider !== 'jtl' ||
+        !['jtl', 'cin7'].includes(erp.provider) ||
         shopify.connectionId === erp.connectionId
       )
         throw new IdentityError(

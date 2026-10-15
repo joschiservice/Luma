@@ -349,6 +349,8 @@ export async function createApp(options: SimulatorOptions) {
     );
     profile.erp = input.erp ?? profile.erp;
     profile.historyDays = input.historyDays ?? profile.historyDays;
+    profile.integration.stockSyncEveryMs =
+      input.stockSyncEveryMs ?? profile.integration.stockSyncEveryMs;
     const now = Date.now();
     const run: RunRecord = {
       id: input.id,

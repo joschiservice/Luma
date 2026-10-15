@@ -23,6 +23,10 @@ import {
   validateSettings,
   workflowPath,
 } from './runtime.js';
+import type {
+  StockProtectionActivities,
+  StockProtectionWorkflowInput,
+} from './stock-protection-workflow.js';
 
 /** Uses one stable Temporal ID for every process run, including uncertain start retries. */
 export const processWorkflowId = (tenantId: string, runId: string) =>
@@ -53,6 +57,33 @@ function createProcessCommands(
   }
 
   return {
+    /** Starts one durable hold lifecycle per case; retries reuse the existing run. */
+    async startStockProtection(context: TenantContext, incidentId: string) {
+      const fresh = await identity.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      if (
+        fresh.actor.id !== context.actor.id ||
+        fresh.dataRegion !== dataRegion
+      )
+        throw new Error('Stock protection principal changed');
+      const input: StockProtectionWorkflowInput = {
+        tenantId: fresh.tenantId,
+        userId: fresh.actor.id,
+        dataRegion,
+        incidentId,
+      };
+      try {
+        await client.workflow.start('stockProtectionWorkflow', {
+          workflowId: `stock-protection:${fresh.tenantId}:${incidentId}`,
+          taskQueue,
+          args: [input],
+          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError))
+          throw error;
+      }
+    },
     async start(
       context: TenantContext,
       run: ProcessRun,
@@ -127,6 +158,7 @@ function createProcessCommands(
 export async function createProcessWorker(
   settings: TemporalSettings,
   activities: ProcessActivities,
+  stockProtection?: StockProtectionActivities,
 ) {
   validateSettings(settings);
   const data = temporalDataConverter(settings);
@@ -143,7 +175,7 @@ export async function createProcessWorker(
       workflowsPath: workflowPath(),
       dataConverter: data.converter,
       activities: temporalActivities(
-        activities,
+        { ...activities, ...stockProtection },
         settings.captureActivityError,
         settings.dataRegion,
       ),

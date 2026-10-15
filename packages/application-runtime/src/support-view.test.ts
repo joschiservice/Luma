@@ -128,6 +128,7 @@ it('lists every route with a request body that support views may call', () => {
     'metrics.summary',
     'nativeStock.verifyPurchaseReceipt',
     'procurement.incomingStock',
+    'stockProtection.view',
   ]);
 });
 

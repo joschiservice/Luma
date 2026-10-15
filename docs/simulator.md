@@ -121,7 +121,7 @@ Failure decisions hash the seed, the request identity and how often that request
 
 ## Incidents and the scorecard
 
-Each incident kind in `@luma/simulator-core` declares the case class Luma should open, or none where Luma shows it elsewhere or has no rule yet. Incidents emerge at the chaos rates or are injected from the panel or API. Stock and provider incidents start immediately; order incidents place a new order that carries the incident and stay **planned** until the order reaches the affected step. **Recover** repairs the cause the way the merchant would. Drift incidents also end on their own when the shop matches JTL again, for example after Luma's governed stock correction.
+Each incident kind in `@luma/simulator-core` declares the case class Luma should open, or none where Luma shows it elsewhere or has no rule yet. Incidents emerge at the chaos rates or are injected from the panel or API. Stock and provider incidents start immediately; order incidents place a new order that carries the incident and stay **planned** until the order reaches the affected step. **Recover** repairs the cause the way the merchant would. Drift incidents also end on their own when the shop matches JTL again, for example after Luma's governed stock correction. **Stock sync stalled** stops the stock sync to one shop for every SKU; ERP changes queue and reach the shop only on **Recover**. It runs only when injected.
 
 Ground truth stays in the simulator database. The scorecard compares it with Luma's cases, which the pilot lists through a simulator-only API route:
 

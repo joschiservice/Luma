@@ -88,16 +88,16 @@ the compiled `dist` output.
 
 Start with the smallest check that proves the change, then widen:
 
-| Scope               | Command                                                                 |
-| ------------------- | ----------------------------------------------------------------------- |
-| One rule or service | `pnpm --filter @luma/resolution test inventory-monitor.test.ts`         |
-| One backend journey | `pnpm test:e2e returns.e2e.mjs`                                         |
-| One browser journey | `pnpm test:browser returns.browser.mjs`                                 |
-| Your branch         | `pnpm test:affected`                                                    |
-| Shared components   | `pnpm test:ui`                                                          |
-| A feature area      | `pnpm verify:feature <simulator\|workflows\|orders\|inbox\|purchasing>` |
-| Before review       | `pnpm check`                                                            |
-| Every CI gate       | `pnpm test:full`                                                        |
+| Scope               | Command                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| One rule or service | `pnpm --filter @luma/resolution test inventory-monitor.test.ts`                           |
+| One backend journey | `pnpm test:e2e returns.e2e.mjs`                                                           |
+| One browser journey | `pnpm test:browser returns.browser.mjs`                                                   |
+| Your branch         | `pnpm test:affected`                                                                      |
+| Shared components   | `pnpm test:ui`                                                                            |
+| A feature area      | `pnpm verify:feature <simulator\|workflows\|orders\|inbox\|purchasing\|stock-protection>` |
+| Before review       | `pnpm check`                                                                              |
+| Every CI gate       | `pnpm test:full`                                                                          |
 
 `pnpm verify:feature` builds once, then runs formatting, lint, focused package checks with
 a disposable database and the related journeys. It stops at the first failure and keeps a

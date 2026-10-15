@@ -32,6 +32,7 @@ import {
   statusLabels as orderStatusLabels,
 } from '../../shared/orders/presentation';
 import { IncomingStockSection } from '../../shared/procurement/incoming-stock';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
@@ -73,6 +74,14 @@ export function StockPage() {
       refreshing={query.isFetching}
       offline={query.isPaused}
       refresh={() => void query.refetch()}
+      stockProtection={
+        query.data ? (
+          <StockProtectionNotice
+            organizationId={organizationId}
+            positionId={positionId}
+          />
+        ) : null
+      }
       incoming={
         query.data ? (
           <IncomingStockSection
@@ -144,8 +153,11 @@ export function StockDetailView({
   nativeStock,
   incoming,
   replenishment,
+  stockProtection,
 }: {
   organizationId: string;
+  /** Incident protection loaded by the connected page. */
+  stockProtection?: ReactNode;
   /** The connected page supplies the authorized assistant control. */
   contextualAssistance?: boolean;
   search?: InventorySearch;
@@ -171,6 +183,7 @@ export function StockDetailView({
 
   return (
     <div className="inventory-page">
+      {stockProtection}
       <RecordHeader
         section={{
           label: m.inventory_page_title(),

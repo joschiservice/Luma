@@ -11,6 +11,9 @@ export interface WorkspaceSettings {
         propagationSeconds: number;
         oversellPropagationSeconds: number;
         stuckSeconds: number;
+        stallSeconds?: number | undefined;
+        stallMinPositions?: number | undefined;
+        stallSharePercent?: number | undefined;
       }
     | undefined;
   revision: number;

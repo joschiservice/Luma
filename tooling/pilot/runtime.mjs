@@ -130,8 +130,8 @@ export async function createPilot(
     let stockRefresh = null;
     let orderRefresh = null;
     let orderPlans = null;
-    const refreshStock = async (actor, positionId) =>
-      stockRefresh?.refresh(actor, positionId);
+    const refreshStock = async (actor, positionId, maxAgeMs, options) =>
+      stockRefresh?.refresh(actor, positionId, maxAgeMs, options);
     const installations = createInstalledConnections(db, {
       refreshStock,
       sourceOrderLines: createOrderLineReader(db),
@@ -868,6 +868,10 @@ export async function createPilot(
             application.codeProcesses,
             application.caseWorkflows,
             application.coordination,
+            {
+              services: installations.registry.stockProtection(),
+              start: processClient.startStockProtection,
+            },
           )
         : undefined;
     if (replenishmentWorker) resources.add(replenishmentWorker.close);

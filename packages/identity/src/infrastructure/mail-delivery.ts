@@ -19,6 +19,10 @@ import { drainPasswordMail } from './password-mail.js';
 import { workspaceTransaction } from './settings.js';
 
 interface Delivery {
+  stock_protection_document?: {
+    stage: 'placed' | 'partial_failure' | 'escalated' | 'released';
+    store: string;
+  } | null;
   id: string;
   kind:
     | 'invitation'
@@ -287,7 +291,18 @@ async function memberMail(
   return {
     ...address,
     email: {
-      kind: message.kind === 'issues' ? 'issue' : 'connection',
+      ...(message.stock_protection_document && message.kind === 'issues'
+        ? {
+            kind: 'stock_protection' as const,
+            stage: message.stock_protection_document.stage,
+            store: message.stock_protection_document.store,
+          }
+        : {
+            kind:
+              message.kind === 'issues'
+                ? ('issue' as const)
+                : ('connection' as const),
+          }),
       workspace: workspace.name,
       link: `${origin}/app/${tenantId}/${message.kind === 'issues' ? `exceptions/${message.target_id}/detail` : `connections#connection-${message.target_id}`}`,
       preferencesLink,

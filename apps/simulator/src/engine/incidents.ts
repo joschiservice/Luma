@@ -23,7 +23,12 @@ import {
   type WorldOrder,
   worldOrder,
 } from './orders.js';
-import { driftStock, recoverDrift } from './stock.js';
+import {
+  driftStock,
+  recoverDrift,
+  resumeStockSync,
+  stallStockSync,
+} from './stock.js';
 import {
   closeIncident,
   type EngineEvents,
@@ -103,6 +108,17 @@ export async function injectIncident(world: World, input: InjectIncident) {
     );
     if (!incident)
       throw new Error(`${variant.sku} already drifts in ${shopName}`);
+
+    return incident;
+  }
+  if (kind === 'stock-sync-stall') {
+    const shopName = firstShop(world, input.instance).name;
+    const incident = await stallStockSync(world, shopName, 'injected', {
+      id: input.id,
+      sharePercent: input.sharePercent,
+    });
+    if (!incident)
+      throw new Error(`The stock sync to ${shopName} is already stalled`);
 
     return incident;
   }
@@ -496,6 +512,8 @@ export async function recoverIncident(world: World, id: string) {
   const shopName = incident.instance ?? '';
   if (incident.kind === 'inventory-drift' || incident.kind === 'oversell')
     await recoverDrift(world, incident);
+  else if (incident.kind === 'stock-sync-stall')
+    await resumeStockSync(world, incident);
   else if (
     incident.kind === 'provider-outage' ||
     incident.kind === 'shipping-provider-outage' ||

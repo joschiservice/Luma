@@ -91,5 +91,13 @@
   "email_morning_brief_case_verified": "Verifiziert: {label}",
   "email_morning_brief_case_ongoing": "Laufend: {label}",
   "email_morning_brief_open": "Home öffnen",
-  "email_morning_brief_unavailable": "Für deinen Zugriff nicht verfügbar"
+  "email_morning_brief_unavailable": "Für deinen Zugriff nicht verfügbar",
+  "email_protection_subject": "Bestandsschutz-Update für {store}",
+  "email_protection_preview": "Prüfe den Bestandsschutz-Vorfall.",
+  "email_protection_heading": "Bestandsschutz",
+  "email_protection_placed": "Luma hat für {store} Bestand zurückgehalten, weil die ERP-Bestandssynchronisierung aussetzt. Im Vorfall siehst du alle gehaltenen und ungeschützten Artikel.",
+  "email_protection_partial": "Einige Rückhaltungen für {store} konnten nicht bestätigt werden. Luma gleicht ungewisse Änderungen ab und sendet sie nicht erneut.",
+  "email_protection_escalated": "Rückhaltungen für {store} haben ihr Zeitlimit erreicht. Prüfe den Vorfall, um sie freizugeben oder länger zu behalten.",
+  "email_protection_released": "Der Bestandsschutz für {store} ist beendet. Prüfe verifizierte Freigaben, externe Änderungen und die Zusammenfassung.",
+  "email_protection_action": "Bestandsschutz prüfen"
 }

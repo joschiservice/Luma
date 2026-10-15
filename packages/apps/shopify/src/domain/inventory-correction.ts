@@ -57,6 +57,17 @@ export const correctionSnapshot = z.object({
   locationName: z.string(),
   available: z.number().int().nullable(),
   tracked: z.boolean(),
+  inventoryPolicy: z.enum(['DENY', 'CONTINUE']).nullable().optional(),
+  protectionMetadata: z
+    .object({
+      sku: z.string().nullable(),
+      tags: z.array(z.string()),
+      collections: z.array(z.string()),
+      complete: z.boolean(),
+      active: z.boolean(),
+    })
+    .nullable()
+    .optional(),
   itemActive: z.boolean().nullable().optional(),
   locationActive: z.boolean().nullable().optional(),
   bundleParent: z.boolean().nullable().optional(),

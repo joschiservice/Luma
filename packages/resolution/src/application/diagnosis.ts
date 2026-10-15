@@ -131,7 +131,8 @@ function inIncidentScope(
       // Workflow effects require the execution owner's reconciliation path.
       return false;
     case 'order_quantity_mismatch':
-      // Scheduled detection rereads every source of the order itself before evaluating.
+    case 'stock_sync_stall':
+      // Scheduled detection rereads these sources itself before evaluating.
       return false;
   }
 }

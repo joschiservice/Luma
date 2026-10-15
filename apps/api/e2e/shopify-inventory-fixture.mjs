@@ -95,11 +95,25 @@ export async function correctionFixture(
   const mutations = [];
   let lost = false,
     race = false,
-    delayVerification = false;
+    delayVerification = false,
+    throttles = 0;
   const transport = createTransport(async (request) => {
     const body = JSON.parse(request.body);
     if (body.query.startsWith('mutation')) {
       mutations.push(body);
+      if (throttles > 0) {
+        throttles--;
+
+        return {
+          status: 429,
+          headers: { 'retry-after': '0' },
+          body: {
+            errors: [
+              { message: 'Throttled', extensions: { code: 'THROTTLED' } },
+            ],
+          },
+        };
+      }
       if (race) {
         await shopify.command(context(), {
           kind: 'available',
@@ -370,6 +384,9 @@ export async function correctionFixture(
         location: '1',
         quantity,
       }),
+    throttleMutations: (count) => {
+      throttles = count;
+    },
     loseResponse: () => {
       lost = true;
     },

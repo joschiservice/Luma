@@ -1,6 +1,6 @@
 # Exception detection
 
-Detection evaluates the five [V0 taxonomy](exception-taxonomy.md) classes against
+Detection evaluates the six [V0 taxonomy](exception-taxonomy.md) classes against
 normalized evidence and persists the result as tenant-scoped incidents. It records every
 accepted evaluation with its rule and configuration versions, decision, evidence
 references and delivery correlation ID (inventory also keeps the exact signed difference,
@@ -50,6 +50,16 @@ reads decide:
   most 25 positions per pass. Before the reread, the monitor reads the stored reports of
   the last 24 hours to find when the pair last agreed, so the rule can let a fresh gap wait
   for provider sync.
+- **Stock sync stall:** runs before stock mismatch. Each storefront is compared with the
+  resolved stock authority as a whole. Each current stock report keeps when its quantity was
+  first seen and whether it is a quantity Luma wrote, so one query reads only the products
+  whose authority quantity changed inside the stall lookback and whether the storefront now
+  matches. A storefront quantity Luma wrote doesn't count as followed. A storefront is
+  checked only when enough products lag, and a new evaluation also needs Luma's own stock
+  streams of both connections to be current. Then the earliest lagging products, at least
+  five, are reread from both sides like a stock mismatch, and the rule runs on the counts and
+  the rereads. Below the minimum, an open case is only verified. While a stall case is open,
+  the stock mismatch rule lets a gap of that pair wait unless it oversells.
 - **Stuck fulfillment:** open work with an established source progress time older than the stuck threshold is reread
   through its order, at most 25 per pass, oldest progress first. A future start time
   exempts the work. A reported hold exempts it until the work has gone 24 hours
@@ -68,6 +78,7 @@ reads decide:
 
 Open cases of these classes are always included. When the fresh evaluation is clear, the
 monitor requests verification: stock and fulfillment reread the case's exact subject; a
+stock sync stall rereads the products that lagged at its latest detection; a
 sync failure passes once its stream completes a scan after the latest detection without
 new failures; an order quantity case rereads every source that was read before its latest
 detection and passes when the rule clears on those reads across the same sources. A newly detected subject gets a diagnosis. Rules run independently, so an

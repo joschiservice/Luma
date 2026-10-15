@@ -32,7 +32,10 @@ export async function readInventoryWriteProofs(
     const receipt = parsed.data;
     if (
       receipt.referenceDocumentUri !==
-      `luma://inventory-corrections/${receipt.idempotencyKey}`
+        `luma://inventory-corrections/${receipt.idempotencyKey}` &&
+      !/^luma:\/\/inventory-holds\/[0-9a-f-]{36}$/.test(
+        receipt.referenceDocumentUri,
+      )
     )
       continue;
     candidates.push(receipt);

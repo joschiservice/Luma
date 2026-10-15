@@ -532,6 +532,18 @@ describe('Cin7 catalog and stock', () => {
   it('sums bins and batches per product and location', async () => {
     const { read } = fixture();
     const page = await read('inventory.read', { limit: 100 });
+    const reread = await read('inventory.read', { limit: 100 });
+    expect(
+      page.items.every((item) =>
+        /^[a-f0-9]{64}$/.test(item.sourceRevision ?? ''),
+      ),
+    ).toBe(true);
+    expect(reread.items.map((item) => item.sourceRevision)).toEqual(
+      page.items.map((item) => item.sourceRevision),
+    );
+    expect(reread.items.map((item) => item.id)).not.toEqual(
+      page.items.map((item) => item.id),
+    );
     expect(
       page.items.map((item) => [
         item.source.externalId,

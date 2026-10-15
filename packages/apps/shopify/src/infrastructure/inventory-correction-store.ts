@@ -37,6 +37,23 @@ export function createCorrectionStore(
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           `${context.tenantId}:${run.target.connectionId}:${run.before.inventoryItemId}:${run.before.locationId}`,
         ]);
+        const held = await tx.query(
+          `SELECT 1 FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p
+          WHERE i.tenant_id=$1 AND i.connection_id=$2 AND (p->>'positionId'=$3 OR EXISTS(SELECT 1 FROM shopify_stock_protection_actions a WHERE a.tenant_id=i.tenant_id AND a.incident_id=i.id AND a.hold_id=(p->>'id')::uuid AND a.document->'before'->>'inventoryItemId'=$4 AND a.document->'before'->>'locationId'=$5)) AND p->>'status' IN ('pending','held','tightened','releasing','unknown') LIMIT 1`,
+          [
+            context.tenantId,
+            run.target.connectionId,
+            run.target.positionId,
+            run.before.inventoryItemId,
+            run.before.locationId,
+          ],
+        );
+        if (held.rowCount)
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Stock protection owns this position. Release the hold before correcting stock.',
+          );
         if (run.target.receipt) {
           const receiptId = run.target.receipt.commitmentId;
           await tx.query(

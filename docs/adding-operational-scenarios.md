@@ -15,7 +15,8 @@ Add a default rate to the presets in [presets.ts](../packages/simulator/core/src
 
 Start the incident where it happens in the merchant world (`apps/simulator/src/engine`):
 
-- Stock incidents freeze the stock sync for one shop SKU
+- Stock incidents freeze the stock sync for one shop SKU, or stall it for every SKU of a
+  shop and queue the changes until recovery
   ([stock.ts](../apps/simulator/src/engine/stock.ts)).
 - Order incidents are planned when an order is placed and start at the step they affect,
   such as import, picking, shipment sync or refund

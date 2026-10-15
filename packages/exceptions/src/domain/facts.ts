@@ -16,6 +16,15 @@ interface Thresholds {
    * once instead of waiting for sync.
    */
   oversellGuardPercent: number;
+  /**
+   * How long a stock authority's change may stay unmatched by the storefront before it counts as
+   * not followed by the merchant's stock sync.
+   */
+  stallSeconds?: number | undefined;
+  /** Positions that must stay unfollowed, on fresh reads, before a stalled sync is raised. */
+  stallMinPositions?: number | undefined;
+  /** Share of recently changed positions, in percent, that must be unfollowed. */
+  stallSharePercent?: number | undefined;
 }
 
 export interface Configuration {
@@ -108,6 +117,13 @@ interface FactMap {
      * within tolerance; null when no agreement is recorded. Absent on legacy input.
      */
     mismatchSince?: string | null;
+    /**
+     * An open stock sync stall case covers this pair, so a gap that doesn't oversell waits for
+     * the sync instead of opening its own case. Absent on earlier input.
+     */
+    syncStalled?: boolean;
+    /** The held selling quantity from an active, pair-scoped incident. */
+    protectedAvailable?: string;
   };
   order_quantity_mismatch: Common & {
     /** Canonical line ID, or a mapped SKU that occurs once per source, as comparisons match lines. */
@@ -127,6 +143,33 @@ interface FactMap {
     /** Oldest and newest contributing order and fulfillment reads, on Luma's clock. */
     oldestReadAt: string;
     latestReadAt: string;
+  };
+  stock_sync_stall: Common & {
+    /** The stock authority's connection, then the storefront connection that should follow it. */
+    connectionIds: [string, string];
+    /**
+     * Linked positions whose authority stock changed at least the stall window ago and that the
+     * storefront still doesn't match, from stored reports.
+     */
+    lagging: number;
+    /** Linked positions whose authority stock changed in the same window and that the storefront matches. */
+    followed: number;
+    /** Lagging positions reread from both sources for this evaluation. */
+    sampled: number;
+    /** Reread positions that still differ. */
+    confirmed: number;
+    /** Reread positions where the storefront shows more stock than the authority. */
+    overselling: number;
+    /** When Luma first saw the earliest unfollowed authority change; null without lagging positions. */
+    laggingSince: string | null;
+    /** Oldest and newest reread; null when nothing was reread. */
+    oldestReadAt: string | null;
+    latestReadAt: string | null;
+    /**
+     * Both connections' stock reads completed after the earliest unfollowed change and none are
+     * failing, so a missing storefront update is not Luma's own gap.
+     */
+    readsCurrent: boolean;
   };
   workflow_failure: Common & {
     runId: string;
@@ -160,7 +203,7 @@ export type Decision =
   | { decision: 'clear' | 'defer' | 'reject'; severity: null; reason: string };
 
 export const defaultConfiguration: Configuration = {
-  version: 'v0.3',
+  version: 'v0.4',
   ruleVersion: 'v0.2',
   inventoryTolerance: '0',
   thresholds: {
@@ -172,8 +215,37 @@ export const defaultConfiguration: Configuration = {
     propagationSeconds: 1800,
     oversellPropagationSeconds: 120,
     oversellGuardPercent: 25,
+    stallSeconds: 900,
+    stallMinPositions: 3,
+    stallSharePercent: 50,
   },
 };
+
+/** Stall thresholds, with defaults for configurations stored before they existed. */
+export function stallThresholds(thresholds: Configuration['thresholds']) {
+  return {
+    seconds: thresholds.stallSeconds ?? 900,
+    minPositions: thresholds.stallMinPositions ?? 3,
+    sharePercent: thresholds.stallSharePercent ?? 50,
+  };
+}
+
+/**
+ * Whether enough recent authority changes are unfollowed to suspect a stalled stock sync: at
+ * least the minimum number of products, and at least the configured share of changed products.
+ */
+export function stallSuspected(
+  counts: { lagging: number; followed: number },
+  thresholds: Configuration['thresholds'],
+) {
+  const stall = stallThresholds(thresholds);
+
+  return (
+    counts.lagging >= stall.minPositions &&
+    counts.lagging * 100 >=
+      stall.sharePercent * (counts.lagging + counts.followed)
+  );
+}
 
 /** Scale decimals to millionths without rounding through floating point. */
 export function decimalUnits(value: string): bigint {

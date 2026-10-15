@@ -1385,6 +1385,132 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     ).toBeNull();
   });
 
+  it('counts which stock authority changes a storefront followed inside a window under tenant RLS', async () => {
+    const at = (seconds: number) =>
+      new Date(
+        Date.parse('2026-09-21T00:00:00Z') + seconds * 1000,
+      ).toISOString();
+    const report = (
+      connectionId: string,
+      external: string,
+      amount: string,
+      seconds: number,
+    ) =>
+      stock({
+        connectionId,
+        amount,
+        external,
+        observed: at(seconds),
+        time: at(seconds),
+      });
+    const readable = {
+      appId: 'shopify',
+      appInstallationVersion: 1,
+      permissions: ['inventory.read'],
+      granted: ['inventory.read'],
+    };
+    await owner.query(
+      "INSERT INTO workspace_apps(tenant_id,app_id,status,version) VALUES($1,'shopify','installed',1) ON CONFLICT DO NOTHING",
+      [tenant],
+    );
+    await owner.query(
+      'UPDATE connector_installations SET document=document||$3::jsonb WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+      [tenant, [connection, secondConnection], readable],
+    );
+    try {
+      const positions: Record<string, string> = {};
+      // Each product starts in agreement; `connection` is the authority.
+      for (const [sku, amount] of [
+        ['lagging', '3'],
+        ['followed', '5'],
+        ['unchanged', '7'],
+        ['recent', '9'],
+        ['corrected', '11'],
+      ] as const) {
+        const left = await mapStock(
+          report(connection, sku, amount, 0),
+          `follow-${sku}-l0`,
+          `follow-${sku}`,
+        );
+        await mapStock(
+          report(secondConnection, sku, amount, 10),
+          `follow-${sku}-r10`,
+          `follow-${sku}`,
+        );
+        if (left.status === 'pending') throw new Error('Expected projection');
+        positions[sku] = left.entityId;
+      }
+      const ingest = (input: ReturnType<typeof report>, key: string) =>
+        services.ingestion.ingest(context(), key, input);
+      // The authority sells one unit; the storefront never follows.
+      await ingest(report(connection, 'lagging', '2', 60), 'follow-lag-l60');
+      await ingest(report(connection, 'lagging', '2', 120), 'follow-lag-l120');
+      // The storefront follows this change.
+      await ingest(report(connection, 'followed', '4', 60), 'follow-f-l60');
+      await ingest(
+        report(secondConnection, 'followed', '4', 90),
+        'follow-f-r90',
+      );
+      // The storefront differs, but the authority did not change in the window.
+      await ingest(
+        report(secondConnection, 'unchanged', '6', 60),
+        'follow-u-r60',
+      );
+      // Luma corrected the storefront itself; that is no evidence that the sync works.
+      const corrected = report(secondConnection, 'corrected', '10', 90);
+      Object.assign(corrected.observation.data, {
+        writeAttribution: {
+          evidenceId: randomUUID(),
+          adjustmentId: 'gid://shopify/InventoryAdjustmentGroup/1',
+          referenceDocumentUri: 'luma://inventory-corrections/1',
+          available: '10',
+          quantityMatches: true,
+        },
+      });
+      await ingest(report(connection, 'corrected', '10', 60), 'follow-c-l60');
+      await ingest(corrected, 'follow-c-r90');
+      // A change after the window may still be syncing.
+      await ingest(report(connection, 'recent', '8', 600), 'follow-r-l600');
+      const sources = createDetectionSources(createTenantDatabase(runtime));
+      const options = {
+        authorityId: connection,
+        storefrontIds: [secondConnection],
+        since: at(30),
+        before: at(300),
+        tolerance: '0',
+        limit: 5,
+      };
+
+      expect(await sources.stockFollowing(context(), options)).toEqual([
+        {
+          storefrontId: secondConnection,
+          followed: 1,
+          lagging: 1,
+          laggingSince: at(60),
+          positions: [
+            {
+              positionId: positions.lagging,
+              skuId: expect.any(String),
+              locationId: expect.any(String),
+              changedAt: at(60),
+            },
+          ],
+        },
+      ]);
+      expect(
+        await sources.stockFollowing(context(), { ...options, limit: 0 }),
+      ).toEqual([expect.objectContaining({ lagging: 1, positions: [] })]);
+      expect(
+        await sources.stockFollowing(context(otherTenant), options),
+      ).toEqual([]);
+    } finally {
+      await owner.query(
+        "UPDATE connector_installations SET document=document-'appId'-'appInstallationVersion'||'{\"permissions\":[],\"granted\":[]}'::jsonb WHERE tenant_id=$1 AND id=ANY($2::uuid[])",
+        [tenant, [connection, secondConnection]],
+      );
+    }
+  });
+
   it('deduplicates concurrent retries and rejects changed content under one ingest key', async () => {
     await mapStock(stock(), 'seed');
     const input = stock({ time: '2026-09-18T01:00:00Z' });

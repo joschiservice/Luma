@@ -59,6 +59,7 @@ import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
 import { CollectionSummaryBand } from '../adaptive/summary-band';
 import { recordReturnPath } from '../records/data';
@@ -753,6 +754,7 @@ export function InventoryView({
       {note ? <p className="inventory-note">{note}</p> : null}
       {summary}
       {notices}
+      <StockProtectionNotice organizationId={organizationId} />
       {preview ? (
         <CollectionPreview
           className="inventory-preview"

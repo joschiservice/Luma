@@ -29,13 +29,18 @@ export function createStockRefresh(deps: {
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? (() => undefined);
 
-  async function read(context: TenantContext, source: PositionSource) {
+  async function read(
+    context: TenantContext,
+    source: PositionSource,
+    readPurpose?: 'foreground' | 'incremental' | 'history',
+  ) {
     let cursor: string | undefined;
     do {
       const result = await deps.capabilities.read(context, {
         connectionId: source.connectionId,
         capability: 'inventory.read',
         version: '0',
+        ...(readPurpose ? { readPurpose } : {}),
         input: {
           limit: 100,
           sku: source.sku,
@@ -67,16 +72,25 @@ export function createStockRefresh(deps: {
       context: TenantContext,
       positionId: string,
       maxAgeMs = 60_000,
+      options?: {
+        connectionId?: string;
+        readPurpose?: 'foreground' | 'incremental' | 'history';
+      },
     ) {
       let current = 0;
       for (const source of await deps.sources.positionSources(
         context,
         positionId,
       )) {
+        if (
+          options?.connectionId &&
+          source.connectionId !== options.connectionId
+        )
+          continue;
         if (now().getTime() - Date.parse(source.observedAt) < maxAgeMs)
           continue;
         try {
-          const observation = await read(context, source);
+          const observation = await read(context, source, options?.readPurpose);
           if (
             observation &&
             (await deps.project(context, observation, positionId))

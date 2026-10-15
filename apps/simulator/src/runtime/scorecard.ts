@@ -34,6 +34,8 @@ const detectionWindow: Record<string, number> = {
   inventory_mismatch: 15 * minute,
   // The quantity rule waits for the propagation window, then for fresh reads of every source.
   order_quantity_mismatch: 45 * minute,
+  // Changes must stay unfollowed for the stall window, then be reread.
+  stock_sync_stall: 30 * minute,
   stuck_fulfillment: 3 * 60 * minute,
   sync_failure: 30 * minute,
   workflow_failure: 30 * minute,
@@ -68,7 +70,8 @@ function matches(incident: Incident, item: LumaCase) {
   const expected = incidentKinds[incident.kind].exceptionClass;
   if (item.exceptionClass !== expected) return false;
   if (Date.parse(item.detectedAt) < incident.startedAt - minute) return false;
-  if (expected === 'sync_failure')
+  // Connection-level cases name the connection, not a record.
+  if (expected === 'sync_failure' || expected === 'stock_sync_stall')
     return !!incident.instance && item.instances.includes(incident.instance);
   const ids = new Set(item.identifiers);
   // Every case at a location names it, so match on the record itself when one is known.

@@ -19,6 +19,20 @@ try {
       'resolution',
       'exceptions',
     ],
+    'stock-protection': [
+      'app-shopify',
+      'app-cin7',
+      'policies',
+      'execution',
+      'resolution',
+      'exceptions',
+      'workflow-temporal',
+      'application-runtime',
+      'api-contract',
+      'web',
+      'simulator',
+      'simulator-shopify',
+    ],
     workflows: [
       'workflows',
       'workflow-temporal',
@@ -73,7 +87,7 @@ try {
   };
   if (process.argv.length !== 3 || !Object.hasOwn(packages, feature))
     throw new Error(
-      'Usage: pnpm verify:feature <simulator|workflows|orders|inbox|purchasing>',
+      'Usage: pnpm verify:feature <simulator|workflows|orders|inbox|purchasing|stock-protection>',
     );
 
   const directory = await mkdtemp(join(tmpdir(), `luma-verify-${feature}-`));

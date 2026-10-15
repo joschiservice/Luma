@@ -123303,6 +123303,7 @@
                 "stuck_fulfillment",
                 "inventory_mismatch",
                 "order_quantity_mismatch",
+                "stock_sync_stall",
                 "workflow_failure"
               ],
               "type": "string"
@@ -124376,13 +124377,25 @@
                         },
                         "stuckSeconds": {
                           "type": "number"
+                        },
+                        "stallSeconds": {
+                          "type": "number"
+                        },
+                        "stallMinPositions": {
+                          "type": "number"
+                        },
+                        "stallSharePercent": {
+                          "type": "number"
                         }
                       },
                       "required": [
                         "inventoryTolerance",
                         "propagationSeconds",
                         "oversellPropagationSeconds",
-                        "stuckSeconds"
+                        "stuckSeconds",
+                        "stallSeconds",
+                        "stallMinPositions",
+                        "stallSharePercent"
                       ]
                     },
                     "diagnosis": {
@@ -127439,6 +127452,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -127750,6 +127778,21 @@
                         "type": "integer",
                         "minimum": 60,
                         "maximum": 604800
+                      },
+                      "stallSeconds": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 86400
+                      },
+                      "stallMinPositions": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "stallSharePercent": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
                       }
                     },
                     "required": [
@@ -127816,6 +127859,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -128105,6 +128163,9 @@
                   "writeMode": {
                     "enum": ["observe_only", "writes_enabled"],
                     "type": "string"
+                  },
+                  "acknowledgeStockHolds": {
+                    "type": "boolean"
                   }
                 },
                 "required": ["commandId", "revision", "writeMode"],
@@ -128157,6 +128218,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -128531,6 +128607,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -128880,6 +128971,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -129666,6 +129772,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -131720,6 +131841,1491 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/shopify/stock-protection-view": {
+      "post": {
+        "operationId": "stockProtection.view",
+        "summary": "Read stock protection settings and incidents",
+        "tags": ["stockProtection"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "incidentId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "positionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "skuId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 0
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 200,
+                    "default": 0
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    },
+                    "settings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sourceConnectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "default": 0
+                          },
+                          "mode": {
+                            "enum": ["off", "preview", "on"],
+                            "type": "string",
+                            "default": "off"
+                          },
+                          "riskThreshold": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "default": 10
+                          },
+                          "includeSalesRate": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "bufferUnits": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "default": 2
+                          },
+                          "bufferPercent": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "default": 20
+                          },
+                          "keepSellable": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "default": 0
+                          },
+                          "maxSkus": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2000,
+                            "default": 200
+                          },
+                          "maxUnitsPerSku": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647,
+                            "default": 100
+                          },
+                          "dailyUnits": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647,
+                            "default": 20000
+                          },
+                          "maxDurationSeconds": {
+                            "type": "integer",
+                            "minimum": 60,
+                            "maximum": 604800,
+                            "default": 21600
+                          },
+                          "durationAction": {
+                            "enum": ["escalate", "release"],
+                            "type": "string",
+                            "default": "escalate"
+                          },
+                          "exclusions": {
+                            "type": "object",
+                            "properties": {
+                              "skus": {
+                                "type": "array",
+                                "maxItems": 1000,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "default": []
+                              },
+                              "tags": {
+                                "type": "array",
+                                "maxItems": 1000,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "default": []
+                              },
+                              "collections": {
+                                "type": "array",
+                                "maxItems": 1000,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "default": []
+                              }
+                            },
+                            "additionalProperties": false,
+                            "default": {
+                              "skus": [],
+                              "tags": [],
+                              "collections": []
+                            }
+                          }
+                        },
+                        "required": ["connectionId", "sourceConnectionId"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "incidents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "requesterId": {
+                            "type": "string"
+                          },
+                          "canApprove": {
+                            "type": "boolean"
+                          },
+                          "positionCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "protectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "exposedSkus": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "heldCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "uncertainCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "pendingCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "unitHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "exposedUnits": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "positionsTruncated": {
+                            "type": "boolean"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sourceConnectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "mode": {
+                            "enum": ["preview", "on"],
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "active",
+                              "approval_required",
+                              "escalated",
+                              "released",
+                              "unknown"
+                            ],
+                            "type": "string"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "endedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "deadline": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "releaseRequested": {
+                            "type": "boolean"
+                          },
+                          "stopNew": {
+                            "type": "boolean"
+                          },
+                          "decisionId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "positions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "positionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "skuId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "sku": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "title": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "preview",
+                                    "held",
+                                    "tightened",
+                                    "releasing",
+                                    "released",
+                                    "released_by_sync",
+                                    "changed_outside_luma",
+                                    "skipped",
+                                    "not_protected",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "reason": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "before": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "authority": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "held": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "current": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "startedAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "endedAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "unitMilliseconds": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "exposedUnits": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "actionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "positionId",
+                                "skuId",
+                                "sku",
+                                "title",
+                                "status",
+                                "reason",
+                                "before",
+                                "authority",
+                                "held",
+                                "current",
+                                "startedAt",
+                                "endedAt",
+                                "unitMilliseconds",
+                                "exposedUnits",
+                                "actionId"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "sourceConnectionId",
+                          "label",
+                          "mode",
+                          "state",
+                          "startedAt",
+                          "endedAt",
+                          "deadline",
+                          "releaseRequested",
+                          "stopNew",
+                          "decisionId",
+                          "positions"
+                        ]
+                      }
+                    },
+                    "pairs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sourceConnectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "connectionId",
+                          "sourceConnectionId",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "canManage",
+                    "settings",
+                    "incidents",
+                    "pairs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/shopify/stock-protection-save": {
+      "post": {
+        "operationId": "stockProtection.save",
+        "summary": "Configure stock protection for one store",
+        "description": "Enabling preauthorizes bounded incident holds and releases. Send the last read revision. Disabling active holds requires release or keep until recovery.",
+        "tags": ["stockProtection"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "connectionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "sourceConnectionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "default": 0
+                      },
+                      "mode": {
+                        "enum": ["off", "preview", "on"],
+                        "type": "string",
+                        "default": "off"
+                      },
+                      "riskThreshold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647,
+                        "default": 10
+                      },
+                      "includeSalesRate": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "bufferUnits": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647,
+                        "default": 2
+                      },
+                      "bufferPercent": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "default": 20
+                      },
+                      "keepSellable": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647,
+                        "default": 0
+                      },
+                      "maxSkus": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2000,
+                        "default": 200
+                      },
+                      "maxUnitsPerSku": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647,
+                        "default": 100
+                      },
+                      "dailyUnits": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647,
+                        "default": 20000
+                      },
+                      "maxDurationSeconds": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 604800,
+                        "default": 21600
+                      },
+                      "durationAction": {
+                        "enum": ["escalate", "release"],
+                        "type": "string",
+                        "default": "escalate"
+                      },
+                      "exclusions": {
+                        "type": "object",
+                        "properties": {
+                          "skus": {
+                            "type": "array",
+                            "maxItems": 1000,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "default": []
+                          },
+                          "tags": {
+                            "type": "array",
+                            "maxItems": 1000,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "default": []
+                          },
+                          "collections": {
+                            "type": "array",
+                            "maxItems": 1000,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "default": []
+                          }
+                        },
+                        "additionalProperties": false,
+                        "default": {
+                          "skus": [],
+                          "tags": [],
+                          "collections": []
+                        }
+                      }
+                    },
+                    "required": ["connectionId", "sourceConnectionId"],
+                    "additionalProperties": false
+                  },
+                  "activeHolds": {
+                    "enum": ["release", "keep"],
+                    "type": "string"
+                  }
+                },
+                "required": ["settings"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceConnectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "default": 0
+                    },
+                    "mode": {
+                      "enum": ["off", "preview", "on"],
+                      "type": "string",
+                      "default": "off"
+                    },
+                    "riskThreshold": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 10
+                    },
+                    "includeSalesRate": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "bufferUnits": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 2
+                    },
+                    "bufferPercent": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "default": 20
+                    },
+                    "keepSellable": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 0
+                    },
+                    "maxSkus": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2000,
+                      "default": 200
+                    },
+                    "maxUnitsPerSku": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647,
+                      "default": 100
+                    },
+                    "dailyUnits": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647,
+                      "default": 20000
+                    },
+                    "maxDurationSeconds": {
+                      "type": "integer",
+                      "minimum": 60,
+                      "maximum": 604800,
+                      "default": 21600
+                    },
+                    "durationAction": {
+                      "enum": ["escalate", "release"],
+                      "type": "string",
+                      "default": "escalate"
+                    },
+                    "exclusions": {
+                      "type": "object",
+                      "properties": {
+                        "skus": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "default": []
+                        },
+                        "tags": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "default": []
+                        },
+                        "collections": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "default": []
+                        }
+                      },
+                      "additionalProperties": false,
+                      "default": {
+                        "skus": [],
+                        "tags": [],
+                        "collections": []
+                      }
+                    }
+                  },
+                  "required": ["connectionId", "sourceConnectionId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/shopify/stock-protection-control": {
+      "post": {
+        "operationId": "stockProtection.control",
+        "summary": "Release, extend or approve stock protection",
+        "tags": ["stockProtection"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "action": {
+                    "enum": ["release", "extend", "approve", "reject"],
+                    "type": "string"
+                  },
+                  "holdId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["id", "action"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requesterId": {
+                      "type": "string"
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "positionCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "protectedCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "exposedSkus": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "heldCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "uncertainCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pendingCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "unitHours": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "exposedUnits": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "positionsTruncated": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceConnectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "enum": ["preview", "on"],
+                      "type": "string"
+                    },
+                    "state": {
+                      "enum": [
+                        "active",
+                        "approval_required",
+                        "escalated",
+                        "released",
+                        "unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "releaseRequested": {
+                      "type": "boolean"
+                    },
+                    "stopNew": {
+                      "type": "boolean"
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "positionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "skuId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sku": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "enum": [
+                              "pending",
+                              "preview",
+                              "held",
+                              "tightened",
+                              "releasing",
+                              "released",
+                              "released_by_sync",
+                              "changed_outside_luma",
+                              "skipped",
+                              "not_protected",
+                              "unknown"
+                            ],
+                            "type": "string"
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "before": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "authority": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "held": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "current": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "startedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "endedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "unitMilliseconds": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "exposedUnits": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "actionId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "positionId",
+                          "skuId",
+                          "sku",
+                          "title",
+                          "status",
+                          "reason",
+                          "before",
+                          "authority",
+                          "held",
+                          "current",
+                          "startedAt",
+                          "endedAt",
+                          "unitMilliseconds",
+                          "exposedUnits",
+                          "actionId"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "connectionId",
+                    "sourceConnectionId",
+                    "label",
+                    "mode",
+                    "state",
+                    "startedAt",
+                    "endedAt",
+                    "deadline",
+                    "releaseRequested",
+                    "stopNew",
+                    "decisionId",
+                    "positions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {

@@ -42,6 +42,10 @@ export interface PolicyRepository {
 }
 
 export interface PolicyDependencies {
+  /** Trusted incident-owner admission for explicitly opted-in stock protection, with persisted caps. */
+  stockProtection?:
+    | ((context: TenantContext, action: ProposedAction) => Promise<boolean>)
+    | undefined;
   /** Trusted owner evidence for an unchanged later step covered by an existing approval. */
   coveredApproval?:
     | ((
@@ -169,15 +173,21 @@ export function createPolicyService(deps: PolicyDependencies) {
           action,
           capability.minimumRisk,
         );
+        const preauthorized =
+          action.capability === 'inventory.available.protect' &&
+          (await deps.stockProtection?.(fresh, action)) === true;
         const baseline = evaluatePolicy(
           action,
-          capability,
+          action.capability === 'inventory.available.protect' && !preauthorized
+            ? { ...capability, available: false }
+            : capability,
           fresh.permissions,
           fresh.actor.id,
           now.getTime(),
           approval,
           workspace.required || scoped?.outcome === 'approval_required',
           workspace.requireIndependentApproval,
+          preauthorized,
         );
         const candidate =
           baseline.outcome === 'approval_required' &&

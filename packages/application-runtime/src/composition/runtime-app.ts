@@ -119,8 +119,14 @@ export async function buildRuntimeApp(
     let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
     let orderRefresh: ReturnType<typeof createOrderRefreshService> | undefined;
     const composed: { orders?: ApplicationServices['http']['orders'] } = {};
-    const refreshStock = async (context: TenantContext, positionId: string) =>
-      stockRefresh?.refresh(context, positionId);
+    const refreshStock = async (
+      context: TenantContext,
+      positionId: string,
+      maxAgeMs?: number,
+      options?: Parameters<
+        ReturnType<typeof createStockRefreshService>['refresh']
+      >[3],
+    ) => stockRefresh?.refresh(context, positionId, maxAgeMs, options);
     const installedConnections =
       configured && 'registry' in configured
         ? configured

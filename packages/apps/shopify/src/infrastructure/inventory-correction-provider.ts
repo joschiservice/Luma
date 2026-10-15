@@ -29,6 +29,20 @@ const nodeSchema = z.object({
   tracked: z.boolean(),
   variant: z
     .object({
+      inventoryPolicy: z.enum(['DENY', 'CONTINUE']).optional(),
+      sku: z.string().nullable().optional(),
+      product: z
+        .object({
+          status: z.string(),
+          tags: z.array(z.string()),
+          collections: z
+            .object({
+              nodes: z.array(z.object({ id: z.string() })),
+              pageInfo: z.object({ hasNextPage: z.boolean() }),
+            })
+            .optional(),
+        })
+        .optional(),
       requiresComponents: z.boolean(),
       productVariantComponents: z.object({
         nodes: z.array(z.object({ id: gid('ProductVariantComponent') })),
@@ -70,6 +84,10 @@ export function createInventoryCorrectionProvider(
       inventoryItemId: string,
       locationId: string,
     ): Promise<InventoryWriteReceipt[]>;
+    /** Attribution is bound by the trusted incident owner, never by client input. */
+    holdId?: string;
+    /** Only collection exclusions need this bounded, more expensive product membership read. */
+    includeCollections?: boolean;
     /** Rechecks source authority immediately before sending the mutation. */
     eligible?: () => Promise<boolean>;
     /** Native publication stores quantity without changing inactive inventory eligibility. */
@@ -88,12 +106,16 @@ export function createInventoryCorrectionProvider(
     gid('InventoryItem').parse(inventoryItemId);
     gid('Location').parse(locationId);
     const raw = await request(
-      `query LumaInventoryCorrection($id: ID!, $locationId: ID!) {
-      node(id: $id) { ... on InventoryItem { id tracked variant { requiresComponents productVariantComponents(first: 1) { nodes { id } } } inventoryLevel(locationId: $locationId) {
+      `query LumaInventoryCorrection($id: ID!, $locationId: ID!, $collections: Boolean!) {
+      node(id: $id) { ... on InventoryItem { id tracked variant { inventoryPolicy sku product { status tags collections(first: 250) @include(if: $collections) { nodes { id } pageInfo { hasNextPage } } } requiresComponents productVariantComponents(first: 1) { nodes { id } } } inventoryLevel(locationId: $locationId) {
         id updatedAt isActive location { id name isActive } quantities(names: ["available"]) { name quantity }
       } } }
     }`,
-      { id: inventoryItemId, locationId },
+      {
+        id: inventoryItemId,
+        locationId,
+        collections: options.includeCollections ?? false,
+      },
     );
     if (raw.node === null)
       throw new ConnectorError({
@@ -133,7 +155,19 @@ export function createInventoryCorrectionProvider(
       id: randomUUID(),
       observedAt,
       targetRevision: createHash('sha256')
-        .update(JSON.stringify(node))
+        .update(
+          JSON.stringify({
+            ...node,
+            variant: node.variant
+              ? {
+                  ...node.variant,
+                  product: node.variant.product
+                    ? { ...node.variant.product, collections: undefined }
+                    : undefined,
+                }
+              : null,
+          }),
+        )
         .digest('hex'),
       inventoryItemId,
       locationId,
@@ -141,6 +175,19 @@ export function createInventoryCorrectionProvider(
       tracked: node.tracked,
       itemActive: level?.isActive ?? null,
       locationActive: level?.location.isActive ?? null,
+      inventoryPolicy: node.variant?.inventoryPolicy ?? null,
+      protectionMetadata: node.variant?.product
+        ? {
+            sku: node.variant.sku ?? null,
+            tags: node.variant.product.tags,
+            collections:
+              node.variant.product.collections?.nodes.map((c) => c.id) ?? [],
+            complete:
+              !options.includeCollections ||
+              node.variant.product.collections?.pageInfo.hasNextPage === false,
+            active: node.variant.product.status === 'ACTIVE',
+          }
+        : null,
       bundleParent: node.variant
         ? node.variant.requiresComponents ||
           node.variant.productVariantComponents.nodes.length > 0
@@ -214,6 +261,7 @@ export function createInventoryCorrectionProvider(
       if (
         !current.complete ||
         !current.tracked ||
+        (!!options.holdId && current.inventoryPolicy !== 'DENY') ||
         current.targetRevision !== input.expectedRevision ||
         current.available !== input.expectedAvailable ||
         (options.eligible && !(await options.eligible()))
@@ -226,7 +274,9 @@ export function createInventoryCorrectionProvider(
         });
       await options.beforeDispatch?.();
       try {
-        const referenceDocumentUri = `luma://inventory-corrections/${context.idempotencyKey}`;
+        const referenceDocumentUri = options.holdId
+          ? `luma://inventory-holds/${options.holdId}`
+          : `luma://inventory-corrections/${context.idempotencyKey}`;
         const raw = await request(
           `mutation LumaInventoryCorrection($input: InventorySetQuantitiesInput!, $key: String!) {
           result: inventorySetQuantities(input: $input) @idempotent(key: $key) {

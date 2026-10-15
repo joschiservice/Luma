@@ -105,7 +105,7 @@ export function createShopifyCaseWorkflows(deps: {
         (item) =>
           item.provider === provider && connections.includes(item.connectionId),
       );
-    const [erp, shop] = [of('jtl'), of('shopify')];
+    const [erp, shop] = [[...of('jtl'), ...of('cin7')], of('shopify')];
     if (erp.length !== 1 || shop.length !== 1)
       return {
         problem:
@@ -173,7 +173,10 @@ export function createShopifyCaseWorkflows(deps: {
     async requirements(context) {
       const [shop, erp] = await Promise.all([
         connection(context, 'shopify', 'inventory.available.reconcile'),
-        connection(context, 'jtl', 'inventory.read'),
+        Promise.all([
+          connection(context, 'jtl', 'inventory.read'),
+          connection(context, 'cin7', 'inventory.read'),
+        ]).then((values) => values.some(Boolean)),
       ]);
 
       return [
@@ -192,7 +195,7 @@ export function createShopifyCaseWorkflows(deps: {
           met: erp,
           detail: erp
             ? 'An ERP connection reports available stock.'
-            : 'Connect JTL so Luma has an authoritative quantity to copy.',
+            : 'Connect JTL or Cin7 Core so Luma has an authoritative quantity to copy.',
           fix: erp
             ? null
             : { label: 'Open Connections', destination: 'connections' },

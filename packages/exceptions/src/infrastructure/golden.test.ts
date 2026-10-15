@@ -13,6 +13,7 @@ const className = z.enum([
   'stuck_fulfillment',
   'inventory_mismatch',
   'order_quantity_mismatch',
+  'stock_sync_stall',
   'workflow_failure',
 ]);
 
@@ -50,6 +51,9 @@ const corpusSchema = z
         uncertaintySeconds: z.number().int().positive(),
         propagationSeconds: z.number().int().positive(),
         oversellGuardPercent: z.number().int().min(0).max(100),
+        stallSeconds: z.number().int().positive(),
+        stallMinPositions: z.number().int().positive(),
+        stallSharePercent: z.number().int().min(0).max(100),
       })
       .strict(),
     bases: z.object(schemas).strict(),

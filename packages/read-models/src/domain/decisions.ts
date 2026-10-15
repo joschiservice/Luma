@@ -24,6 +24,7 @@ export function evidenceState(
 const classLabels: Record<string, string> = {
   inventory_mismatch: 'Stock mismatch',
   order_quantity_mismatch: 'Quantity difference',
+  stock_sync_stall: 'Stock sync stalled',
   sync_failure: 'Connection issue',
   stuck_fulfillment: 'Fulfillment delay',
   workflow_failure: 'Workflow issue',

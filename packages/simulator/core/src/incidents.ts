@@ -17,6 +17,7 @@ export interface IncidentKind {
   exceptionClass:
     | 'inventory_mismatch'
     | 'order_quantity_mismatch'
+    | 'stock_sync_stall'
     | 'stuck_fulfillment'
     | 'sync_failure'
     | 'workflow_failure'
@@ -35,6 +36,14 @@ export const incidentKinds = {
       'The stock sync stops updating one SKU at one shop location, so the shop shows more or less stock than the ERP.',
     unit: 'order',
     exceptionClass: 'inventory_mismatch',
+    surface: 'case',
+  },
+  'stock-sync-stall': {
+    label: 'Stock sync stalled',
+    description:
+      'The stock sync to one shop stops for every SKU, so ERP stock changes queue and the shop keeps selling against old figures until it resumes.',
+    unit: 'day',
+    exceptionClass: 'stock_sync_stall',
     surface: 'case',
   },
   oversell: {

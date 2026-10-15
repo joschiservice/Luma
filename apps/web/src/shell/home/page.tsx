@@ -69,6 +69,7 @@ import {
 import { sessionOptions } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { useWorkspaceLayout } from '../../kit/layout/data';
+import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import {
   ActivityModule,
   AttentionModule,
@@ -387,6 +388,7 @@ export function HomePage() {
 
   return (
     <div className="home">
+      <StockProtectionNotice organizationId={organizationId} />
       <header className="home-header">
         <div className="home-header-copy">
           <p className="home-date">{today}</p>

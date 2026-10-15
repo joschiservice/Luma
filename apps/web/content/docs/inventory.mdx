@@ -60,6 +60,14 @@ Luma opens an issue without waiting when a store shows stock that your stock sou
 
 A gap that is still open after the wait becomes a **Stock mismatch** issue that says how long Luma waited. An order shows its ordered items that are syncing in its **Issues** panel.
 
+## When the stock sync stalls
+
+The app or integration that copies stock from your stock source to your store can stop working. Then your store keeps selling against figures that get older with every sale, return or delivery.
+
+Luma opens one **Stock sync stalled** issue for the store when, 15 minutes after your stock source changed, at least 3 linked products still show the old figure in the store, and at least half of the recent changes haven't arrived. You can change these limits under **Issue detection** in [Workspace settings](/docs/workspace-settings). Stock that Luma corrected itself doesn't count as a change the sync delivered. Before opening it, Luma reads those products from both systems again. Luma doesn't open the issue while its own reads of either system are failing or behind. The issue is high severity when the store shows more stock than your stock source has.
+
+While the issue is open, products that differ in that store wait for the sync instead of opening their own **Stock mismatch** issue. A product that shows more stock in the store than your stock source has still gets its own issue, because it can oversell. Ask whoever runs your stock sync to check and restart it first: a product you correct earlier can be overwritten when the sync runs again. The issue closes when fresh reads show the products that lagged match again.
+
 ## Link the same SKU across systems
 
 Luma treats records from different systems as the same SKU only after they’re linked, by a person or by an [automatic linking](/docs/data-sync#automatic-linking) rule. Until then, Shopify’s and your ERP’s stock for one item appear as separate SKUs, and you can’t compare them or correct one from the other.
@@ -185,3 +193,38 @@ prove physical warehouse stock. Use an independent warehouse source for physical
 and ledger changes. To hand stock authority back, clear holds and pending effects, restore
 and verify the full native baseline, and obtain a separate ownership review. Activation and
 other stock states need their own authorized actions.
+
+## Protect stock during a stalled sync
+
+When stock protection is available for your workspace, an Admin or Owner can configure it
+under **Settings → Approvals → Stock protection**. Choose the Shopify store and start with
+**Preview**. Preview records which positions would be held without writing to Shopify.
+Choose **On** to authorize incident holds within your limits. **Always require approval**
+still requires one review for the incident. If that approval expires while holds remain,
+Luma asks for a fresh incident review before making more changes.
+
+Protection starts only after Luma confirms that the ERP stock sync has stalled and Luma
+can still read both systems. It protects tracked, mapped at-risk stock. Items that can sell
+when out of stock, bundles, native stock, excluded products and positions with unresolved
+corrections are not protected. The incident lists the reason for each exclusion.
+
+The buffer lowers Shopify's available stock once. A further ERP decrease can tighten the
+hold downward. A sale, manual edit, return or another app changing the held value ends
+Luma's ownership; Luma leaves that value alone for the rest of the incident. When the sync
+recovers, releases use fresh ERP stock, not the number from before the hold. Accepted
+writes stay unverified until independent reads confirm them.
+
+Home, Inventory and the affected product show the incident. Open it to review ERP, held
+and Shopify quantities, release one SKU or all holds, or extend the deadline. At the time
+limit Luma keeps holds and asks for help unless you explicitly selected release at the
+limit. Issue emails report placement, partial failures, the deadline and release.
+
+Turning protection off or switching to Preview asks whether to release current holds or
+keep them until recovery. Observe-only blocks releases too: release first if you want
+stock returned immediately. Disconnecting Shopify or uninstalling its app cannot restore
+stock; affected holds stay unknown until access or the merchant sync restores them.
+
+Shopify inventory history identifies these adjustments with
+`luma://inventory-holds/<holdId>`. The incident summary records duration, held SKUs,
+unit-hours withheld and observed oversell exposure. Exposure is evidence of risk, not proof
+of a prevented sale.

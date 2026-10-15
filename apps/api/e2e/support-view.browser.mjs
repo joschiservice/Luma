@@ -239,13 +239,15 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
   );
   expect(preferences.rows[0].count).toBe(0);
 
-  // The owner sees the view in Activity and revokes access.
+  // Activity names the member shown and the path read. The owner then revokes access.
   await ownerPage.goto(`/app/${f.workspace.id}/activity`);
   await expect(
-    ownerPage.getByText('Read-only support view started').first(),
+    ownerPage.getByRole('button', { name: / member Luma support Recorded$/ }),
   ).toBeVisible();
   await expect(
-    ownerPage.getByText('Support view opened a page').first(),
+    ownerPage.getByRole('button', {
+      name: / \/settings Luma support Recorded$/,
+    }),
   ).toBeVisible();
   await ownerPage.goto(`/app/${f.workspace.id}/settings/support`);
   await ownerPage.getByRole('button', { name: 'Revoke access' }).click();

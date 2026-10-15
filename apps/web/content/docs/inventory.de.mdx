@@ -114,3 +114,39 @@ Kann Luma die Anpassungsreferenz nicht bestätigen, bleibt die Aktion auch bei �
 ## Umlagerungen und Wareneingang verfolgen [#follow-transfers-and-receiving]
 
 Wähle in Bestand **Umlagerungen**, um Bestand zu verfolgen, der zwischen Lagerorten unterwegs ist. Wechsle im Ansichtsmenü zwischen Umlagerungen und Sendungen. Filtere nach Quelle, angeforderter, versandter, empfangener oder nicht empfangener Menge, Anforderungsdatum oder letzter Aktualisierung in der Quelle, und sortiere nach Name oder Aktualisierung; ohne Sortierung stehen die neuesten Anforderungen oben. Öffne einen Beleg, um seine genauen Quellpositionen und Mengen zu prüfen. Diese Mengen liefern Kontext; Luma addiert sie nicht zum gemeldeten Bestand eines Lagerorts.
+
+## Bestand bei ausgesetzter Synchronisierung schützen
+
+Wenn Bestandsschutz für deinen Workspace verfügbar ist, können Admins und Owner ihn unter
+**Einstellungen → Freigaben → Bestandsschutz** einrichten. Wähle den Shopify-Shop und starte
+mit **Vorschau**. Sie zeichnet geplante Rückhaltungen auf, ohne Shopify zu ändern. **Ein**
+erlaubt Rückhaltungen innerhalb deiner Grenzen. **Immer Freigabe verlangen** verlangt
+weiterhin eine Freigabe für den gesamten Vorfall. Läuft diese Freigabe ab, während noch
+Bestand zurückgehalten wird, fordert Luma vor weiteren Änderungen eine neue
+Vorfallsfreigabe an.
+
+Der Schutz beginnt erst, wenn Luma einen Synchronisierungsausfall bestätigt hat und beide
+Systeme weiterhin lesen kann. Er schützt verfolgte, zugeordnete Risikobestände. Artikel mit
+Verkauf ohne Bestand, Sets, native Bestände, ausgeschlossene Produkte und Positionen mit
+ungewissen Korrekturen bleiben ungeschützt. Der Vorfall nennt die Gründe.
+
+Der Puffer senkt den verfügbaren Shopify-Bestand einmal. Sinkt der ERP-Bestand weiter unter
+den gehaltenen Wert, kann Luma ihn weiter senken. Ändern Verkäufe, Retouren, Menschen oder
+andere Apps den Wert, beendet Luma die Rückhaltung dieser Position und überschreibt die
+Änderung nicht. Freigaben verwenden frischen ERP-Bestand, nie den früheren Shopify-Wert.
+Erst unabhängige Lesevorgänge bestätigen eine Änderung.
+
+Home, Bestand und betroffene Produkte verlinken den Vorfall. Dort siehst du ERP-, gehaltene
+und Shopify-Mengen, kannst einzelne Artikel oder alle freigeben und die Frist verlängern.
+Beim Zeitlimit bleiben Rückhaltungen bestehen und Luma fordert Hilfe an, sofern du nicht
+ausdrücklich die Freigabe beim Zeitlimit gewählt hast. Vorfalls-E-Mails informieren über
+Beginn, Teilfehler, Frist und Ende.
+
+Beim Ausschalten oder Wechsel zur Vorschau wählst du zwischen sofortiger Freigabe und
+Beibehalten bis zur Wiederherstellung. Der Beobachtungsmodus blockiert auch Freigaben.
+Trennst du Shopify oder deinstallierst die App, kann Luma Bestand nicht zurücksetzen; die
+betroffenen Positionen bleiben unbekannt, bis Zugriff oder Synchronisierung zurückkehren.
+
+Shopifys Bestandshistorie zeigt `luma://inventory-holds/<holdId>` als Referenz. Die
+Zusammenfassung nennt Dauer, Artikel, zurückgehaltene Einheitenstunden und beobachtetes
+Überverkaufsrisiko. Dieses Risiko beweist keinen verhinderten Verkauf.

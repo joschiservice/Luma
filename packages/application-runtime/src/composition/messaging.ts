@@ -158,6 +158,7 @@ const caseLabels: Record<string, string> = {
   stuck_fulfillment: 'Stuck fulfillment',
   inventory_mismatch: 'Inventory mismatch',
   order_quantity_mismatch: 'Order quantity difference',
+  stock_sync_stall: 'Stock sync stalled',
   workflow_failure: 'Workflow failure',
 };
 

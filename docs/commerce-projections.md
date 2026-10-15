@@ -138,6 +138,14 @@ and a set of untimed reads settles on the same current snapshot in any arrival o
 When an adapter starts or stops reporting update times, the transition is ordered by
 observation time.
 
+A database trigger keeps three facts on each current stock report whenever its snapshot
+changes: the available quantity (null for a tombstone), when that quantity was first seen
+(kept while later reports repeat it, reset when it differs) and whether the report carries
+a matching attribution of Luma's own write. Every write path that moves the projection
+updates them, so detection reads recent changes without scanning report history. Moving
+back to an earlier snapshot, for example after relinking, counts as a change at that
+snapshot's observation time.
+
 Order lines and fulfillments have immutable canonical parent bindings. Fulfillment lines
 must occur in the same connection's order projection and use its units. Split operations
 stay separate; quantities are not clamped to the ordered amount. The owner revalidates

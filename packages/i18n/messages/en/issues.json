@@ -4,6 +4,7 @@
   "issues_kind_stuck_fulfillment": "Fulfillment delay",
   "issues_kind_workflow_failure": "Workflow issue",
   "issues_kind_order_quantity_mismatch": "Quantity difference",
+  "issues_kind_stock_sync_stall": "Stock sync stalled",
   "issues_kind_other": "Operational issue",
   "issues_state_detected": "Detected",
   "issues_state_diagnosed": "Investigation ready",
@@ -549,5 +550,6 @@
   "issues_review_workflow_recorded": "The workflow’s recorded proposal, approval, change and verification are linked in Change and outcome check. Decisions about that proposal use its own review in Needs you.",
   "issues_workflow_recorded_status": "Recorded workflow steps available",
   "issues_detection_stock_limits": "Detection settings: tolerance {tolerance} units; confirmation {window} seconds; oversell risk {oversell} seconds.",
-  "issues_detection_fulfillment_limit": "Detection setting: no progress for {limit} seconds."
+  "issues_detection_fulfillment_limit": "Detection setting: no progress for {limit} seconds.",
+  "issues_detection_stall_limits": "Detection settings: stock changes not shown in the store after {window} seconds; at least {count} products and {share}% of recent changes."
 }

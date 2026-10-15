@@ -15,6 +15,7 @@ export const caseClasses = [
   'stuck_fulfillment',
   'inventory_mismatch',
   'order_quantity_mismatch',
+  'stock_sync_stall',
   'workflow_failure',
 ] as const;
 
@@ -163,6 +164,9 @@ export const caseDetailSchema = caseSummarySchema.extend({
       propagationSeconds: z.number(),
       oversellPropagationSeconds: z.number(),
       stuckSeconds: z.number(),
+      stallSeconds: z.number(),
+      stallMinPositions: z.number(),
+      stallSharePercent: z.number(),
     })
     .optional(),
   diagnosis: diagnosisSchema.nullable(),

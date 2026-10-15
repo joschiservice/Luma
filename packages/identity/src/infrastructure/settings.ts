@@ -106,6 +106,13 @@ function transaction(
   });
 
   return {
+    activeStockHolds: async () =>
+      !!(
+        await tx.query(
+          `SELECT 1 FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p WHERE i.tenant_id=$1 AND p->>'status' IN ('held','tightened','unknown','releasing') AND (p->>'startedAt' IS NOT NULL OR (p->>'status'='unknown' AND p->>'actionId' IS NOT NULL)) AND p->>'endedAt' IS NULL LIMIT 1`,
+          [tenantId],
+        )
+      ).rowCount,
     async member(userId) {
       const row = (
         await tx.query<MembershipRow>(
@@ -158,7 +165,7 @@ function transaction(
       const org = (
         await tx.query<SettingsSnapshot['workspace']>(
           `SELECT o.name,o.slug,o.write_mode AS "writeMode",o.data_region AS "dataRegion",COALESCE(s.timezone,'UTC') AS timezone,
-        COALESCE(s.detection,'{"inventoryTolerance":"0","propagationSeconds":1800,"oversellPropagationSeconds":120,"stuckSeconds":7200}'::jsonb) AS detection,COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision",COALESCE(s.replenishment_approval,'{"separateSend":false,"threshold":null}'::jsonb) AS "replenishmentApproval",
+        '{"inventoryTolerance":"0","propagationSeconds":1800,"oversellPropagationSeconds":120,"stuckSeconds":7200,"stallSeconds":900,"stallMinPositions":3,"stallSharePercent":50}'::jsonb||COALESCE(s.detection,'{}'::jsonb) AS detection,COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision",COALESCE(s.replenishment_approval,'{"separateSend":false,"threshold":null}'::jsonb) AS "replenishmentApproval",
         COALESCE(s.require_independent_approval,true) AS "requireIndependentApproval",workspace_active_member_count() AS "activeMemberCount"
         FROM organizations o LEFT JOIN workspace_settings s ON s.tenant_id=o.id WHERE o.id=$1`,
           [tenantId],

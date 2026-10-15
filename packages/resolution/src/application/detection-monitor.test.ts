@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
   DetectionSources,
   FulfillmentWork,
+  StockFollowing,
   StockPosition,
   SyncStreamState,
 } from './detection-monitor.js';
@@ -47,6 +48,7 @@ function exceptionService(
 ) {
   const incidents: Incident[] = [];
   const ingested: DetectionRequest[] = [];
+  const evidence = new Map<string, DetectionRequest['evidence']>();
 
   return {
     incidents,
@@ -76,7 +78,9 @@ function exceptionService(
                   facts.canonicalLocationId!,
                   ...[...facts.connectionIds!].sort(),
                 ]
-              : [facts.connectionId!];
+              : request.input.exceptionClass === 'stock_sync_stall'
+                ? [facts.connectionIds![0]!]
+                : [facts.connectionId!];
         let incident = incidents.find(
           (item) =>
             item.state !== 'resolved' &&
@@ -99,6 +103,7 @@ function exceptionService(
                 stuck_fulfillment: 'fulfillment-progress',
                 inventory_mismatch: 'available-stock',
                 order_quantity_mismatch: 'order-line-quantity',
+                stock_sync_stall: 'stock-sync-follow',
                 workflow_failure: 'workflow-step',
               }[request.input.exceptionClass],
               subjectKind: {
@@ -106,6 +111,7 @@ function exceptionService(
                 stuck_fulfillment: 'fulfillment',
                 inventory_mismatch: 'sku',
                 order_quantity_mismatch: 'order',
+                stock_sync_stall: 'connection',
                 workflow_failure: 'workflow_run',
               }[request.input.exceptionClass],
               subjectId:
@@ -125,11 +131,18 @@ function exceptionService(
           };
           incidents.push(incident);
         }
+        evidence.set(incident.id, [
+          ...(evidence.get(incident.id) ?? []),
+          ...request.evidence,
+        ]);
 
         return { decision, incident, reviewRequired: false };
       },
     ),
     list: vi.fn(async () => structuredClone(incidents)),
+    evidence: vi.fn(
+      async (_context: TenantContext, id: string) => evidence.get(id) ?? [],
+    ),
     verify: vi.fn(async (actor: TenantContext, id: string) => {
       const incident = incidents.find((item) => item.id === id)!;
       const result = await verifier().evaluate(actor, incident);
@@ -148,6 +161,7 @@ function fixture(
     positions?: StockPosition[];
     work?: FulfillmentWork[];
     stock?: Record<string, string>;
+    following?: StockFollowing[];
     fulfillment?: Partial<FulfillmentSnapshot>;
     /** When Luma first saw the stock sides disagree after they last agreed. */
     mismatchSince?: string;
@@ -161,6 +175,7 @@ function fixture(
     positions: overrides.positions ?? [],
     work: overrides.work ?? [],
     stock: overrides.stock ?? {},
+    following: overrides.following ?? [],
     fulfillment: overrides.fulfillment ?? {},
   };
   const sources: DetectionSources = {
@@ -194,6 +209,12 @@ function fixture(
               ),
           )
           .slice(0, limit),
+    ),
+    stockFollowing: vi.fn<DetectionSources['stockFollowing']>(
+      async (_context, { storefrontIds }) =>
+        state.following.filter((item) =>
+          storefrontIds.includes(item.storefrontId),
+        ),
     ),
     stockAgreement: vi.fn<DetectionSources['stockAgreement']>(async () =>
       state.mismatchSince
@@ -766,5 +787,192 @@ describe('detection monitor', () => {
       expect.any(Error),
     );
     expect(f.exceptions.incidents).toHaveLength(1);
+  });
+
+  describe('stalled stock sync', () => {
+    /** Three linked products whose ERP stock changed 40 minutes ago, with healthy stock reads. */
+    function stalled(
+      overrides: {
+        followed?: number;
+        streams?: SyncStreamState[];
+        stock?: Record<string, string>;
+        authorityOverrides?: AuthorityOverrides;
+      } = {},
+    ) {
+      const positions = [position(), position(), position()];
+      const following: StockFollowing = {
+        storefrontId: connections.de,
+        followed: overrides.followed ?? 0,
+        lagging: positions.length,
+        laggingSince: ago(40),
+        positions: positions.map((item) => ({
+          positionId: item.positionId,
+          skuId: item.skuId,
+          locationId: item.locationId,
+          changedAt: ago(40),
+        })),
+      };
+      const reads = (connectionId: string, provider: string) =>
+        stream({
+          connectionId,
+          provider,
+          capability: 'inventory.read',
+          lastCompleteAt: ago(2),
+        });
+
+      return fixture({
+        positions,
+        following: [following],
+        ...(overrides.authorityOverrides
+          ? { authorityOverrides: overrides.authorityOverrides }
+          : {}),
+        stock: overrides.stock ?? {
+          [connections.erp]: '5',
+          [connections.de]: '9',
+        },
+        streams: overrides.streams ?? [
+          reads(connections.erp, 'jtl'),
+          reads(connections.de, 'shopify'),
+        ],
+      });
+    }
+
+    const stalls = (f: ReturnType<typeof fixture>) =>
+      f.exceptions.incidents.filter(
+        (item) => item.exceptionClass === 'stock_sync_stall',
+      );
+    const stallRequests = (f: ReturnType<typeof fixture>) =>
+      f.exceptions.ingested.filter(
+        (item) => item.input.exceptionClass === 'stock_sync_stall',
+      );
+
+    it('opens one case for the storefront when its lagging products still differ on fresh reads', async () => {
+      const f = stalled();
+
+      await f.monitor.tick(context);
+
+      expect(stalls(f)).toEqual([
+        expect.objectContaining({
+          severity: 'high',
+          subject: {
+            ruleIdentity: 'stock-sync-follow',
+            subjectKind: 'connection',
+            subjectId: connections.de,
+            scope: [connections.erp],
+          },
+        }),
+      ]);
+      expect(stallRequests(f)[0]!.input.facts).toMatchObject({
+        lagging: 3,
+        sampled: 3,
+        confirmed: 3,
+        overselling: 3,
+        readsCurrent: true,
+      });
+      expect(f.diagnose).toHaveBeenCalledWith(context, stalls(f)[0]!.id);
+      // The storefront that reported no unfollowed changes is not evaluated.
+      expect(
+        stallRequests(f).some(
+          (item) => item.input.facts.subjectId === connections.at,
+        ),
+      ).toBe(false);
+    });
+
+    it('leaves a store whose recent changes mostly arrived to per-product checks', async () => {
+      const f = stalled({ followed: 10 });
+
+      await f.monitor.tick(context);
+
+      // Nothing is reread or evaluated for a store whose sync visibly works.
+      expect(stallRequests(f)).toEqual([]);
+      expect(stalls(f)).toEqual([]);
+    });
+
+    it('starts no evaluation while Luma’s own stock reads are failing', async () => {
+      const f = stalled({
+        streams: [
+          stream({
+            connectionId: connections.de,
+            provider: 'shopify',
+            capability: 'inventory.read',
+            attempts: 2,
+            failingSince: ago(10),
+          }),
+        ],
+      });
+
+      await f.monitor.tick(context);
+
+      expect(stallRequests(f)).toEqual([]);
+      expect(stalls(f)).toEqual([]);
+    });
+
+    it('lets the products of a stalled store wait instead of opening one case each, unless they oversell', async () => {
+      const f = stalled({
+        stock: { [connections.erp]: '5', [connections.de]: '4' },
+        authorityOverrides: { inventory_selling: connections.de },
+      });
+      const mismatches = () =>
+        f.exceptions.incidents.filter(
+          (item) =>
+            item.exceptionClass === 'inventory_mismatch' &&
+            item.subject.scope.includes(connections.de),
+        );
+
+      await f.monitor.tick(context);
+
+      expect(stalls(f)).toHaveLength(1);
+      expect(mismatches()).toEqual([]);
+      const waiting = f.exceptions.ingested.filter(
+        (item) =>
+          item.input.exceptionClass === 'inventory_mismatch' &&
+          item.input.facts.syncStalled,
+      );
+      expect(waiting.length).toBeGreaterThan(0);
+      expect(
+        waiting.every((item) =>
+          item.evidence.some(
+            (evidence) =>
+              evidence.key === `stock-sync-stall:${stalls(f)[0]!.id}`,
+          ),
+        ),
+      ).toBe(true);
+
+      // Without the stall case the same gap opens its own case.
+      const control = fixture({
+        positions: f.state.positions,
+        stock: { [connections.erp]: '5', [connections.de]: '4' },
+        authorityOverrides: { inventory_selling: connections.de },
+      });
+      await control.monitor.tick(context);
+      expect(
+        control.exceptions.incidents.some(
+          (item) => item.exceptionClass === 'inventory_mismatch',
+        ),
+      ).toBe(true);
+
+      // A storefront that shows more than the ERP has still opens its own case.
+      f.state.stock[connections.de] = '9';
+      await f.monitor.tick(context);
+      expect(mismatches().length).toBeGreaterThan(0);
+    });
+
+    it('closes the case only when the products that lagged match on fresh reads', async () => {
+      const f = stalled({
+        stock: { [connections.erp]: '5', [connections.de]: '4' },
+      });
+      await f.monitor.tick(context);
+      expect(stalls(f)).toHaveLength(1);
+      expect(stalls(f)[0]!.severity).toBe('medium');
+
+      // No stored changes are unfollowed any more, but the storefront still shows other figures.
+      f.state.following = [];
+      await f.monitor.tick(context);
+      expect(stalls(f)[0]!.state).not.toBe('resolved');
+
+      f.state.stock[connections.de] = '5';
+      await f.monitor.tick(context);
+      expect(stalls(f)[0]!.state).toBe('resolved');
+    });
   });
 });

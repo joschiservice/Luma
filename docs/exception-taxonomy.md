@@ -2,7 +2,7 @@
 
 Version: `v0.2`. Owner: `@luma/exceptions`.
 
-This spec defines five exception classes, using the names and lifecycle in
+This spec defines six exception classes, using the names and lifecycle in
 [ADR-002](architecture/002-canonical-commerce-model.md): what evidence each needs, when it
 fires, how it may be resolved and what verifies it. Rules consume normalized evidence,
 never provider payloads. The [golden cases](../packages/exceptions/fixtures/exceptions-v0.json)
@@ -58,7 +58,7 @@ regression comparison. The rules rest on these provider facts:
   clock. Reread out-of-order or ambiguous projections before evaluation.
 - Thresholds are fixture defaults, not service promises: freshness 300 s, pair skew 60 s,
   sync retry window 900 s, stuck progress 7,200 s, uncertainty escalation 1,800 s,
-  inventory tolerance `0`, sync propagation 1,800 s and oversell guard 25 %. Tenant configuration is versioned; changing a value requires
+  inventory tolerance `0`, sync propagation 1,800 s, oversell guard 25 % and a stock sync stall after 900 s on at least 3 products and 50 % of recent changes. Tenant configuration is versioned; changing a value requires
   reevaluation and invalidates stale proposals.
 - Use exact decimal arithmetic (up to 14 integer and 6 fractional digits). Null is
   unknown, zero is known, and negative or fractional stock is valid. Never derive available
@@ -81,8 +81,9 @@ applicable branch wins:
    eligibility from current exemption evidence; a bare pending status is insufficient.
 3. **Inventory:** missing SKU/pool mapping → incomplete/ambiguous projection → null
    quantities → unknown/different units → non-provider basis → future/stale observations
-   → pair skew → tolerance → pending sync → severity. Oversell severity requires the
-   selling source and the authority to be different sources.
+   → pair skew → tolerance → stalled sync (a gap that doesn't oversell) → pending sync →
+   severity. Oversell severity requires the selling source and the authority to be different
+   sources.
 4. **Workflow:** missing durable evidence → unknown effect → intentional cancellation →
    healthy running/succeeded → exhausted failed/timed-out step → pending retry. An
    interrupted step with known no effect defers for a durable terminal or retry decision.
@@ -90,6 +91,9 @@ applicable branch wins:
 5. **Order quantity:** incomplete comparison → stale/future reads → reported values agree
    → unresolved authority → authority does not report the line → future change → sources
    not reread after the propagation window → detect.
+6. **Stock sync stall:** Luma's own reads not current → fewer lagging products than the
+   minimum → share of recent changes below the threshold → no fresh rereads → stale/future
+   rereads → too few rereads still differ → severity.
 
 ### Identity, repetition and overlap
 
@@ -338,10 +342,52 @@ the case scope is reread after the latest detection, and the same rule must clea
 reads: every reporting source shows one value. A source set that changed since detection
 cannot verify the case.
 
+## 6. `stock_sync_stall`
+
+**Subject:** a storefront connection and the workspace's stock authority. Subject
+`connection` (the storefront); rule identity `stock-sync-follow`; scope `[authorityConnectionId]`.
+The authority is the resolved `inventory_stock` connection; every storefront connection is
+compared with it.
+
+**Normal:** the merchant's stock sync carries each authority change to the storefront within
+the stall window. A few products that don't follow are individual stock mismatches, not a
+stalled sync.
+
+**Trigger:** from stored reports, a linked product is _lagging_ when the authority's current
+quantity was first seen between the lookback start (the larger of 2 hours and twice the stall
+window, before the window) and `stallSeconds` ago, and the storefront's current report
+differs beyond the inventory tolerance; it _followed_ when the storefront matches with a
+quantity Luma didn't write. Natively owned positions and unknown quantities are left out. The rule detects when Luma's own stock
+reads of both connections completed after the earliest lagging change without failing, at
+least `stallMinPositions` products lag, they are at least `stallSharePercent` of lagging and
+followed products, and at least `stallMinPositions` of the earliest lagging products still
+differ on fresh rereads of both sides. Severity is `high` (`oversell_risk`) when a reread
+storefront shows more than the authority, otherwise `medium` (`storefront_not_following`).
+Too few lagging products, a low share or rereads that agree clear the rule; reads that are
+not current or fresh defer.
+
+**Evidence:** both reread observations and the mapping of each reread product, and one item
+with the stored counts, the window and the lagging products it reread. While the case is
+open, an `inventory_mismatch` evaluation of the same pair carries `syncStalled` and an
+evidence item naming the case; a gap that doesn't oversell defers with `sync_stalled`, which
+resets the uncertainty window instead of escalating. Oversell risk still detects.
+
+**Likely causes:** the merchant's stock connector stopped, paused, lost access or fell behind.
+Luma does not read the connector itself, so the cause is a hypothesis.
+
+**Safe resolution:** a person restarts or repairs the stock sync. Opted-in [stock protection](shopify-actions.md#incident-stock-protection) can hold at-risk
+Shopify stock while the sync is stalled. Correcting individual products outside that ownership
+can be overwritten when the sync resumes.
+
+**Verification:** postcondition `equivalent_inventory_agrees`. The lagging products named in
+the latest detection are reread from both sides and must agree, and the stored history must
+no longer meet the stall threshold. No comparable reread is inconclusive.
+
 ## Golden fixture format
 
 The fixture supplies a fixed `now`, versioned thresholds, per-class base facts and named
-cases (`sync-*`, `fulfillment-*`, `inventory-*`, `order-quantity-*`, `workflow-*`). Materialize a case with a
+cases (`sync-*`, `fulfillment-*`, `inventory-*`, `order-quantity-*`, `stock-sync-stall-*`,
+`workflow-*`). Materialize a case with a
 **shallow** merge of its class base and `input`; arrays replace whole arrays. Each base
 supplies tenant, subject and synthetic evidence keys. Cases are normalized rule facts, not
 connector responses or database rows. Labels such as `tenant-a` are test identities;
@@ -377,6 +423,10 @@ never counted as autonomous verified success.
 - **`v0.2`, `order_quantity_mismatch`.** Added the class with its facts, rule identity and
   golden cases (`order-quantity-*`). It reuses `propagationSeconds` and the freshness
   window; existing classes evaluate as before, so the version stays `v0.2`.
+- **`v0.2`, `stock_sync_stall`.** Added the class with its facts, rule identity, the optional
+  thresholds `stallSeconds`, `stallMinPositions` and `stallSharePercent` (defaults apply when
+  absent) and golden cases (`stock-sync-stall-*`). Existing classes evaluate as before. The
+  default configuration version changed, so open cases are reevaluated on their next pass.
 - **`v0.2`, `inventory_mismatch` pending sync.** Added the optional fact `mismatchSince`,
   the thresholds `propagationSeconds` and `oversellGuardPercent`, and
   the decision `defer`/`propagation_pending`. Inputs without the facts evaluate as in

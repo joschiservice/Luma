@@ -18,6 +18,7 @@ export function shopifyRequestBudget(
   connection: Pick<InstalledConnection, 'tenantId' | 'target'>,
   purpose: RequestPurpose = 'foreground',
   region = options.env?.LUMA_REGION ?? 'AU',
+  maxWaitMs?: number,
 ): ReadBudget {
   if (!options.requestBudgetStore) return createReadBudget();
   const binding = createHash('sha256')
@@ -36,7 +37,7 @@ export function shopifyRequestBudget(
     store: options.requestBudgetStore,
     key: `luma:shopify:admission:v1:{${binding}}`,
     purpose,
-    maxWaitMs: purpose === 'foreground' ? 2000 : 0,
+    maxWaitMs: maxWaitMs ?? (purpose === 'foreground' ? 2000 : 0),
     continuationWaitMs: purpose === 'foreground' ? 2000 : 10000,
   });
 }
