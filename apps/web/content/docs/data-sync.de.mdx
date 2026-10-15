@@ -82,6 +82,8 @@ Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig 
 
 ## Wenn ein Abgleich dich braucht [#when-a-sync-needs-you]
 
+- **Wartet wegen Anfragelimit** oder **Erneuter Versuch nach Anfragelimit**: Luma hält das Anfragelimit der Quelle ein. Luma versucht es automatisch erneut und zeigt den nächsten Versuch an, wenn der Zeitpunkt bekannt ist. Du kannst die Seite verlassen; bereits importierte Datensätze bleiben verfügbar.
+- **Wartet auf Sync-Kapazität**: Andere Lesezugriffe laufen. Luma fährt automatisch fort, sobald Kapazität verfügbar ist.
 - **Neuer Versuch läuft**: Ein Lesevorgang ist fehlgeschlagen, und Luma versucht es automatisch erneut, mit jeweils etwas längerer Pause.
 - **Fehlgeschlagen**: Der Abgleich ist mehrmals hintereinander fehlgeschlagen. Die Meldung nennt den Grund. Behebe die Ursache, etwa indem du die Verbindung neu verbindest, und wähle dann **Jetzt erneut versuchen**.
 - **Muss fortgesetzt werden**: Die Person, unter deren Zugriff der Abgleich lief, verwaltet den Workspace nicht mehr. Eine Person mit **Importe verwalten** wählt **Mit meinem Zugriff fortsetzen**, und der Abgleich läuft mit ihrem Zugriff weiter.

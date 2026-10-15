@@ -17,6 +17,7 @@ import {
   current,
   importing,
   organizationId,
+  rateLimited,
   recentHistory,
   waiting,
 } from './sync-fixtures';
@@ -26,6 +27,7 @@ const overviews: Record<string, SyncOverview | undefined> = {
   recentHistory,
   waiting,
   current,
+  rateLimited,
   attention,
   empty: { ...importing, connections: [], runs: [] },
 };
@@ -170,7 +172,7 @@ export const Waiting: Story = {
     await expect(canvas.getByText('1,240 of 3,100 orders')).toBeVisible();
     await expect(
       canvas.getByText(
-        'Waiting for request capacity. Luma retries automatically.',
+        'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
       ),
     ).toBeVisible();
     await expect(
@@ -181,5 +183,38 @@ export const Waiting: Story = {
 
 export const WaitingDark: Story = {
   args: { state: 'waiting' },
+  globals: { theme: 'dark' },
+};
+
+export const RateLimited: Story = {
+  args: { state: 'rateLimited' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const waiting = await canvas.findByRole('group', {
+      name: 'Orders: Waiting for rate limit',
+    });
+    const retrying = canvas.getByRole('group', {
+      name: 'Orders: Retrying after rate limit',
+    });
+    const explanation =
+      'The source’s request limit has been reached. Luma will retry automatically.';
+    await expect(within(waiting).getByText(explanation)).toBeVisible();
+    await expect(
+      within(waiting).getByText('1,240 of 3,100 orders'),
+    ).toBeVisible();
+    await expect(
+      within(waiting).getByText('Next retry in 1 minute'),
+    ).toBeVisible();
+    await expect(
+      within(retrying).getByText(explanation, { exact: false }),
+    ).toBeVisible();
+    await expect(
+      within(retrying).getByText('Next retry in 1 minute'),
+    ).toBeVisible();
+  },
+};
+
+export const RateLimitedDark: Story = {
+  ...RateLimited,
   globals: { theme: 'dark' },
 };

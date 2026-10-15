@@ -191,6 +191,76 @@ describe('link methods', () => {
 });
 
 describe('waiting explanations', () => {
+  it.each([
+    ['request_capacity', 'Waiting for rate limit'],
+    ['provider_cooldown', 'Waiting for rate limit'],
+    ['connection_capacity', 'Waiting for sync capacity'],
+    ['orders', 'Waiting for orders'],
+    ['admission_unavailable', 'Waiting'],
+    ['queued', 'Waiting'],
+  ] as const)('labels %s accurately', (reason, label) => {
+    const waiting = stream({
+      status: 'waiting',
+      waiting: {
+        reason,
+        connections: [],
+        observedAt: '2026-10-14T13:00:00Z',
+        until: null,
+      },
+    });
+    expect(streamState(waiting)).toEqual({ state: 'waiting', label });
+  });
+
+  it('explains provider cooldowns and automatic retries', () => {
+    expect(
+      waitingStatement(
+        stream({
+          status: 'waiting',
+          waiting: {
+            reason: 'provider_cooldown',
+            connections: [],
+            observedAt: '2026-10-14T13:00:00Z',
+            until: '2026-10-14T13:01:00Z',
+          },
+        }),
+      ),
+    ).toBe(
+      'The source’s request limit has been reached. Luma will retry automatically.',
+    );
+  });
+
+  it('names rate-limited retries without hiding failures or manual pauses', () => {
+    const retrying = stream({
+      status: 'retrying',
+      error: {
+        code: 'rate_limited',
+        message: 'The source asked Luma to slow down.',
+        at: '2026-10-14T13:00:00Z',
+        attempts: 1,
+      },
+    });
+    expect(streamState(retrying)).toEqual({
+      state: 'attention',
+      label: 'Retrying after rate limit',
+    });
+    expect(streamState({ ...retrying, status: 'failing' })).toEqual({
+      state: 'error',
+      label: 'Failing',
+    });
+    expect(streamState({ ...retrying, status: 'paused' }).label).toBe('Paused');
+    expect(
+      streamState({
+        ...retrying,
+        error: {
+          code: 'timeout',
+          message: 'The source did not respond in time.',
+          at: '2026-10-14T13:00:00Z',
+          attempts: 1,
+        },
+      }).label,
+    ).toBe('Retrying');
+  });
+
   it('keeps the waiting label separate from paused and names capacity holders', () => {
     const waiting = stream({
       status: 'waiting',
@@ -203,7 +273,7 @@ describe('waiting explanations', () => {
     });
     expect(streamState(waiting)).toEqual({
       state: 'waiting',
-      label: 'Waiting',
+      label: 'Waiting for sync capacity',
     });
     expect(waitingStatement(waiting)).toBe(
       'Waiting for sync capacity. Currently syncing: Cin7 warehouse.',
@@ -223,7 +293,7 @@ describe('waiting explanations', () => {
       },
     });
     expect(waitingStatement(waiting)).toBe(
-      'Waiting for request capacity. Luma retries automatically.',
+      'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
     );
   });
 });

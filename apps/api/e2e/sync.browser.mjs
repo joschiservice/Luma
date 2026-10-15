@@ -65,10 +65,12 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   );
   await page.getByRole('button', { name: 'Refresh sync status' }).click();
   await page
-    .getByRole('group', { name: 'Orders: Waiting', exact: true })
+    .getByRole('group', { name: 'Orders: Waiting for rate limit', exact: true })
     .waitFor();
   await expect(
-    page.getByText('Waiting for request capacity. Luma retries automatically.'),
+    page.getByText(
+      'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
+    ),
   ).toBeVisible();
   await expect(
     page.getByText('50 of 120 orders', { exact: true }),

@@ -84,6 +84,8 @@ A rule shows **Waiting for data** until Luma has read both connections completel
 
 ## When a sync needs you
 
+- **Waiting for rate limit** or **Retrying after rate limit**: Luma is respecting the source’s request limit. It retries automatically and shows the next retry time when known. You can leave the page; records already imported stay available.
+- **Waiting for sync capacity**: other reads are running. Luma continues automatically when capacity is available.
 - **Retrying**: a read failed and Luma tries again automatically, waiting a little longer each time.
 - **Failing**: it failed several times in a row. The message explains why. Fix the cause, for example by reconnecting the connection, then choose **Retry now**.
 - **Needs someone to resume**: the person the sync ran as no longer manages the workspace. Someone with **Manage imports** chooses **Resume with my access**, and the sync continues with their access.

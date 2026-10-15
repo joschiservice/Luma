@@ -495,7 +495,11 @@ function StreamRow({
               time: soon(stream.waiting.until, now),
             })}
           </small>
-        ) : stream.status !== 'waiting' && stream.nextRunAt && !stream.scan ? (
+        ) : stream.status !== 'waiting' &&
+          stream.nextRunAt &&
+          (!stream.scan ||
+            stream.status === 'retrying' ||
+            stream.status === 'failing') ? (
           <small title={stream.nextRunAt}>
             {startsNow
               ? m.sync_stream_starting_now()
@@ -644,7 +648,9 @@ function StreamNotices({
             : m.sync_notice_failed_title()}
         </AlertTitle>
         <AlertDescription>
-          {stream.error.message}{' '}
+          {stream.error.code === 'rate_limited'
+            ? m.sync_wait_provider_cooldown()
+            : stream.error.message}{' '}
           {stream.nextRunAt
             ? m.sync_notice_next_attempt({ time: soon(stream.nextRunAt, now) })
             : ''}{' '}

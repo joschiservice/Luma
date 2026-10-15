@@ -433,3 +433,41 @@ export const waiting: SyncOverview = {
     }),
   })),
 };
+
+/** Request-budget waits, a provider cooldown and a rate-limited page retry. */
+export const rateLimited: SyncOverview = {
+  ...waiting,
+  connections: waiting.connections.map((connection, index) => ({
+    ...connection,
+    recordTypes: connection.recordTypes.map((item) => {
+      if (!item.stream || item.recordType !== 'orders') return item;
+
+      return {
+        ...item,
+        stream: {
+          ...item.stream,
+          status: index === 0 ? 'waiting' : 'retrying',
+          waiting:
+            index === 0
+              ? {
+                  reason: 'provider_cooldown',
+                  connections: [],
+                  observedAt: asOf,
+                  until: '2026-09-29T09:01:00.000Z',
+                }
+              : null,
+          nextRunAt: '2026-09-29T09:01:00.000Z',
+          error:
+            index === 0
+              ? null
+              : {
+                  code: 'rate_limited',
+                  message: 'The source asked Luma to slow down.',
+                  at: asOf,
+                  attempts: 1,
+                },
+        },
+      };
+    }),
+  })),
+};
