@@ -46,7 +46,12 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
 
   // An order line leads to the product and back.
   await page.goto(`/app/${f.org.id}/orders/${catalog.soldOrderId}`);
-  await page.getByRole('link', { name: 'Product and stock' }).first().click();
+  // The line's item name opens its product.
+  await page
+    .getByRole('table', { name: /^Lines reported by / })
+    .getByRole('link')
+    .first()
+    .click();
   await page
     .getByRole('heading', { name: 'Same SKU. Different listings.' })
     .waitFor();

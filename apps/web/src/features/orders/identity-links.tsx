@@ -45,6 +45,34 @@ export function OrderIdentityLinks({
   );
 }
 
+/**
+ * Says how many orders in other sources Luma suggests linking, so suggestions are found without
+ * opening the source links. `open` opens them. Renders nothing without suggestions, while
+ * loading or when the links can't be read.
+ */
+export function OrderLinkSuggestions({
+  organizationId,
+  orderId,
+  open,
+}: {
+  organizationId: string;
+  orderId: string;
+  open: () => void;
+}) {
+  const query = useQuery(identityOptions(organizationId, 'order', orderId));
+  const count = query.data?.suggestions.length ?? 0;
+  if (!count) return null;
+
+  return (
+    <div className="order-link-hint">
+      <span>{m.orders_links_suggested({ count })}</span>
+      <Button variant="outline" size="sm" onClick={open}>
+        {m.orders_links_review()}
+      </Button>
+    </div>
+  );
+}
+
 /** Searches explicitly chosen orders when the source has no marketplace reference. */
 function OrderLinkSearch({
   organizationId,

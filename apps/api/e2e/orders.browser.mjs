@@ -208,25 +208,31 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   expect(new URL(page.url()).searchParams.has('q')).toBe(false);
   await page.getByRole('link', { name: '#2001' }).click();
   await page.getByRole('heading', { name: '#2001', level: 1 }).waitFor();
-  await page.getByRole('heading', { name: 'Current state' }).waitFor();
+  await page.getByRole('region', { name: 'Current state' }).waitFor();
   await page
     .getByText(
       'The comparison needs fresh, complete reads and unambiguous line mappings. Unknown values do not prove a difference.',
     )
     .first()
     .waitFor();
-  await page.getByRole('cell', { name: '2', exact: true }).first().waitFor();
   await page.getByText('Canvas tote').first().waitFor();
   await expect(
-    page.getByRole('columnheader', { name: 'Current', exact: true }),
+    page.getByRole('columnheader', { name: 'Quantity', exact: true }),
   ).toBeVisible();
   const editedLine = page
     .getByRole('row')
     .filter({ hasText: 'Canvas tote' })
     .first();
-  await expect(editedLine.getByRole('cell').nth(0)).toHaveText('1');
-  await expect(editedLine.getByRole('cell').nth(1)).toHaveText('2');
-  await expect(editedLine.getByRole('cell').nth(2)).toHaveText('1');
+  // One current unit, with the two ordered and one reduced beneath it.
+  const editedQuantity = editedLine
+    .getByRole('cell')
+    .filter({ hasText: '2 ordered' });
+  await expect(
+    editedQuantity.locator('.order-line-quantity > span').first(),
+  ).toHaveText('1');
+  await expect(editedQuantity).toContainText('1 reduced');
+  // The comparison is inconclusive, so no fact is listed as differing until all are shown.
+  await page.getByRole('button', { name: /^Show all \d+ facts$/ }).click();
   const comparisonTable = page.getByRole('table', {
     name: 'Facts reported by each source',
   });

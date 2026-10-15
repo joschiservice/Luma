@@ -1,4 +1,10 @@
-import type { OrderDetail, OrderList, OrderListItem } from '@luma/api-contract';
+import type {
+  OrderChangePlanQuery,
+  OrderChangePlans,
+  OrderDetail,
+  OrderList,
+  OrderListItem,
+} from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
@@ -13,7 +19,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { CollectionNotices } from '../../kit/collections/notices';
 import type { CollectionError } from '../../kit/collections/paging';
@@ -253,6 +259,13 @@ const detail: OrderDetail = {
           currentQuantity: null,
           cancelledQuantity: null,
           remainingQuantity: null,
+          prices: {
+            originalUnit: paid('24', '26'),
+            discountedUnit: paid('21.6', '23.4'),
+            totalDiscount: paid('4.8', '5.2'),
+          },
+          // Without current units, Luma can't compute the line's total.
+          currentTotal: null,
         }),
         line({
           id: '89898989-8989-4898-8989-898989898989',
@@ -266,6 +279,12 @@ const detail: OrderDetail = {
           remainingQuantity: '0',
           fulfilledQuantity: '0',
           catalog: 'no_product',
+          prices: {
+            originalUnit: paid('3', '3.25'),
+            discountedUnit: paid('3', '3.25'),
+            totalDiscount: null,
+          },
+          currentTotal: { amount: '3', currency: 'EUR' },
         }),
       ],
     },
@@ -282,7 +301,14 @@ const detail: OrderDetail = {
       fulfillment: 'unfulfilled',
       open: true,
       addresses: { state: 'not_imported' },
-      lines: [line({ fulfilledQuantity: '0', remainingQuantity: '2' })],
+      lines: [
+        line({
+          fulfilledQuantity: '0',
+          remainingQuantity: '2',
+          unitPrice: { amount: '24', currency: 'EUR' },
+          currentTotal: { amount: '48', currency: 'EUR' },
+        }),
+      ],
     },
   ],
   differences: [
@@ -702,6 +728,82 @@ function ListPreview({ state = 'ready' }: { state?: ListState }) {
   );
 }
 
+const sku = '99999999-9999-4999-8999-999999999999';
+
+/** Tokyo store still shows the units JTL-Wawi removed; packing has started in the warehouse. */
+const detectedPlans = (
+  proposal: OrderChangePlanQuery | null,
+): OrderChangePlans => ({
+  orderId: detail.order.id,
+  asOf: '2026-09-28T09:00:00.000Z',
+  comparisonState: 'confirmed',
+  hidden: [],
+  plans: [
+    {
+      change: {
+        kind: 'quantity',
+        origin: proposal ? 'proposed' : 'detected',
+        lineKey: sku,
+        line: { skuCode: 'TOTE-RED', title: 'Canvas tote' },
+        from: '2',
+        to: proposal?.quantity ?? '1',
+        unit: 'each',
+      },
+      acknowledgements: [
+        {
+          connectionId: shop,
+          state: 'differs',
+          value: '2',
+          readAt: '2026-09-28T08:00:00.000Z',
+          fresh: true,
+        },
+        {
+          connectionId: erp,
+          state: 'reflects',
+          value: '1',
+          readAt: '2026-09-28T09:00:00.000Z',
+          fresh: true,
+        },
+      ],
+      shipped: [],
+      safety: {
+        state: 'unsafe',
+        reasons: [{ code: 'work_started', connectionId: erp, lineKey: sku }],
+      },
+      steps: [
+        {
+          id: 'confirm',
+          kind: 'confirm',
+          action: 'confirm_picking',
+          performer: 'person',
+          role: 'warehouse',
+          connectionId: erp,
+          capability: null,
+          executable: false,
+          blockedBy: null,
+          permission: null,
+          viewerCanRequest: false,
+          handoff: null,
+        },
+        {
+          id: 'shopify',
+          kind: 'update_record',
+          action: 'update_quantity',
+          performer: 'luma',
+          role: null,
+          connectionId: shop,
+          capability: 'orders.quantity.edit',
+          executable: false,
+          blockedBy: 'unsafe',
+          permission: 'shopify:order_edits.apply',
+          viewerCanRequest: true,
+          handoff: null,
+        },
+      ],
+    },
+  ],
+});
+
 function DetailPreview({
   state = 'ready',
 }: {
@@ -716,11 +818,28 @@ function DetailPreview({
     | 'restricted'
     | undefined;
 }) {
+  const [proposal, setProposal] = useState<OrderChangePlanQuery | null>(null);
+
   return (
     <OrderDetailView
       organizationId={organizationId}
       search={{ view: 'needs_you' }}
       refresh={() => {}}
+      changePlan={{
+        plans: detectedPlans(proposal),
+        loading: false,
+        failed: false,
+        proposal,
+        propose: (lineKey, quantity) =>
+          setProposal({ kind: 'quantity', lineKey, quantity }),
+        clear: () => setProposal(null),
+        openEdit: () => {},
+      }}
+      links={() => (
+        <p className="order-note">
+          Linked source records and line matches appear here.
+        </p>
+      )}
       loading={state === 'loading'}
       offline={state === 'offline'}
       error={
@@ -915,9 +1034,17 @@ export const OpenPreview: Story = {
       name: 'Order preview',
     });
     await expect(within(preview).getByText('Canvas tote')).toBeVisible();
+    await expect(within(preview).getByText('2 to fulfill')).toBeVisible();
+    // Open issues link from the preview, the ones that need the reader first.
     await expect(
-      within(preview).getByRole('button', { name: 'Filter by Open' }),
+      within(preview).getByRole('link', { name: /Fulfillment delay/ }),
     ).toBeVisible();
+    // Filter shortcuts appear with the value they act on, here by keyboard focus.
+    const filter = within(preview).getByRole('button', {
+      name: 'Filter by Open',
+    });
+    filter.focus();
+    await waitFor(() => expect(filter).toBeVisible());
   },
 };
 
@@ -974,21 +1101,35 @@ export const OrderRecord: Story = {
         'Payment differs between sources: “Payment pending” in JTL-Wawi and “Paid” in Tokyo store.',
       ),
     ).toBeVisible();
-    await userEvent.click(
-      within(canvas.getByRole('group', { name: 'Show lines from' })).getByRole(
-        'button',
-        { name: 'Tokyo store' },
-      ),
+    // One switch chooses the source for both the lines and the charges.
+    await expect(canvas.getAllByRole('group', { name: /from$/ })).toHaveLength(
+      1,
     );
+    await userEvent.click(
+      within(
+        canvas.getByRole('group', { name: 'Lines and charges from' }),
+      ).getByRole('button', { name: 'Tokyo store' }),
+    );
+    await expect(
+      canvas.getByRole('table', {
+        name: 'Order amounts reported by Tokyo store',
+      }),
+    ).toBeInTheDocument();
     const lines = within(
       canvas.getByRole('table', {
         name: 'Lines reported by Tokyo store',
       }),
     );
-    const unknownQuantities = lines.getAllByText('Not reported');
-    await expect(unknownQuantities).toHaveLength(2);
-    for (const quantity of unknownQuantities)
-      await expect(quantity).toBeVisible();
+    // Without current units for the tote, neither its total nor its remaining units are known.
+    await expect(lines.getByText('Total')).toBeVisible();
+    await expect(lines.getAllByText('Unknown')).toHaveLength(2);
+    // One gift wrapping: its unit price and total.
+    await expect(lines.getAllByText('€3.00')).toHaveLength(2);
+    // Tokyo store reports neither current nor reduced units for the tote.
+    await expect(lines.getByText('Not reported')).toBeVisible();
+    await expect(lines.getByText('Reductions not reported')).toBeVisible();
+    await expect(lines.getByText('2 ordered')).toBeVisible();
+    await expect(lines.getByText('Confirmed difference')).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();
@@ -997,6 +1138,89 @@ export const OrderRecord: Story = {
       canvas.getByText('SO-10', { selector: '[aria-current]' }),
     ).toBeVisible();
     await expect(canvas.queryByText(/66666666-/)).toBeNull();
+  },
+};
+
+/** A line's menu plans a quantity change in a panel beside the order. */
+export const RecordPlanChange: Story = {
+  args: { page: 'detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    // The detected change is summarized beneath the lines.
+    await expect(
+      await canvas.findByText('Change a line’s quantity: Canvas tote'),
+    ).toBeVisible();
+    await expect(canvas.getByText('Not safe to change')).toBeVisible();
+    await userEvent.click(
+      canvas.getAllByRole('button', { name: 'Actions for Canvas tote' })[0]!,
+    );
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: 'Plan a quantity change' }),
+    );
+    const sheet = within(await body.findByRole('dialog'));
+    const quantity = sheet.getByRole('textbox', { name: 'New quantity' });
+    await expect(quantity).toHaveFocus();
+    await userEvent.type(quantity, '1');
+    await userEvent.click(
+      sheet.getByRole('button', { name: 'Plan this change' }),
+    );
+    await expect(await sheet.findByText(/Your proposal/)).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+  },
+};
+
+/** A line's facts from every source, opened from its menu. */
+export const RecordLineComparison: Story = {
+  args: { page: 'detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      (
+        await canvas.findAllByRole('button', {
+          name: 'Actions for Canvas tote',
+        })
+      )[0]!,
+    );
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: 'Compare across sources' }),
+    );
+    const sheet = within(
+      await body.findByRole('dialog', {
+        name: 'Compare Canvas tote across sources',
+      }),
+    );
+    await waitFor(() =>
+      expect(sheet.getByText('Osaka warehouse: 2')).toBeVisible(),
+    );
+  },
+};
+
+/** Source links open from the order's menu instead of filling the page. */
+export const RecordLinkedSources: Story = {
+  args: { page: 'detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    // Only the facts that differ show until the reader asks for all of them.
+    const comparison = within(
+      await canvas.findByRole('region', { name: 'Source comparison' }),
+    );
+    await expect(comparison.queryByText('Read by Luma')).toBeNull();
+    await userEvent.click(
+      comparison.getByRole('button', { name: 'Show all 13 facts' }),
+    );
+    await expect(comparison.getByText('Read by Luma')).toBeVisible();
+    await userEvent.click(
+      body.getByRole('button', { name: 'More order actions' }),
+    );
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: 'Linked sources' }),
+    );
+    const dialog = await body.findByRole('dialog', { name: 'Linked sources' });
+    await waitFor(() => expect(dialog).toBeVisible());
   },
 };
 
@@ -1130,7 +1354,14 @@ export const RecordCharges: Story = {
     const section = within(
       await canvas.findByRole('region', { name: 'Delivery and charges' }),
     );
-    await userEvent.click(section.getByRole('button', { name: 'Tokyo store' }));
+    const choose = (source: string) =>
+      userEvent.click(
+        within(
+          canvas.getByRole('group', { name: 'Lines and charges from' }),
+        ).getByRole('button', { name: source }),
+      );
+    await choose('Tokyo store');
+    await expect(section.getByText('As reported by Tokyo store')).toBeVisible();
     await expect(section.getByText('EUR, charged in CHF')).toBeVisible();
     const amounts = within(
       section.getByRole('table', {
@@ -1150,7 +1381,7 @@ export const RecordCharges: Story = {
       canvas.getByText(/Custom item or deleted product/),
     ).toBeVisible();
 
-    await userEvent.click(section.getByRole('button', { name: 'JTL-Wawi' }));
+    await choose('JTL-Wawi');
     await expect(
       section.getByText(
         'JTL-Wawi reports no delivery or charge details for this order.',

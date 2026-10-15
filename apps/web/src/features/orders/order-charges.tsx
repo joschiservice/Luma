@@ -1,18 +1,18 @@
 import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
-import { formatPercent } from '@luma/i18n/format';
+import { formatList, formatPercent } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import {
   DataTable,
   type DataTableColumn,
 } from '@luma/ui/components/primitives/data-table';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Receipt } from 'lucide-react';
 import { type ReactNode, useId } from 'react';
 
 import { OrderSection } from '../../shared/orders/order-section';
 import { formatMoney } from '../../shared/orders/presentation';
-import { SourceSwitch } from './source-facts';
 
 type Amounts = NonNullable<OrderSourceFacts['amounts']>;
 
@@ -351,22 +351,22 @@ function taxColumns(missing: string): DataTableColumn<TaxLine>[] {
 
 /**
  * Shows the delivery, commercial and operational facts one source reports for the order:
- * currencies, amounts as placed and current, shipping charges, discounts, tax lines, tags,
- * operational attributes and addresses. Groups the source does not report say so.
+ * amounts as placed and current, addresses, then shipping charges, discounts and tax lines when
+ * the source lists any. Groups the source does not report or lists nothing for are named in one
+ * line each, so they never read as zero. Currency, channel and tags stay visible; the source's
+ * other attributes and read times are under a disclosure. With several sources, the page's source
+ * switch chooses `shown` and the description names it.
  */
 export function OrderCharges({
   detail,
   shown,
-  choose,
 }: {
   detail: OrderDetail;
   shown: OrderSourceFacts | undefined;
-  choose: (connectionId: string) => void;
 }) {
   if (!shown) return null;
   const source = shown.label;
   const missing = m.orders_charges_not_reported({ source });
-  const notReported = (reported: boolean) => (reported ? null : missing);
   const { attributes, currencies, amounts } = shown;
   const reportsNothing =
     !currencies &&
@@ -377,28 +377,68 @@ export function OrderCharges({
     !shown.tags &&
     !attributes &&
     shown.taxesIncluded === undefined;
+  const groups = [
+    {
+      key: 'shipping',
+      title: m.orders_shipping_title(),
+      count: shown.shippingLines?.length,
+      table: shown.shippingLines?.length ? (
+        <DataTable
+          caption={m.orders_shipping_caption({ source })}
+          columns={shippingColumns(missing)}
+          rows={shown.shippingLines}
+          rowKey={(line) =>
+            line.id ?? `${line.title}:${line.code}:${line.removed}`
+          }
+          density="compact"
+        />
+      ) : null,
+    },
+    {
+      key: 'discounts',
+      title: m.orders_discounts_title(),
+      count: shown.discounts?.length,
+      table: shown.discounts?.length ? (
+        <DataTable
+          caption={m.orders_discounts_caption({ source })}
+          columns={discountColumns(missing)}
+          rows={shown.discounts}
+          rowKey={(discount) =>
+            `${discount.index ?? ''}:${discount.kind}:${discount.label ?? ''}`
+          }
+          density="compact"
+        />
+      ) : null,
+    },
+    {
+      key: 'tax',
+      title: m.orders_tax_title(),
+      count: shown.taxLines?.length,
+      table: shown.taxLines?.length ? (
+        <DataTable
+          caption={m.orders_tax_caption({ source })}
+          columns={taxColumns(missing)}
+          rows={shown.taxLines}
+          rowKey={(line) => `${line.title ?? ''}:${line.rate ?? ''}`}
+          density="compact"
+        />
+      ) : null,
+    },
+  ];
+  const unreported = groups.filter((group) => group.count === undefined);
+  const empty = groups.filter((group) => group.count === 0);
 
   return (
-    <OrderSection title={m.orders_charges_title()} icon={Receipt}>
-      <SourceSwitch
-        detail={detail}
-        shown={shown}
-        choose={choose}
-        label={m.orders_charges_source_switch()}
-      />
+    <OrderSection
+      title={m.orders_charges_title()}
+      icon={Receipt}
+      description={
+        detail.sources.length > 1
+          ? m.orders_section_source({ source })
+          : undefined
+      }
+    >
       <div className="order-charges">
-        <dl className="order-facts">
-          <Fact label={m.orders_charges_read_at()}>
-            <WorkspaceDate value={shown.observedAt} />
-          </Fact>
-          <Fact label={m.orders_charges_source_updated()}>
-            {shown.sourceUpdatedAt ? (
-              <WorkspaceDate value={shown.sourceUpdatedAt} />
-            ) : (
-              <span className="order-muted">{missing}</span>
-            )}
-          </Fact>
-        </dl>
         {reportsNothing ? (
           <p className="order-note">
             {m.orders_charges_none_reported({ source })}
@@ -421,12 +461,6 @@ export function OrderCharges({
                   <span className="order-muted">{missing}</span>
                 )}
               </Fact>
-              <Fact label={m.orders_charges_taxes_included()}>
-                {flag(shown.taxesIncluded, missing)}
-              </Fact>
-              <Fact label={m.orders_charges_duties_included()}>
-                {flag(shown.dutiesIncluded, missing)}
-              </Fact>
               <Fact label={m.orders_charges_channel()}>
                 {attributes?.channel ?? (
                   <span className="order-muted">{missing}</span>
@@ -445,42 +479,9 @@ export function OrderCharges({
                   m.common_none()
                 )}
               </Fact>
-              <Fact label={m.orders_charges_test()}>
-                {attributes?.test ? (
+              {attributes?.test ? (
+                <Fact label={m.orders_charges_test()}>
                   <Badge tone="warning">{m.common_yes()}</Badge>
-                ) : (
-                  flag(attributes?.test, missing)
-                )}
-              </Fact>
-              <Fact label={m.orders_charges_edited()}>
-                {flag(attributes?.edited, missing)}
-              </Fact>
-              <Fact label={m.orders_charges_requires_shipping()}>
-                {flag(attributes?.requiresShipping, missing)}
-              </Fact>
-              <Fact label={m.orders_charges_source_fulfillment()}>
-                {attributes?.fulfillmentStatus ? (
-                  (sourceFulfillment[attributes.fulfillmentStatus]?.() ??
-                  attributes.fulfillmentStatus)
-                ) : (
-                  <span className="order-muted">{missing}</span>
-                )}
-              </Fact>
-              <Fact label={m.orders_charges_processed()}>
-                {attributes?.processedAt ? (
-                  <WorkspaceDate value={attributes.processedAt} />
-                ) : (
-                  <span className="order-muted">{missing}</span>
-                )}
-              </Fact>
-              {attributes?.closedAt ? (
-                <Fact label={m.orders_charges_closed()}>
-                  <WorkspaceDate value={attributes.closedAt} />
-                </Fact>
-              ) : null}
-              {attributes?.cancelledAt ? (
-                <Fact label={m.orders_charges_cancelled()}>
-                  <WorkspaceDate value={attributes.cancelledAt} />
                 </Fact>
               ) : null}
               {attributes?.cancelReason ? (
@@ -490,9 +491,10 @@ export function OrderCharges({
                 </Fact>
               ) : null}
             </dl>
+            <Addresses detail={detail} source={shown} />
             <Group
               title={m.orders_amounts_title()}
-              missing={notReported(!!amounts)}
+              missing={amounts ? null : missing}
             >
               {amounts ? (
                 <DataTable
@@ -507,56 +509,104 @@ export function OrderCharges({
                 />
               ) : null}
             </Group>
-            <Group
-              title={m.orders_shipping_title()}
-              missing={notReported(!!shown.shippingLines)}
-            >
-              <DataTable
-                caption={m.orders_shipping_caption({ source })}
-                columns={shippingColumns(missing)}
-                rows={shown.shippingLines ?? []}
-                rowKey={(line) =>
-                  line.id ?? `${line.title}:${line.code}:${line.removed}`
-                }
-                density="compact"
-                empty={
-                  <p className="order-note">{m.orders_shipping_empty()}</p>
-                }
-              />
-            </Group>
-            <Group
-              title={m.orders_discounts_title()}
-              missing={notReported(!!shown.discounts)}
-            >
-              <DataTable
-                caption={m.orders_discounts_caption({ source })}
-                columns={discountColumns(missing)}
-                rows={shown.discounts ?? []}
-                rowKey={(discount) =>
-                  `${discount.index ?? ''}:${discount.kind}:${discount.label ?? ''}`
-                }
-                density="compact"
-                empty={
-                  <p className="order-note">{m.orders_discounts_empty()}</p>
-                }
-              />
-            </Group>
-            <Group
-              title={m.orders_tax_title()}
-              missing={notReported(!!shown.taxLines)}
-            >
-              <DataTable
-                caption={m.orders_tax_caption({ source })}
-                columns={taxColumns(missing)}
-                rows={shown.taxLines ?? []}
-                rowKey={(line) => `${line.title ?? ''}:${line.rate ?? ''}`}
-                density="compact"
-                empty={<p className="order-note">{m.orders_tax_empty()}</p>}
-              />
-            </Group>
           </>
         )}
-        <Addresses detail={detail} source={shown} />
+        {reportsNothing ? (
+          <Addresses detail={detail} source={shown} />
+        ) : (
+          <>
+            {groups.map((group) =>
+              group.table ? (
+                <Group key={group.key} title={group.title} missing={null}>
+                  {group.table}
+                </Group>
+              ) : null,
+            )}
+            {unreported.length || empty.length ? (
+              <ul className="order-footnotes">
+                {unreported.length ? (
+                  <li>
+                    {m.orders_charges_groups_not_reported({
+                      source,
+                      groups: formatList(
+                        unreported.map((group) => group.title),
+                      ),
+                    })}
+                  </li>
+                ) : null}
+                {empty.length ? (
+                  <li>
+                    {m.orders_charges_groups_empty({
+                      source,
+                      groups: formatList(empty.map((group) => group.title)),
+                    })}
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+          </>
+        )}
+        <Disclosure variant="plain" className="order-charges-more">
+          <summary>{m.orders_charges_more({ source })}</summary>
+          <dl className="order-facts">
+            <Fact label={m.orders_charges_read_at()}>
+              <WorkspaceDate value={shown.observedAt} />
+            </Fact>
+            <Fact label={m.orders_charges_source_updated()}>
+              {shown.sourceUpdatedAt ? (
+                <WorkspaceDate value={shown.sourceUpdatedAt} />
+              ) : (
+                <span className="order-muted">{missing}</span>
+              )}
+            </Fact>
+            {reportsNothing ? null : (
+              <>
+                <Fact label={m.orders_charges_taxes_included()}>
+                  {flag(shown.taxesIncluded, missing)}
+                </Fact>
+                <Fact label={m.orders_charges_duties_included()}>
+                  {flag(shown.dutiesIncluded, missing)}
+                </Fact>
+                {attributes?.test ? null : (
+                  <Fact label={m.orders_charges_test()}>
+                    {flag(attributes?.test, missing)}
+                  </Fact>
+                )}
+                <Fact label={m.orders_charges_edited()}>
+                  {flag(attributes?.edited, missing)}
+                </Fact>
+                <Fact label={m.orders_charges_requires_shipping()}>
+                  {flag(attributes?.requiresShipping, missing)}
+                </Fact>
+                <Fact label={m.orders_charges_source_fulfillment()}>
+                  {attributes?.fulfillmentStatus ? (
+                    (sourceFulfillment[attributes.fulfillmentStatus]?.() ??
+                    attributes.fulfillmentStatus)
+                  ) : (
+                    <span className="order-muted">{missing}</span>
+                  )}
+                </Fact>
+                <Fact label={m.orders_charges_processed()}>
+                  {attributes?.processedAt ? (
+                    <WorkspaceDate value={attributes.processedAt} />
+                  ) : (
+                    <span className="order-muted">{missing}</span>
+                  )}
+                </Fact>
+                {attributes?.closedAt ? (
+                  <Fact label={m.orders_charges_closed()}>
+                    <WorkspaceDate value={attributes.closedAt} />
+                  </Fact>
+                ) : null}
+                {attributes?.cancelledAt ? (
+                  <Fact label={m.orders_charges_cancelled()}>
+                    <WorkspaceDate value={attributes.cancelledAt} />
+                  </Fact>
+                ) : null}
+              </>
+            )}
+          </dl>
+        </Disclosure>
       </div>
     </OrderSection>
   );

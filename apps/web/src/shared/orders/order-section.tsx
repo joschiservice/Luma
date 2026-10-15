@@ -21,7 +21,7 @@ export function OrderSection({
 }: {
   title: string;
   icon: LucideIcon;
-  description?: string;
+  description?: string | undefined;
   action?: ReactNode;
   children: ReactNode;
 }) {

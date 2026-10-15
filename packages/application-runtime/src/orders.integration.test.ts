@@ -135,6 +135,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       sku?: { external: string; key: string } | null;
       skuCode?: string | null;
       title?: string | null;
+      unitPrice?: string;
     }[];
   }) {
     const tenantId = options.tenantId ?? tenant;
@@ -182,6 +183,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
                 : { amount: line.cancelled ?? '0', unit: 'each' },
             skuCode: line.skuCode ?? null,
             title: line.title ?? null,
+            ...(line.unitPrice
+              ? { unitPrice: { amount: line.unitPrice, currency: 'EUR' } }
+              : {}),
           })),
         },
       },
@@ -2483,6 +2487,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           quantity: '2',
           current: '2',
           sku: { external: 'item-1', key: 'edit-sku' },
+          unitPrice: '0.1',
         },
       ],
     };
@@ -2498,6 +2503,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           key: 'erp-line',
           quantity: '2',
           cancelled: null,
+          unitPrice: '0.1',
           sku: { external: 'erp-item', key: 'edit-sku' },
         },
       ],
@@ -2516,6 +2522,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       currentQuantity: '1',
       cancelledQuantity: '1',
       remainingQuantity: '1',
+      currentTotal: { amount: '0.1', currency: 'EUR' },
     });
     // ERP reductions are unknown; ordered units cannot substitute for current units.
     expect(edited.differences).toEqual([]);
@@ -2526,6 +2533,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       currentQuantity: null,
       cancelledQuantity: null,
       remainingQuantity: null,
+      // Without current units, Luma can't know the line's value.
+      currentTotal: null,
     });
     expect(
       (await services.orders.history(context(), id)).find(

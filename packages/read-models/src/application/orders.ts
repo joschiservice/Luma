@@ -240,6 +240,11 @@ export interface OrderSourceFacts extends OrderSource, OrderCommercialData {
     } | null;
     comparisonKey: string | null;
     unitPrice?: { amount: string; currency: string } | null;
+    /**
+     * Current units × the unit price after discounts, or `unitPrice` when the source reports no
+     * discounted price; null when either is not reported.
+     */
+    currentTotal?: { amount: string; currency: string } | null;
     /** Whether `unitPrice` includes tax, as the source states it; null when unknown. */
     taxIncluded?: boolean | null;
     taxRate?: string | null;

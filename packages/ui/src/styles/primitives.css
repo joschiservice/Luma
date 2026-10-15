@@ -1420,6 +1420,7 @@
   [data-slot='button']:not([data-size='sm']),
   [data-slot='select-trigger'],
   [data-slot='input'],
+  [data-slot='toggle-group-item'],
   .ui-disclosure[data-slot='disclosure'] > summary {
     min-height: 44px;
   }

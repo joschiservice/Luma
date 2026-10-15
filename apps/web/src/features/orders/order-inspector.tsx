@@ -4,6 +4,7 @@ import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { issueKind } from '@luma/ui/components/issues/case-presentation';
 import { Badge } from '@luma/ui/components/primitives/badge';
+import { Button } from '@luma/ui/components/primitives/button';
 import {
   Card,
   CardContent,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
   Database,
   Inbox,
+  Link2,
   type LucideIcon,
   Workflow,
 } from 'lucide-react';
@@ -245,16 +247,22 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
 
 /**
  * Shows the order's linked issues, workflow runs and sources beside the record. `here` is the
- * order path that the raw record view links back to.
+ * order path that the raw record view links back to; `manageLinks` opens the source links.
+ * `linkSuggestions` points to links Luma suggests.
  */
 export function OrderInspector({
   detail,
   organizationId,
   here,
+  manageLinks,
+  linkSuggestions,
 }: {
   detail: OrderDetail;
   organizationId: string;
   here: string;
+  manageLinks?: (() => void) | undefined;
+  /** Suggested links to orders in other sources, with the control that reviews them. */
+  linkSuggestions?: ReactNode;
 }) {
   return (
     <aside className="order-inspector" aria-label={m.orders_inspector_label()}>
@@ -285,6 +293,18 @@ export function OrderInspector({
         }
       >
         <OrderSources sources={detail.sources} />
+        {linkSuggestions}
+        {manageLinks ? (
+          <Button
+            className="order-inspector-action"
+            variant="outline"
+            size="sm"
+            onClick={manageLinks}
+          >
+            <Link2 aria-hidden="true" />
+            {m.orders_links_manage()}
+          </Button>
+        ) : null}
       </InspectorCard>
     </aside>
   );

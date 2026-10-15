@@ -156657,6 +156657,26 @@
                                     }
                                   ]
                                 },
+                                "currentTotal": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "string"
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Current units × the unit price after discounts, or `unitPrice` when the source reports no discounted price. Luma computes it exactly with the same tax basis as the price; null when the units or price are not reported."
+                                },
                                 "taxIncluded": {
                                   "anyOf": [
                                     {
@@ -158226,6 +158246,26 @@
                                             "type": "null"
                                           }
                                         ]
+                                      },
+                                      "currentTotal": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Current units × the unit price after discounts, or `unitPrice` when the source reports no discounted price. Luma computes it exactly with the same tax basis as the price; null when the units or price are not reported."
                                       },
                                       "taxIncluded": {
                                         "anyOf": [

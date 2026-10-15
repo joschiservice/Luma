@@ -9,18 +9,25 @@ import { useCallback, useId, useState } from 'react';
 
 import { IdentityLinks } from '../sync/identity-links';
 
-/** Lets an operator explicitly match current lines of an already linked order, retaining each source's quantities. */
+/**
+ * Lets an operator explicitly match current lines of an already linked order, retaining each
+ * source's quantities. `initialLineId` opens with that line chosen.
+ */
 export function OrderLineIdentityLinks({
   organizationId,
   detail,
+  initialLineId,
 }: {
   organizationId: string;
   detail: OrderDetail;
+  initialLineId?: string | undefined;
 }) {
   const client = useQueryClient();
   const id = useId();
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialLineId ?? null,
+  );
   const changed = useCallback(() => {
     void client.invalidateQueries({
       queryKey: ['private', 'organization', organizationId],

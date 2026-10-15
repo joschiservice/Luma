@@ -5,11 +5,11 @@ import { Badge } from '@luma/ui/components/primitives/badge';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { actorLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
-import { Route } from 'lucide-react';
 
-import { OrderSection } from '../../shared/orders/order-section';
-
-/** Shows source-backed milestones per part, retaining unknown occurrence times and investigation candidates. */
+/**
+ * Shows source-backed milestones per part, retaining unknown occurrence times and investigation
+ * candidates. Renders the content only; the order page places it in its timeline.
+ */
 export function OrderJourney({
   detail,
   organizationId,
@@ -65,7 +65,7 @@ export function OrderJourney({
   );
 
   return (
-    <OrderSection title={m.orders_journey_title()} icon={Route}>
+    <div className="order-timeline-panel">
       <p className="order-note">{m.orders_journey_explanation()}</p>
       {!journey ? (
         <p className="order-note">{m.orders_journey_unavailable()}</p>
@@ -244,6 +244,6 @@ export function OrderJourney({
             ))}
         </>
       )}
-    </OrderSection>
+    </div>
   );
 }

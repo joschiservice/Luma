@@ -1,5 +1,6 @@
 import type { OrderListItem } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
+import { issueKind } from '@luma/ui/components/issues/case-presentation';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -8,12 +9,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@luma/ui/components/primitives/dropdown-menu';
+import { StatePill } from '@luma/ui/components/primitives/state';
 import type { CellFilterValue } from '@luma/ui/lib/collection-conditions';
 import { useQuery } from '@tanstack/react-query';
-import { ListFilter } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { ChevronRight, ListFilter } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { formatQuantity } from '../../shared/orders/presentation';
+import {
+  formatQuantity,
+  issueStateLabel,
+} from '../../shared/orders/presentation';
 import { ordersPresentation } from './collection';
 import { orderOptions } from './data';
 import { orderField, OrderFlags } from './fields';
@@ -91,7 +97,8 @@ const label = (key: string) => ordersPresentation[key]?.label() ?? key;
 
 /**
  * A compact summary of the order open beside the list: its attention flags and key facts from
- * the list row, then the current-state sentences and first lines from the order's detail read.
+ * the list row, then the current-state sentences, first lines with their remaining units and
+ * open issues from the order's detail read. A failed refresh keeps the details already read.
  * `filter` offers "Show only this value" and "Hide this value" on status, payment, fulfillment
  * and each source.
  */
@@ -112,6 +119,10 @@ export function OrderPreview({
   const source =
     detail.data?.sources.find((item) => item.selected) ??
     detail.data?.sources[0];
+  // Issues still open on the order, the ones that need the reader first.
+  const openIssues = (detail.data?.issues ?? [])
+    .filter((issue) => issue.state !== 'resolved')
+    .sort((left, right) => Number(right.needsYou) - Number(left.needsYou));
   const menu = (field: string, value: string, text: string) =>
     filter ? (
       <FilterMenu field={field} value={value} label={text} filter={filter} />
@@ -158,13 +169,7 @@ export function OrderPreview({
           </dl>
         </>
       ) : null}
-      {detail.isPending ? (
-        <p role="status" className="order-note">
-          {m.orders_detail_loading()}
-        </p>
-      ) : detail.isError ? (
-        <Alert role="status">{m.orders_preview_unavailable()}</Alert>
-      ) : detail.data ? (
+      {detail.data ? (
         <>
           <OrderSummaryList detail={detail.data} />
           {source?.lines.length ? (
@@ -178,11 +183,22 @@ export function OrderPreview({
                     <span>
                       {line.title ?? line.skuCode ?? m.common_empty_value()}
                     </span>
-                    <span>
+                    <span className="order-preview-quantity">
                       {formatQuantity(
                         line.currentQuantity ?? line.quantity,
                         line.unit,
                       )}
+                      {line.remainingQuantity !== null &&
+                      Number(line.remainingQuantity) > 0 ? (
+                        <small>
+                          {m.orders_preview_line_remaining({
+                            quantity: formatQuantity(
+                              line.remainingQuantity,
+                              line.unit,
+                            ),
+                          })}
+                        </small>
+                      ) : null}
                     </span>
                   </li>
                 ))}
@@ -196,7 +212,51 @@ export function OrderPreview({
               ) : null}
             </section>
           ) : null}
+          {openIssues.length ? (
+            <section>
+              <h3 className="order-preview-heading">
+                {m.orders_inspector_issues()}
+              </h3>
+              <ul className="order-list">
+                {openIssues.map((issue) => (
+                  <li key={issue.id}>
+                    <Link
+                      className="order-row-link"
+                      to="/app/$organizationId/exceptions/$exceptionId"
+                      params={{ organizationId, exceptionId: issue.id }}
+                      search={{ view: issue.needsYou ? 'needs_you' : 'active' }}
+                    >
+                      <span className="orders-cell-stack">
+                        <strong>{issueKind(issue).label}</strong>
+                        <small>{issueStateLabel(issue.state)}</small>
+                      </span>
+                      {issue.needsYou ? (
+                        <StatePill state="attention">
+                          {m.orders_flag_needs_you()}
+                        </StatePill>
+                      ) : null}
+                      <ChevronRight
+                        className="order-row-chevron"
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {detail.isError ? (
+            <p role="status" className="order-note">
+              {m.orders_preview_stale()}
+            </p>
+          ) : null}
         </>
+      ) : detail.isPending ? (
+        <p role="status" className="order-note">
+          {m.orders_detail_loading()}
+        </p>
+      ) : detail.isError ? (
+        <Alert role="status">{m.orders_preview_unavailable()}</Alert>
       ) : null}
     </div>
   );

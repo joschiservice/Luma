@@ -1,5 +1,6 @@
 import {
   lineComparisonKeys,
+  lineValue,
   orderComparisonState,
   sharedComparisonLines,
 } from '@luma/orders';
@@ -80,6 +81,14 @@ export async function readSourceFacts(
       (value, index) => {
         const line = object(value);
         const progress = row.progress[index];
+        const unitPrice = line.unitPrice
+          ? {
+              amount: String(object(line.unitPrice).amount),
+              currency: String(object(line.unitPrice).currency),
+            }
+          : null;
+        const currentQuantity = text(line.currentQuantity);
+        const commercial = lineCommercialFacts(line);
 
         return {
           id: String(line.id),
@@ -129,24 +138,24 @@ export async function readSourceFacts(
                       },
               }),
           comparisonKey: null as string | null,
-          unitPrice: line.unitPrice
-            ? {
-                amount: String(object(line.unitPrice).amount),
-                currency: String(object(line.unitPrice).currency),
-              }
-            : null,
+          unitPrice,
+          // The price the reader sees for the line: after discounts when the source reports it.
+          currentTotal: lineValue(
+            commercial.prices?.discountedUnit?.shop ?? unitPrice,
+            currentQuantity,
+          ),
           taxIncluded:
             typeof line.taxIncluded === 'boolean' ? line.taxIncluded : null,
           taxRate: text(line.taxRate),
           skuCode: text(line.skuCode),
           title: text(line.title),
           quantity: String(line.quantity),
-          currentQuantity: text(line.currentQuantity),
+          currentQuantity,
           cancelledQuantity: text(line.cancelledQuantity),
           unit: String(line.unit),
           fulfilledQuantity: progress?.fulfilled ?? '0',
           remainingQuantity: progress?.remaining ?? null,
-          ...lineCommercialFacts(line),
+          ...commercial,
         };
       },
     );

@@ -72,8 +72,17 @@ test('confirms source order and line identities, reviews the exact shipping corr
   const orderUrl = `/app/${f.tenantId}/orders/${f.shop}`;
   await page.goto(orderUrl);
   await expect(
-    page.getByRole('heading', { name: 'Current state', exact: true }),
+    page.getByRole('region', { name: 'Current state', exact: true }),
   ).toBeVisible();
+  // Linked sources open in a panel beside the order.
+  const openLinks = async () => {
+    await page.getByRole('button', { name: 'More order actions' }).click();
+    await page.getByRole('menuitem', { name: 'Linked sources' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Linked sources' }),
+    ).toBeVisible();
+  };
+  await openLinks();
   const sourceChoice = page
     .locator('.sync-identity-suggestions li')
     .filter({ hasText: 'SIMULATED STARSHIPIT' });
@@ -84,6 +93,7 @@ test('confirms source order and line identities, reviews the exact shipping corr
     'Checked these exact Shopify and Starshipit orders in the merchant integration.',
   );
   await page.reload();
+  await openLinks();
   const lineSection = page.getByRole('region', {
     name: 'Match order lines',
     exact: true,
@@ -106,7 +116,9 @@ test('confirms source order and line identities, reviews the exact shipping corr
   );
   await f.setShopQuantity(1);
   await page.reload();
-  const plan = page.getByRole('region', { name: /^Change plan/ });
+  await page.getByRole('button', { name: 'More order actions' }).click();
+  await page.getByRole('menuitem', { name: 'Plan a quantity change' }).click();
+  const plan = page.getByRole('dialog', { name: 'Change plan' });
   await plan.getByLabel('New quantity', { exact: true }).fill('1');
   await plan
     .getByRole('button', { name: 'Plan this change', exact: true })
@@ -244,7 +256,7 @@ test('confirms source order and line identities, reviews the exact shipping corr
   const observer = await f.page('warehouse');
   await observer.goto(orderUrl);
   await expect(
-    observer.getByRole('heading', { name: 'Current state', exact: true }),
+    observer.getByRole('region', { name: 'Current state', exact: true }),
   ).toBeVisible();
   await expect(
     observer.getByRole('heading', {

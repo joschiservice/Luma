@@ -247,6 +247,13 @@ const orderLineSchema = z.object({
     .object({ amount: z.string(), currency: z.string() })
     .nullable()
     .optional(),
+  currentTotal: z
+    .object({ amount: z.string(), currency: z.string() })
+    .nullable()
+    .optional()
+    .describe(
+      'Current units × the unit price after discounts, or `unitPrice` when the source reports no discounted price. Luma computes it exactly with the same tax basis as the price; null when the units or price are not reported.',
+    ),
   taxIncluded: z
     .boolean()
     .nullable()

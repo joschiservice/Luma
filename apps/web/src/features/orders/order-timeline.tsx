@@ -1,13 +1,20 @@
 import type { ActivityEvent, OrderDetail } from '@luma/api-contract';
-import { formatList } from '@luma/i18n/format';
+import { formatList, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { StateDot } from '@luma/ui/components/primitives/state';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@luma/ui/components/primitives/tabs';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { actorLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
-import { Activity, ChevronRight, History, Truck } from 'lucide-react';
+import { ChevronRight, History, Truck } from 'lucide-react';
+import { useState } from 'react';
 
 import { OrderSection } from '../../shared/orders/order-section';
 import {
@@ -18,6 +25,7 @@ import {
   statusLabels,
 } from '../../shared/orders/presentation';
 import { activityLabel, activityState } from '../activity/presentation';
+import { OrderJourney } from './journey';
 
 function sourceLabel(detail: OrderDetail, connectionId: string) {
   return (
@@ -127,9 +135,9 @@ export function OrderFulfillments({
 }
 
 /** Lists the order, fulfillment, return and refund states Luma read from each source, newest first. */
-export function ObservedHistory({ detail }: { detail: OrderDetail }) {
+function ObservedHistory({ detail }: { detail: OrderDetail }) {
   return (
-    <OrderSection title={m.orders_history_title()} icon={History}>
+    <div className="order-timeline-panel">
       <ol className="order-history">
         {detail.history.entries.map((entry) => (
           <li key={entry.snapshotId}>
@@ -161,12 +169,12 @@ export function ObservedHistory({ detail }: { detail: OrderDetail }) {
           {m.orders_history_truncated({ count: 100 })}
         </p>
       ) : null}
-    </OrderSection>
+    </div>
   );
 }
 
 /** Lists what Luma decided and did for this order, its issues and workflow runs. */
-export function LumaActivity({
+function LumaActivity({
   detail,
   organizationId,
 }: {
@@ -174,7 +182,7 @@ export function LumaActivity({
   organizationId: string;
 }) {
   return (
-    <OrderSection title={m.orders_activity_title()} icon={Activity}>
+    <div className="order-timeline-panel">
       {detail.activity.entries.length ? (
         <ol className="order-activity">
           {detail.activity.entries.map((entry) => (
@@ -210,6 +218,83 @@ export function LumaActivity({
           {m.orders_activity_truncated({ count: 25 })}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+type TimelineTab = 'activity' | 'journey' | 'history';
+
+/**
+ * The order's history in one section: what Luma did, the source-backed journey and the states
+ * Luma read from each source, one tab each. It opens on the journey when a journey check needs
+ * investigation or Luma recorded no activity. `from` is the order path that part links return to.
+ */
+export function OrderTimeline({
+  detail,
+  organizationId,
+  from,
+}: {
+  detail: OrderDetail;
+  organizationId: string;
+  from: string;
+}) {
+  // Journey checks that need investigation come first; otherwise what Luma did.
+  const [tab, setTab] = useState<TimelineTab>(
+    detail.journey?.candidates.length || !detail.activity.entries.length
+      ? 'journey'
+      : 'activity',
+  );
+  const tabs: { value: TimelineTab; label: string; count?: number }[] = [
+    {
+      value: 'activity',
+      label: m.orders_activity_title(),
+      count: detail.activity.entries.length,
+    },
+    {
+      value: 'journey',
+      label: m.orders_journey_title(),
+      ...(detail.journey ? { count: detail.journey.events.length } : {}),
+    },
+    {
+      value: 'history',
+      label: m.orders_history_title(),
+      count: detail.history.entries.length,
+    },
+  ];
+
+  return (
+    <OrderSection title={m.orders_timeline_title()} icon={History}>
+      <Tabs
+        value={tab}
+        onValueChange={(value: TimelineTab) => setTab(value)}
+        className="order-timeline"
+      >
+        <TabsList aria-label={m.orders_timeline_title()}>
+          {tabs.map((item) => (
+            <TabsTrigger key={item.value} value={item.value}>
+              {item.label}
+              {item.count ? (
+                <span className="order-tab-count">
+                  {formatNumber(item.count)}
+                </span>
+              ) : null}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="activity">
+          <LumaActivity detail={detail} organizationId={organizationId} />
+        </TabsContent>
+        <TabsContent value="journey">
+          <OrderJourney
+            detail={detail}
+            organizationId={organizationId}
+            from={from}
+          />
+        </TabsContent>
+        <TabsContent value="history">
+          <ObservedHistory detail={detail} />
+        </TabsContent>
+      </Tabs>
     </OrderSection>
   );
 }

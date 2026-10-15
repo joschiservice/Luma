@@ -71,9 +71,17 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`/app/${f.org.id}/orders/${a}`);
-  const panel = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Linked sources', exact: true }),
-  });
+  const panel = page.getByRole('dialog', { name: 'Linked sources' });
+  const openLinks = async () => {
+    await page.getByRole('button', { name: 'More order actions' }).click();
+    await page.getByRole('menuitem', { name: 'Linked sources' }).click();
+    await expect(panel).toBeVisible();
+  };
+  // The order's side panel points to the suggested link.
+  await expect(
+    page.getByText('Luma found 1 possible match in another source.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Review matches' }).click();
   await expect(
     panel.getByRole('heading', { name: 'Possibly the same order' }),
   ).toBeVisible();
@@ -83,7 +91,7 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     }),
   ).toBeVisible();
   await panel.getByRole('button', { name: 'Link', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: /^(Link|Unlink) / });
   await expect(
     dialog.getByRole('button', { name: 'Link records' }),
   ).toBeDisabled();
@@ -99,6 +107,8 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
   await expect(
     panel.getByRole('button', { name: 'Unlink', exact: true }),
   ).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
   await expect(
     page.getByRole('heading', { name: 'Source comparison', exact: true }),
   ).toBeVisible();
@@ -124,7 +134,7 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await panel.scrollIntoViewIfNeeded();
+  await openLinks();
   await panel.screenshot({ path: '/tmp/luma117-order-linked-dark-mobile.png' });
   await panel
     .locator('li')
@@ -147,6 +157,7 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
   await expect(
     page.getByRole('heading', { name: 'SO-10', exact: true }),
   ).toBeVisible();
+  await openLinks();
   await panel.getByLabel('Find another order').fill('#1001');
   await panel.getByRole('button', { name: 'Review link' }).click();
   await expect(dialog.getByText('Shopify ID 1001')).toBeVisible();
@@ -161,8 +172,9 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     }),
   );
   await page.reload();
+  await openLinks();
   await expect(
-    panel.getByRole('heading', { name: 'Linked sources', exact: true }),
+    panel.getByRole('heading', { name: 'Possibly the same order' }),
   ).toBeVisible();
   await expect(
     panel.getByRole('button', { name: 'Link', exact: true }),

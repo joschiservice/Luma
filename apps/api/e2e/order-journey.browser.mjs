@@ -62,10 +62,12 @@ test('journey checks and evidence remain readable in both themes, narrow layouts
   ).toHaveValue('JOURNEY');
   await page.getByRole('link', { name: '#JOURNEY', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/orders/${order}`));
-  const journey = page.getByRole('region', {
-    name: 'Order journey',
-    exact: true,
-  });
+  // History opens on the journey because a journey check needs investigation.
+  const history = page.getByRole('region', { name: 'History', exact: true });
+  await expect(
+    history.getByRole('tab', { name: /^Order journey/ }),
+  ).toHaveAttribute('aria-selected', 'true');
+  const journey = history.getByRole('tabpanel');
   await expect(
     journey.getByText('Occurrence time unknown', { exact: true }).first(),
   ).toBeVisible();

@@ -454,14 +454,22 @@ function ProposeQuantity({
   proposal,
   propose,
   clear,
+  initialLine,
 }: {
   lines: PlanLine[];
   proposal: OrderChangePlanQuery | null;
   propose: (lineKey: string, quantity: string) => void;
   clear: () => void;
+  /** The line the reader chose to plan for; its quantity field takes focus. */
+  initialLine?: string | undefined;
 }) {
   const id = useId();
-  const [line, setLine] = useState(proposal?.lineKey ?? lines[0]?.key ?? '');
+  const chosen = lines.some((item) => item.key === initialLine)
+    ? initialLine
+    : undefined;
+  const [line, setLine] = useState(
+    chosen ?? proposal?.lineKey ?? lines[0]?.key ?? '',
+  );
   const [quantity, setQuantity] = useState(proposal?.quantity ?? '');
   const [invalid, setInvalid] = useState(false);
   if (!lines.length)
@@ -506,6 +514,8 @@ function ProposeQuantity({
         </FieldLabel>
         <Input
           id={`${id}-quantity`}
+          // The reader opened the plan from this line's menu to enter its quantity.
+          autoFocus={!!chosen}
           inputMode="decimal"
           value={quantity}
           aria-invalid={invalid || undefined}
@@ -532,26 +542,8 @@ function ProposeQuantity({
   );
 }
 
-/**
- * Presents order change plans: what changes, which systems show it, what shipped, whether the
- * change is still safe and the ordered steps for Luma and for people. `editAction` renders the
- * control that hands an executable Luma step to the owning app's own review.
- */
-export function OrderChangePlanView({
-  plans,
-  loading = false,
-  failed = false,
-  sources,
-  locationNames = new Map(),
-  lines,
-  proposal = null,
-  propose,
-  clear,
-  editAction,
-  title,
-  action,
-  authority = null,
-}: {
+/** What the change plan content needs: plans, their read state and the proposal control. */
+export interface OrderChangePlanProps {
   plans?: OrderChangePlans | undefined;
   loading?: boolean;
   failed?: boolean;
@@ -563,15 +555,95 @@ export function OrderChangePlanView({
   propose?: (lineKey: string, quantity: string) => void;
   clear?: () => void;
   editAction?: (step: Step) => ReactNode;
-  title?: string;
-  action?: ReactNode;
   /** The connection that holds order-line authority, which leads a quantity plan's summary. */
   authority?: string | null;
-}) {
-  const sourceLabel = (connectionId: string) =>
+  /** The line the reader chose to plan for, by comparison key. */
+  initialLine?: string | undefined;
+}
+
+function sourceLabels(sources: OrderChangePlanProps['sources']) {
+  return (connectionId: string) =>
     sources.find((source) => source.connectionId === connectionId)?.label ??
     m.orders_plan_any_system();
+}
 
+/**
+ * Presents order change plans: what changes, which systems show it, what shipped, whether the
+ * change is still safe and the ordered steps for Luma and for people. With `lines`, a form
+ * proposes a quantity first. `editAction` renders the control that hands an executable Luma
+ * step to the owning app's own review.
+ */
+export function OrderChangePlanContent({
+  plans,
+  loading = false,
+  failed = false,
+  sources,
+  locationNames = new Map(),
+  lines,
+  proposal = null,
+  propose,
+  clear,
+  editAction,
+  authority = null,
+  initialLine,
+}: OrderChangePlanProps) {
+  const sourceLabel = sourceLabels(sources);
+
+  return (
+    <div className="order-plan-body" aria-busy={loading}>
+      {lines && propose && clear ? (
+        <ProposeQuantity
+          key={`${proposal?.lineKey ?? ''}:${proposal?.quantity ?? ''}:${initialLine ?? ''}`}
+          lines={lines}
+          proposal={proposal}
+          propose={propose}
+          clear={clear}
+          initialLine={initialLine}
+        />
+      ) : null}
+      {plans?.hidden.includes('fulfillments') ? (
+        <p className="order-note" role="status">
+          {m.orders_plan_hidden()}
+        </p>
+      ) : null}
+      {failed ? (
+        <p role="alert" className="order-note">
+          {m.orders_plan_failed()}
+        </p>
+      ) : !plans ? (
+        loading ? (
+          <p role="status" className="order-note">
+            {m.orders_plan_loading()}
+          </p>
+        ) : null
+      ) : plans.plans.length ? (
+        plans.plans.map((plan) => (
+          <PlanCard
+            key={`${plan.change.kind}:${plan.change.lineKey ?? ''}`}
+            plan={plan}
+            sourceLabel={sourceLabel}
+            locationNames={locationNames}
+            editAction={editAction}
+            authority={authority}
+          />
+        ))
+      ) : (
+        <p className="order-note" role="status">
+          {plans.comparisonState === 'inconclusive'
+            ? m.orders_plan_inconclusive()
+            : m.orders_plan_none_detected()}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Presents order change plans in an order section, as on a case about the order. */
+export function OrderChangePlanView({
+  title,
+  action,
+  ...props
+}: OrderChangePlanProps & { title?: string; action?: ReactNode }) {
   return (
     <OrderSection
       title={title ?? m.orders_plan_title()}
@@ -579,51 +651,76 @@ export function OrderChangePlanView({
       description={m.orders_plan_description()}
       action={action}
     >
-      <div className="order-plan-body" aria-busy={loading}>
-        {plans?.hidden.includes('fulfillments') ? (
-          <p className="order-note" role="status">
-            {m.orders_plan_hidden()}
-          </p>
-        ) : null}
-        {failed ? (
-          <p role="alert" className="order-note">
-            {m.orders_plan_failed()}
-          </p>
-        ) : !plans ? (
-          loading ? (
-            <p role="status" className="order-note">
-              {m.orders_plan_loading()}
-            </p>
-          ) : null
-        ) : plans.plans.length ? (
-          plans.plans.map((plan) => (
-            <PlanCard
-              key={`${plan.change.kind}:${plan.change.lineKey ?? ''}`}
-              plan={plan}
-              sourceLabel={sourceLabel}
-              locationNames={locationNames}
-              editAction={editAction}
-              authority={authority}
-            />
-          ))
-        ) : (
-          <p className="order-note" role="status">
-            {plans.comparisonState === 'inconclusive'
-              ? m.orders_plan_inconclusive()
-              : m.orders_plan_none_detected()}
-          </p>
-        )}
-        {lines && propose && clear ? (
-          <ProposeQuantity
-            key={`${proposal?.lineKey ?? ''}:${proposal?.quantity ?? ''}`}
-            lines={lines}
-            proposal={proposal}
-            propose={propose}
-            clear={clear}
-          />
-        ) : null}
-      </div>
+      <OrderChangePlanContent {...props} />
     </OrderSection>
+  );
+}
+
+/**
+ * Lists the changes a plan covers in one line each, with whether it is still safe, so the order
+ * page can point to the full plan. Renders nothing while there is nothing to plan.
+ */
+export function OrderChangeSummary({
+  plans,
+  failed = false,
+  locationNames = new Map(),
+  review,
+}: Pick<OrderChangePlanProps, 'plans' | 'failed' | 'locationNames'> & {
+  /** Opens the full plan. */
+  review: () => void;
+}) {
+  if (failed)
+    return (
+      <p role="alert" className="order-note">
+        {m.orders_plan_failed()}
+      </p>
+    );
+  if (!plans?.plans.length) return null;
+
+  return (
+    <section className="order-changes" aria-label={m.orders_plan_title()}>
+      <ul>
+        {plans.plans.map((plan) => {
+          const [state, label] = safety[plan.safety.state];
+          const line = plan.change.line
+            ? (plan.change.line.title ?? plan.change.line.skuCode)
+            : null;
+
+          return (
+            <li key={`${plan.change.kind}:${plan.change.lineKey ?? ''}`}>
+              <RouteIcon aria-hidden="true" />
+              <span className="orders-cell-stack">
+                <strong>
+                  {line
+                    ? m.orders_plan_summary_line({
+                        kind: kindLabels[plan.change.kind](),
+                        line,
+                      })
+                    : kindLabels[plan.change.kind]()}
+                </strong>
+                <small>
+                  {plan.change.origin === 'detected'
+                    ? m.orders_plan_origin_detected()
+                    : m.orders_plan_origin_proposed()}
+                  {plan.change.kind === 'address'
+                    ? null
+                    : ` · ${m.orders_plan_change_value({
+                        from: valueText(plan, plan.change.from, locationNames),
+                        to: valueText(plan, plan.change.to, locationNames),
+                      })}`}
+                  {` · ${m.orders_plan_summary_steps({ count: plan.steps.length })}`}
+                </small>
+              </span>
+              <StatePill state={state}>{label()}</StatePill>
+            </li>
+          );
+        })}
+      </ul>
+      <Button variant="outline" size="sm" onClick={review}>
+        {m.orders_plan_review({ count: plans.plans.length })}
+        <ArrowRight aria-hidden="true" />
+      </Button>
+    </section>
   );
 }
 

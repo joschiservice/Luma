@@ -63,9 +63,183 @@
 
 .order-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 16px;
   align-items: start;
+}
+
+.order-lines,
+.order-comparison {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.order-line-menu-narrow,
+.order-line-remaining-narrow {
+  display: none;
+}
+
+/* Matches the breakpoint at which data tables hide narrow columns. */
+@media (max-width: 760px) {
+  .order-line-menu-narrow {
+    display: block;
+    margin-left: -6px;
+  }
+
+  .order-line-quantity .order-line-remaining-narrow {
+    display: block;
+  }
+}
+
+.order-line-item .orders-row-flags {
+  margin-top: 2px;
+}
+
+.order-line-title {
+  font-weight: 500;
+}
+
+a.order-line-title {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.order-line-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.order-line-quantity small {
+  white-space: normal;
+}
+
+.order-line-remaining {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.order-footnotes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+/* Detected and proposed changes beneath the lines, each one line with its safety. */
+.order-changes {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-row);
+}
+
+.order-changes ul {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.order-changes li > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--foreground-subtle);
+}
+
+.order-changes li {
+  flex-wrap: wrap;
+}
+
+.order-changes li > .orders-cell-stack {
+  flex: 1 1 220px;
+}
+
+/* One source choice for the sections that show a single source's report. */
+.order-source-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.order-comparison-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.order-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-timeline-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.order-tab-count {
+  color: var(--foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-inspector-action {
+  margin-top: 12px;
+}
+
+.order-link-hint {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.order-link-hint + .order-inspector-action {
+  display: none;
+}
+
+.order-charges-more > dl {
+  margin-top: 10px;
+}
+
+.order-sheet {
+  max-width: min(720px, 100vw);
+}
+
+.order-sheet-body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
 }
 
 .order-main,
@@ -125,18 +299,6 @@
   margin: 0;
   color: var(--muted-foreground);
   font-size: 13px;
-}
-
-.order-source-switch {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.order-source-switch [aria-pressed='true'] {
-  background: var(--surface-selected);
-  color: var(--signal-text);
 }
 
 .order-charges {
@@ -393,6 +555,16 @@
   gap: 8px 12px;
 }
 
+.order-plan-body > .order-plan-propose {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.order-plan:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
 .order-plan-propose-actions {
   display: flex;
   flex-wrap: wrap;
@@ -485,6 +657,48 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.order-preview-quantity {
+  display: grid;
+  justify-items: end;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-preview-quantity small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+/* Filter shortcuts appear with the value they act on, and always on touch screens. */
+.order-preview-fact .order-preview-filter {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.order-preview-fact:hover .order-preview-filter,
+.order-preview-fact:focus-within .order-preview-filter,
+.order-preview-sources > span:hover .order-preview-filter,
+.order-preview-sources > span:focus-within .order-preview-filter {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .order-preview-fact .order-preview-filter {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-preview-fact .order-preview-filter {
+    transition: none;
+  }
+}
+
+.order-preview > section {
+  display: grid;
+  gap: 6px;
 }
 
 .order-preview-lines li > :first-child {

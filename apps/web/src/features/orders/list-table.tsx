@@ -62,7 +62,7 @@ function orderColumns(
       cell:
         key === 'number'
           ? (order: OrderListItem) => (
-              <>
+              <span className="orders-cell-stack">
                 <DataTableRowLink render={link(order)}>
                   {orderLabel(order)}
                 </DataTableRowLink>
@@ -72,7 +72,7 @@ function orderColumns(
                   ].join(' · ')}
                 </small>
                 <OrderFlags order={order} />
-              </>
+              </span>
             )
           : (order: OrderListItem) => orderField(order, key),
     };

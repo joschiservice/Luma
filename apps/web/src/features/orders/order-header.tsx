@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Truck,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { RecordAssistance } from '../../kit/record-assistance';
 import {
@@ -103,7 +104,8 @@ function orderFacts(order: OrderListItem): RecordFact[] {
 /**
  * Names the order in the workspace breadcrumb and opens the page with its key facts. Current
  * state below says what needs attention, so the header doesn't repeat it as flags. Without
- * `detail`, only the breadcrumb is shown. `returnPath` is the record the reader came from.
+ * `detail`, only the breadcrumb is shown. `returnPath` is the record the reader came from;
+ * `menu` follows the other actions in the workspace bar.
  */
 export function OrderHeader({
   contextualAssistance = false,
@@ -111,12 +113,14 @@ export function OrderHeader({
   search,
   returnPath,
   detail,
+  menu,
 }: {
   organizationId: string;
   contextualAssistance?: boolean;
   search: OrdersSearch;
   returnPath: string | null;
   detail?: OrderDetail | undefined;
+  menu?: ReactNode;
 }) {
   const order = detail?.order;
   const needsYou = detail?.issues.find((issue) => issue.needsYou);
@@ -156,6 +160,7 @@ export function OrderHeader({
               <ArrowRight aria-hidden="true" />
             </Link>
           ) : null}
+          {menu}
         </>
       }
       facts={order ? orderFacts(order) : []}

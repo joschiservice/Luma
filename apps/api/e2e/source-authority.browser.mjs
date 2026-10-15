@@ -152,6 +152,7 @@ test('reviews source authority, safely retries an override and resolves each ord
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`/app/${f.org.id}/orders/${id}`);
+  await page.getByRole('button', { name: /^Show all \d+ facts$/ }).click();
   const comparison = page.getByRole('table', {
     name: 'Facts reported by each source',
   });

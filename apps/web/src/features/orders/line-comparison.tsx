@@ -202,8 +202,18 @@ function value(
   );
 }
 
-/** Shows each mapped line's quantities, shipment state and location with source authority and read evidence. */
-export function LineComparison({ detail }: { detail: OrderDetail }) {
+/**
+ * Shows each mapped line's quantities, shipment state and location with source authority and
+ * read evidence. `only` limits it to one line, by comparison key or line ID, without the line
+ * column.
+ */
+export function LineComparison({
+  detail,
+  only,
+}: {
+  detail: OrderDetail;
+  only?: string | undefined;
+}) {
   const differences = new Map(
     detail.differences.map((item) => [`${item.lineKey}:${item.field}`, item]),
   );
@@ -218,24 +228,26 @@ export function LineComparison({ detail }: { detail: OrderDetail }) {
       entry.sources.set(source.connectionId, line);
       lines.set(key, entry);
     }
-  const rows: Row[] = [...lines].flatMap(([lineKey, entry]) =>
-    fields.map((field) => ({
-      key: `${lineKey}:${field.field}`,
-      lineKey,
-      item: entry.item,
-      field: field.field,
-      label: field.label(),
-      group: field.group,
-      lines: entry.sources,
-    })),
-  );
+  const rows: Row[] = [...lines]
+    .filter(([lineKey]) => only === undefined || lineKey === only)
+    .flatMap(([lineKey, entry]) =>
+      fields.map((field) => ({
+        key: `${lineKey}:${field.field}`,
+        lineKey,
+        item: entry.item,
+        field: field.field,
+        label: field.label(),
+        group: field.group,
+        lines: entry.sources,
+      })),
+    );
   const labels = {
     matching: m.orders_comparison_matching,
     pending: m.orders_comparison_pending,
     confirmed: m.orders_comparison_confirmed,
     inconclusive: m.orders_comparison_inconclusive,
   };
-  const columns: DataTableColumn<Row>[] = [
+  const lineColumn: DataTableColumn<Row>[] = [
     {
       key: 'line',
       header: m.orders_comparison_line(),
@@ -248,6 +260,9 @@ export function LineComparison({ detail }: { detail: OrderDetail }) {
         </span>
       ),
     },
+  ];
+  const columns: DataTableColumn<Row>[] = [
+    ...(only === undefined ? lineColumn : []),
     {
       key: 'field',
       header: m.orders_comparison_field(),
