@@ -168,7 +168,7 @@ export function createClient(options: ShopifyTransportOptions): {
             cost: z
               .object({
                 requestedQueryCost: z.number().nonnegative(),
-                actualQueryCost: z.number().nonnegative().optional(),
+                actualQueryCost: z.number().nonnegative().nullable().optional(),
                 throttleStatus: z.object({
                   currentlyAvailable: z.number().nonnegative(),
                   restoreRate: z.number().positive(),
@@ -188,7 +188,7 @@ export function createClient(options: ShopifyTransportOptions): {
         cost.requestedQueryCost,
         cost.throttleStatus.currentlyAvailable,
         cost.throttleStatus.restoreRate,
-        cost.actualQueryCost,
+        cost.actualQueryCost ?? undefined,
         cost.throttleStatus.maximumAvailable,
       );
     if (envelope.errors?.length) {

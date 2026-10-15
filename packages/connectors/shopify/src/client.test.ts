@@ -98,6 +98,17 @@ it('does not treat a partial throttled mutation response as a confirmed non-disp
     Response.json({
       data: { result: {} },
       errors: [{ extensions: { code: 'THROTTLED' } }],
+      extensions: {
+        cost: {
+          requestedQueryCost: 10,
+          actualQueryCost: null,
+          throttleStatus: {
+            currentlyAvailable: 0,
+            restoreRate: 100,
+            maximumAvailable: 2000,
+          },
+        },
+      },
     }),
   );
   await expect(
