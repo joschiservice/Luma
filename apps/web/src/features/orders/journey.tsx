@@ -66,7 +66,6 @@ export function OrderJourney({
 
   return (
     <div className="order-timeline-panel">
-      <p className="order-note">{m.orders_journey_explanation()}</p>
       {!journey ? (
         <p className="order-note">{m.orders_journey_unavailable()}</p>
       ) : (
@@ -206,42 +205,28 @@ export function OrderJourney({
               {m.orders_journey_truncated({ count: 500 })}
             </p>
           ) : null}
-          {journey.comparisons
-            .filter(
-              (comparison) =>
-                comparison.count > 0 ||
-                (journey.events.some(
-                  (event) => event.stage === comparison.from,
-                ) &&
-                  journey.events.some(
-                    (event) => event.stage === comparison.to,
-                  )),
-            )
-            .map((comparison) => (
+          {journey.comparisons.map((comparison) =>
+            comparison.count > 0 &&
+            comparison.medianMs !== null &&
+            comparison.p90Ms !== null ? (
               <p
                 className="order-note"
                 key={`${comparison.from}:${comparison.to}`}
               >
-                {comparison.count &&
-                comparison.medianMs !== null &&
-                comparison.p90Ms !== null
-                  ? m.orders_journey_comparison({
-                      from: stages[comparison.from],
-                      to: stages[comparison.to],
-                      median: formatNumber(comparison.medianMs / 3600000, {
-                        maximumFractionDigits: 2,
-                      }),
-                      p90: formatNumber(comparison.p90Ms / 3600000, {
-                        maximumFractionDigits: 2,
-                      }),
-                      count: comparison.count,
-                    })
-                  : m.orders_journey_no_comparison({
-                      from: stages[comparison.from],
-                      to: stages[comparison.to],
-                    })}
+                {m.orders_journey_comparison({
+                  from: stages[comparison.from],
+                  to: stages[comparison.to],
+                  median: formatNumber(comparison.medianMs / 3600000, {
+                    maximumFractionDigits: 2,
+                  }),
+                  p90: formatNumber(comparison.p90Ms / 3600000, {
+                    maximumFractionDigits: 2,
+                  }),
+                  count: comparison.count,
+                })}
               </p>
-            ))}
+            ) : null,
+          )}
         </>
       )}
     </div>
