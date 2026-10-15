@@ -229,3 +229,38 @@ export function activitySystemOptions(
     label: providerName(system),
   }));
 }
+
+/** Opens the event's authoritative record, with retained activity as a fallback. */
+export function activityHref(
+  item: ActivityEvent,
+  organizationId: string,
+): string {
+  const base = `/app/${encodeURIComponent(organizationId)}`;
+  if (item.type === 'procurement' && item.proposalId)
+    return `${base}/procurement/${encodeURIComponent(item.proposalId)}`;
+  if (item.exceptionId)
+    return `${base}/exceptions/${encodeURIComponent(item.exceptionId)}`;
+  if (item.playbookId && item.workflowRunId)
+    return `${base}/workflows/${encodeURIComponent(item.playbookId)}#run-${encodeURIComponent(item.workflowRunId)}`;
+  if (item.playbookId)
+    return `${base}/workflows/${encodeURIComponent(item.playbookId)}`;
+  if (item.connectionId)
+    return `${base}/apps#connection-${encodeURIComponent(item.connectionId)}`;
+
+  return `${base}/activity?event=${encodeURIComponent(item.id)}`;
+}
+
+/** Names the business change without exposing storage identifiers. */
+export function activityTitle(
+  item: Pick<ActivityEvent, 'type' | 'summary' | 'action'> &
+    Partial<Pick<ActivityEvent, 'actor'>>,
+): string {
+  if (item.type === 'procurement') return activityLabel(item.action);
+
+  if (!item.summary)
+    return item.actor?.workflow?.name || activityLabel(item.action);
+
+  return /^[a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+$/.test(item.summary)
+    ? activityChangeLabel(item.summary)
+    : item.summary;
+}

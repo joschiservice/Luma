@@ -35,8 +35,12 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { BoundActionStep } from '@luma/execution';
-import type { IdentityService, TenantContext } from '@luma/identity';
-import { hasPermission } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  type IdentityService,
+  type TenantContext,
+} from '@luma/identity';
 import {
   createPurchaseIncoming,
   createPurchaseIncomingStore,
@@ -787,7 +791,7 @@ export function createApplicationServices(
         available: options.supplierExtraction?.available ?? false,
         reason:
           options.supplierExtraction?.reason ??
-          'Reading supplier messages isn’t set up on this server.',
+          'Automatic extraction of supplier commitments isn’t set up on this server. Connected mailbox messages are still available in Inbox.',
       },
       trace: (context) => supplierTrace(context.requestId),
       ...(options.supplierMessageRetentionDays
@@ -1136,6 +1140,36 @@ export function createApplicationServices(
       codeProcesses,
       { vocabulary: replenishment.vocabulary },
       shippingMethodVocabulary,
+      {
+        vocabulary: async () => ({
+          triggers: (['event', 'exception'] as const).map((kind) => ({
+            kind,
+            executable: false,
+            options: templateSources.flatMap((source) => {
+              const content = source.content();
+              const trigger = content.applicability.trigger;
+              if (
+                trigger.kind !== kind ||
+                (trigger.kind !== 'event' && trigger.kind !== 'exception')
+              )
+                return [];
+              const value =
+                trigger.kind === 'event'
+                  ? trigger.eventType
+                  : trigger.issueType;
+
+              return [
+                {
+                  value,
+                  label: value
+                    .replaceAll(/[._-]/g, ' ')
+                    .replace(/^./, (letter) => letter.toUpperCase()),
+                },
+              ];
+            }),
+          })),
+        }),
+      },
     ],
     builtIn: [
       replenishment.version.definition.id,
@@ -1460,7 +1494,7 @@ export function createApplicationServices(
     ],
     refreshContext: identity.refreshContext,
   });
-  const decisionAssignments = createDecisionAssignments(database, {
+  const queueAssignments = createDecisionAssignments(database, {
     refreshContext: identity.refreshContext,
     members: async (context) =>
       (await identity.listMembers(context)).map((member) => member.userId),
@@ -1469,9 +1503,48 @@ export function createApplicationServices(
       if (item?.outcome) return false;
 
       // Return case assignments belong to the case's revision-checked command.
-      return !!item && item.owner.kind !== 'return_case';
+      return (
+        !!item &&
+        item.owner.kind !== 'return_case' &&
+        item.owner.kind !== 'case'
+      );
     },
   });
+  const decisionAssignments = {
+    async assign(
+      context: TenantContext,
+      input: {
+        decisionId: string;
+        assigneeId: string | null;
+        revision: number;
+      },
+    ) {
+      if (!input.decisionId.startsWith('case:'))
+        return queueAssignments.assign(context, input);
+      const item = await decisions.find(context, input.decisionId);
+      if (!item || item.outcome || item.owner.kind !== 'case')
+        throw new IdentityError(
+          404,
+          'NOT_FOUND',
+          'This decision no longer needs a person.',
+        );
+      const owner = await detection.cases.assignOwner(
+        context,
+        item.owner.exceptionId,
+        { userId: input.assigneeId, revision: input.revision },
+      );
+
+      return {
+        decisionId: input.decisionId,
+        assignment: {
+          assigneeId: owner.userId,
+          assignedBy: owner.assignedBy,
+          assignedAt: owner.assignedAt,
+          revision: owner.revision,
+        },
+      };
+    },
+  };
   const orderQueries = {
     state: orderStateQueries,
     attention: orderAttentionQuery,

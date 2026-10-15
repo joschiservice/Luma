@@ -30,11 +30,9 @@ export function createReplenishmentReviewContext(deps: {
             title: string | null;
           }>(
             `SELECT s.sku_id AS "skuId",s.document->'data'->>'locationId' AS "locationId",
-       (SELECT CASE WHEN count(DISTINCT p.document->'data'->>'title')=1
-         THEN min(p.document->'data'->>'title') END FROM inventory_product_skus k
-         JOIN inventory_projections i ON i.tenant_id=k.tenant_id AND i.entity_id=k.product_id AND i.connection_id=k.connection_id
-         JOIN inventory_snapshots p ON p.tenant_id=i.tenant_id AND p.id=i.snapshot_id
-         WHERE k.tenant_id=s.tenant_id AND k.sku_id=s.sku_id AND k.connection_id=$3) AS title
+       (SELECT concat_ws(' · ', k.product_title, nullif(k.variant_title, 'Default Title'))
+         FROM inventory_product_skus k WHERE k.tenant_id=s.tenant_id AND k.sku_id=s.sku_id AND k.product_title IS NOT NULL
+         ORDER BY (k.connection_id=$3) DESC, k.connection_id, k.product_id LIMIT 1) AS title
        FROM inventory_projections i JOIN inventory_snapshots s ON s.tenant_id=i.tenant_id AND s.id=i.snapshot_id
        WHERE i.tenant_id=$1 AND i.entity_id=$2 AND i.connection_id=$3 AND s.kind='position'`,
             [context.tenantId, rule.positionId, rule.connectionId],

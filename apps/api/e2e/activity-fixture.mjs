@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { seedPlaybooks } from './playbooks-fixture.mjs';
 
 /** Seeds immutable producer records for history pagination and outcome checks. */
-export async function seedActivity(db, tenantId, actorId, count = 35) {
+export async function seedActivity(
+  db,
+  tenantId,
+  actorId,
+  count = 35,
+  separateEvents = false,
+) {
   const { connectionId } = await seedPlaybooks(db, tenantId);
   const proposalId = randomUUID();
   const at = new Date().toISOString();
@@ -52,6 +58,36 @@ export async function seedActivity(db, tenantId, actorId, count = 35) {
   for (let i = 0; i < count; i++) {
     const id = randomUUID();
     ids.push(id);
+    let eventProposalId = proposalId;
+    if (separateEvents && i > 0) {
+      const eventIssueId = randomUUID();
+      eventProposalId = randomUUID();
+      const eventIncident = {
+        ...incident,
+        id: eventIssueId,
+        fingerprint: randomUUID().replaceAll('-', '').padEnd(64, 'b'),
+      };
+      await db.owner.query(
+        "INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'detected',$4)",
+        [eventIssueId, tenantId, eventIncident.fingerprint, eventIncident],
+      );
+      await db.owner.query(
+        'INSERT INTO case_proposals(tenant_id,id,exception_id,diagnosis_revision,action_hash,document) VALUES($1,$2,$3,1,$4,$5)',
+        [
+          tenantId,
+          eventProposalId,
+          eventIssueId,
+          'b'.repeat(64),
+          {
+            id: eventProposalId,
+            tenantId,
+            connectionId,
+            target: { kind: 'order', id: `Order ${1042 + i}` },
+            capability: 'orders.shipping-method.write',
+          },
+        ],
+      );
+    }
     const doc = {
       id,
       tenantId,
@@ -60,7 +96,7 @@ export async function seedActivity(db, tenantId, actorId, count = 35) {
       occurredAt: at,
       actor: { kind: 'user', id: actorId },
       connectionId,
-      proposalId,
+      proposalId: eventProposalId,
       details:
         i === 0
           ? { outcome: 'approved' }
@@ -74,7 +110,7 @@ export async function seedActivity(db, tenantId, actorId, count = 35) {
     };
     await db.owner.query(
       'INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document,created_at) VALUES($1::uuid,$2,$1::text,$3,$4,$5)',
-      [id, tenantId, proposalId, doc, at],
+      [id, tenantId, eventProposalId, doc, at],
     );
   }
   await db.owner.query(

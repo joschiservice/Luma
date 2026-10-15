@@ -37,6 +37,8 @@ export interface DecisionProvider {
 
 export interface DecisionQuery extends CollectionListParameters {
   view: DecisionView;
+  /** Reader-actionable work by default; direct item reads include all work. */
+  scope?: 'actionable' | 'waiting' | 'all' | undefined;
   domain?: DecisionDomain | undefined;
   reason?: DecisionReason | undefined;
   /** Searches titles; it may name people or records and is never logged. */

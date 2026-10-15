@@ -267,10 +267,17 @@ it('counts partial returns once, keeps decisions apart from store records and en
   });
   expect(detail.case.assignee).toEqual({ id: f.owner.id, name: 'Owner' });
 
-  // Needs you keeps the owning case assignment and offers members a read-only review.
-  const queue = await f.request(
+  // Read-only reviews keep the owning assignment in Waiting on others.
+  const actionable = await f.request(
     f.member,
     `${f.base}/decisions?view=all&limit=100`,
+  );
+  expect(
+    actionable.items.some((item) => item.id === `return-case:${first.case.id}`),
+  ).toBe(false);
+  const queue = await f.request(
+    f.member,
+    `${f.base}/decisions?view=all&scope=waiting&limit=100`,
   );
   const attention = queue.items.find(
     (item) => item.id === `return-case:${first.case.id}`,

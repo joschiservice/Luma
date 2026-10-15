@@ -49,3 +49,9 @@ describe('activity outcome evidence', () => {
 it('labels the manual close command separately from verified outcomes', () => {
   expect(activityOutcome({ outcome: 'close' })).toBe('manually_disposed');
 });
+
+it('keeps a refused policy admission visible as a failed event', () => {
+  expect(
+    activityOutcome({ action: 'policy.evaluated', outcome: 'denied' }),
+  ).toBe('failed');
+});

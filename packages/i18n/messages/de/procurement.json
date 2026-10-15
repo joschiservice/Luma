@@ -651,5 +651,8 @@
   "procurement_preview_label": "Vorschau der Lieferantenbestellung",
   "procurement_preview_open": "Lieferantenbestellung öffnen",
   "procurement_list_unmatched_body": "Versuche eine andere Suche, Ansicht oder Bedingung.",
-  "procurement_value_mixed": "Gemischt oder teilweise bepreist"
+  "procurement_value_mixed": "Gemischt oder teilweise bepreist",
+  "procurement_waiting_proposals": "{count, plural, one {{count, number} Vorschlag wartet auf Freigabe} other {{count, number} Vorschläge warten auf Freigabe}}",
+  "procurement_list_orders_suppliers_ready": "Deine Lieferanten sind bereit. Erstelle einen Bestellentwurf oder prüfe die Vorschläge, die auf Freigabe warten.",
+  "procurement_list_orders_checking_suppliers": "Erstelle einen Bestellentwurf, sobald das Lieferantenverzeichnis geladen ist."
 }

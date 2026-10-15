@@ -37,7 +37,7 @@ export function supplierExtractionAvailability(
     settings,
     gatewayInstalled,
     supplierExtractionProfile,
-    'Reading supplier messages needs a regional model route with zero data retention.',
+    'Automatic extraction of supplier commitments needs a regional model route with zero data retention. Connected mailbox messages are still available in Inbox.',
     'supplier-extraction',
   );
 }

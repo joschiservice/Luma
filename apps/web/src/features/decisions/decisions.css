@@ -232,3 +232,35 @@
     gap: 2px;
   }
 }
+
+.decisions-waiting-list {
+  display: grid;
+  gap: 12px;
+  padding-inline-start: 20px;
+}
+.decisions-waiting-list li {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .decisions-toolbar .collection-toolbar-views:has(> .collection-view-bar) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .decisions-toolbar .decisions-views {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .decisions-toolbar .collection-toolbar-refresh {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .decisions-toolbar .collection-toolbar-search {
+    flex-basis: 100%;
+  }
+  .decisions-toolbar .collection-toolbar-filters {
+    flex-basis: auto;
+  }
+}

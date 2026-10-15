@@ -81,8 +81,25 @@ export const collectionViewsOptions = (
       'collection',
       domain,
     ],
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal, client }) => {
       try {
+        const availability = await client.ensureQueryData({
+          ...privateQueryDefaults,
+          queryKey: [
+            'private',
+            'organization',
+            organizationId,
+            'adaptive',
+            'availability',
+          ],
+          queryFn: ({ signal }) =>
+            api.adaptive.availability(
+              { params: { organizationId } },
+              { signal },
+            ),
+        });
+        if (!availability.views)
+          return { available: false, items: [] as CollectionSavedView[] };
         const views = await api.adaptiveViews.list(
           { params: { organizationId } },
           { signal },

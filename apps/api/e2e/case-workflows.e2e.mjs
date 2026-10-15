@@ -407,11 +407,18 @@ test('a connection check ends without handing over when reads have already recov
     },
   });
   await f.pilot.observe({ check: false });
+  // Start from a sustained failure whose automatic retries have been exhausted.
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET attempts=5,failing_since=now()-interval '16 minutes'
+     WHERE tenant_id=$1 AND connection_id=$2 AND error_code IS NOT NULL`,
+    [f.manifest.organizationId, f.manifest.connections.shopify],
+  );
   await f.pilot.detect();
   const [opened] = (await f.pilot.detection.exceptions.list(f.actor)).filter(
     (item) => item.exceptionClass === 'sync_failure',
   );
   expect(opened).toBeDefined();
+  expect(opened.severity).toBe('medium');
   // The provider recovers before the run reads the stream.
   const [fault] = (await f.call('runs/operations')).faults;
   await f.call('runs/operations/control', { action: 'disable', id: fault.id });

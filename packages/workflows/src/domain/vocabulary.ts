@@ -18,6 +18,8 @@ interface TriggerEntry extends VocabularyAvailability {
   kind: WorkflowTrigger['kind'];
   label: string;
   description: string;
+  /** Installed issue and event names that an author can select. */
+  options?: { value: string; label: string }[];
 }
 
 interface StepKindEntry extends VocabularyAvailability {
@@ -91,6 +93,7 @@ export interface VocabularyContribution {
     kind: TriggerEntry['kind'];
     executable: boolean;
     reason?: string;
+    options?: { value: string; label: string }[];
   }[];
   stepKinds?: {
     kind: StepKindEntry['kind'];
@@ -205,6 +208,18 @@ export function mergeVocabulary(
         label: triggerLabels[kind][0],
         description: triggerLabels[kind][1],
         ...availability(kind, triggers),
+        ...(triggers.some((entry) => entry.kind === kind && entry.options)
+          ? {
+              options: [
+                ...new Map(
+                  triggers
+                    .filter((entry) => entry.kind === kind)
+                    .flatMap((entry) => entry.options ?? [])
+                    .map((option) => [option.value, option]),
+                ).values(),
+              ],
+            }
+          : {}),
       }),
     ),
     stepKinds: (Object.keys(stepLabels) as StepKindEntry['kind'][]).map(

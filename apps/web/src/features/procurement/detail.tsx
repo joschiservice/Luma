@@ -15,7 +15,12 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
-import { DataTable } from '@luma/ui/components/primitives/data-table';
+import { CollectionDisplay } from '@luma/ui/components/primitives/collection-display';
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableColumnState,
+} from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
@@ -821,6 +826,236 @@ function Lines({
     context: context?.lines.find((c) => c.lineId === line.lineId),
   }));
 
+  const [columnState, setColumnState] = useState<DataTableColumnState>({
+    columns: [
+      'item',
+      'ordered',
+      'confirmed',
+      'received',
+      'expected',
+      'unit_cost',
+    ].map((key) => ({ key })),
+  });
+  const columns: DataTableColumn<(typeof rows)[number]>[] = [
+    {
+      key: 'item',
+      required: true,
+      header: m.procurement_lines_item(),
+      cell: ({ line, context }) => (
+        <span className="procurement-cell">
+          {context?.skuId ? (
+            <Link
+              to="/app/$organizationId/products/$skuId"
+              params={{ organizationId, skuId: context.skuId }}
+            >
+              {context?.title ?? line.description}
+            </Link>
+          ) : (
+            <span>{context?.title ?? line.description}</span>
+          )}
+          <small>
+            <code>{context?.positions[0]?.sku ?? line.sku}</code>
+            {line.overdue ? ` · ${m.procurement_overdue()}` : ''}
+          </small>
+        </span>
+      ),
+    },
+    {
+      key: 'unit_cost',
+      header: m.workflows_review_unit_cost(),
+      numeric: true,
+      cell: ({ line }) =>
+        formatMoney(
+          record.order.lines.find((item) => item.id === line.lineId)
+            ?.unitPrice ?? null,
+        ) ?? m.workflows_review_not_reported(),
+    },
+    {
+      key: 'ordered',
+      header: m.procurement_lines_ordered(),
+      numeric: true,
+      cell: ({ line }) =>
+        quantityWithUnit(quantity(line.ordered), line.unit, line.ordered),
+    },
+    {
+      key: 'confirmed',
+      header: m.procurement_lines_confirmed(),
+      numeric: true,
+      cell: ({ line }) =>
+        line.confirmed === null ? (
+          <span className="procurement-muted">{m.common_empty_value()}</span>
+        ) : (
+          <span
+            className={
+              Math.abs(line.confirmed - line.ordered) > 1e-9
+                ? 'procurement-changed'
+                : undefined
+            }
+          >
+            {quantity(line.confirmed)}
+          </span>
+        ),
+    },
+    {
+      key: 'shipped',
+      header: m.procurement_lines_shipped(),
+      numeric: true,
+      cell: ({ line }) =>
+        line.shipped === null ? m.common_empty_value() : quantity(line.shipped),
+    },
+    {
+      key: 'ordered_difference',
+      header: m.procurement_lines_ordered_difference(),
+      numeric: true,
+      hideOnNarrow: true,
+      cell: ({ line }) =>
+        line.orderedDifference === null
+          ? m.common_empty_value()
+          : quantity(line.orderedDifference),
+    },
+    {
+      key: 'shipped_difference',
+      header: m.procurement_lines_shipped_difference(),
+      numeric: true,
+      hideOnNarrow: true,
+      cell: ({ line }) =>
+        line.shippedDifference === null
+          ? m.common_empty_value()
+          : quantity(line.shippedDifference),
+    },
+    {
+      key: 'received',
+      header: m.procurement_lines_received(),
+      numeric: true,
+      cell: ({ line }) => (
+        <span className="procurement-cell procurement-cell-end">
+          <span>{quantity(line.received)}</span>
+          {line.damaged > 0 ? (
+            <small>
+              {m.procurement_receipt_good({
+                quantity: quantity(line.goodReceived),
+              })}
+            </small>
+          ) : null}
+          {line.outstanding > 1e-9 && line.received > 0 ? (
+            <small>
+              {m.procurement_lines_outstanding({
+                quantity: quantity(line.outstanding),
+              })}
+            </small>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'received_difference',
+      header: m.procurement_lines_received_difference(),
+      numeric: true,
+      hideOnNarrow: true,
+      cell: ({ line }) =>
+        line.receivedDifference === null
+          ? m.common_empty_value()
+          : quantity(line.receivedDifference),
+    },
+    {
+      key: 'damaged',
+      header: m.procurement_lines_damage(),
+      numeric: true,
+      cell: ({ line }) => quantity(line.damaged),
+    },
+    {
+      key: 'shortage',
+      header: m.procurement_lines_shortage(),
+      numeric: true,
+      hideOnNarrow: true,
+      cell: ({ line }) => quantity(line.shortage),
+    },
+    {
+      key: 'expected',
+      header: m.procurement_column_expected(),
+      hideOnNarrow: true,
+      cell: ({ line }) =>
+        line.stage === 'received' ? (
+          <span className="procurement-muted">
+            {m.procurement_lines_arrived()}
+          </span>
+        ) : line.expectedDate ? (
+          <span className="procurement-cell">
+            <span>{calendarDate(line.expectedDate)}</span>
+            <small>
+              {line.promisedDate
+                ? m.procurement_lines_promised()
+                : m.procurement_lines_requested()}
+            </small>
+          </span>
+        ) : (
+          <span className="procurement-muted">
+            {m.procurement_lines_not_set()}
+          </span>
+        ),
+    },
+    {
+      key: 'stock',
+      header: m.procurement_lines_stock(),
+      hideOnNarrow: true,
+      cell: ({ context }) =>
+        contextError ? (
+          <span className="procurement-muted">{m.common_not_available()}</span>
+        ) : !context ? (
+          <span className="procurement-muted">…</span>
+        ) : context.positions.length ? (
+          <span className="procurement-cell">
+            {context.positions.slice(0, 2).map((position) => (
+              <Link
+                key={position.id}
+                to="/app/$organizationId/inventory/$positionId"
+                params={{ organizationId, positionId: position.id }}
+              >
+                {(new Set(
+                  position.sources
+                    .filter((s) => !s.deleted)
+                    .map((s) => s.available),
+                ).size === 1 && position.sources.every((s) => !s.deleted)
+                  ? position.sources.slice(0, 1)
+                  : position.sources
+                )
+                  .map((s) =>
+                    s.deleted
+                      ? m.procurement_stock_removed()
+                      : `${position.sources.some((other) => other.available !== s.available) ? `${s.label}: ` : ''}${quantityWithUnit(stockQuantity(s.available), position.unit, s.available ?? '')}`,
+                  )
+                  .join(' / ')}{' '}
+                <small>{position.location}</small>
+              </Link>
+            ))}
+            {context.otherOrders.length ? (
+              <small>
+                {m.procurement_lines_other_orders({
+                  count: context.otherOrders.length,
+                })}
+              </small>
+            ) : null}
+          </span>
+        ) : (
+          <span className="procurement-muted">
+            {context.skuId
+              ? m.procurement_stock_none()
+              : m.procurement_lines_unknown_sku()}
+          </span>
+        ),
+    },
+    {
+      key: 'stage',
+      header: m.procurement_lines_state(),
+      hideOnNarrow: true,
+      cell: ({ line }) => (
+        <StatePill state={lineStages[line.stage].state}>
+          {lineStages[line.stage].label()}
+        </StatePill>
+      ),
+    },
+  ];
+
   return (
     <section className="procurement-section" aria-labelledby="order-lines">
       <div className="procurement-section-heading">
@@ -832,233 +1067,27 @@ function Lines({
             })}
           </span>
         ) : null}
+        <CollectionDisplay
+          columns={{
+            options: columns.map((column) => ({
+              key: column.key,
+              label: String(column.header),
+              required: column.key === 'item',
+            })),
+            shown: columnState.columns.map(({ key }) => key),
+            onChange: (keys) =>
+              setColumnState({ columns: keys.map((key) => ({ key })) }),
+          }}
+        />
       </div>
       <DataTable
         caption={m.procurement_lines_caption()}
         density="compact"
         rows={rows}
         rowKey={(row) => row.line.lineId}
-        columns={[
-          {
-            key: 'item',
-            header: m.procurement_lines_item(),
-            cell: ({ line, context }) => (
-              <span className="procurement-cell">
-                {context?.skuId ? (
-                  <Link
-                    to="/app/$organizationId/products/$skuId"
-                    params={{ organizationId, skuId: context.skuId }}
-                  >
-                    {line.description}
-                  </Link>
-                ) : (
-                  <span>{line.description}</span>
-                )}
-                <small>
-                  <code>{context?.positions[0]?.sku ?? line.sku}</code>
-                  {line.overdue ? ` · ${m.procurement_overdue()}` : ''}
-                </small>
-              </span>
-            ),
-          },
-          {
-            key: 'unit_cost',
-            header: m.workflows_review_unit_cost(),
-            numeric: true,
-            cell: ({ line }) =>
-              formatMoney(
-                record.order.lines.find((item) => item.id === line.lineId)
-                  ?.unitPrice ?? null,
-              ) ?? m.workflows_review_not_reported(),
-          },
-          {
-            key: 'ordered',
-            header: m.procurement_lines_ordered(),
-            numeric: true,
-            cell: ({ line }) =>
-              quantityWithUnit(quantity(line.ordered), line.unit, line.ordered),
-          },
-          {
-            key: 'confirmed',
-            header: m.procurement_lines_confirmed(),
-            numeric: true,
-            cell: ({ line }) =>
-              line.confirmed === null ? (
-                <span className="procurement-muted">
-                  {m.common_empty_value()}
-                </span>
-              ) : (
-                <span
-                  className={
-                    Math.abs(line.confirmed - line.ordered) > 1e-9
-                      ? 'procurement-changed'
-                      : undefined
-                  }
-                >
-                  {quantity(line.confirmed)}
-                </span>
-              ),
-          },
-          {
-            key: 'shipped',
-            header: m.procurement_lines_shipped(),
-            numeric: true,
-            cell: ({ line }) =>
-              line.shipped === null
-                ? m.common_empty_value()
-                : quantity(line.shipped),
-          },
-          {
-            key: 'ordered_difference',
-            header: m.procurement_lines_ordered_difference(),
-            numeric: true,
-            hideOnNarrow: true,
-            cell: ({ line }) =>
-              line.orderedDifference === null
-                ? m.common_empty_value()
-                : quantity(line.orderedDifference),
-          },
-          {
-            key: 'shipped_difference',
-            header: m.procurement_lines_shipped_difference(),
-            numeric: true,
-            hideOnNarrow: true,
-            cell: ({ line }) =>
-              line.shippedDifference === null
-                ? m.common_empty_value()
-                : quantity(line.shippedDifference),
-          },
-          {
-            key: 'received',
-            header: m.procurement_lines_received(),
-            numeric: true,
-            cell: ({ line }) => (
-              <span className="procurement-cell procurement-cell-end">
-                <span>{quantity(line.received)}</span>
-                {line.damaged > 0 ? (
-                  <small>
-                    {m.procurement_receipt_good({
-                      quantity: quantity(line.goodReceived),
-                    })}
-                  </small>
-                ) : null}
-                {line.outstanding > 1e-9 && line.received > 0 ? (
-                  <small>
-                    {m.procurement_lines_outstanding({
-                      quantity: quantity(line.outstanding),
-                    })}
-                  </small>
-                ) : null}
-              </span>
-            ),
-          },
-          {
-            key: 'received_difference',
-            header: m.procurement_lines_received_difference(),
-            numeric: true,
-            hideOnNarrow: true,
-            cell: ({ line }) =>
-              line.receivedDifference === null
-                ? m.common_empty_value()
-                : quantity(line.receivedDifference),
-          },
-          {
-            key: 'damaged',
-            header: m.procurement_lines_damage(),
-            numeric: true,
-            cell: ({ line }) => quantity(line.damaged),
-          },
-          {
-            key: 'shortage',
-            header: m.procurement_lines_shortage(),
-            numeric: true,
-            hideOnNarrow: true,
-            cell: ({ line }) => quantity(line.shortage),
-          },
-          {
-            key: 'expected',
-            header: m.procurement_column_expected(),
-            hideOnNarrow: true,
-            cell: ({ line }) =>
-              line.stage === 'received' ? (
-                <span className="procurement-muted">
-                  {m.procurement_lines_arrived()}
-                </span>
-              ) : line.expectedDate ? (
-                <span className="procurement-cell">
-                  <span>{calendarDate(line.expectedDate)}</span>
-                  <small>
-                    {line.promisedDate
-                      ? m.procurement_lines_promised()
-                      : m.procurement_lines_requested()}
-                  </small>
-                </span>
-              ) : (
-                <span className="procurement-muted">
-                  {m.procurement_lines_not_set()}
-                </span>
-              ),
-          },
-          {
-            key: 'stock',
-            header: m.procurement_lines_stock(),
-            hideOnNarrow: true,
-            cell: ({ context }) =>
-              contextError ? (
-                <span className="procurement-muted">
-                  {m.common_not_available()}
-                </span>
-              ) : !context ? (
-                <span className="procurement-muted">…</span>
-              ) : context.positions.length ? (
-                <span className="procurement-cell">
-                  {context.positions.slice(0, 2).map((position) => (
-                    <Link
-                      key={position.id}
-                      to="/app/$organizationId/inventory/$positionId"
-                      params={{ organizationId, positionId: position.id }}
-                    >
-                      {position.sources
-                        .map((s) =>
-                          s.deleted
-                            ? m.procurement_stock_removed()
-                            : quantityWithUnit(
-                                stockQuantity(s.available),
-                                position.unit,
-                                s.available ?? '',
-                              ),
-                        )
-                        .join(' / ')}{' '}
-                      <small>{position.location}</small>
-                    </Link>
-                  ))}
-                  {context.otherOrders.length ? (
-                    <small>
-                      {m.procurement_lines_other_orders({
-                        count: context.otherOrders.length,
-                      })}
-                    </small>
-                  ) : null}
-                </span>
-              ) : (
-                <span className="procurement-muted">
-                  {context.skuId
-                    ? m.procurement_stock_none()
-                    : m.procurement_lines_unknown_sku()}
-                </span>
-              ),
-          },
-          {
-            key: 'stage',
-            header: m.procurement_lines_state(),
-            hideOnNarrow: true,
-            cell: ({ line }) => (
-              <StatePill state={lineStages[line.stage].state}>
-                {lineStages[line.stage].label()}
-              </StatePill>
-            ),
-          },
-        ]}
+        columns={columns}
+        columnState={columnState}
+        onColumnStateChange={setColumnState}
       />
       <p className="procurement-note">{m.procurement_lines_note()}</p>
       <p>

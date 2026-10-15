@@ -97,6 +97,17 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page.getByText('Stock checked.', { exact: false }).waitFor();
   const run = (await f.request('/runs')).items[0];
   await f.waitFor(run.id, 'awaiting_decision');
+  await page.goto(`/app/${f.manifest.organizationId}/procurement`);
+  await page
+    .getByRole('link', { name: '1 proposal waiting for approval', exact: true })
+    .click();
+  await expect(
+    page.getByText('Waiting on others', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Waiting for another approver', { exact: true }),
+  ).toBeVisible();
+  await page.goto(path);
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await page
     .getByRole('heading', { name: new RegExp(`50 × ${sku}$`) })
@@ -164,10 +175,14 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   ).toBe(true);
   await review.getByRole('link', { name: 'View run activity' }).click();
   await review
-    .getByText('Purchase order created', { exact: true })
+    .getByRole('button', { name: /Replenish low stock.*Verified/ })
+    .click();
+  await review
+    .locator('.activity-steps li')
+    .filter({ hasText: 'Purchase order created' })
     .first()
     .waitFor();
-  await review.goBack();
+  await review.getByRole('link', { name: 'Open record', exact: true }).click();
   await review.getByRole('link', { name: 'Open purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
   // The stock record shows the same readiness and returns to the original context.

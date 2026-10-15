@@ -242,6 +242,9 @@ export const authoringVocabularySchema = z.object({
       kind: z.enum(workflowTriggerKinds),
       label: z.string(),
       description: z.string(),
+      options: z
+        .array(z.object({ value: z.string(), label: z.string() }))
+        .optional(),
       ...availability,
     }),
   ),

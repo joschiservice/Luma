@@ -55,7 +55,7 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
       tenantId,
     ])
   ).rows[0].user_id;
-  const fixture = await seedActivity(db, tenantId, actor);
+  const fixture = await seedActivity(db, tenantId, actor, 35, true);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   await page.locator('.activity-event').first().waitFor();
   // Wide screens list every Activity filter in a docked panel.
@@ -79,15 +79,12 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
   await search.press('Enter');
   await expect.poll(() => param('q')).toBe('lovelace');
   await page.locator('.activity-event').first().waitFor();
-  await page
-    .getByText('Ada Lovelace · activity@example.test · JTL Cloud')
-    .first()
-    .waitFor();
+  await page.getByText('Ada Lovelace · JTL Cloud').first().waitFor();
   expect(await page.getByText(actor).count()).toBe(0);
   await addFilter('Outcome', 'Outcome unclear');
   await expect.poll(() => condition('outcome')).toEqual(['uncertain']);
   await page
-    .getByRole('button', { name: /Change attempt finished/ })
+    .getByRole('button', { name: /Change the order’s shipping method/ })
     .first()
     .click();
   await page.getByText('observation:shipping-1042', { exact: true }).waitFor();
@@ -292,7 +289,7 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
   await page.setViewportSize({ width: 390, height: 844 });
   const first = page
     .getByRole('button', {
-      name: /Change attempt finished|System connected|Approved under workspace rules/,
+      name: /Change the order’s shipping method|System connected|Approved under workspace rules/,
     })
     .first();
   await first.focus();

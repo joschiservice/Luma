@@ -162,5 +162,8 @@
   "activity_actor_me": "Ich",
   "activity_actor_luma": "Luma",
   "activity_actor_workflows": "Workflows",
-  "activity_actor_unknown_person": "Unbekannte Person"
+  "activity_actor_unknown_person": "Unbekannte Person",
+  "activity_intro": "Verfolge Änderungen, Entscheidungen und verifizierte Ergebnisse im Workspace.",
+  "activity_guide": "Aktivitätsleitfaden",
+  "activity_open_record": "Datensatz öffnen"
 }

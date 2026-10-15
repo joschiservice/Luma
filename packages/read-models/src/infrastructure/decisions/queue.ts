@@ -63,7 +63,6 @@ type QueueRow = {
 const emptyCounts = <K extends string>(keys: readonly K[]) =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
 
-const views = ['all', 'mine', 'unassigned'] as const;
 const domains = [
   'orders',
   'fulfillment',
@@ -83,7 +82,7 @@ const reasons = [
 // their owners before this query and only contribute ranking and record lookup columns.
 // Rank 0: the deadline falls within the expiring window; 1: high impact; 2: the rest. Unknown
 // impact is not ranked below known low impact. Binds: $1 tenant, $2 evaluation time, $3 external rows,
-// $4 expiring window minutes, $5 view, $6 reader, $7 domain, $8 reason, $9 one item ID, $10 whether
+// $4 expiring window minutes, $5 one item ID, $6 whether
 // the reader may read issues. Returns every decision of the view; the queue is bounded to work
 // waiting on a person, and conditions, search, sorting and paging run on the presented items.
 function queueSql(cases: string) {
@@ -102,8 +101,8 @@ function queueSql(cases: string) {
    CASE WHEN c.subject->>'subjectKind' IN ('order','fulfillment','sku','product') THEN c.subject->>'subjectKind' END AS record_kind,
    NULL::text AS record_id,c.subject->'scope'->>0 AS record_connection,c.subject->>'subjectId' AS record_external,
    to_jsonb(c) AS facts,
-   CASE WHEN to_jsonb(c)->'owner'->>'userId' IS NOT NULL THEN jsonb_build_object('assigneeId',to_jsonb(c)->'owner'->'userId','assignedBy',to_jsonb(c)->'owner'->'assignedBy','assignedAt',to_jsonb(c)->'owner'->'assignedAt','revision',to_jsonb(c)->'owner'->'revision') END AS owner_assignment
-  FROM case_rows c WHERE $10::boolean),
+   CASE WHEN to_jsonb(c)->'owner'->>'revision' IS NOT NULL THEN jsonb_build_object('assigneeId',to_jsonb(c)->'owner'->'userId','assignedBy',to_jsonb(c)->'owner'->'assignedBy','assignedAt',to_jsonb(c)->'owner'->'assignedAt','revision',to_jsonb(c)->'owner'->'revision') END AS owner_assignment
+  FROM case_rows c WHERE $6::boolean),
  external AS (
   SELECT x.id,x.reason,x.domain,x.impact,x.requested_at,x.deadline,x.record_kind,x.record_id,
    x.record_connection,x.record_external,NULL::jsonb AS facts,x.owner_assignment
@@ -116,23 +115,14 @@ function queueSql(cases: string) {
    COALESCE(c.deadline,'infinity'::timestamptz) AS deadline_key
   FROM (SELECT * FROM cases UNION ALL SELECT * FROM external) c
   LEFT JOIN decision_assignments a ON a.tenant_id=$1 AND a.decision_id=c.id
-  WHERE $9::text IS NULL OR c.id=$9),
- in_view AS (SELECT * FROM ranked WHERE $5='all' OR ($5='mine' AND assignee_id=$6::uuid)
-  OR ($5='unassigned' AND assignee_id IS NULL)),
- filtered AS (SELECT * FROM in_view WHERE ($7::text IS NULL OR domain=$7) AND ($8::text IS NULL OR reason=$8))
- SELECT (SELECT jsonb_build_object('all',count(*),'mine',count(*) FILTER (WHERE assignee_id=$6::uuid),
-   'unassigned',count(*) FILTER (WHERE assignee_id IS NULL)) FROM ranked) AS views,
-  (SELECT COALESCE(jsonb_object_agg(domain,n),'{}'::jsonb) FROM (SELECT domain,count(*) AS n FROM in_view
-   WHERE $8::text IS NULL OR reason=$8 GROUP BY domain) d) AS domains,
-  (SELECT COALESCE(jsonb_object_agg(reason,n),'{}'::jsonb) FROM (SELECT reason,count(*) AS n FROM in_view
-   WHERE $7::text IS NULL OR domain=$7 GROUP BY reason) r) AS reasons,
-  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',p.id,'rank',p.rank,'deadlineKey',p.deadline_key,
+  WHERE $5::text IS NULL OR c.id=$5)
+ SELECT  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',p.id,'rank',p.rank,'deadlineKey',p.deadline_key,
    'requestedAt',p.requested_at,'facts',p.facts,
    'assignment',CASE WHEN p.revision IS NULL THEN NULL ELSE jsonb_build_object('assigneeId',p.assignee_id,
     'assignedBy',p.assigned_by,'assignedAt',p.assigned_at,'revision',p.revision) END,
    'record',jsonb_build_object('kind',p.record_kind,'id',p.record_id,'connection',p.record_connection,'external',p.record_external))
    ORDER BY p.rank,p.deadline_key,p.requested_at,p.id)
-   FROM filtered p),
+   FROM ranked p),
   '[]'::jsonb) AS items`;
 }
 
@@ -234,7 +224,8 @@ export function createDecisionQueue(
       createHash('sha256')
         .update(
           JSON.stringify([
-            'decisions-v2',
+            'decisions-v3',
+            query.scope ?? 'actionable',
             fresh.tenantId,
             fresh.actor.id,
             query.view,
@@ -305,19 +296,12 @@ export function createDecisionQueue(
         await tx.query('SET LOCAL jit = off');
         const result = (
           await tx.query<{
-            views: Record<string, number>;
-            domains: Record<string, number>;
-            reasons: Record<string, number>;
             items: QueueRow[];
           }>(sql, [
             fresh.tenantId,
             asOf,
             JSON.stringify(rows),
             expiringWindowMinutes,
-            query.view,
-            fresh.actor.id,
-            query.domain ?? null,
-            query.reason ?? null,
             only,
             readsCases,
           ])
@@ -355,7 +339,51 @@ export function createDecisionQueue(
             ];
           },
         );
-        const matching = filterDecisions(queue, query.where, query.q, {
+        const scoped = only
+          ? queue
+          : queue.filter(({ item }) => {
+              const actionable =
+                ['decide', 'run', 'check', 'investigate'].includes(
+                  item.response,
+                ) && !(item.automatic && item.reason === 'run');
+
+              return (
+                query.scope === 'all' ||
+                (query.scope === 'waiting' ? !actionable : actionable)
+              );
+            });
+        const inView = scoped.filter(
+          ({ item }) =>
+            query.view === 'all' ||
+            (query.view === 'mine'
+              ? item.assignment?.assigneeId === fresh.actor.id
+              : !item.assignment?.assigneeId),
+        );
+        const filtered = inView.filter(
+          ({ item }) =>
+            (!query.domain || item.domain === query.domain) &&
+            (!query.reason || item.reason === query.reason),
+        );
+        const counts = {
+          views: {
+            all: scoped.length,
+            mine: scoped.filter(
+              ({ item }) => item.assignment?.assigneeId === fresh.actor.id,
+            ).length,
+            unassigned: scoped.filter(
+              ({ item }) => !item.assignment?.assigneeId,
+            ).length,
+          },
+          domains: emptyCounts(domains),
+          reasons: emptyCounts(reasons),
+        };
+        for (const { item } of inView) {
+          if (!query.reason || item.reason === query.reason)
+            counts.domains[item.domain]++;
+          if (!query.domain || item.domain === query.domain)
+            counts.reasons[item.reason]++;
+        }
+        const matching = filterDecisions(filtered, query.where, query.q, {
           readerId: fresh.actor.id,
           now: new Date(asOf),
           timeZone,
@@ -438,11 +466,7 @@ export function createDecisionQueue(
         const base = {
           schemaVersion: 1 as const,
           asOf,
-          counts: {
-            views: { ...emptyCounts(views), ...result.views },
-            domains: { ...emptyCounts(domains), ...result.domains },
-            reasons: { ...emptyCounts(reasons), ...result.reasons },
-          },
+          counts,
           sources: [
             ...(readsCases
               ? [{ id: 'cases', label: 'Issues', state: 'available' as const }]

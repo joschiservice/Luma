@@ -119,10 +119,11 @@ records stay separate from detection.
 Quiet webhook traffic and an idle worker are normal without a scheduled job failure.
 
 **Trigger:** an active connection has a normalized failed read. `authentication`,
-`permission_denied`, `invalid_response`, `unsupported_capability` and `unsupported_version`
-detect immediately (`high`). `transient`, `timeout` and `rate_limited` detect (`medium`)
-only when `retryExhausted = true` and at least 900 s have passed since `firstFailureAt`.
-A success resets the window. Other errors defer for classification. A failed pagination
+`permission_denied` detect immediately (`high`). Other classified failures, including malformed
+responses, wait until `retryExhausted = true` and at least 900 s have passed since
+`firstFailureAt`. They start at `medium` and rise to `high` after 3600 s. Both windows scale
+with the configured sync-failure threshold. A successful complete scan resets the window.
+Failures without a classified error defer. A failed pagination
 page is a read failure; keep every last-good snapshot. A connection the provider stopped
 accepting (`accessLost`: Luma recorded a credential or grant rejection and nobody
 reconnected since) detects immediately (`high`, reason `access_lost`) even though its

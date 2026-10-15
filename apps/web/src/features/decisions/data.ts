@@ -42,6 +42,8 @@ export const needsYouSearch = z.object({
   /** The selected decision, kept in the URL so links and Back restore it. */
   item: z.string().max(200).optional().catch(undefined),
   grouped: z.boolean().optional().catch(undefined),
+  /** Opens proposals waiting on someone else from linked workspaces. */
+  waiting: z.boolean().optional().catch(undefined),
 });
 
 export type NeedsYouSearch = z.infer<typeof needsYouSearch>;
@@ -75,7 +77,9 @@ export function withoutLegacyFilters(search: NeedsYouSearch): NeedsYouSearch {
 
 /** Whether the URL says what to show, so the route must not restore the remembered view. */
 export function namesListState(search: NeedsYouSearch) {
-  return Boolean(search.item || search.q || search.cursor || search.page);
+  return Boolean(
+    search.item || search.q || search.cursor || search.page || search.waiting,
+  );
 }
 
 /** The list state without search and paging, so the queue starts on page one. */

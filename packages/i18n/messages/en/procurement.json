@@ -651,5 +651,8 @@
   "procurement_preview_label": "Purchase order preview",
   "procurement_preview_open": "Open purchase order",
   "procurement_list_unmatched_body": "Try another search, view or condition.",
-  "procurement_value_mixed": "Mixed or partly priced"
+  "procurement_value_mixed": "Mixed or partly priced",
+  "procurement_waiting_proposals": "{count, plural, one {{count, number} proposal waiting for approval} other {{count, number} proposals waiting for approval}}",
+  "procurement_list_orders_suppliers_ready": "Your suppliers are ready. Create a draft order or review the proposals waiting for approval.",
+  "procurement_list_orders_checking_suppliers": "Create a draft order once the supplier directory has loaded."
 }

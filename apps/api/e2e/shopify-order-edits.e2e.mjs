@@ -59,9 +59,9 @@ test('an approved Shopify quantity edit is calculated, committed once and verifi
   assert.equal(await unfulfilled(fixture, order, order.lines[0]), 3);
 
   const decision = async (user) =>
-    (await f.request(user, `${f.base}/decisions?domain=orders`)).items.find(
-      (item) => item.kind === 'order_edit',
-    );
+    (
+      await f.request(user, `${f.base}/decisions?domain=orders&scope=all`)
+    ).items.find((item) => item.kind === 'order_edit');
   const pending = await decision(admin);
   assert.equal(pending.reason, 'approval');
   assert.equal(pending.response, 'decide');

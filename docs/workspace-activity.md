@@ -1,11 +1,18 @@
 # Workspace Activity
 
-Activity lists recorded workspace actions, newest recorded first, with attribution,
+Activity groups recorded workspace actions into business events, newest recorded first, with attribution,
 timestamps, the proposed capability and resource, dispatch result, verification and evidence
 references. It is read-only: it has no decision or retry commands. Both the standard API and
 the pilot runtime compose the Activity service.
 
 Code: `@luma/resolution` (activity read), `activity` API contract.
+
+The web and Home request the business view. It keeps one event per issue, workflow run or
+proposal and expands up to 100 earlier steps that passed the same visibility and filters.
+Routine step records and approval-rule checks cannot create a business event by themselves;
+they remain in the event history. Approval, accepted writes, uncertain outcomes and verified
+results keep their distinct labels. The API's event view retains individual immutable records.
+Grouping precedes pagination, so a group is not repeated on older pages.
 
 ## Reads and ordering
 

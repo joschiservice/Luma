@@ -25,8 +25,10 @@ import { useContext, useState } from 'react';
 import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { vocabularyOptions } from './authoring/data';
 import { cancelWorkflowStart, fireWorkflow, workflowError } from './data';
 import { workflowTriggerLabel } from './presentation';
+import { WorkflowSubjectPicker } from './subject-picker';
 
 const api = createWebApiClient();
 
@@ -56,6 +58,7 @@ export function WorkflowTriggers({
   accessLost: () => Promise<void>;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
+  const vocabulary = useQuery(vocabularyOptions(organizationId));
   const params = { organizationId, definitionId: detail.summary.id };
   const subscriptions = useQuery({
     ...privateQueryDefaults,
@@ -80,10 +83,9 @@ export function WorkflowTriggers({
   );
   const trigger =
     selectedSubscription?.trigger ?? version.applicability.trigger;
-  const [schedule, setSchedule] = useState('');
   const [subscriptionKind, setSubscriptionKind] = useState<
-    'manual' | 'schedule' | 'event' | 'condition'
-  >('schedule');
+    'manual' | 'event' | 'condition'
+  >('manual');
   const [eventType, setEventType] = useState(version.context.kind);
   const [conditionField, setConditionField] = useState(
     Object.keys(version.context.fields)[0] ?? '',
@@ -92,8 +94,6 @@ export function WorkflowTriggers({
 
   function subscriptionTrigger(): WorkflowTrigger {
     if (subscriptionKind === 'manual') return { kind: 'manual' };
-    if (subscriptionKind === 'schedule')
-      return { kind: 'schedule', at: workspaceInstant(schedule, timeZone) };
     if (subscriptionKind === 'event') return { kind: 'event', eventType };
     const type = version.context.fields[conditionField];
     const equals =
@@ -283,16 +283,13 @@ export function WorkflowTriggers({
               <Select
                 id="workflow-subscription-kind"
                 value={subscriptionKind}
-                options={['manual', 'schedule', 'event', 'condition'].map(
-                  (kind) => ({
-                    value: kind,
-                    label: actions[kind as keyof typeof actions](),
-                  }),
-                )}
+                options={['manual', 'event', 'condition'].map((kind) => ({
+                  value: kind,
+                  label: actions[kind as keyof typeof actions](),
+                }))}
                 onValueChange={(value) => {
                   if (
                     value === 'manual' ||
-                    value === 'schedule' ||
                     value === 'event' ||
                     value === 'condition'
                   )
@@ -305,10 +302,16 @@ export function WorkflowTriggers({
                   <label htmlFor="workflow-subscription-event">
                     {m.authoring_coordination_event_type()}
                   </label>
-                  <Input
+                  <Select
                     id="workflow-subscription-event"
+                    aria-label={m.authoring_coordination_event_type()}
                     value={eventType}
-                    onChange={(event) => setEventType(event.target.value)}
+                    options={
+                      vocabulary.data?.triggers.find(
+                        (entry) => entry.kind === 'event',
+                      )?.options ?? []
+                    }
+                    onValueChange={(value) => setEventType(value ?? '')}
                     disabled={configure.isPending}
                   />
                 </>
@@ -341,26 +344,11 @@ export function WorkflowTriggers({
                   />
                 </>
               ) : null}
-              {subscriptionKind === 'schedule' ? (
-                <>
-                  <label htmlFor="workflow-subscription-schedule">
-                    {m.authoring_coordination_subscription_schedule()}
-                  </label>
-                  <Input
-                    id="workflow-subscription-schedule"
-                    type="datetime-local"
-                    value={schedule}
-                    disabled={configure.isPending}
-                    onChange={(event) => setSchedule(event.target.value)}
-                  />
-                </>
-              ) : null}
               <Button
                 type="button"
                 onClick={() => configure.mutate()}
                 disabled={
                   configure.isPending ||
-                  (subscriptionKind === 'schedule' && !schedule) ||
                   (subscriptionKind === 'event' && !eventType.trim()) ||
                   (subscriptionKind === 'condition' && !conditionField)
                 }
@@ -426,6 +414,8 @@ export function WorkflowTriggers({
         <Alert tone="neutral">{m.workflows_triggers_automatic()}</Alert>
       ) : !detail.canManage ? (
         <Alert tone="neutral">{m.workflows_triggers_cannot_manage()}</Alert>
+      ) : trigger.kind === 'schedule' ? (
+        <Alert tone="warning">{m.workflows_schedule_unavailable()}</Alert>
       ) : expired ? (
         <Alert tone="warning">{m.workflows_triggers_expired()}</Alert>
       ) : (
@@ -438,20 +428,16 @@ export function WorkflowTriggers({
         >
           <fieldset disabled={pending || request !== null}>
             <legend>{m.workflows_triggers_record_legend()}</legend>
-            <label>
-              {m.workflows_triggers_record_id({
-                kind: version.applicability.subjectKind,
-              })}
-              <Input
-                required
+            <div className="workflow-subject-field">
+              <span>{m.workflows_record_select()}</span>
+              <WorkflowSubjectPicker
+                key={version.applicability.subjectKind}
+                organizationId={organizationId}
+                kind={version.applicability.subjectKind}
                 value={subject}
-                maxLength={200}
-                onChange={(event) => setSubject(event.target.value)}
-                placeholder={m.workflows_triggers_record_placeholder({
-                  kind: version.applicability.subjectKind,
-                })}
+                onChange={setSubject}
               />
-            </label>
+            </div>
             {external ? (
               <label>
                 {m.workflows_triggers_source_id()}
@@ -574,7 +560,7 @@ export function WorkflowTriggers({
                 {m.workflows_triggers_start_another()}
               </Button>
             ) : null}
-            <Button type="submit" disabled={pending || !!success}>
+            <Button type="submit" disabled={pending || !!success || !subject}>
               <Play size={14} aria-hidden="true" />{' '}
               {pending
                 ? m.workflows_triggers_sending()

@@ -47,6 +47,23 @@ export function createShopifyCaseWorkflows(deps: {
   id(value: string): string;
   now(): Date;
 }): CaseWorkflowAdapter[] {
+  const workflowConnections = async (
+    context: TenantContext,
+    providers: string[],
+  ) =>
+    (await deps.connections(context))
+      .filter((connection) => providers.includes(connection.provider ?? ''))
+      .map((connection) => ({
+        id: connection.id,
+        label: connection.label,
+        system: connection.target.kind,
+        version: connection.version,
+        blockers:
+          connection.status === 'active'
+            ? []
+            : ['This connection is not active.'],
+        targets: [],
+      }));
   const { conflict, problem, governed, sent } = createGovernedSteps(deps);
 
   async function connection(
@@ -106,6 +123,7 @@ export function createShopifyCaseWorkflows(deps: {
 
   const stock: CaseWorkflowAdapter = {
     version: deps.versions.stock,
+    connections: (context) => workflowConnections(context, ['shopify', 'jtl']),
     template: {
       trigger:
         'When detection confirms that Shopify and the ERP disagree on linked stock',
@@ -318,6 +336,7 @@ export function createShopifyCaseWorkflows(deps: {
 
   const hold: CaseWorkflowAdapter = {
     version: deps.versions.hold,
+    connections: (context) => workflowConnections(context, ['shopify']),
     template: {
       trigger:
         'When detection confirms a Shopify fulfillment held past the stuck window',

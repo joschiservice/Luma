@@ -22223,7 +22223,7 @@
       "get": {
         "operationId": "activity.list",
         "summary": "Search workspace activity",
-        "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. `actor` keeps events recorded by any of the named actors; it only narrows what the caller may already see. Cursors are bound to workspace, restricted-activity access, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection changes and access changes (members, invitations, roles and workspace settings, type `access`) are visible only with the View restricted activity permission; `visibility` is `admin` for those callers. Approval and provider acceptance do not establish verified resolution.",
+        "description": "The `business` view groups events by issue, run or proposal and hides routine checks; `detail=steps` includes up to 100 earlier steps under the same visibility and filters. The default event view retains each immutable record. Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. `actor` keeps events recorded by any of the named actors; it only narrows what the caller may already see. Cursors are bound to workspace, restricted-activity access, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection changes and access changes (members, invitations, roles and workspace settings, type `access`) are visible only with the View restricted activity permission; `visibility` is `admin` for those callers. Approval and provider acceptance do not establish verified resolution.",
         "tags": ["activity"],
         "parameters": [
           {
@@ -22234,6 +22234,30 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["events", "business"],
+              "type": "string",
+              "default": "events"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "detail",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["summary", "steps"],
+              "type": "string",
+              "default": "summary"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
           },
           {
             "name": "from",
@@ -22388,6 +22412,27 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "workflowRunId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resourceKind": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "id": {
                             "type": "string",
                             "maxLength": 200
@@ -22706,6 +22751,381 @@
                             "items": {
                               "type": "string",
                               "maxLength": 500
+                            }
+                          },
+                          "steps": {
+                            "type": "array",
+                            "maxItems": 100,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "workflowRunId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "resourceKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "occurredAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "actor": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "enum": [
+                                        "member",
+                                        "former_member",
+                                        "luma",
+                                        "support",
+                                        "service",
+                                        "unrecorded"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "id": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 300
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "name": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 200
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "email": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 320
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "workflow": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "maxLength": 200
+                                            },
+                                            "name": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "maxLength": 200
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": ["id", "name"]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "id",
+                                    "name",
+                                    "email",
+                                    "workflow"
+                                  ]
+                                },
+                                "action": {
+                                  "type": "string",
+                                  "maxLength": 160
+                                },
+                                "type": {
+                                  "enum": [
+                                    "issue",
+                                    "decision",
+                                    "execution",
+                                    "verification",
+                                    "resolution",
+                                    "connection",
+                                    "procurement",
+                                    "access"
+                                  ],
+                                  "type": "string"
+                                },
+                                "outcome": {
+                                  "enum": [
+                                    "approved",
+                                    "rejected",
+                                    "escalated",
+                                    "attempted",
+                                    "provider_accepted",
+                                    "verified",
+                                    "failed",
+                                    "uncertain",
+                                    "manually_disposed",
+                                    "recorded"
+                                  ],
+                                  "type": "string"
+                                },
+                                "exceptionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "proposalId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "attemptId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "connectionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "system": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "resource": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "playbookId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "mode": {
+                                  "enum": [
+                                    "simulation",
+                                    "shadow",
+                                    "pilot",
+                                    "unrecorded"
+                                  ],
+                                  "type": "string"
+                                },
+                                "summary": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "executionState": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "verificationPhase": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "failureCode": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "connections": {
+                                  "type": "array",
+                                  "maxItems": 100,
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "system": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "system"]
+                                  }
+                                },
+                                "dispatch": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "verification": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "evidenceRefs": {
+                                  "type": "array",
+                                  "maxItems": 100,
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "recordedAt",
+                                "occurredAt",
+                                "actor",
+                                "action",
+                                "type",
+                                "outcome",
+                                "exceptionId",
+                                "proposalId",
+                                "attemptId",
+                                "connectionId",
+                                "system",
+                                "resource",
+                                "playbookId",
+                                "mode",
+                                "summary",
+                                "executionState",
+                                "verificationPhase",
+                                "failureCode",
+                                "connections",
+                                "dispatch",
+                                "verification",
+                                "evidenceRefs"
+                              ]
                             }
                           }
                         },
@@ -37954,6 +38374,21 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["value", "label"]
+                            }
                           },
                           "executable": {
                             "type": "boolean"
@@ -200397,6 +200832,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "enum": ["actionable", "waiting", "all"],
+              "type": "string",
+              "default": "actionable",
+              "description": "Actionable work by default; waiting holds decisions that need someone else. Direct item reads include either scope."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
           },
           {
             "name": "view",
