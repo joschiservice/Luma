@@ -102,6 +102,11 @@ the shared runtime to it. Keeping them apart means a build never rewrites the ru
 dev server reads, and the bundle contains exactly one runtime, which matters because the
 request's language lives in that runtime's state.
 
+Type declarations use one module per message even for the shared runtime. TypeScript's
+declaration emitter repeatedly searches the exports of large locale modules; keeping the
+declarations in small modules avoids that cost without increasing dev-server requests.
+Both outputs are compiled from the same loaded project before they are published together.
+
 Compiles take turns through a lock and swap the result into place, so concurrent Turbo tasks
 and dev servers never read a half-written runtime. Dev servers don't compile at startup unless
 the runtime is missing; they recompile when a message file changes. Don't switch to

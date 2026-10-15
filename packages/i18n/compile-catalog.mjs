@@ -1,8 +1,11 @@
+import * as fs from 'node:fs';
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { compile } from '@inlang/paraglide-js';
+import { writeOutput } from '@inlang/paraglide-js';
+import { loadProjectFromDirectory } from '@inlang/sdk';
 
+import { compileCatalogOutput } from './compile-output.mjs';
 import {
   compilerOptions,
   productionCompilerOptions,
@@ -40,7 +43,17 @@ async function compileOnce(options) {
     for (const entry of await readdir(parent))
       if (entry.startsWith(prefix))
         await rm(path.join(parent, entry), { recursive: true, force: true });
-    await compile({ ...options, outdir: staging });
+    const project = await loadProjectFromDirectory({
+      path: options.project,
+      fs,
+    });
+    try {
+      const output = await compileCatalogOutput(project, options);
+      await writeOutput({ directory: staging, output, fs: fs.promises });
+      for (const warning of await project.errors.get()) console.warn(warning);
+    } finally {
+      await project.close();
+    }
     await rename(options.outdir, retired).catch((error) => {
       if (error.code !== 'ENOENT') throw error;
     });

@@ -40,7 +40,8 @@
   },
   "dependencies": {
     "@inlang/paraglide-js": "2.26.0",
-    "@inlang/plugin-icu1": "1.1.1"
+    "@inlang/plugin-icu1": "1.1.1",
+    "@inlang/sdk": "3.1.0"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
