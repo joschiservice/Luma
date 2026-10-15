@@ -246,7 +246,7 @@ test('opens contextual issue guides and preserves the investigation across help 
   await page.getByRole('link', { name: 'Back to issues' }).click();
   expect(page.url()).toBe(selectedUrl);
   await page.goto(`/app/${organizationId}/home`);
-  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   await helpButton.click();
   await help
     .getByRole('heading', { name: 'Start your day on Home', exact: true })

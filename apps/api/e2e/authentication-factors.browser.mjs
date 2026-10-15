@@ -105,7 +105,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   const security = `/app/${organizationId}/settings/security`;
 
@@ -147,7 +147,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
   await page.getByRole('button', { name: 'Use a backup code' }).click();
   await page.getByLabel('Backup code').fill(codes[0]);
   await page.getByRole('button', { name: 'Verify' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
 
   // A used backup code cannot open another session.
   await page.goto('/sign-out');
@@ -163,7 +163,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
     .click();
   await page.getByLabel('Authentication code').fill(totp(setupKey));
   await page.getByRole('button', { name: 'Verify' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
 
   await page.goto(security);
   await heading(page, 'Authenticator app');
@@ -183,7 +183,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
   await page.goto('/sign-out');
   await heading(page, 'Sign in to Luma');
   await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(security);
@@ -268,6 +268,6 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
 
   await page.goto('/sign-out');
   await signInWithPassword(page);
-  await heading(page, 'Needs your attention');
+  await heading(page, 'Needs you');
   expect(errors).toEqual([]);
 });

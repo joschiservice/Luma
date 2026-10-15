@@ -46,9 +46,9 @@ type CaseView = CaseQuery['view'];
 
 const caseViews: readonly CaseView[] = ['needs_you', 'active', 'history'];
 
-/** The case list a view value names; saved view IDs and unknown values show Needs review. */
+/** The case list a view value names; missing or unknown segments show All open. */
 export function caseView(value: string | null | undefined): CaseView {
-  return caseViews.find((view) => view === value) ?? 'needs_you';
+  return caseViews.find((view) => view === value) ?? 'active';
 }
 
 /** Whether the URL still uses the filters of older links. */
@@ -92,7 +92,7 @@ export function withoutLegacyFilters(search: InboxSearch): InboxSearch {
     : next;
 }
 
-/** Whether the URL says what to show, so the route must not restore the remembered view. */
+/** Whether the URL names page context, so the route must not restore a remembered view. */
 export function namesListState(search: InboxSearch) {
   return Boolean(search.q || search.cursor || search.page || search.shadow);
 }

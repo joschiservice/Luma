@@ -1291,9 +1291,16 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       expect(caseDetailSchema.parse(pending.json()).diagnosisStatus).toBe(
         'pending',
       );
+      const allOpen = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions`,
+      );
+      expect(allOpen.statusCode).toBe(200);
+      expect(
+        allOpen.json().items.map((item: { id: string }) => item.id),
+      ).toEqual([id]);
       const attention = await services.cases.list(
         context(),
-        caseQuerySchema.parse({}),
+        caseQuerySchema.parse({ view: 'needs_you' }),
       );
       expect(attention.items).toEqual([]);
       await services.diagnoses.run(context(), id);
@@ -2591,7 +2598,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     );
     const needs = await services.cases.list(
       context(),
-      caseQuerySchema.parse({}),
+      caseQuerySchema.parse({ view: 'needs_you' }),
     );
     expect(needs.items.map((x) => x.id)).toEqual([ids[0]]);
     expect(needs.items[0]?.attention.reason).toBe('uncertainty');

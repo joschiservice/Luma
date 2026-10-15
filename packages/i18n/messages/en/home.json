@@ -1,7 +1,7 @@
 {
   "home_view_all": "View all",
   "home_view_all_label": "View all: {module}",
-  "home_module_attention_title": "Needs your attention",
+  "home_module_attention_title": "Needs you",
   "home_module_attention_description": "Approvals, manual steps and outcome checks from issues, workflows and apps, most urgent first.",
   "home_module_handling_title": "Luma is handling",
   "home_module_handling_description": "Issues Luma is investigating, fixing or checking without you.",

@@ -59,7 +59,7 @@ it('supports a direct full-page URL with default inbox state', () => {
   );
   // An unknown view stays in the URL and resolves to the default view; invalid filters drop.
   expect(matches.at(-1)?.search).toMatchObject({ view: 'invalid' });
-  expect(caseView('invalid')).toBe('needs_you');
+  expect(caseView('invalid')).toBe('active');
   expect(matches.at(-1)?.search).toMatchObject({ severity: undefined });
   expect(matches.at(-1)?.params).toMatchObject({ organizationId, exceptionId });
 });

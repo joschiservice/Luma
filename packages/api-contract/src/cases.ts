@@ -50,7 +50,7 @@ const caseSorts = [
 
 export const caseQuerySchema = z
   .object({
-    view: z.enum(['needs_you', 'active', 'history']).default('needs_you'),
+    view: z.enum(['needs_you', 'active', 'history']).default('active'),
     ownerId: z
       .union([z.string().uuid(), z.literal('unassigned')])
       .optional()

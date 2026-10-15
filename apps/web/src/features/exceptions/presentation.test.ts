@@ -47,6 +47,25 @@ it('only reports verified when the outcome was observed', () => {
   ).toEqual({ state: 'idle', label: 'Closed' });
 });
 
+it('names the required step without implying the reader can approve or execute it', () => {
+  expect(
+    issueStatus({
+      ...base,
+      attention: {
+        ...base.attention,
+        required: true,
+        reason: 'manual_intervention',
+      },
+    }),
+  ).toEqual({ state: 'attention', label: 'Manual step required' });
+  expect(
+    issueStatus({
+      ...base,
+      attention: { ...base.attention, required: true, reason: 'uncertainty' },
+    }),
+  ).toEqual({ state: 'attention', label: 'Review evidence' });
+});
+
 it('describes issue kinds and elapsed time compactly', () => {
   expect(issueKind({ class: 'stuck_fulfillment' })).toEqual({
     label: 'Fulfillment delay',

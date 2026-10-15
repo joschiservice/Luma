@@ -799,7 +799,7 @@ const person = ['any_of', 'none_of', 'empty', 'not_empty'] as const;
 export const issuesCatalog: CollectionCatalog = {
   domain: 'issues',
   permission: 'issues.read',
-  segments: ['needs_you', 'active', 'history'],
+  segments: ['active', 'needs_you', 'history'],
   defaultSort: { field: 'urgency', direction: 'asc' },
   defaultColumns: ['summary', 'class', 'severity', 'state', 'owner'],
   layouts: ['list', 'board'],
