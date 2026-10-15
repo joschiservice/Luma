@@ -38,6 +38,8 @@ export interface InventoryMonitorOptions {
     StockAgreement,
     'agreedAt' | 'mismatchSince' | 'snapshotIds'
   > | null>;
+  /** The open stock sync stall case that covers this pair; its gaps wait unless they oversell. */
+  stall?: { exceptionId: string; detectedAt: string };
   now?: () => Date;
 }
 
@@ -137,6 +139,7 @@ export function createInventoryMonitor(options: InventoryMonitorOptions) {
         complete: true,
         projectionCurrent: leftCurrent && rightCurrent,
         ...(agreed ? { agreement: agreed } : {}),
+        ...(options.stall ? { stall: options.stall } : {}),
       },
       hash,
     );
@@ -204,6 +207,8 @@ export function createInventoryMonitor(options: InventoryMonitorOptions) {
   return {
     matches,
     verifier,
+    /** Reads both sides fresh and records them; returns the evaluation request without ingesting it. */
+    read,
     /** Runs detection on fresh observations; a clear result still requires independent verification. */
     async check(
       context: TenantContext,

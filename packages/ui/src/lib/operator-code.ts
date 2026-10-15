@@ -142,6 +142,13 @@ export const operatorCodeMessages: Record<string, () => string> = {
   reconciliation_required: m.vocabulary_operator_reconciliation_required,
   quantities_agree: m.vocabulary_operator_quantities_agree,
   unknown_value: m.vocabulary_operator_unknown_value,
+  reads_not_current: m.vocabulary_operator_reads_not_current,
+  below_stall_threshold: m.vocabulary_operator_below_stall_threshold,
+  storefront_following: m.vocabulary_operator_storefront_following,
+  unconfirmed_lag: m.vocabulary_operator_unconfirmed_lag,
+  storefront_caught_up: m.vocabulary_operator_storefront_caught_up,
+  storefront_not_following: m.vocabulary_operator_storefront_not_following,
+  sync_stalled: m.vocabulary_operator_sync_stalled,
 };
 
 /** Names a registered code; unknown codes remain an explicit unavailable label. */

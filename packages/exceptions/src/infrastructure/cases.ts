@@ -13,6 +13,7 @@ import type {
 import type { Incident } from '../application/detection.js';
 import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
 import type { Configuration } from '../domain/facts.js';
+import { stallThresholds } from '../domain/facts.js';
 import { inventorySources } from '../domain/inventory-sources.js';
 import {
   type CaseMetricItem,
@@ -188,10 +189,22 @@ export function orderAttentionForOrders(orders: string) {
     WHERE r.tenant_id=$1 AND r.order_id IN (SELECT entity_id FROM ${orders}))`);
 }
 
+/** The stall settings an issue was detected under, with defaults for older configurations. */
+function stallLimits(configuration: Configuration) {
+  const stall = stallThresholds(configuration.thresholds);
+
+  return {
+    stallSeconds: stall.seconds,
+    stallMinPositions: stall.minPositions,
+    stallSharePercent: stall.sharePercent,
+  };
+}
+
 /** The summary of an issue whose investigation can't be shown, by class. */
 const fallbackSummaries: Readonly<Record<string, string>> = {
   inventory_mismatch: 'Inventory quantities differ across mapped sources.',
   order_quantity_mismatch: 'Order line quantities differ between systems.',
+  stock_sync_stall: 'The storefront stopped following stock changes.',
   sync_failure: 'A connection read failed.',
   stuck_fulfillment: 'Fulfillment progress needs investigation.',
   workflow_failure: 'A workflow did not reach its expected outcome.',
@@ -729,6 +742,7 @@ export function createCaseReader(
                           .oversellPropagationSeconds ??
                         row.configuration.thresholds.propagationSeconds,
                       stuckSeconds: row.configuration.thresholds.stuckSeconds,
+                      ...stallLimits(row.configuration),
                     },
                   }
                 : {}),

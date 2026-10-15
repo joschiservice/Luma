@@ -52,6 +52,23 @@ const positionRow = z.object({
   ),
 });
 
+const followingRow = z.object({
+  storefrontId: z.string().uuid(),
+  followed: z.coerce.number().int(),
+  lagging: z.coerce.number().int(),
+  laggingSince: time.nullable(),
+  positions: z
+    .array(
+      z.object({
+        positionId: z.string().uuid(),
+        skuId: z.string().uuid(),
+        locationId: z.string().uuid(),
+        changedAt: time,
+      }),
+    )
+    .nullable(),
+});
+
 const fulfillmentRow = z.object({
   fulfillmentId: z.string().uuid(),
   connectionId: z.string().uuid(),
@@ -284,6 +301,57 @@ export function createDetectionSources(
           ? [row.snapshotId, row.otherId]
           : [row.otherId, row.snapshotId],
       };
+    },
+    async stockFollowing(
+      context,
+      { authorityId, storefrontIds, since, before, tolerance, limit },
+    ) {
+      // Current reports keep when their quantity was first seen, so only products that changed in
+      // the window are read. A storefront quantity Luma wrote is no evidence that the sync works.
+      const rows = await db.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query(
+          `WITH sources AS (
+            SELECT c.id FROM connector_installations c
+            WHERE c.tenant_id=$1 AND c.id=ANY($3::uuid[]||$2::uuid) AND ${readable('inventory.read')}
+          ), changes AS (
+            SELECT a.entity_id,a.snapshot_id,a.available,a.available_changed_at AS changed_at
+            FROM inventory_projections a
+            WHERE a.tenant_id=$1 AND a.connection_id=$2 AND a.connection_id IN (SELECT id FROM sources)
+             AND a.available IS NOT NULL AND a.available_changed_at>=$4::timestamptz
+             AND a.available_changed_at<=$5::timestamptz
+          ), pairs AS (
+            SELECT x.entity_id,x.changed_at,f.connection_id AS storefront_id,f.luma_written,
+             abs(f.available-x.available)<=$6::numeric AS agrees,
+             s.document->'data'->>'skuId' AS sku_id,s.document->'data'->>'locationId' AS location_id
+            FROM changes x
+            JOIN inventory_projections f ON f.tenant_id=$1 AND f.entity_id=x.entity_id
+            JOIN inventory_snapshots s ON s.tenant_id=$1 AND s.id=x.snapshot_id
+            WHERE f.connection_id=ANY($3::uuid[]) AND f.connection_id IN (SELECT id FROM sources)
+             AND f.available IS NOT NULL
+             AND NOT EXISTS(SELECT 1 FROM inventory_stock_ownership_scopes n
+              WHERE n.tenant_id=$1 AND n.location_id=(s.document->'data'->>'locationId')::uuid AND n.mode='own')
+          )
+          SELECT storefront_id AS "storefrontId",count(*) FILTER (WHERE agrees AND NOT luma_written) AS followed,
+           count(*) FILTER (WHERE NOT agrees) AS lagging,
+           min(changed_at) FILTER (WHERE NOT agrees) AS "laggingSince",
+           to_jsonb((array_agg(jsonb_build_object('positionId',entity_id,'skuId',sku_id,'locationId',location_id,
+             'changedAt',changed_at) ORDER BY changed_at,entity_id) FILTER (WHERE NOT agrees))[1:$7::int]) AS positions
+          FROM pairs GROUP BY storefront_id ORDER BY storefront_id`,
+          [
+            context.tenantId,
+            authorityId,
+            storefrontIds,
+            since,
+            before,
+            tolerance,
+            limit,
+          ],
+        );
+
+        return z.array(followingRow).parse(result.rows);
+      });
+
+      return rows.map((row) => ({ ...row, positions: row.positions ?? [] }));
     },
     async orderSources(context, orderId) {
       const rows = await db.transaction(context.tenantId, async (tx) => {

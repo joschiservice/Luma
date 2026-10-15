@@ -5,7 +5,7 @@ import type {
   EvaluationInput,
   Facts,
 } from './facts.js';
-import { decimalString, decimalUnits } from './facts.js';
+import { decimalString, decimalUnits, stallThresholds } from './facts.js';
 
 export const diagnosisVersion = 'diagnosis-v1';
 
@@ -244,7 +244,13 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
                   Date.parse(input.facts.oldestReadAt) +
                     configuration.thresholds.freshnessSeconds * 1000,
                 ).toISOString()
-              : null,
+              : input.exceptionClass === 'stock_sync_stall' &&
+                  input.facts.oldestReadAt
+                ? new Date(
+                    Date.parse(input.facts.oldestReadAt) +
+                      configuration.thresholds.freshnessSeconds * 1000,
+                  ).toISOString()
+                : null,
       model: { status: 'disabled', model: null, promptVersion: null },
       reread: { status: 'not_requested', retryAfter: null },
     },
@@ -455,6 +461,74 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
         'Ask the warehouse owner to inspect the operation and reread its order and shipments.',
         'Fresh shipment evidence proves the intended line quantities shipped or a reviewed cancellation disposition.',
         ['Reconcile ambiguous shipment effects before any retry.'],
+      );
+      break;
+    }
+    case 'stock_sync_stall': {
+      const f = input.facts;
+      const provider = (connectionId: string) => {
+        const name = evidence.find(
+          (e) => e.connectionId === connectionId && e.source,
+        )?.source?.provider;
+
+        return name ? (systemNames[name] ?? name) : null;
+      };
+      const authority = provider(f.connectionIds[0]) ?? 'The stock system';
+      const store = provider(f.connectionIds[1]) ?? 'the storefront';
+      result.summary = `${store} stopped following stock changes from ${authority}.`;
+      result.facts.push(
+        finding(
+          'unfollowed_changes',
+          `${f.lagging} linked products changed stock in ${authority} at least ${Math.round(stallThresholds(configuration.thresholds).seconds / 60)} minutes ago and ${store} still shows the old figure; ${f.followed} changes in the same period reached ${store}.`,
+        ),
+        finding(
+          'fresh_rereads',
+          `Luma reread ${f.sampled} of them from both systems; ${f.confirmed} still differ.`,
+        ),
+      );
+      if (f.laggingSince)
+        result.facts.push(
+          finding(
+            'lagging_since',
+            `The earliest change that hasn't reached ${store} was seen at ${f.laggingSince}.`,
+          ),
+        );
+      result.constraints.push(
+        'The merchant’s stock sync is judged by its effect: Luma does not read the sync itself, so the cause is not established.',
+        'Each product that differs can also have its own stock issue; this issue covers the store as a whole.',
+      );
+      if (decision.decision === 'detect') {
+        result.impact.observed.push(
+          finding(
+            'stock_not_following',
+            `${store} sells against stock figures that no longer match ${authority}.`,
+          ),
+        );
+        if (decision.reason === 'oversell_risk')
+          result.impact.potential.push(
+            finding(
+              'oversell_exposure',
+              `${f.overselling} reread products show more stock in ${store} than ${authority} has, so ${store} can oversell them.`,
+            ),
+          );
+      }
+      hypothesis(
+        'stock_sync_stopped',
+        'The stock sync between the two systems stopped, slowed down or lost access.',
+        [
+          'Check the stock sync app or integration for errors, pauses or expired access.',
+          'Check whether the stock sync runs on a schedule and when it last ran.',
+        ],
+      );
+      immediate = decision.decision === 'detect';
+      step(
+        'manual_intervention',
+        'restore_stock_sync',
+        `Ask whoever runs the stock sync between ${authority} and ${store} to check and restart it.`,
+        `Fresh reads show ${store} matches ${authority} again for the products that differed.`,
+        [
+          'Correct individual products only after the sync runs again, or the sync may overwrite the correction.',
+        ],
       );
       break;
     }

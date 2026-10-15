@@ -60,6 +60,14 @@ Luma opens an issue without waiting when a store shows stock that your stock sou
 
 A gap that is still open after the wait becomes a **Stock mismatch** issue that says how long Luma waited. An order shows its ordered items that are syncing in its **Issues** panel.
 
+## When the stock sync stalls
+
+The app or integration that copies stock from your stock source to your store can stop working. Then your store keeps selling against figures that get older with every sale, return or delivery.
+
+Luma opens one **Stock sync stalled** issue for the store when, 15 minutes after your stock source changed, at least 3 linked products still show the old figure in the store, and at least half of the recent changes haven't arrived. You can change these limits under **Issue detection** in [Workspace settings](/docs/workspace-settings). Stock that Luma corrected itself doesn't count as a change the sync delivered. Before opening it, Luma reads those products from both systems again. Luma doesn't open the issue while its own reads of either system are failing or behind. The issue is high severity when the store shows more stock than your stock source has.
+
+While the issue is open, products that differ in that store wait for the sync instead of opening their own **Stock mismatch** issue. A product that shows more stock in the store than your stock source has still gets its own issue, because it can oversell. Ask whoever runs your stock sync to check and restart it first: a product you correct earlier can be overwritten when the sync runs again. The issue closes when fresh reads show the products that lagged match again.
+
 ## Link the same SKU across systems
 
 Luma treats records from different systems as the same SKU only after they’re linked, by a person or by an [automatic linking](/docs/data-sync#automatic-linking) rule. Until then, Shopify’s and your ERP’s stock for one item appear as separate SKUs, and you can’t compare them or correct one from the other.

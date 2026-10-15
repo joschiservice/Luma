@@ -119,6 +119,8 @@ export interface InventoryDetectionInput {
   configuration: Configuration;
   /** Recent agreement history; when absent, the rule cannot wait for sync. */
   agreement?: StockAgreement;
+  /** The open stock sync stall case that covers this pair, if any, and when it was first detected. */
+  stall?: { exceptionId: string; detectedAt: string };
 }
 
 /** Builds inventory facts and evidence for detection and independent verification. */
@@ -187,7 +189,12 @@ export function inventoryRequest(
     sellingSource: mapping.sellingSource,
     tolerance: configuration.inventoryTolerance,
     ...(agreement ? { mismatchSince: agreement.mismatchSince } : {}),
+    ...(input.stall ? { syncStalled: true } : {}),
   };
+  const stallKey = input.stall
+    ? `stock-sync-stall:${input.stall.exceptionId}`
+    : null;
+  if (stallKey) facts.evidenceRefs.push(stallKey);
   const mappingEvidence: Evidence = {
     key: mappingKey,
     tenantId: context.tenantId,
@@ -209,6 +216,7 @@ export function inventoryRequest(
       input.complete,
       input.projectionCurrent,
       agreementKey,
+      stallKey,
     ]),
     input: { exceptionClass: 'inventory_mismatch', facts },
     evidence: [
@@ -227,6 +235,22 @@ export function inventoryRequest(
               adapterVersion: 'stock-agreement-v1',
               schemaVersion: 1,
               facts: { ...agreement },
+            } satisfies Evidence,
+          ]
+        : []),
+      ...(input.stall && stallKey
+        ? [
+            {
+              key: stallKey,
+              tenantId: context.tenantId,
+              connectionId: null,
+              source: null,
+              // Evidence keys are immutable, so the reference carries only fixed facts.
+              observedAt: input.stall.detectedAt,
+              sourceUpdatedAt: null,
+              adapterVersion: 'stock-sync-stall-v1',
+              schemaVersion: 1,
+              facts: { exceptionId: input.stall.exceptionId },
             } satisfies Evidence,
           ]
         : []),

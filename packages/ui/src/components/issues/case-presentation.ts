@@ -28,6 +28,10 @@ const kinds: Record<string, { label: Label; domain: Domain }> = {
     label: m.issues_kind_order_quantity_mismatch,
     domain: 'orders',
   },
+  stock_sync_stall: {
+    label: m.issues_kind_stock_sync_stall,
+    domain: 'inventory',
+  },
 };
 
 const sources: Record<string, string> = {

@@ -289,7 +289,10 @@ export function createSettingsService(deps: SettingsDependencies) {
             ...before,
             name: input.name,
             timezone: input.timezone,
-            detection: input.detection ?? before.detection,
+            // Settings a client doesn't send keep their stored values.
+            detection: input.detection
+              ? { ...before.detection, ...input.detection }
+              : before.detection,
             revision: before.revision + 1,
           };
           await tx.saveWorkspace(after);

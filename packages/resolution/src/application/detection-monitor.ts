@@ -21,6 +21,8 @@ import type {
 import {
   decimalUnits,
   evaluateException,
+  stallSuspected,
+  stallThresholds,
   verificationPostconditions,
 } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
@@ -89,6 +91,24 @@ export interface FulfillmentWork {
   observedAt: string;
 }
 
+/** How a storefront followed its stock authority's recent changes, from stored reports. */
+export interface StockFollowing {
+  storefrontId: string;
+  /** Changed positions whose storefront report matches the authority's. */
+  followed: number;
+  /** Changed positions whose storefront report still differs. */
+  lagging: number;
+  /** When Luma first saw the earliest change the storefront doesn't match; null without lag. */
+  laggingSince: string | null;
+  /** Lagging positions, earliest change first, at most the requested number. */
+  positions: {
+    positionId: string;
+    skuId: string;
+    locationId: string;
+    changedAt: string;
+  }[];
+}
+
 /** One connection's stored report for a stock position, with when it was observed. */
 export interface PositionSource extends StockSource {
   observedAt: string;
@@ -116,6 +136,23 @@ export interface DetectionSources {
       limit: number;
     },
   ): Promise<StockPosition[]>;
+  /**
+   * For each storefront that has any, the linked positions whose stock authority report changed
+   * between `since` and `before` (when Luma first saw the new quantity), split by whether the
+   * storefront's current report matches the authority's within `tolerance`. Natively owned
+   * positions and unknown quantities are left out.
+   */
+  stockFollowing(
+    context: TenantContext,
+    options: {
+      authorityId: string;
+      storefrontIds: string[];
+      since: string;
+      before: string;
+      tolerance: string;
+      limit: number;
+    },
+  ): Promise<StockFollowing[]>;
   /**
    * The latest stored report in `(since, until]` from either connection that agreed within
    * `tolerance` with the other connection's latest report in the same window, and the first
@@ -217,7 +254,7 @@ export interface DetectionMonitorOptions {
   /** Order line quantity checks; without them, order quantity cases are neither opened nor verified. */
   orders?: OrderQuantitySources;
   capabilities: Pick<CapabilityReader, 'read'>;
-  exceptions: Pick<DetectionService, 'ingest' | 'list' | 'verify'>;
+  exceptions: Pick<DetectionService, 'ingest' | 'list' | 'verify' | 'evidence'>;
   /** Prepares a diagnosis for a newly detected case so people see its cause and options. */
   diagnose?(context: TenantContext, exceptionId: string): Promise<unknown>;
   /** Records a fresh stock read and reports whether it is now the source's current projection. */
@@ -353,13 +390,25 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     );
   }
 
-  function inventoryMonitor(mapping: InventoryMapping, positionId: string) {
+  function inventoryMonitor(
+    mapping: InventoryMapping,
+    positionId: string,
+    stall?: Incident,
+  ) {
     return createInventoryMonitor({
       capabilities,
       mapping,
       configuration,
       hash,
       now,
+      ...(stall
+        ? {
+            stall: {
+              exceptionId: stall.id,
+              detectedAt: stall.firstDetectedAt,
+            },
+          }
+        : {}),
       project: (context, observation) =>
         options.project(context, observation, positionId),
       agreement: (context, window) =>
@@ -622,9 +671,21 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       limit: limits.stock,
     });
     const authority = await options.authority.read(context);
+    // A store whose sync stalled has one case; its products' gaps wait unless they oversell.
+    const stalls = incidents.filter(
+      (item) => item.exceptionClass === 'stock_sync_stall',
+    );
     for (const position of positions)
       for (const mapping of stockMappings(context, position, authority)) {
-        const monitor = inventoryMonitor(mapping, position.positionId);
+        const monitor = inventoryMonitor(
+          mapping,
+          position.positionId,
+          stalls.find(
+            (item) =>
+              item.subject.subjectId === mapping.right.source.connectionId &&
+              item.subject.scope[0] === mapping.left.source.connectionId,
+          ),
+        );
         const incident = tracked.find(monitor.matches);
         try {
           const result = await monitor.check(context, exceptions);
@@ -857,6 +918,338 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     }
   }
 
+  /** The storefronts compared with the workspace's stock authority, when one is resolved. */
+  function stockPairs(authority: AuthoritySnapshot) {
+    const stock = authority.groups.find(
+      (group) => group.group === 'inventory_stock',
+    );
+    if (stock?.state !== 'resolved' || !stock.connectionId) return null;
+    const authorityId = stock.connectionId;
+    const storefrontIds = authority.connections
+      .filter(
+        (connection) =>
+          connection.category === 'storefront' && connection.id !== authorityId,
+      )
+      .map((connection) => connection.id);
+
+    return storefrontIds.length ? { authorityId, storefrontIds } : null;
+  }
+
+  /** Positions reread per storefront and pass to confirm that the storefront still lags. */
+  const stallSample = () =>
+    Math.max(stallThresholds(configuration.thresholds).minPositions, 5);
+
+  /**
+   * Rereads the named positions from the stock authority and the storefront and records the
+   * reads. Positions without an exact mapping or a complete read are skipped.
+   */
+  async function stallReads(
+    context: TenantContext,
+    authority: AuthoritySnapshot,
+    pair: { authorityId: string; storefrontId: string },
+    named: { positionId: string; skuId: string; locationId: string }[],
+  ) {
+    const reads: DetectionRequest[] = [];
+    for (const item of named) {
+      const [position] = await sources.stockPositions(context, {
+        include: [{ skuId: item.skuId, locationId: item.locationId }],
+        limit: 1,
+      });
+      const mapping =
+        position?.positionId === item.positionId
+          ? stockMappings(context, position, authority).find(
+              (candidate) =>
+                candidate.left.source.connectionId === pair.authorityId &&
+                candidate.right.source.connectionId === pair.storefrontId,
+            )
+          : undefined;
+      if (!mapping) continue;
+      try {
+        reads.push(
+          await inventoryMonitor(mapping, item.positionId).read(context),
+        );
+      } catch (error) {
+        log('A stock reread for a stall check failed.', error);
+      }
+    }
+
+    return reads.map((read) => {
+      const f = read.input.facts as Facts<'inventory_mismatch'>;
+      const comparable =
+        f.mappedSku &&
+        f.equivalentPool &&
+        f.complete &&
+        f.projectionCurrent &&
+        f.leftAvailable !== null &&
+        f.rightAvailable !== null &&
+        f.leftUnit === f.rightUnit &&
+        f.leftBasis === 'provider_reported' &&
+        f.rightBasis === 'provider_reported';
+      const gap = comparable
+        ? decimalUnits(f.rightAvailable!) - decimalUnits(f.leftAvailable!)
+        : 0n;
+      const tolerance = decimalUnits(f.tolerance);
+
+      return {
+        read,
+        facts: f,
+        comparable,
+        differs: comparable && (gap > tolerance || -gap > tolerance),
+        overselling: comparable && gap > tolerance,
+      };
+    });
+  }
+
+  /**
+   * Builds the stall evaluation of one storefront from stored history and fresh rereads of its
+   * earliest lagging positions. Evidence names every reread and the stored counts.
+   */
+  async function stallRequest(
+    context: TenantContext,
+    authority: AuthoritySnapshot,
+    pair: { authorityId: string; storefrontId: string },
+    following: StockFollowing,
+    window: { since: string; before: string },
+    streams: SyncStreamState[],
+  ): Promise<DetectionRequest> {
+    const reads = (
+      await stallReads(context, authority, pair, following.positions)
+    ).filter((item) => item.comparable);
+    const times = reads
+      .flatMap(({ facts }) => [facts.leftObservedAt, facts.rightObservedAt])
+      .sort();
+    const stored = {
+      ...pair,
+      ...window,
+      followed: following.followed,
+      lagging: following.lagging,
+      laggingSince: following.laggingSince,
+      positions: following.positions,
+    };
+    const summary: Evidence = {
+      key: `stock-following:${hash(JSON.stringify(stored))}`,
+      tenantId: context.tenantId,
+      connectionId: null,
+      source: null,
+      observedAt: window.before,
+      sourceUpdatedAt: null,
+      adapterVersion: 'stock-following-v1',
+      schemaVersion: 1,
+      facts: stored,
+    };
+    const evidence = [
+      ...new Map(
+        [...reads.flatMap(({ read }) => read.evidence), summary].map((item) => [
+          item.key,
+          item,
+        ]),
+      ).values(),
+    ];
+
+    return {
+      key: hash(
+        JSON.stringify([
+          'stock-sync-stall',
+          pair,
+          evidence.map((item) => item.key).sort(),
+          readsCurrent(streams, pair, following.laggingSince),
+        ]),
+      ),
+      input: {
+        exceptionClass: 'stock_sync_stall',
+        facts: {
+          tenantId: context.tenantId,
+          evidenceTenantId: context.tenantId,
+          subjectId: pair.storefrontId,
+          evidenceRefs: evidence.map((item) => item.key),
+          connectionIds: [pair.authorityId, pair.storefrontId],
+          lagging: following.lagging,
+          followed: following.followed,
+          sampled: reads.length,
+          confirmed: reads.filter((item) => item.differs).length,
+          overselling: reads.filter((item) => item.overselling).length,
+          laggingSince: following.laggingSince,
+          oldestReadAt: times[0] ?? null,
+          latestReadAt: times.at(-1) ?? null,
+          readsCurrent: readsCurrent(streams, pair, following.laggingSince),
+        },
+      },
+      configuration,
+      evidence,
+    };
+  }
+
+  /**
+   * Whether Luma's own stock reads of both connections completed since the earliest unfollowed
+   * change without failing. Otherwise a missing storefront update may only be a read Luma hasn't
+   * made.
+   */
+  function readsCurrent(
+    streams: SyncStreamState[],
+    pair: { authorityId: string; storefrontId: string },
+    laggingSince: string | null,
+  ) {
+    return [pair.authorityId, pair.storefrontId].every((connectionId) => {
+      const stream = streams.find(
+        (item) =>
+          item.connectionId === connectionId &&
+          item.capability === 'inventory.read',
+      );
+
+      return (
+        !!stream?.lastCompleteAt &&
+        stream.active &&
+        stream.attempts === 0 &&
+        (!laggingSince ||
+          Date.parse(stream.lastCompleteAt) >= Date.parse(laggingSince))
+      );
+    });
+  }
+
+  /** The stall window ending now: changes Luma first saw in it should have reached the storefront. */
+  function stallWindow() {
+    const seconds = stallThresholds(configuration.thresholds).seconds;
+    const at = +now();
+
+    return {
+      since: new Date(
+        at - Math.max(2 * 3600, 2 * seconds) * 1000 - seconds * 1000,
+      ).toISOString(),
+      before: new Date(at - seconds * 1000).toISOString(),
+    };
+  }
+
+  async function stockSync(context: TenantContext, incidents: Incident[]) {
+    const tracked = incidents.filter(
+      (item) => item.exceptionClass === 'stock_sync_stall',
+    );
+    const authority = await options.authority.read(context);
+    const pairs = stockPairs(authority);
+    if (!pairs) return;
+    const window = stallWindow();
+    const following = await sources.stockFollowing(context, {
+      ...pairs,
+      ...window,
+      tolerance: configuration.inventoryTolerance,
+      limit: stallSample(),
+    });
+    const streams = await sources.streams(context);
+    for (const storefrontId of pairs.storefrontIds) {
+      const incident = tracked.find(
+        (item) =>
+          item.subject.subjectId === storefrontId &&
+          item.subject.scope[0] === pairs.authorityId,
+      );
+      const found = following.find(
+        (item) => item.storefrontId === storefrontId,
+      );
+      // Too few unfollowed changes to suspect the sync: an open case checks its own products.
+      if (!found || !stallSuspected(found, configuration.thresholds)) {
+        if (incident) await verify(context, incident);
+        continue;
+      }
+      const pair = { authorityId: pairs.authorityId, storefrontId };
+      // Luma's own failing reads are a sync failure case; they don't start a stall evaluation.
+      if (!incident && !readsCurrent(streams, pair, found.laggingSince))
+        continue;
+      try {
+        const request = await stallRequest(
+          context,
+          authority,
+          pair,
+          found,
+          window,
+          streams,
+        );
+        const result = await exceptions.ingest(context, request);
+        if (result.decision.decision === 'detect') {
+          await diagnoseNew(context, result, incident);
+          // The stock rule of this pass already lets this store's gaps wait.
+          if (result.incident && !incident) incidents.push(result.incident);
+        } else if (result.decision.decision === 'clear' && incident)
+          await verify(context, incident);
+      } catch (error) {
+        log(
+          'A stock sync check could not complete; it runs again next pass.',
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Verifies that a storefront follows its stock authority again: the products that lagged at
+   * the latest detection match on fresh reads, and too few recent changes are still unfollowed
+   * to call the sync stalled.
+   */
+  async function verifyStall(
+    context: TenantContext,
+    incident: Readonly<Incident>,
+  ): Promise<VerificationResult> {
+    const authority = await options.authority.read(context);
+    const pair = {
+      authorityId: incident.subject.scope[0]!,
+      storefrontId: incident.subject.subjectId,
+    };
+    const pairs = stockPairs(authority);
+    if (
+      pairs?.authorityId !== pair.authorityId ||
+      !pairs.storefrontIds.includes(pair.storefrontId)
+    )
+      throw new Error('The stock authority or storefront changed');
+    const latest = (await exceptions.evidence(context, incident.id))
+      .filter((item) => item.adapterVersion === 'stock-following-v1')
+      .sort((a, b) => a.observedAt.localeCompare(b.observedAt))
+      .at(-1);
+    const named = (latest?.facts.positions ??
+      []) as StockFollowing['positions'];
+    const window = stallWindow();
+    const [following] = await sources.stockFollowing(context, {
+      authorityId: pair.authorityId,
+      storefrontIds: [pair.storefrontId],
+      ...window,
+      tolerance: configuration.inventoryTolerance,
+      limit: 0,
+    });
+    const reads = (await stallReads(context, authority, pair, named)).filter(
+      (item) => item.comparable,
+    );
+    const stillStalled =
+      !!following && stallSuspected(following, configuration.thresholds);
+    const evidence = [
+      ...new Map(
+        reads
+          .flatMap(({ read }) => read.evidence)
+          .filter((item) => item.connectionId !== null)
+          .map((item) => [item.key, item]),
+      ).values(),
+    ];
+    const outcome = !reads.length
+      ? 'inconclusive'
+      : reads.some((item) => item.differs) || stillStalled
+        ? 'failed'
+        : 'passed';
+
+    return {
+      reason:
+        outcome === 'passed'
+          ? 'storefront_following_again'
+          : outcome === 'failed'
+            ? 'storefront_still_behind'
+            : 'no_comparable_reread',
+      outcome,
+      complete: true,
+      authoritative: true,
+      evidence,
+      bindings: evidence.map((item) => ({
+        evidenceKey: item.key,
+        exceptionClass: 'stock_sync_stall',
+        subject: incident.subject,
+        postcondition: verificationPostconditions.stock_sync_stall,
+      })),
+    };
+  }
+
   async function diagnoseNew(
     context: TenantContext,
     result: { incident: Incident | null },
@@ -886,9 +1279,12 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
   } = {
     version: 'detection-monitor-v1',
     handles: (incident) =>
-      ['sync_failure', 'inventory_mismatch', 'stuck_fulfillment'].includes(
-        incident.exceptionClass,
-      ) ||
+      [
+        'sync_failure',
+        'inventory_mismatch',
+        'stuck_fulfillment',
+        'stock_sync_stall',
+      ].includes(incident.exceptionClass) ||
       (incident.exceptionClass === 'order_quantity_mismatch' &&
         !!options.orders),
     async evaluate(context, incident): Promise<VerificationResult> {
@@ -910,6 +1306,8 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
           found.positionId,
         ).verifier.evaluate(context, incident);
       }
+      if (incident.exceptionClass === 'stock_sync_stall')
+        return verifyStall(context, incident);
       if (incident.exceptionClass === 'order_quantity_mismatch') {
         const orders = options.orders;
         if (!orders) throw new Error('Order quantities are not checked here');
@@ -1057,6 +1455,8 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       const incidents = (await exceptions.list(context)).filter(open);
       for (const [name, run] of [
         ['Sync failure detection', syncFailures],
+        // Before stock detection, so a store's stall case lets its products' gaps wait.
+        ['Stock sync detection', stockSync],
         ['Stock detection', stock],
         ['Fulfillment detection', fulfillments],
         ['Order quantity detection', orderQuantities],

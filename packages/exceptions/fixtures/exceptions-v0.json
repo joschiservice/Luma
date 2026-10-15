@@ -10,7 +10,10 @@
     "stuckSeconds": 7200,
     "uncertaintySeconds": 1800,
     "propagationSeconds": 1800,
-    "oversellGuardPercent": 25
+    "oversellGuardPercent": 25,
+    "stallSeconds": 900,
+    "stallMinPositions": 3,
+    "stallSharePercent": 50
   },
   "bases": {
     "sync_failure": {
@@ -99,6 +102,22 @@
       "changedAt": "2026-09-17T11:15:00Z",
       "oldestReadAt": "2026-09-17T11:58:00Z",
       "latestReadAt": "2026-09-17T12:00:00Z"
+    },
+    "stock_sync_stall": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "shopify-a",
+      "evidenceRefs": ["jtl-observation-1", "shopify-observation-1"],
+      "connectionIds": ["jtl-a", "shopify-a"],
+      "lagging": 5,
+      "followed": 1,
+      "sampled": 3,
+      "confirmed": 3,
+      "overselling": 0,
+      "laggingSince": "2026-09-17T11:30:00Z",
+      "oldestReadAt": "2026-09-17T11:59:00Z",
+      "latestReadAt": "2026-09-17T12:00:00Z",
+      "readsCurrent": true
     },
     "workflow_failure": {
       "tenantId": "tenant-a",
@@ -1211,6 +1230,186 @@
         "decision": "defer",
         "severity": null,
         "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "stock-sync-stall-tenant-mismatch",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "stock-sync-stall-reads-not-current",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "readsCurrent": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "reads_not_current"
+      }
+    },
+    {
+      "id": "stock-sync-stall-no-lag",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "lagging": 0,
+        "sampled": 0,
+        "confirmed": 0,
+        "laggingSince": null,
+        "oldestReadAt": null,
+        "latestReadAt": null
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "below_stall_threshold"
+      }
+    },
+    {
+      "id": "stock-sync-stall-below-threshold",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "lagging": 2,
+        "sampled": 2,
+        "confirmed": 2
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "below_stall_threshold"
+      }
+    },
+    {
+      "id": "stock-sync-stall-most-changes-followed",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "lagging": 3,
+        "followed": 4
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "storefront_following"
+      }
+    },
+    {
+      "id": "stock-sync-stall-half-followed-detects",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "lagging": 3,
+        "followed": 3
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "storefront_not_following"
+      }
+    },
+    {
+      "id": "stock-sync-stall-unconfirmed",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "sampled": 0,
+        "confirmed": 0,
+        "oldestReadAt": null,
+        "latestReadAt": null
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unconfirmed_lag"
+      }
+    },
+    {
+      "id": "stock-sync-stall-stale-reread",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "oldestReadAt": "2026-09-17T11:50:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "stale_evidence"
+      }
+    },
+    {
+      "id": "stock-sync-stall-future-reread",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "latestReadAt": "2026-09-17T12:01:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "future_evidence"
+      }
+    },
+    {
+      "id": "stock-sync-stall-caught-up-on-reread",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "confirmed": 2
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "storefront_caught_up"
+      }
+    },
+    {
+      "id": "stock-sync-stall-detect",
+      "exceptionClass": "stock_sync_stall",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "storefront_not_following"
+      }
+    },
+    {
+      "id": "stock-sync-stall-oversell",
+      "exceptionClass": "stock_sync_stall",
+      "input": {
+        "overselling": 1
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-sync-stalled",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "5",
+        "rightAvailable": "3",
+        "syncStalled": true
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "sync_stalled"
+      }
+    },
+    {
+      "id": "inventory-sync-stalled-oversell",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "syncStalled": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
       }
     }
   ]

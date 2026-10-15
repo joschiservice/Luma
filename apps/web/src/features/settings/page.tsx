@@ -349,6 +349,17 @@ export function SettingsView({
   );
 }
 
+/** Input bounds of each numeric detection setting, as the settings API validates them. */
+const detectionLimits = {
+  inventoryTolerance: [0, undefined],
+  propagationSeconds: [0, 86400],
+  oversellPropagationSeconds: [0, 3600],
+  stuckSeconds: [60, 604800],
+  stallSeconds: [60, 86400],
+  stallMinPositions: [1, 1000],
+  stallSharePercent: [1, 100],
+} as const;
+
 function WorkspaceForm({
   data,
   organizationId,
@@ -366,11 +377,16 @@ function WorkspaceForm({
     detection?: SettingsSnapshot['workspace']['detection'];
   } | null>(null);
   const value = draft ?? current;
-  const detection = value.detection ?? {
-    inventoryTolerance: '0',
-    propagationSeconds: 1800,
-    oversellPropagationSeconds: 120,
-    stuckSeconds: 7200,
+  const detection = {
+    stallSeconds: 900,
+    stallMinPositions: 3,
+    stallSharePercent: 50,
+    ...(value.detection ?? {
+      inventoryTolerance: '0',
+      propagationSeconds: 1800,
+      oversellPropagationSeconds: 120,
+      stuckSeconds: 7200,
+    }),
   };
   const command = useSettingsCommand(organizationId);
   const zones = Array.from(
@@ -442,6 +458,9 @@ function WorkspaceForm({
                 'propagationSeconds',
                 'oversellPropagationSeconds',
                 'stuckSeconds',
+                'stallSeconds',
+                'stallMinPositions',
+                'stallSharePercent',
               ] as const
             ).map((key) => (
               <div className="settings-field" key={key}>
@@ -451,19 +470,16 @@ function WorkspaceForm({
                     propagationSeconds: m.settings_detection_propagation,
                     oversellPropagationSeconds: m.settings_detection_oversell,
                     stuckSeconds: m.settings_detection_stuck,
+                    stallSeconds: m.settings_detection_stall_window,
+                    stallMinPositions: m.settings_detection_stall_products,
+                    stallSharePercent: m.settings_detection_stall_share,
                   }[key]()}
                 </label>
                 <Input
                   id={`detection-${key}`}
                   type={key === 'inventoryTolerance' ? 'text' : 'number'}
-                  min={key === 'stuckSeconds' ? 60 : 0}
-                  max={
-                    key === 'stuckSeconds'
-                      ? 604800
-                      : key === 'oversellPropagationSeconds'
-                        ? 3600
-                        : 86400
-                  }
+                  min={detectionLimits[key][0]}
+                  max={detectionLimits[key][1]}
                   required
                   value={detection[key]}
                   onChange={(event) =>

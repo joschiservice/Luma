@@ -17,6 +17,8 @@ export {
   decimalString,
   decimalUnits,
   defaultConfiguration,
+  stallSuspected,
+  stallThresholds,
 } from './domain/facts.js';
 
 export type { Configuration, Facts } from './domain/facts.js';

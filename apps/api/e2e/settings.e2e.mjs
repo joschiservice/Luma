@@ -163,6 +163,44 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
   expect(JSON.stringify(audit.rows)).not.toContain('cookie');
 });
 
+it('saves stalled stock sync settings and keeps them when a client omits them', async (t) => {
+  const { request, owner, base, command } = await settingsFixture(t);
+  const { workspace } = await request(owner, `${base}/settings`);
+  expect(workspace.detection).toMatchObject({
+    stallSeconds: 900,
+    stallMinPositions: 3,
+    stallSharePercent: 50,
+  });
+  const detection = {
+    ...workspace.detection,
+    stallSeconds: 600,
+    stallMinPositions: 5,
+    stallSharePercent: 40,
+  };
+  const save = (revision, value, status) =>
+    request(
+      owner,
+      `${base}/settings/workspace`,
+      'PATCH',
+      command({
+        name: workspace.name,
+        timezone: workspace.timezone,
+        revision,
+        detection: value,
+      }),
+      status,
+    );
+  await save(0, { ...detection, stallSharePercent: 0 }, 400);
+  expect((await save(0, detection)).workspace.detection).toEqual(detection);
+  // A client that doesn't know the stall settings leaves them as they were.
+  const older = Object.fromEntries(
+    Object.entries(detection).filter(([key]) => !key.startsWith('stall')),
+  );
+  expect(
+    (await save(1, { ...older, propagationSeconds: 600 })).workspace.detection,
+  ).toEqual({ ...detection, propagationSeconds: 600 });
+});
+
 it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old, revoked and reused links', async (t) => {
   const f = await settingsFixture(t);
   const { request, owner, member, outsider, base, command } = f;

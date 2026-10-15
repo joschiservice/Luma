@@ -123,6 +123,7 @@ const suites = {
       '@luma/api',
       'test:e2e',
       'simulator.e2e.mjs',
+      'stock-sync-stall.e2e.mjs',
       'starshipit-simulator.e2e.mjs',
       'starshipit-updates.e2e.mjs',
       'shopify-shipment-publishing.e2e.mjs',

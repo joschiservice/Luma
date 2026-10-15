@@ -1424,6 +1424,7 @@ export const journeyAreas = {
     ...orders,
     ...metrics,
   ],
+  'stock-sync-stall.e2e.mjs': [...simulator, ...sync, ...detection],
   'source-authority.browser.mjs': [
     ...ordersFixture,
     ...orders,

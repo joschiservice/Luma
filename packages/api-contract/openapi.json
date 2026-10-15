@@ -122868,6 +122868,7 @@
                 "stuck_fulfillment",
                 "inventory_mismatch",
                 "order_quantity_mismatch",
+                "stock_sync_stall",
                 "workflow_failure"
               ],
               "type": "string"
@@ -123941,13 +123942,25 @@
                         },
                         "stuckSeconds": {
                           "type": "number"
+                        },
+                        "stallSeconds": {
+                          "type": "number"
+                        },
+                        "stallMinPositions": {
+                          "type": "number"
+                        },
+                        "stallSharePercent": {
+                          "type": "number"
                         }
                       },
                       "required": [
                         "inventoryTolerance",
                         "propagationSeconds",
                         "oversellPropagationSeconds",
-                        "stuckSeconds"
+                        "stuckSeconds",
+                        "stallSeconds",
+                        "stallMinPositions",
+                        "stallSharePercent"
                       ]
                     },
                     "diagnosis": {
@@ -127004,6 +127017,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -127315,6 +127343,21 @@
                         "type": "integer",
                         "minimum": 60,
                         "maximum": 604800
+                      },
+                      "stallSeconds": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 86400
+                      },
+                      "stallMinPositions": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "stallSharePercent": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
                       }
                     },
                     "required": [
@@ -127381,6 +127424,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -127722,6 +127780,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -128096,6 +128169,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -128445,6 +128533,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [
@@ -129231,6 +129334,21 @@
                               "type": "integer",
                               "minimum": 60,
                               "maximum": 604800
+                            },
+                            "stallSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 86400
+                            },
+                            "stallMinPositions": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
+                            "stallSharePercent": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100
                             }
                           },
                           "required": [

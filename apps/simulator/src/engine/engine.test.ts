@@ -146,6 +146,61 @@ describe('merchant world', () => {
     expect(compared).toBeGreaterThan(30);
   }, 120_000);
 
+  it('holds back every stock change for a shop while its sync is stalled and pushes them on recovery', async () => {
+    const { world } = await buildWorld(testRun('small'));
+    world.live = true;
+    const shop = world.model.shops[0]!;
+    const location = shop.shop.warehouse;
+    const stall = await injectIncident(world, {
+      id: randomUUID(),
+      kind: 'stock-sync-stall',
+    });
+    expect(stall).toMatchObject({ status: 'active', instance: shop.name });
+    expect(
+      await injectIncident(world, { id: stall.id, kind: 'stock-sync-stall' }),
+    ).toEqual(stall);
+    await expect(
+      injectIncident(world, { id: randomUUID(), kind: 'stock-sync-stall' }),
+    ).rejects.toThrow('already stalled');
+    // A restock in the ERP that the shop would normally show within one sync interval.
+    const restocked = world.model.catalog.variants
+      .filter((variant) => variant.shops.includes(shop.name))
+      .slice(0, 3);
+    for (const variant of restocked) {
+      const before = await readItemStock(erpContext(world), variant.id);
+      const [warehouse, quantity] = Object.entries(before!.warehouses)[0]!;
+      await erp(world, {
+        kind: 'stock',
+        itemId: variant.id,
+        warehouse,
+        quantity: quantity + 500,
+      });
+    }
+    await advanceWorld(world, world.now + 15 * 60_000);
+    const shopAvailable = async (variant: string) =>
+      (await readStock(shopContext(world, shop.name), variant, location))
+        ?.available;
+    const erpAvailable = async (variant: string) =>
+      Math.max(
+        0,
+        (await readItemStock(erpContext(world), variant))?.available ?? 0,
+      );
+    for (const variant of restocked)
+      expect(
+        (await erpAvailable(variant.id)) - (await shopAvailable(variant.id))!,
+      ).toBeGreaterThan(400);
+
+    await recoverIncident(world, stall.id);
+    for (const variant of restocked)
+      expect(await shopAvailable(variant.id)).toBe(
+        await erpAvailable(variant.id),
+      );
+    const closed = await world
+      .store('world')
+      .get<Incident>('incident', stall.id);
+    expect(closed?.data.status).toBe('recovered');
+  }, 120_000);
+
   it('injects and recovers stock drift, outages and order incidents as ground truth', async () => {
     const { world } = await buildWorld(testRun('test'));
     world.live = true;

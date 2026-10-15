@@ -4,7 +4,11 @@ import type {
   EvaluationInput,
   Facts,
 } from './facts.js';
-import { decimalUnits, inventoryPropagationSeconds } from './facts.js';
+import {
+  decimalUnits,
+  inventoryPropagationSeconds,
+  stallThresholds,
+} from './facts.js';
 
 const result = (
   decision: 'clear' | 'defer' | 'reject',
@@ -157,6 +161,8 @@ export function evaluate(
         f.authority !== null &&
         f.authority !== f.sellingSource &&
         (f.sellingSource === 'left' ? difference > 0n : difference < 0n);
+      // A stalled sync already has its case; a gap that can't oversell waits for the sync to run.
+      if (f.syncStalled && !oversell) return result('defer', 'sync_stalled');
       // A gap Luma saw open only recently is usually a sale still syncing. It waits unless the
       // storefront oversells a material share of the authority's stock.
       if (
@@ -197,6 +203,27 @@ export function evaluate(
         return result('defer', 'propagation_pending');
 
       return detect('medium', 'quantity_mismatch');
+    }
+    case 'stock_sync_stall': {
+      const f = parsed.facts;
+      // A storefront that looks behind while Luma's own reads are behind proves nothing.
+      if (!f.readsCurrent) return result('defer', 'reads_not_current');
+      const stall = stallThresholds(t);
+      if (f.lagging < stall.minPositions)
+        return result('clear', 'below_stall_threshold');
+      // Most recent changes reached the storefront: the sync works, a few SKUs don't.
+      if (f.lagging * 100 < stall.sharePercent * (f.lagging + f.followed))
+        return result('clear', 'storefront_following');
+      if (!f.oldestReadAt || !f.latestReadAt)
+        return result('defer', 'unconfirmed_lag');
+      const stale = freshness(f.oldestReadAt, f.latestReadAt);
+      if (stale) return stale;
+      if (f.confirmed < stall.minPositions)
+        return result('clear', 'storefront_caught_up');
+
+      return f.overselling > 0
+        ? detect('high', 'oversell_risk')
+        : detect('medium', 'storefront_not_following');
     }
     case 'workflow_failure': {
       const f = parsed.facts;
@@ -253,6 +280,13 @@ export function identity(input: EvaluationInput) {
         subjectKind: 'order',
         subjectId: input.facts.subjectId,
         scope: [input.facts.lineKey, ...[...input.facts.connectionIds].sort()],
+      };
+    case 'stock_sync_stall':
+      return {
+        ruleIdentity: 'stock-sync-follow',
+        subjectKind: 'connection',
+        subjectId: input.facts.connectionIds[1],
+        scope: [input.facts.connectionIds[0]],
       };
     case 'workflow_failure':
       return {

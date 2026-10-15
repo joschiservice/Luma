@@ -141,7 +141,10 @@ export function createDetectionRepository(
               : input.exceptionClass === 'order_quantity_mismatch'
                 ? input.facts.changedAt
                 : null;
-        if (decision.decision === 'defer' && !waiting) {
+        // A stalled sync has its own case, so waiting for it is no uncertainty about this one.
+        const stalled =
+          decision.decision === 'defer' && decision.reason === 'sync_stalled';
+        if (decision.decision === 'defer' && !waiting && !stalled) {
           const uncertainty = await tx.query<{
             first_deferred_at: Date;
             review_required: boolean;
@@ -388,7 +391,10 @@ export function createDetectionRepository(
                         incident.exceptionClass === 'order_quantity_mismatch'
                       ? e.connectionId !== null &&
                         subject.scope.slice(1).includes(e.connectionId)
-                      : e.connectionId === null;
+                      : incident.exceptionClass === 'stock_sync_stall'
+                        ? e.connectionId === subject.subjectId ||
+                          e.connectionId === subject.scope[0]
+                        : e.connectionId === null;
 
               return (
                 !binding ||

@@ -116,6 +116,7 @@ function fixture(
       return { decision, incident, reviewRequired: false };
     }),
     list: vi.fn(async () => structuredClone(incidents)),
+    evidence: vi.fn(async () => []),
     verify: vi.fn(async (actor: typeof context, id: string) => {
       const incident = incidents.find((item) => item.id === id)!;
       const result = await monitor.verifier.evaluate(actor, incident);

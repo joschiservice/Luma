@@ -157,6 +157,7 @@ export function createScheduledDetection(options: {
         ingest: (...args) => exceptions().ingest(...args),
         list: (...args) => exceptions().list(...args),
         verify: (...args) => exceptions().verify(...args),
+        evidence: (...args) => exceptions().evidence(...args),
       },
       diagnose: (context, exceptionId) =>
         options.detection().diagnoses.run(context, exceptionId),
@@ -193,6 +194,9 @@ export function createScheduledDetection(options: {
               propagationSeconds: number;
               oversellPropagationSeconds: number;
               stuckSeconds: number;
+              stallSeconds?: number;
+              stallMinPositions?: number;
+              stallSharePercent?: number;
             };
           }>('SELECT detection FROM workspace_settings WHERE tenant_id=$1', [
             context.tenantId,

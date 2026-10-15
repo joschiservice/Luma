@@ -2,13 +2,22 @@ import { z } from 'zod';
 
 import { roleReferenceSchema } from './roles.js';
 
-/** Workspace detection windows; oversell risk has a shorter independent confirmation window. */
+/**
+ * Workspace detection windows; oversell risk has a shorter independent confirmation window. The
+ * stock sync stall settings are optional on input; a save without them keeps the stored values.
+ */
 export const detectionSettingsSchema = z
   .object({
     inventoryTolerance: z.string().regex(/^\d{1,14}(?:\.\d{1,6})?$/),
     propagationSeconds: z.number().int().min(0).max(86400),
     oversellPropagationSeconds: z.number().int().min(0).max(3600),
     stuckSeconds: z.number().int().min(60).max(604800),
+    /** How long a stock source's change may stay missing from a store before it counts as not followed. */
+    stallSeconds: z.number().int().min(60).max(86400).optional(),
+    /** Products that must be behind before Luma reports a stalled stock sync. */
+    stallMinPositions: z.number().int().min(1).max(1000).optional(),
+    /** Share of recently changed products, in percent, that must be behind. */
+    stallSharePercent: z.number().int().min(1).max(100).optional(),
   })
   .strict();
 

@@ -28,6 +28,12 @@ interface Freeze {
 const freezeKey = (shopName: string, variant: string) =>
   `${shopName}:${variant}`;
 
+/** A shop whose stock sync stopped for every SKU; changes queue until it resumes. */
+interface Stall {
+  incident: string;
+  shop: string;
+}
+
 /**
  * The availability a shop location mirrors: JTL's total across warehouses, or what Cin7 reports
  * at the shop's warehouse, because Cin7 integrations map one location to each shop location.
@@ -62,6 +68,11 @@ function listings(world: World, variantId: string) {
 export async function syncStock(world: World, limit = 2_000) {
   const store = world.store(worldInstance);
   const page = await store.page({ kind: 'dirty', limit });
+  const stalled = new Set(
+    (await store.page<Stall>({ kind: 'stall', limit: 100 })).items.map(
+      (item) => item.data.shop,
+    ),
+  );
   for (const record of page.items) {
     await store.delete('dirty', record.id);
     const erpStock = await readItemStock(erpContext(world), record.id);
@@ -70,6 +81,15 @@ export async function syncStock(world: World, limit = 2_000) {
     for (const listing of listings(world, record.id)) {
       if (await store.get('freeze', freezeKey(listing.shop, record.id)))
         continue;
+      if (stalled.has(listing.shop)) {
+        await store.put(
+          'stall-pending',
+          freezeKey(listing.shop, record.id),
+          { variant: record.id },
+          { parent: listing.shop, updatedAt: world.now },
+        );
+        continue;
+      }
       await shop(world, listing.shop, {
         kind: 'available',
         variant: record.id,
@@ -217,4 +237,82 @@ export async function recoverDrift(world: World, incident: Incident) {
       erpStock ? mirrored(world, erpStock, shopInstance.shop.warehouse) : 0,
     ),
   });
+}
+
+/**
+ * Stops the stock sync for every SKU of one shop, as when the merchant's stock connector stops
+ * running. ERP changes queue and reach the shop only when the sync resumes. Returns nothing when
+ * the shop's sync is already stalled.
+ */
+export async function stallStockSync(
+  world: World,
+  shopName: string,
+  origin: Incident['origin'],
+  options: { id?: string | undefined } = {},
+) {
+  const store = world.store(worldInstance);
+  if (await store.get('stall', shopName)) return undefined;
+  const shopInstance = instance(world, shopName);
+  if (shopInstance.kind !== 'shopify')
+    throw new Error('A stock sync stall affects a shop');
+  const incident = await openIncident(world, {
+    ...(options.id ? { id: options.id } : {}),
+    kind: 'stock-sync-stall',
+    origin,
+    instance: shopName,
+    summary: `The stock sync to ${shopInstance.shop.name} stopped; ERP stock changes no longer reach the shop.`,
+    resources: [
+      {
+        instance: shopName,
+        kind: 'connection',
+        id: shopName,
+        label: shopInstance.shop.name,
+      },
+    ],
+    detail: {},
+  });
+  await store.put(
+    'stall',
+    shopName,
+    { incident: incident.id, shop: shopName } satisfies Stall,
+    { updatedAt: world.now },
+  );
+
+  return incident;
+}
+
+/** Restarts a stalled shop's stock sync and pushes every change it held back. */
+export async function resumeStockSync(world: World, incident: Incident) {
+  const shopName = incident.instance!;
+  const shopInstance = instance(world, shopName);
+  const store = world.store(worldInstance);
+  await store.delete('stall', shopName);
+  if (shopInstance.kind !== 'shopify') return;
+  for (;;) {
+    const page = await store.page<{ variant: string }>({
+      kind: 'stall-pending',
+      parent: shopName,
+      limit: 500,
+    });
+    if (!page.items.length) return;
+    for (const record of page.items) {
+      await store.delete('stall-pending', record.id);
+      if (await store.get('freeze', freezeKey(shopName, record.data.variant)))
+        continue;
+      const erpStock = await readItemStock(
+        erpContext(world),
+        record.data.variant,
+      );
+      if (!erpStock) continue;
+      await shop(world, shopName, {
+        kind: 'available',
+        variant: record.data.variant,
+        location: shopInstance.shop.warehouse,
+        quantity: Math.max(
+          0,
+          mirrored(world, erpStock, shopInstance.shop.warehouse),
+        ),
+      });
+    }
+  }
 }

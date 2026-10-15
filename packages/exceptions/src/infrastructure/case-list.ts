@@ -378,6 +378,7 @@ const classOrder = [
   'stuck_fulfillment',
   'inventory_mismatch',
   'order_quantity_mismatch',
+  'stock_sync_stall',
   'workflow_failure',
 ] as const satisfies readonly Incident['exceptionClass'][];
 

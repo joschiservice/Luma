@@ -4,6 +4,7 @@
   "issues_kind_stuck_fulfillment": "Fulfillment-Verzögerung",
   "issues_kind_workflow_failure": "Workflow-Problem",
   "issues_kind_order_quantity_mismatch": "Mengenabweichung",
+  "issues_kind_stock_sync_stall": "Bestandsabgleich gestoppt",
   "issues_kind_other": "Betriebsproblem",
   "issues_state_detected": "Erkannt",
   "issues_state_diagnosed": "Untersuchung abgeschlossen",
@@ -549,5 +550,6 @@
   "issues_review_workflow_recorded": "Vorschlag, Freigabe, Änderung und Verifikation des Workflows sind unter Änderung und Ergebniskontrolle verknüpft. Entscheide über diesen Vorschlag in seiner Prüfung unter Wartet auf dich.",
   "issues_workflow_recorded_status": "Aufgezeichnete Workflow-Schritte verfügbar",
   "issues_detection_stock_limits": "Erkennungseinstellungen: Toleranz {tolerance} Einheiten; Bestätigung {window} Sekunden; Überverkaufsrisiko {oversell} Sekunden.",
-  "issues_detection_fulfillment_limit": "Erkennungseinstellung: kein Fortschritt seit {limit} Sekunden."
+  "issues_detection_fulfillment_limit": "Erkennungseinstellung: kein Fortschritt seit {limit} Sekunden.",
+  "issues_detection_stall_limits": "Erkennungseinstellungen: Bestandsänderungen nach {window} Sekunden nicht im Shop; mindestens {count} Produkte und {share} % der letzten Änderungen."
 }

@@ -170,7 +170,13 @@ export function IssueOverview({
               ? m.issues_detection_fulfillment_limit({
                   limit: formatNumber(item.detectionLimits.stuckSeconds),
                 })
-              : null}
+              : item.class === 'stock_sync_stall'
+                ? m.issues_detection_stall_limits({
+                    window: formatNumber(item.detectionLimits.stallSeconds),
+                    count: formatNumber(item.detectionLimits.stallMinPositions),
+                    share: formatNumber(item.detectionLimits.stallSharePercent),
+                  })
+                : null}
         </p>
       ) : null}
       {children}
