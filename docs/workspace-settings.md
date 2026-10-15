@@ -1,6 +1,6 @@
 # Workspace settings
 
-Workspace settings cover the workspace name and timezone, team access, custom roles, the approval preference, email delivery and each member's notification choices and personal layout. Workspace controls are shared; notification preferences and layouts belong to the signed-in member in that workspace. Every access and policy change is serialized, retry-safe and recorded with bounded before/after evidence. The typed `settings` and `roles` contracts are the API reference.
+Workspace settings cover the workspace name, timezone and detection limits, team access, custom roles, the approval preference, email delivery and each member's notification choices and personal layout. Workspace controls are shared; notification preferences and layouts belong to the signed-in member in that workspace. Every access and policy change is serialized, retry-safe and recorded with bounded before/after evidence. The typed `settings` and `roles` contracts are the API reference.
 
 ## Authority
 
@@ -12,6 +12,15 @@ Workspace settings cover the workspace name and timezone, team access, custom ro
 - `support_access.manage` allows and revokes Luma support access and answers support requests.
 
 Sections a role cannot change say which permission they need. Team and role mutations recheck authority under the organization row lock, including concurrent last-owner changes. Access, role and policy changes are appended to `workspace_access_events` with actor, timestamp and bounded before/after values.
+
+## Detection limits
+
+Workspace settings control stock tolerance, the ordinary stock confirmation window, the
+shorter oversell window and the fulfillment progress limit. Oversell risk defaults to two
+minutes; other stock gaps default to thirty minutes. Zero confirms stock gaps immediately.
+Stock mismatches require current, complete, comparable evidence. Each evaluation records its
+configuration, and issue details show the limits used. A setting change requires fresh
+detection and review before a stock correction can run.
 
 ## Source authority
 

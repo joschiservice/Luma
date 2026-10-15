@@ -276,7 +276,7 @@ export const InvestigationFailedWithPreviousFindings: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByText('Findings and evidence'));
-    await userEvent.click(canvas.getByText('Issue details'));
+    await userEvent.click(canvas.getByText('Technical details'));
     await expect(
       canvas.getByText('shared-stock-pool', { selector: 'li' }),
     ).toBeVisible();

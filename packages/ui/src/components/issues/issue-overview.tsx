@@ -4,6 +4,7 @@ import type {
   CaseReview,
   Diagnosis,
 } from '@luma/api-contract';
+import { formatExactQuantity, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useContext } from 'react';
@@ -125,8 +126,12 @@ export function IssueOverview({
           ) : (
             <p>
               {item.subject.kind === 'sku'
-                ? m.issues_overview_sku({ sku: item.subject.id })
-                : m.issues_overview_subject({ id: item.subject.id })}
+                ? m.issues_overview_sku({
+                    sku: item.subject.label ?? m.common_not_reported(),
+                  })
+                : m.issues_overview_subject({
+                    id: item.subject.label ?? m.common_not_reported(),
+                  })}
             </p>
           )}
         </div>
@@ -149,6 +154,25 @@ export function IssueOverview({
           </p>
         ) : null}
       </div>
+      {item.detectionLimits ? (
+        <p>
+          {item.class === 'inventory_mismatch'
+            ? m.issues_detection_stock_limits({
+                tolerance: formatExactQuantity(
+                  item.detectionLimits.inventoryTolerance,
+                ),
+                window: formatNumber(item.detectionLimits.propagationSeconds),
+                oversell: formatNumber(
+                  item.detectionLimits.oversellPropagationSeconds,
+                ),
+              })
+            : item.class === 'stuck_fulfillment'
+              ? m.issues_detection_fulfillment_limit({
+                  limit: formatNumber(item.detectionLimits.stuckSeconds),
+                })
+              : null}
+        </p>
+      ) : null}
       {children}
       <div className="issue-overview-action">
         <h3 className="issue-overview-action-label">

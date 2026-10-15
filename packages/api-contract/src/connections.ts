@@ -73,7 +73,34 @@ export const installationInput = z
   })
   .strict();
 
+/** One operational status shared by connection surfaces; installation validation stays separate. */
+export const connectionHealthSchema = z.enum([
+  'healthy',
+  'delayed',
+  'failing',
+  'access_lost',
+  'importing',
+  'disconnected',
+]);
+
+const connectionCoverageSchema = z.object({
+  health: connectionHealthSchema.optional(),
+  lastObservedAt: z.string().datetime().nullable(),
+  freshness: z.enum(['fresh', 'stale', 'unobserved']),
+  streams: z
+    .array(
+      z.object({
+        recordType: z.string(),
+        lastSuccessfulAt: z.string().datetime().nullable(),
+        lastError: z.string().nullable(),
+        issueIds: z.array(z.string().uuid()),
+      }),
+    )
+    .optional(),
+});
+
 export const installedConnectionSchema = z.object({
+  coverage: connectionCoverageSchema.optional(),
   writeMode: z.literal('observe_only').nullable().optional(),
   provider: z.string().optional(),
   appId: z.string().optional(),

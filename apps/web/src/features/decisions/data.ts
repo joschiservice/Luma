@@ -179,19 +179,15 @@ export async function assignDecision(
 
 /** Loads one decision for a direct link to an item outside the current page. */
 export function decisionOptions(organizationId: string, id: string) {
-  const query = { view: 'all' as const, id, limit: 1 };
-
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...decisionsKey(organizationId), 'item', id],
     refetchOnWindowFocus: 'always',
     queryFn: async ({ signal }) => {
-      const result = await api.decisions.list(
-        { params: { organizationId }, query },
+      return api.decisions.get(
+        { params: { organizationId, decisionId: id } },
         { signal },
       );
-
-      return result.items[0] ?? null;
     },
   });
 }

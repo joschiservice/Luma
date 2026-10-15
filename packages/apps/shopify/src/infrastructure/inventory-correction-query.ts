@@ -93,6 +93,17 @@ export function createCorrectionQuery(
   }
 
   return {
+    configurationKey: (context: TenantContext) =>
+      database.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{ key: string }>(
+              `SELECT COALESCE((SELECT detection FROM workspace_settings WHERE tenant_id=$1),'{"inventoryTolerance":"0","propagationSeconds":1800,"oversellPropagationSeconds":120,"stuckSeconds":7200}'::jsonb)::text AS key`,
+              [context.tenantId],
+            )
+          ).rows[0]!.key,
+      ),
     receipts,
     /** Pins the stock position's product label to the catalog read available at preview time. */
     product: (

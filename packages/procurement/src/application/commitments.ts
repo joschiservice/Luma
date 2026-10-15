@@ -284,6 +284,13 @@ export interface CommitmentStore {
 }
 
 export interface CommitmentDependencies {
+  /** Resolves recorded purchasing actors and explicit admission or draft workflow provenance for authorized history. */
+  timelineActors?(
+    context: TenantContext,
+    entries: PurchasingTimelineEntry[],
+    workflowRunId?: string,
+  ): Promise<PurchasingTimelineEntry[]>;
+
   /** Reads owner-provided stock receipt proof; observation remains distinct from a recorded receipt. */
   additionalTimeline?(
     context: TenantContext,
@@ -1394,6 +1401,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           ...((await deps.additionalTimeline?.(context, orderId)) ?? []),
         ],
       });
+
+      if (deps.timelineActors)
+        timeline.entries = await deps.timelineActors(
+          context,
+          timeline.entries,
+          data.order.origin.workflowRunId,
+        );
 
       return {
         ...recordData,

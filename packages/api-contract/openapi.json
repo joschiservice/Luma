@@ -75825,6 +75825,90 @@
                                   }
                                 ]
                               },
+                              "actor": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "member",
+                                      "former_member",
+                                      "luma",
+                                      "support",
+                                      "service",
+                                      "unrecorded"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "email": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 320
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "workflow": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          "name": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 200
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["id", "name"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "name",
+                                  "email",
+                                  "workflow"
+                                ]
+                              },
                               "reason": {
                                 "anyOf": [
                                   {
@@ -78239,6 +78323,90 @@
                                   {
                                     "type": "null"
                                   }
+                                ]
+                              },
+                              "actor": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "member",
+                                      "former_member",
+                                      "luma",
+                                      "support",
+                                      "service",
+                                      "unrecorded"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "email": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 320
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "workflow": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          "name": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 200
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["id", "name"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "name",
+                                  "email",
+                                  "workflow"
                                 ]
                               },
                               "reason": {
@@ -116477,6 +116645,25 @@
                               "minLength": 1,
                               "maxLength": 512
                             },
+                            "automation": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": ["id", "name"]
+                            },
                             "reason": {
                               "type": "string",
                               "maxLength": 1000
@@ -118155,6 +118342,28 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "pendingStock": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "until": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["count", "until"]
+                    },
                     "generatedAt": {
                       "type": "string",
                       "format": "date-time"
@@ -118195,6 +118404,17 @@
                               "degraded",
                               "disconnected",
                               "revoked"
+                            ],
+                            "type": "string"
+                          },
+                          "health": {
+                            "enum": [
+                              "healthy",
+                              "delayed",
+                              "failing",
+                              "access_lost",
+                              "importing",
+                              "disconnected"
                             ],
                             "type": "string"
                           },
@@ -118426,6 +118646,9 @@
                           "subject": {
                             "type": "object",
                             "properties": {
+                              "label": {
+                                "type": "string"
+                              },
                               "kind": {
                                 "type": "string"
                               },
@@ -118683,6 +118906,9 @@
                           "subject": {
                             "type": "object",
                             "properties": {
+                              "label": {
+                                "type": "string"
+                              },
                               "kind": {
                                 "type": "string"
                               },
@@ -119995,6 +120221,17 @@
                                   "properties": {
                                     "kind": {
                                       "const": "connection"
+                                    },
+                                    "health": {
+                                      "enum": [
+                                        "healthy",
+                                        "delayed",
+                                        "failing",
+                                        "access_lost",
+                                        "importing",
+                                        "disconnected"
+                                      ],
+                                      "type": "string"
                                     },
                                     "id": {
                                       "type": "string",
@@ -121514,6 +121751,17 @@
                                                   "kind": {
                                                     "const": "connection"
                                                   },
+                                                  "health": {
+                                                    "enum": [
+                                                      "healthy",
+                                                      "delayed",
+                                                      "failing",
+                                                      "access_lost",
+                                                      "importing",
+                                                      "disconnected"
+                                                    ],
+                                                    "type": "string"
+                                                  },
                                                   "id": {
                                                     "type": "string",
                                                     "format": "uuid"
@@ -122898,6 +123146,9 @@
                           "subject": {
                             "type": "object",
                             "properties": {
+                              "label": {
+                                "type": "string"
+                              },
                               "kind": {
                                 "type": "string"
                               },
@@ -123575,6 +123826,9 @@
                     "subject": {
                       "type": "object",
                       "properties": {
+                        "label": {
+                          "type": "string"
+                        },
                         "kind": {
                           "type": "string"
                         },
@@ -123671,6 +123925,29 @@
                         {
                           "type": "null"
                         }
+                      ]
+                    },
+                    "detectionLimits": {
+                      "type": "object",
+                      "properties": {
+                        "inventoryTolerance": {
+                          "type": "string"
+                        },
+                        "propagationSeconds": {
+                          "type": "number"
+                        },
+                        "oversellPropagationSeconds": {
+                          "type": "number"
+                        },
+                        "stuckSeconds": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "inventoryTolerance",
+                        "propagationSeconds",
+                        "oversellPropagationSeconds",
+                        "stuckSeconds"
                       ]
                     },
                     "diagnosis": {
@@ -126706,6 +126983,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -126726,6 +127034,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -126955,6 +127294,37 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "detection": {
+                    "type": "object",
+                    "properties": {
+                      "inventoryTolerance": {
+                        "type": "string",
+                        "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                      },
+                      "propagationSeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 86400
+                      },
+                      "oversellPropagationSeconds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600
+                      },
+                      "stuckSeconds": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 604800
+                      }
+                    },
+                    "required": [
+                      "inventoryTolerance",
+                      "propagationSeconds",
+                      "oversellPropagationSeconds",
+                      "stuckSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
                   "timezone": {
                     "type": "string",
                     "minLength": 1,
@@ -126990,6 +127360,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -127010,6 +127411,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -127269,6 +127701,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -127289,6 +127752,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -127519,6 +128013,37 @@
                   },
                   "requireIndependentApproval": {
                     "type": "boolean"
+                  },
+                  "replenishmentApproval": {
+                    "type": "object",
+                    "properties": {
+                      "separateSend": {
+                        "type": "boolean"
+                      },
+                      "threshold": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "pattern": "^[A-Z]{3}$"
+                              }
+                            },
+                            "required": ["amount", "currency"]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["separateSend", "threshold"],
+                    "additionalProperties": false
                   }
                 },
                 "required": ["commandId", "revision", "alwaysRequireApproval"],
@@ -127550,6 +128075,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -127570,6 +128126,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -127837,6 +128424,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -127857,6 +128475,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -128561,6 +129210,37 @@
                         "timezone": {
                           "type": "string"
                         },
+                        "detection": {
+                          "type": "object",
+                          "properties": {
+                            "inventoryTolerance": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "propagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 86400
+                            },
+                            "oversellPropagationSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3600
+                            },
+                            "stuckSeconds": {
+                              "type": "integer",
+                              "minimum": 60,
+                              "maximum": 604800
+                            }
+                          },
+                          "required": [
+                            "inventoryTolerance",
+                            "propagationSeconds",
+                            "oversellPropagationSeconds",
+                            "stuckSeconds"
+                          ],
+                          "additionalProperties": false
+                        },
                         "revision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -128581,6 +129261,37 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "replenishmentApproval": {
+                          "type": "object",
+                          "properties": {
+                            "separateSend": {
+                              "type": "boolean"
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                    },
+                                    "currency": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{3}$"
+                                    }
+                                  },
+                                  "required": ["amount", "currency"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["separateSend", "threshold"],
+                          "additionalProperties": false
                         },
                         "writeMode": {
                           "enum": ["observe_only", "writes_enabled"],
@@ -131939,6 +132650,83 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "coverage": {
+                            "type": "object",
+                            "properties": {
+                              "health": {
+                                "enum": [
+                                  "healthy",
+                                  "delayed",
+                                  "failing",
+                                  "access_lost",
+                                  "importing",
+                                  "disconnected"
+                                ],
+                                "type": "string"
+                              },
+                              "lastObservedAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "freshness": {
+                                "enum": ["fresh", "stale", "unobserved"],
+                                "type": "string"
+                              },
+                              "streams": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "recordType": {
+                                      "type": "string"
+                                    },
+                                    "lastSuccessfulAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "lastError": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "issueIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "recordType",
+                                    "lastSuccessfulAt",
+                                    "lastError",
+                                    "issueIds"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": ["lastObservedAt", "freshness"]
+                          },
                           "writeMode": {
                             "anyOf": [
                               {
@@ -132370,6 +133158,83 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "health": {
+                          "enum": [
+                            "healthy",
+                            "delayed",
+                            "failing",
+                            "access_lost",
+                            "importing",
+                            "disconnected"
+                          ],
+                          "type": "string"
+                        },
+                        "lastObservedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "freshness": {
+                          "enum": ["fresh", "stale", "unobserved"],
+                          "type": "string"
+                        },
+                        "streams": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recordType": {
+                                "type": "string"
+                              },
+                              "lastSuccessfulAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "lastError": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "issueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "required": [
+                              "recordType",
+                              "lastSuccessfulAt",
+                              "lastError",
+                              "issueIds"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["lastObservedAt", "freshness"]
+                    },
                     "writeMode": {
                       "anyOf": [
                         {
@@ -132739,6 +133604,83 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "health": {
+                          "enum": [
+                            "healthy",
+                            "delayed",
+                            "failing",
+                            "access_lost",
+                            "importing",
+                            "disconnected"
+                          ],
+                          "type": "string"
+                        },
+                        "lastObservedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "freshness": {
+                          "enum": ["fresh", "stale", "unobserved"],
+                          "type": "string"
+                        },
+                        "streams": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recordType": {
+                                "type": "string"
+                              },
+                              "lastSuccessfulAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "lastError": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "issueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "required": [
+                              "recordType",
+                              "lastSuccessfulAt",
+                              "lastError",
+                              "issueIds"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["lastObservedAt", "freshness"]
+                    },
                     "writeMode": {
                       "anyOf": [
                         {
@@ -133097,6 +134039,83 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "health": {
+                          "enum": [
+                            "healthy",
+                            "delayed",
+                            "failing",
+                            "access_lost",
+                            "importing",
+                            "disconnected"
+                          ],
+                          "type": "string"
+                        },
+                        "lastObservedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "freshness": {
+                          "enum": ["fresh", "stale", "unobserved"],
+                          "type": "string"
+                        },
+                        "streams": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recordType": {
+                                "type": "string"
+                              },
+                              "lastSuccessfulAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "lastError": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "issueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "required": [
+                              "recordType",
+                              "lastSuccessfulAt",
+                              "lastError",
+                              "issueIds"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["lastObservedAt", "freshness"]
+                    },
                     "writeMode": {
                       "anyOf": [
                         {
@@ -133469,6 +134488,83 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "health": {
+                          "enum": [
+                            "healthy",
+                            "delayed",
+                            "failing",
+                            "access_lost",
+                            "importing",
+                            "disconnected"
+                          ],
+                          "type": "string"
+                        },
+                        "lastObservedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "freshness": {
+                          "enum": ["fresh", "stale", "unobserved"],
+                          "type": "string"
+                        },
+                        "streams": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recordType": {
+                                "type": "string"
+                              },
+                              "lastSuccessfulAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "lastError": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "issueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "required": [
+                              "recordType",
+                              "lastSuccessfulAt",
+                              "lastError",
+                              "issueIds"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["lastObservedAt", "freshness"]
+                    },
                     "writeMode": {
                       "anyOf": [
                         {
@@ -133828,6 +134924,83 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "health": {
+                          "enum": [
+                            "healthy",
+                            "delayed",
+                            "failing",
+                            "access_lost",
+                            "importing",
+                            "disconnected"
+                          ],
+                          "type": "string"
+                        },
+                        "lastObservedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "freshness": {
+                          "enum": ["fresh", "stale", "unobserved"],
+                          "type": "string"
+                        },
+                        "streams": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recordType": {
+                                "type": "string"
+                              },
+                              "lastSuccessfulAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "lastError": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "issueIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "required": [
+                              "recordType",
+                              "lastSuccessfulAt",
+                              "lastError",
+                              "issueIds"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["lastObservedAt", "freshness"]
+                    },
                     "writeMode": {
                       "anyOf": [
                         {
@@ -195904,6 +197077,71 @@
                                         "paused": {
                                           "type": "boolean"
                                         },
+                                        "waiting": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "reason": {
+                                                  "enum": [
+                                                    "orders",
+                                                    "request_capacity",
+                                                    "admission_unavailable",
+                                                    "provider_cooldown",
+                                                    "worker_capacity",
+                                                    "connection_capacity",
+                                                    "recent_changes",
+                                                    "queued"
+                                                  ],
+                                                  "type": "string"
+                                                },
+                                                "connections": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "connectionId": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "connectionId",
+                                                      "label"
+                                                    ]
+                                                  }
+                                                },
+                                                "observedAt": {
+                                                  "type": "string",
+                                                  "format": "date-time"
+                                                },
+                                                "until": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "format": "date-time"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "reason",
+                                                "connections",
+                                                "observedAt",
+                                                "until"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
                                         "blocked": {
                                           "anyOf": [
                                             {
@@ -196601,6 +197839,68 @@
                     },
                     "paused": {
                       "type": "boolean"
+                    },
+                    "waiting": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "reason": {
+                              "enum": [
+                                "orders",
+                                "request_capacity",
+                                "admission_unavailable",
+                                "provider_cooldown",
+                                "worker_capacity",
+                                "connection_capacity",
+                                "recent_changes",
+                                "queued"
+                              ],
+                              "type": "string"
+                            },
+                            "connections": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "connectionId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["connectionId", "label"]
+                              }
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "until": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "connections",
+                            "observedAt",
+                            "until"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "blocked": {
                       "anyOf": [
@@ -198046,6 +199346,1042 @@
         }
       }
     },
+    "/v1/organizations/{organizationId}/decisions/{decisionId}": {
+      "get": {
+        "operationId": "decisions.get",
+        "summary": "Read a decision and its retained outcome",
+        "description": "Reads active work or an authorized retained issue, replenishment, supplier-send or stock-correction outcome, with who answered, when and what happened next. Reading a historical outcome grants no authority to respond or assign. Returns null when the owner or decision is inaccessible.",
+        "tags": ["decisions"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "diff": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "schemaVersion": {
+                                  "const": 1
+                                },
+                                "policy": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "outcome": {
+                                          "enum": [
+                                            "allowed",
+                                            "denied",
+                                            "approval_required"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        },
+                                        "evaluatedAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "validUntil": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "current": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": [
+                                        "outcome",
+                                        "reason",
+                                        "evaluatedAt",
+                                        "validUntil",
+                                        "current"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "capability": {
+                                  "type": "string"
+                                },
+                                "records": {
+                                  "type": "array",
+                                  "maxItems": 100,
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "system": {
+                                        "enum": ["luma", "provider"],
+                                        "type": "string"
+                                      },
+                                      "connectionId": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "format": "uuid"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "kind": {
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "link": {
+                                        "type": "string",
+                                        "pattern": "^\\/app\\/"
+                                      },
+                                      "changes": {
+                                        "type": "array",
+                                        "maxItems": 250,
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "field": {
+                                              "type": "string"
+                                            },
+                                            "before": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "maxLength": 1000
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "beforeKnown": {
+                                              "type": "boolean"
+                                            },
+                                            "after": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "maxLength": 1000
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "afterKnown": {
+                                              "type": "boolean"
+                                            },
+                                            "expected": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "maxLength": 1000
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "expectedKnown": {
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": [
+                                            "field",
+                                            "before",
+                                            "beforeKnown",
+                                            "after",
+                                            "afterKnown",
+                                            "expected",
+                                            "expectedKnown"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "system",
+                                      "connectionId",
+                                      "kind",
+                                      "id",
+                                      "changes"
+                                    ]
+                                  }
+                                },
+                                "scope": {
+                                  "type": "array",
+                                  "maxItems": 20,
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string"
+                                      },
+                                      "count": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "ids": {
+                                        "type": "array",
+                                        "maxItems": 100,
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": ["kind", "count", "ids"]
+                                  }
+                                },
+                                "reversibility": {
+                                  "enum": [
+                                    "reversible",
+                                    "compensatable",
+                                    "irreversible",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "evidence": {
+                                  "type": "object",
+                                  "properties": {
+                                    "link": {
+                                      "type": "string",
+                                      "pattern": "^\\/app\\/"
+                                    },
+                                    "refs": {
+                                      "type": "array",
+                                      "maxItems": 100,
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "observedAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "ageSeconds": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number",
+                                          "minimum": 0
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "validUntil": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    }
+                                  },
+                                  "required": [
+                                    "refs",
+                                    "observedAt",
+                                    "validUntil"
+                                  ]
+                                },
+                                "retryProtection": {
+                                  "const": "immutable_intent_reconcile_before_retry"
+                                },
+                                "canonicalOutcome": {
+                                  "enum": [
+                                    "requires_fresh_verification",
+                                    "internal_record"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "schemaVersion",
+                                "capability",
+                                "records",
+                                "scope",
+                                "reversibility",
+                                "evidence",
+                                "retryProtection",
+                                "canonicalOutcome"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "outcome": {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "enum": [
+                                "approved",
+                                "rejected",
+                                "expired",
+                                "resolved"
+                              ],
+                              "type": "string"
+                            },
+                            "at": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "actorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "actorName": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "actorEmail": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "next": {
+                              "enum": [
+                                "pending",
+                                "running",
+                                "verified",
+                                "failed",
+                                "uncertain"
+                              ],
+                              "type": "string"
+                            },
+                            "workflow": {
+                              "type": "boolean"
+                            },
+                            "purchaseOrderId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "runId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "definitionId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "at",
+                            "actorId",
+                            "actorName",
+                            "actorEmail",
+                            "next",
+                            "workflow"
+                          ]
+                        },
+                        "previousChange": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["label", "value"]
+                          }
+                        },
+                        "automatic": {
+                          "type": "boolean"
+                        },
+                        "observeOnly": {
+                          "type": "boolean"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "kind": {
+                          "enum": [
+                            "case",
+                            "custom_field",
+                            "return_case",
+                            "replenishment",
+                            "shipment_publication",
+                            "fulfillment_recovery",
+                            "inventory_correction",
+                            "order_edit",
+                            "supplier_commitment",
+                            "workflow_handover",
+                            "human_task",
+                            "message_reply"
+                          ],
+                          "type": "string"
+                        },
+                        "reason": {
+                          "enum": [
+                            "approval",
+                            "run",
+                            "recovery",
+                            "manual_intervention",
+                            "uncertainty"
+                          ],
+                          "type": "string"
+                        },
+                        "domain": {
+                          "enum": [
+                            "orders",
+                            "fulfillment",
+                            "inventory",
+                            "procurement",
+                            "operations"
+                          ],
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "why": {
+                          "type": "string"
+                        },
+                        "consequences": {
+                          "type": "array",
+                          "maxItems": 4,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "response": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["response", "text"]
+                          }
+                        },
+                        "change": {
+                          "type": "array",
+                          "maxItems": 12,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["label", "value"]
+                          }
+                        },
+                        "impact": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "enum": ["high", "medium", "low", "unknown"],
+                              "type": "string"
+                            },
+                            "text": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["level", "text"]
+                        },
+                        "urgency": {
+                          "enum": ["expiring", "high", "normal"],
+                          "type": "string"
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deadline": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "requesterId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "evidence": {
+                          "type": "object",
+                          "properties": {
+                            "observedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "validUntil": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "state": {
+                              "enum": ["fresh", "stale", "unknown"],
+                              "type": "string"
+                            }
+                          },
+                          "required": ["observedAt", "validUntil", "state"]
+                        },
+                        "response": {
+                          "enum": [
+                            "decide",
+                            "run",
+                            "check",
+                            "investigate",
+                            "awaiting_other",
+                            "view_only"
+                          ],
+                          "type": "string"
+                        },
+                        "assignment": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "assigneeId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "assignedBy": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "assignedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "assigneeId",
+                                "assignedBy",
+                                "assignedAt",
+                                "revision"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "subject": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["label", "detail"]
+                        },
+                        "record": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "order",
+                                    "fulfillment",
+                                    "position",
+                                    "sku",
+                                    "product",
+                                    "issue"
+                                  ],
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "id"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "owner": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "custom_field"
+                                },
+                                "runId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "stepId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "runId", "stepId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "return_case"
+                                },
+                                "caseId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "caseId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "human_task"
+                                },
+                                "definitionId": {
+                                  "type": "string"
+                                },
+                                "runId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "stepId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "definitionId",
+                                "runId",
+                                "stepId"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "case"
+                                },
+                                "exceptionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "exceptionId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "workflow_run"
+                                },
+                                "definitionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "runId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "followUpProposalId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "definitionId", "runId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "app_fulfillment"
+                                },
+                                "appId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "connectionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "orderId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "fulfillmentId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "appId",
+                                "connectionId",
+                                "orderId",
+                                "fulfillmentId"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "app_inventory"
+                                },
+                                "appId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "positionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "appId", "positionId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "app_order"
+                                },
+                                "appId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "connectionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "orderId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "appId",
+                                "connectionId",
+                                "orderId"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "purchase_order"
+                                },
+                                "purchaseOrderId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "purchaseOrderId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "purchasing_plan"
+                                },
+                                "planId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "planId"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "message_thread"
+                                },
+                                "threadId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              },
+                              "required": ["kind", "threadId"]
+                            }
+                          ]
+                        },
+                        "group": {
+                          "type": "object",
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["key", "label"]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "reason",
+                        "domain",
+                        "title",
+                        "why",
+                        "consequences",
+                        "change",
+                        "impact",
+                        "urgency",
+                        "requestedAt",
+                        "deadline",
+                        "requesterId",
+                        "evidence",
+                        "response",
+                        "assignment",
+                        "subject",
+                        "record",
+                        "owner",
+                        "group"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/decisions": {
       "get": {
         "operationId": "decisions.list",
@@ -198549,6 +200885,112 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "outcome": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "enum": [
+                                  "approved",
+                                  "rejected",
+                                  "expired",
+                                  "resolved"
+                                ],
+                                "type": "string"
+                              },
+                              "at": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "actorId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "actorName": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "actorEmail": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "next": {
+                                "enum": [
+                                  "pending",
+                                  "running",
+                                  "verified",
+                                  "failed",
+                                  "uncertain"
+                                ],
+                                "type": "string"
+                              },
+                              "workflow": {
+                                "type": "boolean"
+                              },
+                              "purchaseOrderId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "runId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "definitionId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "at",
+                              "actorId",
+                              "actorName",
+                              "actorEmail",
+                              "next",
+                              "workflow"
+                            ]
+                          },
+                          "previousChange": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["label", "value"]
+                            }
+                          },
+                          "automatic": {
+                            "type": "boolean"
                           },
                           "observeOnly": {
                             "type": "boolean"

@@ -4,6 +4,7 @@ import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
+import { SearchableSelect } from '@luma/ui/components/primitives/searchable-select';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Switch } from '@luma/ui/components/primitives/switch';
 import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
@@ -26,6 +27,10 @@ import {
   moveModule,
 } from '../../kit/home/preferences';
 import { useWorkspaceLayout } from '../../kit/layout/data';
+import {
+  setDisplayTimezonePreference,
+  useDisplayTimezonePreference,
+} from '../../lib/display-timezone';
 import { setSidebarCollapsed, useSidebarCollapsed } from '../../lib/sidebar';
 import {
   setThemePreference,
@@ -64,9 +69,11 @@ const themes: {
 /** Lets the reader choose the interface language, theme and default sidebar width on this device. */
 export function AppearanceSettings() {
   const theme = useThemePreference();
+  const timezone = useDisplayTimezonePreference();
   const collapsed = useSidebarCollapsed();
   const titleId = useId();
   const descriptionId = useId();
+  const timezoneId = useId();
   const languageId = useId();
   const languageDescriptionId = useId();
 
@@ -78,6 +85,32 @@ export function AppearanceSettings() {
         badge={m.settings_badge_this_device()}
       />
       <div className="settings-panel">
+        <div className="settings-preference">
+          <label id={timezoneId}>{m.settings_display_timezone()}</label>
+          <SearchableSelect
+            aria-labelledby={timezoneId}
+            value={timezone ?? 'workspace'}
+            options={[
+              {
+                value: 'workspace',
+                label: m.settings_display_timezone_workspace(),
+              },
+              ...Array.from(
+                new Set([
+                  'UTC',
+                  ...(timezone ? [timezone] : []),
+                  ...Intl.supportedValuesOf('timeZone'),
+                ]),
+              ).map((value) => ({ value, label: value.replaceAll('_', ' ') })),
+            ]}
+            onValueChange={(value) => {
+              if (value)
+                setDisplayTimezonePreference(
+                  value === 'workspace' ? null : value,
+                );
+            }}
+          />
+        </div>
         <div className="settings-preference">
           <span>
             <strong id={languageId}>{m.settings_language_title()}</strong>

@@ -89,6 +89,7 @@ export interface ReplenishmentTransport {
 
 /** A purchase-order proposal that waits for a person's approval. */
 export interface ReplenishmentDecision {
+  previousQuantity?: number | undefined;
   context?: ReplenishmentApprovalContext | null;
   runId: string;
   definitionId: string;
@@ -369,13 +370,32 @@ export function createReplenishmentService(deps: {
   ): Promise<ReplenishmentDecision[]> {
     const existing = await runs.pending(context, definitionId);
     if (!existing.length) return [];
-    const [evidence, rules, requireIndependentApproval] = await Promise.all([
-      steps.list(
-        context,
-        existing.map((r) => r.id),
+    const [evidence, rules, requireIndependentApproval, recent] =
+      await Promise.all([
+        steps.list(
+          context,
+          existing.map((r) => r.id),
+        ),
+        store.list(context),
+        deps.safety.policies.requiresIndependentApproval(context.tenantId),
+        runs.list(context, definitionId),
+      ]);
+    const previousRuns = new Map(
+      existing.map((run) => [
+        run.id,
+        recent.find(
+          (prior) =>
+            prior.id !== run.id &&
+            prior.context.inputs.activationId ===
+              run.context.inputs.activationId &&
+            Date.parse(prior.createdAt) < Date.parse(run.createdAt),
+        ),
+      ]),
+    );
+    const previousEvidence = await steps.list(context, [
+      ...new Set(
+        [...previousRuns.values()].flatMap((run) => (run ? [run.id] : [])),
       ),
-      store.list(context),
-      deps.safety.policies.requiresIndependentApproval(context.tenantId),
     ]);
     const items: ReplenishmentDecision[] = [];
     for (const run of existing) {
@@ -403,7 +423,17 @@ export function createReplenishmentService(deps: {
         continue;
       const line = JSON.parse(String(binding.action.parameters.lines))[0];
       const inventory = outputs.find((step) => step.stepId === 'inventory');
+      const prior = previousRuns.get(run.id);
+      const priorQuantity = prior
+        ? previousEvidence
+            .get(prior.id)
+            ?.find((step) => step.stepId === 'proposal')?.values.quantity
+        : undefined;
       items.push({
+        ...(typeof priorQuantity === 'number' &&
+        priorQuantity !== Number(line.quantity)
+          ? { previousQuantity: priorQuantity }
+          : {}),
         context: await store.reviewContext(context, run.id),
         runId: run.id,
         definitionId,
@@ -1513,6 +1543,10 @@ export function createReplenishmentService(deps: {
           connectionId: run.tenantId,
           target: { kind: 'purchase_order', id },
           parameters: {
+            submissionScope: JSON.stringify(
+              (await deps.procurement.supplier(context, rule.supplierId))
+                ?.link ?? null,
+            ),
             supplierId: rule.supplierId,
             reference: `REP-${run.id.slice(0, 8).toUpperCase()}`,
             workflowRunId: run.id,

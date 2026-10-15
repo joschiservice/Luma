@@ -548,7 +548,7 @@ test('requires regional confirmation before account creation and keeps it visibl
   await page.keyboard.press('Enter');
   await heading(page, 'Create your account');
   await expect(
-    page.getByText('Account region: Australia', { exact: true }),
+    page.getByText('Account region: Australia (Sydney)', { exact: true }),
   ).toBeVisible();
   await page.getByLabel('Name', { exact: true }).fill('Regional owner');
   await page
@@ -561,7 +561,7 @@ test('requires regional confirmation before account creation and keeps it visibl
   await heading(page, 'Create a workspace');
   await expect(
     page.getByText(
-      'This workspace will be created in Australia. Its region cannot be changed here.',
+      'This workspace will be created in Australia (Sydney). Its region cannot be changed here.',
       { exact: true },
     ),
   ).toBeVisible();

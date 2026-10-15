@@ -18,7 +18,8 @@ import {
   signUpInRegion,
   usePasskeySupport,
 } from '../../kit/identity/data';
-import { RegionChoice, regionLabel } from './region-choice';
+import { regionLabel } from '../../kit/identity/region';
+import { RegionChoice } from './region-choice';
 import { SecondFactorForm } from './second-factor';
 import { ResolutionStory } from './story';
 

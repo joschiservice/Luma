@@ -118,5 +118,7 @@
   "home_returns_not_shared_description": "Retouren erscheinen, sobald ein verbundener Shop Retouren und Erstattungen mit Luma teilt.",
   "home_returns_review_connections": "Verbindungen prüfen",
   "home_window_brief": "Morgenüberblick",
-  "home_brief_window": "Verifizierte Ergebnisse von {start} bis {end}. Entscheidungen und laufende Arbeit zeigen den aktuellen Stand."
+  "home_brief_window": "Verifizierte Ergebnisse von {start} bis {end}. Entscheidungen und laufende Arbeit zeigen den aktuellen Stand.",
+  "home_pending_stock": "{count, plural, one {{count, number} mögliche Bestandsabweichung} other {{count, number} mögliche Bestandsabweichungen}}",
+  "home_pending_stock_until": "Bestätigung bis"
 }

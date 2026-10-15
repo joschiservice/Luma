@@ -347,7 +347,7 @@
   "issues_section_history": "History",
   "issues_section_evidence": "Evidence",
   "issues_section_resolution": "Proposed change",
-  "issues_section_details": "Issue details",
+  "issues_section_details": "Technical details",
   "issues_sections_label": "Issue sections",
   "issues_on_this_page": "On this page",
   "issues_details_sources": "Source systems",
@@ -547,5 +547,7 @@
   "issues_findings_outcome_recorded": "No separate investigation findings were recorded. Review the workflow and independent outcome evidence below.",
   "issues_event_observed": "Issue observed again",
   "issues_review_workflow_recorded": "The workflow’s recorded proposal, approval, change and verification are linked in Change and outcome check. Decisions about that proposal use its own review in Needs you.",
-  "issues_workflow_recorded_status": "Recorded workflow steps available"
+  "issues_workflow_recorded_status": "Recorded workflow steps available",
+  "issues_detection_stock_limits": "Detection settings: tolerance {tolerance} units; confirmation {window} seconds; oversell risk {oversell} seconds.",
+  "issues_detection_fulfillment_limit": "Detection setting: no progress for {limit} seconds."
 }

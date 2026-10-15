@@ -8,7 +8,9 @@ import {
 } from '../common.js';
 import { saveWorkspaceLayoutSchema, workspaceLayoutSchema } from '../layout.js';
 import {
+  detectionSettingsSchema,
   invitationSchema,
+  replenishmentApprovalSchema,
   settingsSnapshotSchema,
   supportAccessDurationSchema,
   supportAccessSchema,
@@ -69,6 +71,7 @@ export const settingsContract = {
           .extend({
             revision: z.number().int().nonnegative(),
             name: z.string().trim().min(1).max(200),
+            detection: detectionSettingsSchema.optional(),
             timezone: z
               .string()
               .min(1)
@@ -128,6 +131,7 @@ export const settingsContract = {
             revision: z.number().int().nonnegative(),
             alwaysRequireApproval: z.boolean(),
             requireIndependentApproval: z.boolean().optional(),
+            replenishmentApproval: replenishmentApprovalSchema.optional(),
           })
           .strict(),
       }),

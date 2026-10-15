@@ -8,12 +8,12 @@ import {
 
 import {
   historyWindow,
-  orderChildren,
   recordCapabilities,
   recordTypes,
   streamStatus,
   type SyncStream,
 } from '../domain/streams.js';
+import { syncWait } from '../domain/waiting.js';
 import type { AutoLinkService } from './automatic-links.js';
 import type {
   LinkRequest,
@@ -57,7 +57,7 @@ const manage = (context: TenantContext) =>
 function streamView(
   stream: SyncStream,
   coverage: StreamCoverage | undefined,
-  waitingOnOrders: boolean,
+  waiting: SyncStreamView['waiting'],
 ): SyncStreamView {
   const window = historyWindow(stream);
   const due =
@@ -73,7 +73,8 @@ function streamView(
 
   return {
     id: stream.id,
-    status: streamStatus(stream, waitingOnOrders),
+    status: streamStatus(stream, false, !!waiting),
+    waiting,
     phase: stream.phase,
     paused: stream.paused,
     blocked: stream.blocked,
@@ -170,9 +171,30 @@ export function createSyncService(deps: SyncServiceDependencies) {
       deps.store.overview(fresh.tenantId),
       sourcePolicy(fresh),
     ]);
+    const asOf = now();
     const coverage = new Map(
       data.coverage.map((item) => [item.streamId, item]),
     );
+
+    const waiting = (stream: SyncStream): SyncStreamView['waiting'] => {
+      const evidence = syncWait(stream, data.streams, asOf);
+      if (!evidence) return null;
+      const { connectionIds, ...reason } = evidence;
+
+      return {
+        ...reason,
+        connections: connections
+          .filter(
+            (connection) =>
+              connectionIds.includes(connection.id) &&
+              !policy.hidden.includes(connection.id),
+          )
+          .map((connection) => ({
+            connectionId: connection.id,
+            label: connection.label,
+          })),
+      };
+    };
 
     return {
       linkCoverage: await deps.store.linkCoverage(
@@ -200,12 +222,6 @@ export function createSyncService(deps: SyncServiceDependencies) {
           const streams = data.streams.filter(
             (stream) => stream.connectionId === connection.id,
           );
-          const ordersImporting = streams.some(
-            (stream) =>
-              stream.recordType === 'orders' &&
-              stream.phase === 'backfill' &&
-              !stream.recentHistoryCompletedAt,
-          );
 
           return {
             connectionId: connection.id,
@@ -225,11 +241,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
                     ? 'granted'
                     : 'not_granted',
                 stream: stream
-                  ? streamView(
-                      stream,
-                      coverage.get(stream.id),
-                      orderChildren.includes(recordType) && ordersImporting,
-                    )
+                  ? streamView(stream, coverage.get(stream.id), waiting(stream))
                   : null,
               };
             }),
@@ -259,7 +271,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
           errors: run.errors,
         })),
       canManage: manage(fresh),
-      asOf: now().toISOString(),
+      asOf: asOf.toISOString(),
     };
   }
 

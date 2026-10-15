@@ -71,7 +71,7 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
     JSON.parse(param('where') ?? '{"conditions":[]}').conditions.find(
       (item) => item.field === field,
     )?.value;
-  await addFilter('System', 'jtl-cloud');
+  await addFilter('System', 'JTL Cloud');
   await expect.poll(() => condition('system')).toEqual(['jtl-cloud']);
   const search = page.getByRole('searchbox', { name: 'Search activity' });
   // People are shown and found by name rather than by user ID.
@@ -79,7 +79,10 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
   await search.press('Enter');
   await expect.poll(() => param('q')).toBe('lovelace');
   await page.locator('.activity-event').first().waitFor();
-  await page.getByText('Ada Lovelace · jtl-cloud').first().waitFor();
+  await page
+    .getByText('Ada Lovelace · activity@example.test · JTL Cloud')
+    .first()
+    .waitFor();
   expect(await page.getByText(actor).count()).toBe(0);
   await addFilter('Outcome', 'Outcome unclear');
   await expect.poll(() => condition('outcome')).toEqual(['uncertain']);
@@ -182,7 +185,7 @@ test('filters, saves views, expands, returns, paginates and recovers workspace a
   await expect(
     panel
       .getByRole('region', { name: 'System', exact: true })
-      .getByRole('button', { name: 'jtl-cloud', exact: true }),
+      .getByRole('button', { name: 'JTL Cloud', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await page.locator('.activity-event').first().waitFor();
   let failOlder = true;

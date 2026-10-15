@@ -158,7 +158,7 @@ function transaction(
       const org = (
         await tx.query<SettingsSnapshot['workspace']>(
           `SELECT o.name,o.slug,o.write_mode AS "writeMode",o.data_region AS "dataRegion",COALESCE(s.timezone,'UTC') AS timezone,
-        COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision",
+        COALESCE(s.detection,'{"inventoryTolerance":"0","propagationSeconds":1800,"oversellPropagationSeconds":120,"stuckSeconds":7200}'::jsonb) AS detection,COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision",COALESCE(s.replenishment_approval,'{"separateSend":false,"threshold":null}'::jsonb) AS "replenishmentApproval",
         COALESCE(s.require_independent_approval,true) AS "requireIndependentApproval",workspace_active_member_count() AS "activeMemberCount"
         FROM organizations o LEFT JOIN workspace_settings s ON s.tenant_id=o.id WHERE o.id=$1`,
           [tenantId],
@@ -232,8 +232,8 @@ function transaction(
         [tenantId, value.name, value.writeMode],
       );
       await tx.query(
-        `INSERT INTO workspace_settings(tenant_id,timezone,revision,always_require_approval,policy_revision,require_independent_approval) VALUES($1,$2,$3,$4,$5,$6)
-        ON CONFLICT(tenant_id) DO UPDATE SET timezone=$2,revision=$3,always_require_approval=$4,policy_revision=$5,require_independent_approval=$6`,
+        `INSERT INTO workspace_settings(tenant_id,timezone,revision,always_require_approval,policy_revision,require_independent_approval,detection,replenishment_approval) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+        ON CONFLICT(tenant_id) DO UPDATE SET timezone=$2,revision=$3,always_require_approval=$4,policy_revision=$5,require_independent_approval=$6,detection=$7,replenishment_approval=$8`,
         [
           tenantId,
           value.timezone,
@@ -241,6 +241,20 @@ function transaction(
           value.alwaysRequireApproval,
           value.policyRevision,
           value.requireIndependentApproval,
+          JSON.stringify(
+            value.detection ?? {
+              inventoryTolerance: '0',
+              propagationSeconds: 1800,
+              oversellPropagationSeconds: 120,
+              stuckSeconds: 7200,
+            },
+          ),
+          JSON.stringify(
+            value.replenishmentApproval ?? {
+              separateSend: false,
+              threshold: null,
+            },
+          ),
         ],
       );
     },

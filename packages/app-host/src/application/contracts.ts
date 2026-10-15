@@ -73,6 +73,8 @@ export type { WorkspaceApp } from '../domain/installation.js';
  * responses still go through the app's own review, which checks the exact proposal again.
  */
 export interface AppDecision {
+  /** A trusted workflow will continue this action after approval. */
+  automatic?: boolean | undefined;
   /** Bound proposal reference for the shared action diff; it never grants execution. */
   actionReference?: { proposalId: string };
   /** Writes are withheld by workspace or connection owner controls. */

@@ -76,6 +76,15 @@ export interface SyncStream {
   liveDueAt?: string | null;
   /** Earliest read time allowed by the connection’s shared provider budget. */
   providerDueAt?: string | null;
+  /** Current page lease and the capacity limits used when the scheduler admitted it. */
+  leaseUntil?: string | null;
+  leaseWorkspaceConcurrency?: number | null;
+  leaseConnectionConcurrency?: number | null;
+  /** Last admission deferral; valid only until its due time or the next claim. */
+  admissionWait?: {
+    reason: 'request_capacity' | 'admission_unavailable';
+    observedAt: string;
+  } | null;
   fullRequested: boolean;
   /** Start of the last completed scan; the next incremental read starts shortly before it. */
   watermark: string | null;
@@ -263,6 +272,7 @@ export function streamStatus(
     'paused' | 'blocked' | 'error' | 'attempts' | 'phase' | 'scan'
   >,
   waitingOnOrders = false,
+  waiting = false,
 ): StreamStatus {
   if (stream.paused) return 'paused';
   if (stream.blocked) return 'blocked';
@@ -270,6 +280,7 @@ export function streamStatus(
     return stream.attempts >= syncPolicy.failingAfterAttempts
       ? 'failing'
       : 'retrying';
+  if (waiting) return 'waiting';
   if (stream.scan?.kind === 'incremental') return 'syncing';
   if (stream.phase === 'backfill')
     return waitingOnOrders && !stream.scan ? 'waiting' : 'importing';

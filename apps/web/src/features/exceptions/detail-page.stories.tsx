@@ -205,7 +205,7 @@ export const FullPage: Story = {
       'History',
       'Evidence',
       'Proposed change',
-      'Issue details',
+      'Technical details',
     ]) {
       const card = canvas.getByRole('region', { name: title });
       await expect(card).toHaveClass('issue-section-card');
@@ -218,7 +218,7 @@ export const FullPage: Story = {
     ).not.toBeNull();
     await expect(
       canvas
-        .getByRole('region', { name: 'Issue details' })
+        .getByRole('region', { name: 'Technical details' })
         .closest('.issue-page-main'),
     ).not.toBeNull();
 
@@ -303,16 +303,16 @@ export const SectionNavigation: Story = {
       await userEvent.click(picker);
       await userEvent.click(
         await within(document.body).findByRole('option', {
-          name: 'Issue details',
+          name: 'Technical details',
         }),
       );
-      await expect(picker).toHaveTextContent('Issue details');
+      await expect(picker).toHaveTextContent('Technical details');
     } else {
       await userEvent.click(
-        canvas.getByRole('button', { name: 'Issue details' }),
+        canvas.getByRole('button', { name: 'Technical details' }),
       );
       await expect(
-        canvas.getByRole('button', { name: 'Issue details' }),
+        canvas.getByRole('button', { name: 'Technical details' }),
       ).toHaveAttribute('aria-current', 'location');
     }
     await expect(scroll.scrollTop).toBeGreaterThan(0);

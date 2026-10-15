@@ -607,7 +607,7 @@
   "procurement_timeline_purchasing_system": "Purchasing system",
   "procurement_timeline_email": "Email",
   "procurement_timeline_inventory": "Stock owner",
-  "procurement_timeline_actor": "Person: {actor}",
+  "procurement_timeline_actor": "Recorded by: {actor}",
   "procurement_timeline_evidence": "Evidence ({count})",
   "procurement_list_view_all": "All purchase orders",
   "procurement_list_view_all_suppliers": "All suppliers",

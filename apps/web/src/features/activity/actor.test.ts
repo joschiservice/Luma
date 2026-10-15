@@ -10,7 +10,7 @@ const ada = {
 };
 
 it('names people, former members, Luma and services instead of IDs', () => {
-  expect(actorLabel(ada)).toBe('Ada Lovelace');
+  expect(actorLabel(ada)).toBe('Ada Lovelace · ada@example.test');
   expect(actorLabel(ada, { email: true })).toBe(
     'Ada Lovelace · ada@example.test',
   );
@@ -19,7 +19,9 @@ it('names people, former members, Luma and services instead of IDs', () => {
       ...ada,
       workflow: { id: 'replenish', name: 'Replenish low stock' },
     }),
-  ).toBe('Ada Lovelace via Replenish low stock');
+  ).toBe(
+    'Luma, via Replenish low stock (runs as Ada Lovelace · ada@example.test)',
+  );
   expect(actorLabel({ ...ada, kind: 'former_member', email: null })).toBe(
     'Ada Lovelace (former member)',
   );
@@ -34,11 +36,11 @@ it('names people, former members, Luma and services instead of IDs', () => {
 });
 
 it('treats a person missing from the listed people as a former member', () => {
-  expect(personLabel([ada], 'user-1')).toBe('Ada Lovelace');
+  expect(personLabel([ada], 'user-1')).toBe('Ada Lovelace · ada@example.test');
   expect(personLabel([ada], 'user-2')).toBe('Former member');
 });
 
 it('names authors that are people and keeps authors that are names already', () => {
-  expect(authorLabel([ada], 'user-1')).toBe('Ada Lovelace');
+  expect(authorLabel([ada], 'user-1')).toBe('Ada Lovelace · ada@example.test');
   expect(authorLabel([ada], 'Luma')).toBe('Luma');
 });

@@ -49,7 +49,8 @@ export interface PolicyDecision {
     | 'stale_intent'
     | 'approval_required'
     | 'approval_rejected'
-    | 'scoped_autonomy';
+    | 'scoped_autonomy'
+    | 'covered_approval';
   /** Trusted bounded-delegation facts; never provided by the caller or a model. */
   autonomy?: AutonomyAdmission;
   autonomyBlock?: AutonomyBlock;

@@ -237,7 +237,12 @@ function PurchaseOrderRecordView({
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const client = useQueryClient();
   const invalidate = () =>
-    client.invalidateQueries({ queryKey: procurementKey(organizationId) });
+    Promise.all([
+      client.invalidateQueries({ queryKey: procurementKey(organizationId) }),
+      client.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId, 'decisions'],
+      }),
+    ]);
   const sync = useMutation({
     mutationFn: () => refreshPurchaseOrder(organizationId, record!.order.id),
     onSuccess: invalidate,
@@ -552,7 +557,12 @@ function NextStep({
   const { progress, submission, readiness, canManage, order } = record;
   const client = useQueryClient();
   const invalidate = () =>
-    client.invalidateQueries({ queryKey: procurementKey(organizationId) });
+    Promise.all([
+      client.invalidateQueries({ queryKey: procurementKey(organizationId) }),
+      client.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId, 'decisions'],
+      }),
+    ]);
   const decide = useMutation({
     mutationFn: (outcome: 'approved' | 'rejected') =>
       decideSubmission(organizationId, submission!.id, {
@@ -1184,7 +1194,12 @@ function Message({
   } | null>(null);
   const client = useQueryClient();
   const invalidate = () =>
-    client.invalidateQueries({ queryKey: procurementKey(organizationId) });
+    Promise.all([
+      client.invalidateQueries({ queryKey: procurementKey(organizationId) }),
+      client.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId, 'decisions'],
+      }),
+    ]);
   const review = useMutation({
     mutationFn: (input: {
       id: string;

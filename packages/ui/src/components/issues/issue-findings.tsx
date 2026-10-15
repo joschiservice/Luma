@@ -6,6 +6,7 @@ import type {
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 
+import { operatorCodeLabel } from '../../lib/operator-code';
 import { Disclosure } from '../primitives/disclosure';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import { freshnessLabel, quantityLabel, unitLabel } from './case-presentation';
@@ -32,7 +33,7 @@ function sourceLabel(provider: string | null | undefined) {
 /** Names where a piece of evidence came from, such as “Shopify · Inventory”, or Luma’s own record. */
 export function evidenceSourceLabel(entry: Pick<Evidence, 'source'>) {
   return entry.source
-    ? `${entry.source.provider} · ${entry.source.resource}`
+    ? `${sourceLabel(entry.source.provider)} · ${operatorCodeLabel(entry.source.resource)}`
     : m.issues_evidence_luma_record();
 }
 

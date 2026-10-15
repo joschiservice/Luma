@@ -5,12 +5,26 @@ export interface WorkspaceSettings {
   slug: string;
   dataRegion: string;
   timezone: string;
+  detection?:
+    | {
+        inventoryTolerance: string;
+        propagationSeconds: number;
+        oversellPropagationSeconds: number;
+        stuckSeconds: number;
+      }
+    | undefined;
   revision: number;
   alwaysRequireApproval: boolean;
   /** Team preference; the rule is off while fewer than two members have access. */
   requireIndependentApproval: boolean;
   activeMemberCount: number;
   policyRevision: number;
+  replenishmentApproval?:
+    | {
+        separateSend: boolean;
+        threshold: { amount: string; currency: string } | null;
+      }
+    | undefined;
   writeMode: 'observe_only' | 'writes_enabled';
 }
 

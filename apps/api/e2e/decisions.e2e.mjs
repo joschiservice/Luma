@@ -173,6 +173,25 @@ it('lists replenishment approvals in Needs you and follows decisions made on the
     { status: 404 },
   );
   await f.waitFor(run.id, 'verified');
+  const archived = await f.pilot.app.inject({
+    url: `${organization}/decisions/${encodeURIComponent(id)}`,
+    headers: { cookie: f.approverCookie },
+  });
+  expect(archived.statusCode, archived.body).toBe(200);
+  expect(archived.json()).toMatchObject({
+    response: 'view_only',
+    assignment: null,
+    outcome: {
+      state: 'approved',
+      next: 'verified',
+      actorEmail: 'pilot-requester@example.test',
+    },
+  });
+  const inaccessible = await f.pilot.app.inject({
+    url: `/v1/organizations/${randomUUID()}/decisions/${encodeURIComponent(id)}`,
+    headers: { cookie: f.ownerCookie },
+  });
+  expect([403, 404]).toContain(inaccessible.statusCode);
 });
 
 it('projects a case approval for each reader and drops it once the case desk decides', async (t) => {

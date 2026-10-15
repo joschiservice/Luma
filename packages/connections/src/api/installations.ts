@@ -7,6 +7,7 @@ import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
+import type { CoverageReader } from '../application/coverage.js';
 import type { InstallationService } from '../application/installations.js';
 
 type ConnectionManagement = Omit<
@@ -23,6 +24,7 @@ export function connectionRoutes(
   internalOrdersEnabled: (
     context: TenantContext,
   ) => Promise<boolean> = async () => false,
+  coverage?: CoverageReader,
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
@@ -61,11 +63,19 @@ export function connectionRoutes(
       const { service, context } = use(request);
 
       const enabled = await internalOrdersEnabled(context);
+      const health = new Map(
+        ((await coverage?.(context, new Date().toISOString())) ?? []).map(
+          (item) => [item.id, item],
+        ),
+      );
 
       return {
         items: (await service.list(context))
           .filter((connection) => connection.provider !== 'luma-erp' || enabled)
-          .map(summary),
+          .map((connection) => ({
+            ...summary(connection),
+            coverage: health.get(connection.id),
+          })),
       };
     }),
     install: os.install.handler(

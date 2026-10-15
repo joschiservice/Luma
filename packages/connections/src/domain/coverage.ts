@@ -3,6 +3,19 @@ import type { InstalledConnection } from './installation.js';
 export interface ConnectionCoverage {
   /** Next freshness boundary for the observed capabilities, when available. */
   nextRefreshAt?: string | null;
+  health?:
+    | 'healthy'
+    | 'delayed'
+    | 'failing'
+    | 'access_lost'
+    | 'importing'
+    | 'disconnected';
+  streams?: {
+    recordType: string;
+    lastSuccessfulAt: string | null;
+    lastError: string | null;
+    issueIds: string[];
+  }[];
   id: string;
   label: string;
   status: InstalledConnection['status'];
@@ -56,6 +69,18 @@ export function summarizeConnectionCoverage(
   }
 
   return {
+    health:
+      connection.status === 'revoked'
+        ? 'access_lost'
+        : connection.status === 'disconnected'
+          ? 'disconnected'
+          : connection.status === 'degraded'
+            ? 'failing'
+            : freshness === 'stale'
+              ? 'delayed'
+              : missing || connection.status === 'pending'
+                ? 'importing'
+                : 'healthy',
     nextRefreshAt: times.some(
       (time) => time + freshnessWindowMs + 1 > Date.parse(asOf),
     )

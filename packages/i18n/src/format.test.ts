@@ -29,6 +29,8 @@ describe('formatting', () => {
     expect(formatExactQuantity('999999999999999999.123456')).toBe(
       '999,999,999,999,999,999.123456',
     );
+    expect(formatExactQuantity('2.000000')).toBe('2');
+    expect(formatExactQuantity('2.125000')).toBe('2.125');
     expect(formatExactQuantity('-0.125001')).toBe('-0.125001');
     overwriteGetLocale(() => 'de');
     expect(formatExactQuantity('999999999999999999.123456')).toBe(

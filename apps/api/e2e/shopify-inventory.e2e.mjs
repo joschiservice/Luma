@@ -109,6 +109,37 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   assert.equal(verified.state, 'verified');
   assert.equal(await decision(f.owner), undefined);
   assert.equal(mutations.length, 1);
+  const answered = await f.request(
+    admin,
+    `${f.base}/decisions/${encodeURIComponent(pending.id)}`,
+  );
+  assert.equal(answered.response, 'view_only');
+  assert.equal(answered.outcome.state, 'approved');
+  assert.equal(answered.outcome.next, 'verified');
+  assert.equal(answered.outcome.actorEmail, admin.email);
+  assert.equal(answered.record.id, target.positionId);
+  assert.equal(
+    await f.request(
+      f.member,
+      `${f.base}/decisions/${encodeURIComponent(pending.id)}`,
+    ),
+    null,
+  );
+  await f.request(
+    f.outsider,
+    `${f.base}/decisions/${encodeURIComponent(pending.id)}`,
+    'GET',
+    undefined,
+    404,
+  );
+  const wrongConnection = `shopify:inventory_correction:${target.positionId}:${randomUUID()}`;
+  assert.equal(
+    await f.request(
+      admin,
+      `${f.base}/decisions/${encodeURIComponent(wrongConnection)}`,
+    ),
+    null,
+  );
   const stockDetail = await f.request(
     f.owner,
     `${f.base}/inventory/${target.positionId}`,
@@ -446,3 +477,36 @@ test.for(['solo', 'team preference'])(
     assert.ok(approval.policyVersion.endsWith(':self-approval'));
   },
 );
+
+test('changed detection limits require a fresh stock correction review before dispatch', async (t) => {
+  const { f, admin, call, target, mutations } = await correctionFixture(t);
+  const preview = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  const { workspace } = await f.request(f.owner, `${f.base}/settings`);
+  await f.request(
+    f.owner,
+    `${f.base}/settings/workspace`,
+    'PATCH',
+    f.command({
+      revision: workspace.revision,
+      name: workspace.name,
+      timezone: workspace.timezone,
+      detection: { ...workspace.detection, inventoryTolerance: '2' },
+    }),
+  );
+  assert.equal(
+    (await call(f.owner, 'check', { id: preview.id })).state,
+    'denied',
+  );
+  await call(f.owner, 'execute', { id: preview.id }, 409);
+  assert.equal(mutations.length, 0);
+  const refreshed = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  assert.notEqual(refreshed.id, preview.id);
+  assert.equal(refreshed.state, 'approval_required');
+});

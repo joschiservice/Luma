@@ -1,7 +1,7 @@
 {
   "inventory_page_title": "Inventory",
   "inventory_state_differs": "Differs by source",
-  "inventory_state_syncing": "Syncing",
+  "inventory_state_syncing": "Possible mismatch — confirming",
   "inventory_state_removed": "Removed at source",
   "inventory_state_incomplete": "Incomplete stock",
   "inventory_state_agree": "Reported quantities agree",
@@ -45,7 +45,7 @@
   "inventory_explanation_differs": "Same position. Different source quantities.",
   "inventory_explanation_agree": "What each source reports for this position",
   "inventory_explanation_differs_body": "Sources disagree on {fields} stock. Compare read times and availability methods before deciding which quantity to trust.",
-  "inventory_explanation_syncing": "Same position. Waiting for sync.",
+  "inventory_explanation_syncing": "Possible stock mismatch",
   "inventory_explanation_syncing_body": "Sources disagree on {fields} stock. Luma first saw the gap at {since} and expects the sync between the sources to close it. If it is still open at {until}, Luma raises an issue.",
   "inventory_explanation_agree_body": "Only reported quantities are compared. Agreement doesn’t confirm a fresh read or make any source the authority.",
   "inventory_explanation_separate": "Quantities are shown per source and never added together. Refresh shows Luma’s latest readings; it doesn’t read the sources again.",
@@ -267,5 +267,6 @@
   "inventory_transfer_pagination_label": "Transfer pages",
   "inventory_transfer_unavailable_record": "This record isn’t available. It may have been removed, or your role can’t read it.",
   "inventory_transfer_load_failed": "Luma couldn’t load this record.",
-  "inventory_transfer_refresh_failed": "Luma couldn’t refresh this record. The details below may be out of date."
+  "inventory_transfer_refresh_failed": "Luma couldn’t refresh this record. The details below may be out of date.",
+  "inventory_confirming_until": "Possible mismatch — confirming until {time}"
 }

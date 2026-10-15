@@ -33,7 +33,7 @@ export function IssueContext({
         {!compact ? (
           <>
             <span aria-hidden="true">·</span>
-            <strong title={item.subject.id}>{item.subject.id}</strong>
+            <strong>{item.subject.label ?? m.common_not_reported()}</strong>
           </>
         ) : null}
       </div>

@@ -3,6 +3,7 @@ import { m } from '@luma/i18n/messages';
 import type { ReactNode } from 'react';
 
 import { personLabel } from '../../lib/actor';
+import { operatorCodeLabel } from '../../lib/operator-code';
 import { Disclosure } from '../primitives/disclosure';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import { ActionDiff } from './action-diff';
@@ -47,7 +48,7 @@ export function CaseWorkflowHistory({
               {action.diff ? (
                 <ActionDiff diff={action.diff} />
               ) : (
-                <p>{action.capability}</p>
+                <p>{operatorCodeLabel(action.capability)}</p>
               )}
               {action.approval ? (
                 <p>

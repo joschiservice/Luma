@@ -156,5 +156,5 @@ final results, and outbox roles may update only delivery timestamps. Append-only
 cryptographic tamper-proofing: migration and retention credentials stay privileged. The
 safety login must be a non-owner, non-superuser role without `BYPASSRLS` (see
 [database roles](development.md#database-roles)), and the process must run in the
-tenant's EU placement. See [module ownership](architecture/001-module-boundaries.md) and
+tenant's configured region. See [module ownership](architecture/001-module-boundaries.md) and
 [tenant isolation](architecture/003-tenant-isolation-and-data-residency.md).

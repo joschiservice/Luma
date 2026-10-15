@@ -9,6 +9,8 @@ interface Thresholds {
    * source of an order must keep showing a line quantity difference before it opens a case.
    */
   propagationSeconds: number;
+  /** Short confirmation window for storefront overstatement; zero alerts immediately. */
+  oversellPropagationSeconds?: number | undefined;
   /**
    * Storefront overstatement, in percent of the authority's available stock, that is raised at
    * once instead of waiting for sync.
@@ -158,7 +160,7 @@ export type Decision =
   | { decision: 'clear' | 'defer' | 'reject'; severity: null; reason: string };
 
 export const defaultConfiguration: Configuration = {
-  version: 'v0.2',
+  version: 'v0.3',
   ruleVersion: 'v0.2',
   inventoryTolerance: '0',
   thresholds: {
@@ -168,6 +170,7 @@ export const defaultConfiguration: Configuration = {
     stuckSeconds: 7200,
     uncertaintySeconds: 1800,
     propagationSeconds: 1800,
+    oversellPropagationSeconds: 120,
     oversellGuardPercent: 25,
   },
 };
@@ -188,4 +191,22 @@ export function decimalString(value: bigint): string {
   const magnitude = value < 0n ? -value : value;
 
   return `${value < 0n ? '-' : ''}${magnitude / 1_000_000n}.${String(magnitude % 1_000_000n).padStart(6, '0')}`;
+}
+
+/** Selects the confirmation window from the direction of a comparable stock difference. */
+export function inventoryPropagationSeconds(
+  facts: Facts<'inventory_mismatch'>,
+  thresholds: Configuration['thresholds'],
+) {
+  const difference =
+    decimalUnits(facts.leftAvailable ?? '0') -
+    decimalUnits(facts.rightAvailable ?? '0');
+  const oversell =
+    facts.authority !== null &&
+    facts.authority !== facts.sellingSource &&
+    (facts.sellingSource === 'left' ? difference > 0n : difference < 0n);
+
+  return oversell
+    ? (thresholds.oversellPropagationSeconds ?? thresholds.propagationSeconds)
+    : thresholds.propagationSeconds;
 }

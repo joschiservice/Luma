@@ -65,9 +65,10 @@ export async function syncFixture(t, origin = 'http://localhost:3000') {
   const stream = randomUUID();
   await f.db.owner.query(
     `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,scan,scan_id,
-      scan_started_at,scan_pages,scan_records,scan_total,due_at,history_from,history_requirement,current_history_limited)
-    VALUES($1,$2,$3,'orders',$4,'backfill','backfill',$5,now(),2,50,120,now(),now()-interval '60 days','read_all_orders',true)`,
-    [f.org.id, stream, store, f.owner.id, randomUUID()],
+      scan_started_at,scan_pages,scan_records,scan_total,due_at,history_from,history_requirement,current_history_limited,
+      lease_token,lease_until,lease_workspace_concurrency,lease_connection_concurrency)
+    VALUES($1,$2,$3,'orders',$4,'backfill','backfill',$5,now(),2,50,120,now(),now()-interval '60 days','read_all_orders',true,$6,now()+interval '5 minutes',4,2)`,
+    [f.org.id, stream, store, f.owner.id, randomUUID(), randomUUID()],
   );
   await f.db.owner.query(
     `INSERT INTO commerce_sync_items(tenant_id,connection_id,record_type,resource,scope_key,external_id,digest,status,

@@ -17,6 +17,15 @@ it('retains supplier cost and lead time with the proposal and draft even when te
       featureFlagOverrides: { 'supplier-purchasing-terms': true },
     }),
   });
+  await f.pilot.commitments.linkSupplier(f.actor, f.supplier.id, {
+    expectedRevision: 1,
+    link: {
+      connectionId: f.manifest.connections.jtl,
+      externalId: '1',
+      scopeKey: '',
+    },
+    confirmationHours: 48,
+  });
   const skuId = (
     await f.db.owner.query(
       'SELECT s.sku_id FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3',
@@ -79,6 +88,44 @@ it('retains supplier cost and lead time with the proposal and draft even when te
     currency: 'AUD',
   });
   expect(order.value).toEqual({ amount: '625', currency: 'AUD' });
+  const request = {
+    id: randomUUID(),
+    requestedDeliveryDate: new Date(Date.now() + 86400000)
+      .toISOString()
+      .slice(0, 10),
+  };
+  const sent = await f.pilot.commitments.requestSubmission(
+    f.actor,
+    order.order.id,
+    request,
+  );
+  expect(sent.state).toBe('submitted');
+  expect(
+    (
+      await f.pilot.commitments.requestSubmission(
+        f.actor,
+        order.order.id,
+        request,
+      )
+    ).id,
+  ).toBe(sent.id);
+  const policy = (
+    await f.db.owner.query(
+      'SELECT document FROM policy_decisions WHERE tenant_id=$1 AND id=$2',
+      [f.manifest.organizationId, sent.decisionId],
+    )
+  ).rows[0].document;
+  expect(policy).toMatchObject({
+    outcome: 'allowed',
+    reason: 'covered_approval',
+  });
+  const count = (
+    await f.db.owner.query(
+      'SELECT count(*)::int AS n FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=ANY($2::uuid[])',
+      [f.manifest.organizationId, [order.order.origin.actionId, sent.actionId]],
+    )
+  ).rows[0].n;
+  expect(count).toBe(1);
 });
 
 it('replenishes through Temporal, policy, procurement and verification without an exception', async (t) => {
@@ -138,6 +185,21 @@ it('replenishes through Temporal, policy, procurement and verification without a
     decision: { outcome: 'approved' },
     canRespond: false,
   });
+  const answered = await f.pilot.app.inject({
+    method: 'GET',
+    url: `/v1/organizations/${f.manifest.organizationId}/decisions/${encodeURIComponent(`replenishment:${run.id}`)}`,
+    headers: { cookie: f.approverCookie },
+  });
+  expect(answered.statusCode, answered.body).toBe(200);
+  expect(answered.json().outcome).toMatchObject({
+    state: 'approved',
+    next: 'verified',
+    purchaseOrderId: order.id,
+    workflow: true,
+  });
+  expect(answered.json().outcome.actorEmail).toBe(
+    'pilot-requester@example.test',
+  );
   const activity = await f.pilot.app.inject({
     method: 'GET',
     url: `/v1/organizations/${f.manifest.organizationId}/activity?from=${new Date(Date.now() - 86400000).toISOString()}&to=${new Date(Date.now() + 86400000).toISOString()}&q=${run.id}`,
@@ -162,6 +224,14 @@ it('replenishes through Temporal, policy, procurement and verification without a
   expect(
     (await f.pilot.procurement.detail(f.actor, order.id)).history,
   ).toHaveLength(1);
+  const timeline = await f.pilot.commitments.order(f.actor, order.id);
+  expect(
+    timeline.timeline.entries.find((entry) => entry.detail === 'created').actor,
+  ).toMatchObject({
+    kind: 'member',
+    email: 'pilot-operator@example.test',
+    workflow: { id: run.id, name: 'Replenish low stock' },
+  });
   expect((await f.request('/replenishment/starts', start)).id).toBe(run.id);
   expect((await f.pilot.procurement.orders(f.actor)).items).toHaveLength(1);
   expect((await f.pilot.detection.exceptions.list(f.actor)).length).toBe(

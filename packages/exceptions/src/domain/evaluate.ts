@@ -4,7 +4,7 @@ import type {
   EvaluationInput,
   Facts,
 } from './facts.js';
-import { decimalUnits } from './facts.js';
+import { decimalUnits, inventoryPropagationSeconds } from './facts.js';
 
 const result = (
   decision: 'clear' | 'defer' | 'reject',
@@ -162,7 +162,8 @@ export function evaluate(
       if (
         f.mismatchSince &&
         age(f.mismatchSince) >= 0 &&
-        age(f.mismatchSince) <= t.propagationSeconds &&
+        inventoryPropagationSeconds(f, t) > 0 &&
+        age(f.mismatchSince) <= inventoryPropagationSeconds(f, t) &&
         !(oversell && guarded(f, difference, t.oversellGuardPercent))
       )
         return result('defer', 'propagation_pending');

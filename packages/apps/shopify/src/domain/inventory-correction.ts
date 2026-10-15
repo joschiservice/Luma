@@ -171,6 +171,7 @@ export const correctionPreviewInput = correctionTarget
   .strict();
 
 export const correctionView = z.object({
+  workflowRunId: z.string().optional(),
   observeOnly: z.boolean().optional(),
   id: z.string().uuid(),
   target: correctionTarget,

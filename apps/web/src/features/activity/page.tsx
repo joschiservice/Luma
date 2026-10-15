@@ -27,6 +27,10 @@ import {
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { actorLabel } from '@luma/ui/lib/actor';
 import { calendarPresets } from '@luma/ui/lib/date-range';
+import {
+  operatorCodeLabel,
+  operatorCodeMessages,
+} from '@luma/ui/lib/operator-code';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
@@ -227,7 +231,9 @@ export function ActivityPage() {
       }))}
       people={members.data?.map((member) => ({
         id: member.userId,
-        label: member.name || member.email || m.activity_actor_unknown_person(),
+        label:
+          [member.name, member.email].filter(Boolean).join(' · ') ||
+          m.activity_actor_unknown_person(),
       }))}
       views={
         <CollectionViewBar
@@ -706,7 +712,13 @@ function ActivityRow({
             {item.type === 'procurement' ? (
               <>
                 <dt>{m.activity_detail_reason()}</dt>
-                <dd>{item.summary ?? m.activity_not_recorded()}</dd>
+                <dd>
+                  {item.summary
+                    ? operatorCodeMessages[item.summary]
+                      ? operatorCodeLabel(item.summary)
+                      : item.summary
+                    : m.activity_not_recorded()}
+                </dd>
                 <dt>{m.activity_detail_purchase_order()}</dt>
                 <dd>{item.proposalId ?? m.common_none()}</dd>
               </>

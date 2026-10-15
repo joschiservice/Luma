@@ -23,6 +23,10 @@ import {
 import type { ReactNode } from 'react';
 
 import { actorLabel, personLabel } from '../../lib/actor';
+import {
+  operatorCodeLabel,
+  operatorCodeMessages,
+} from '../../lib/operator-code';
 import { Disclosure } from '../primitives/disclosure';
 import { RefreshButton } from '../primitives/refresh-button';
 import { WorkspaceDate } from '../primitives/workspace-date';
@@ -418,13 +422,7 @@ export function CaseTimeline({
                 })}
               </dd>
               <dt>{m.issues_execution_change_label()}</dt>
-              <dd>
-                {caseLabel(
-                  boundProposal.capability
-                    .replaceAll('.', ' ')
-                    .replace(/([a-z])([A-Z])/g, '$1 $2'),
-                )}
-              </dd>
+              <dd>{operatorCodeLabel(boundProposal.capability)}</dd>
               <dt>{m.issues_criteria_connection()}</dt>
               <dd>{boundProposal.connectionId}</dd>
               <dt>{m.issues_criteria_target()}</dt>
@@ -561,17 +559,36 @@ export function CaseTimeline({
                   : m.issues_resolution_meta,
                 {
                   time: <CaseTime value={progress.resolution.at} />,
-                  actor: personLabel(
-                    progress.people,
-                    progress.resolution.actorId,
-                  ),
+                  actor: progress.resolution.automation
+                    ? actorLabel({
+                        ...(progress.people.find(
+                          (person) =>
+                            person.id === progress.resolution!.actorId,
+                        ) ?? {
+                          kind: 'former_member',
+                          id: progress.resolution.actorId,
+                          name: null,
+                          email: null,
+                        }),
+                        workflow: progress.resolution.automation,
+                      })
+                    : personLabel(progress.people, progress.resolution.actorId),
                 },
               )}
             </p>
             {progress.resolution.reason ? (
-              <p>{progress.resolution.reason}</p>
+              <p>
+                {operatorCodeMessages[progress.resolution.reason]
+                  ? operatorCodeLabel(progress.resolution.reason)
+                  : progress.resolution.reason}
+              </p>
             ) : null}
-            <References refs={progress.resolution.evidenceRefs} />
+            {progress.resolution.evidenceRefs.length ? (
+              <Disclosure className="case-evidence">
+                <summary>{m.issues_findings_technical()}</summary>
+                <References refs={progress.resolution.evidenceRefs} />
+              </Disclosure>
+            ) : null}
           </div>
         ) : !expanded ? (
           <p className="case-caption">{m.issues_resolution_open()}</p>
@@ -697,7 +714,13 @@ export function CaseTimeline({
                         {eventOutcomeLabel(event.outcome)}
                       </p>
                     ) : null}
-                    {event.reason ? <p>{event.reason}</p> : null}
+                    {event.reason ? (
+                      <p>
+                        {operatorCodeMessages[event.reason]
+                          ? operatorCodeLabel(event.reason)
+                          : event.reason}
+                      </p>
+                    ) : null}
                     {event.actor.kind !== 'unrecorded' ? (
                       <p className="case-caption audit-actor">
                         {m.issues_history_by({

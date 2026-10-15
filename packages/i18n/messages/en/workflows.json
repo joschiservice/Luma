@@ -554,5 +554,6 @@
   "workflows_review_terms_recorded": "Supplier terms recorded at",
   "workflows_review_demand_recorded": "Demand evidence read at",
   "workflows_review_context_recorded": "Review facts recorded at",
-  "workflows_review_context_note": "Cover is an estimate based on recorded sales, not a demand forecast. Proposed receipt is not confirmed incoming stock. Stock, existing orders and permission are checked again before the draft is created."
+  "workflows_review_context_note": "Cover is an estimate based on recorded sales, not a demand forecast. Proposed receipt is not confirmed incoming stock. Stock, existing orders and permission are checked again before the draft is created. Nothing is sent now. Under the workspace rules, this approval can also cover sending the unchanged draft to the reviewed supplier connection before the approval expires. The requester chooses the delivery date when sending.",
+  "workflows_review_allowed": "Allowed"
 }

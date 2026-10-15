@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 
+import { operatorCodeLabel } from '../../lib/operator-code';
 import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
@@ -163,7 +164,7 @@ export function ResolutionReview({
               <CardHeader className="resolution-proposal-heading">
                 <h4>
                   <ArrowRightLeft size={16} aria-hidden="true" />
-                  {fieldLabel(proposal.capability)}
+                  {operatorCodeLabel(proposal.capability)}
                 </h4>
                 <Badge tone={proposal.risk === 'low' ? 'neutral' : 'warning'}>
                   {risks[proposal.risk]()}
@@ -177,12 +178,24 @@ export function ResolutionReview({
               </p>
               <dl className="resolution-facts">
                 <dt>{m.issues_review_target_system()}</dt>
-                <dd>{connectionLabel ?? proposal.connectionId}</dd>
+                <dd>{connectionLabel ?? m.common_not_reported()}</dd>
                 <dt>{m.issues_review_target_record()}</dt>
                 <dd>
-                  {recordKindLabel(proposal.target.kind)} · {proposal.target.id}
+                  {recordKindLabel(proposal.target.kind)}
+                  {!/^[0-9a-f-]{36}$/i.test(proposal.target.id)
+                    ? ` · ${proposal.target.id}`
+                    : null}
                 </dd>
               </dl>
+              <Disclosure>
+                <summary>{m.issues_findings_technical()}</summary>
+                <dl>
+                  <dt>{m.issues_criteria_connection()}</dt>
+                  <dd>{proposal.connectionId}</dd>
+                  <dt>{m.issues_criteria_target()}</dt>
+                  <dd>{proposal.target.id}</dd>
+                </dl>
+              </Disclosure>
             </Card>
             <div className="resolution-change-group">
               <Card as="div" className="resolution-change-card">

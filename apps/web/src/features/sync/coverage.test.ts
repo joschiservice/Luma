@@ -106,3 +106,14 @@ describe('coverageItems', () => {
     ).toBe(true);
   });
 });
+
+it('distinguishes automatic waits from sources needing attention', () => {
+  const waiting = [
+    item({ state: 'waiting', problem: 'Waiting for request capacity.' }),
+    item({ state: 'waiting', problem: 'Waiting for the next sync pass.' }),
+  ];
+  const summary = coverageSummary(waiting, now);
+  expect(summary.state).toBe('waiting');
+  expect(summary.text).toContain('2 of 2 sources are waiting');
+  expect(summary.text).not.toContain('need attention');
+});

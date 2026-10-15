@@ -273,6 +273,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         revision: number;
         name: string;
         timezone: string;
+        detection?: WorkspaceSettings['detection'];
       },
     ) {
       return command(
@@ -288,6 +289,7 @@ export function createSettingsService(deps: SettingsDependencies) {
             ...before,
             name: input.name,
             timezone: input.timezone,
+            detection: input.detection ?? before.detection,
             revision: before.revision + 1,
           };
           await tx.saveWorkspace(after);
@@ -295,8 +297,16 @@ export function createSettingsService(deps: SettingsDependencies) {
             context.actor.id,
             'workspace.updated',
             context.tenantId,
-            { name: before.name, timezone: before.timezone },
-            { name: after.name, timezone: after.timezone },
+            {
+              name: before.name,
+              timezone: before.timezone,
+              detection: before.detection,
+            },
+            {
+              name: after.name,
+              timezone: after.timezone,
+              detection: after.detection,
+            },
           );
 
           return tx.snapshot(context.actor.id);
@@ -350,6 +360,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         commandId: string;
         revision: number;
         alwaysRequireApproval: boolean;
+        replenishmentApproval?: WorkspaceSettings['replenishmentApproval'];
         requireIndependentApproval?: boolean | undefined;
       },
     ) {
@@ -367,13 +378,18 @@ export function createSettingsService(deps: SettingsDependencies) {
             before.requireIndependentApproval;
           if (
             before.alwaysRequireApproval !== input.alwaysRequireApproval ||
-            before.requireIndependentApproval !== independent
+            before.requireIndependentApproval !== independent ||
+            (input.replenishmentApproval !== undefined &&
+              JSON.stringify(input.replenishmentApproval) !==
+                JSON.stringify(before.replenishmentApproval))
           ) {
             const after = {
               ...before,
               alwaysRequireApproval: input.alwaysRequireApproval,
               requireIndependentApproval: independent,
               policyRevision: before.policyRevision + 1,
+              replenishmentApproval:
+                input.replenishmentApproval ?? before.replenishmentApproval,
             };
             await tx.saveWorkspace(after);
             await tx.audit(
@@ -384,11 +400,13 @@ export function createSettingsService(deps: SettingsDependencies) {
                 required: before.alwaysRequireApproval,
                 requireIndependentApproval: before.requireIndependentApproval,
                 version: before.policyRevision,
+                replenishmentApproval: before.replenishmentApproval,
               },
               {
                 required: after.alwaysRequireApproval,
                 requireIndependentApproval: after.requireIndependentApproval,
                 version: after.policyRevision,
+                replenishmentApproval: after.replenishmentApproval,
               },
             );
           }

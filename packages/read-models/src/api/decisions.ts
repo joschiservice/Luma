@@ -27,6 +27,18 @@ export function decisionRoutes(
   const os = implement(apiContract.decisions).$context<HttpContext>();
 
   return os.router({
+    get: os.get.handler(async ({ context: { request }, input: { params } }) => {
+      if (!request.tenantContext)
+        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!queue)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Needs you is unavailable',
+        );
+
+      return queue.find(request.tenantContext, params.decisionId);
+    }),
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)

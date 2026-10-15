@@ -7,6 +7,7 @@ import {
   StatePill,
 } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { actorLabel } from '@luma/ui/lib/actor';
 
 import { commitmentKinds, statusLabels } from './presentation';
 
@@ -111,7 +112,11 @@ export function PurchasingTimeline({
                 {entry.reason ? <p>{entry.reason}</p> : null}
                 {entry.actorId ? (
                   <small>
-                    {m.procurement_timeline_actor({ actor: entry.actorId })}
+                    {m.procurement_timeline_actor({
+                      actor: entry.actor
+                        ? actorLabel(entry.actor)
+                        : m.common_actor_not_recorded(),
+                    })}
                   </small>
                 ) : null}
                 {entry.evidenceRefs.length ? (

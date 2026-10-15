@@ -101,6 +101,7 @@ export function OwnerReview({
           organizationId={organizationId}
           definitionId={owner.definitionId}
           runId={owner.runId}
+          onChange={onChange}
         />
       );
     case 'app_fulfillment':
@@ -204,10 +205,12 @@ function RunReview({
   organizationId,
   definitionId,
   runId,
+  onChange,
 }: {
   organizationId: string;
   definitionId: string;
   runId: string;
+  onChange: () => Promise<void>;
 }) {
   const runs = useQuery({
     ...workflowRunsOptions(organizationId, definitionId),
@@ -232,5 +235,11 @@ function RunReview({
       </p>
     );
 
-  return <ReplenishmentRunReview organizationId={organizationId} run={run} />;
+  return (
+    <ReplenishmentRunReview
+      organizationId={organizationId}
+      run={run}
+      onChange={onChange}
+    />
+  );
 }

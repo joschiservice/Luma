@@ -701,10 +701,11 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     expect(await byActor([people.ada])).toEqual([events.workflow, events.ada]);
     expect(await byActor([people.ben])).toEqual([events.access, events.ben]);
     expect(await byActor([people.dora])).toEqual([events.dora]);
-    expect(await byActor(['luma'])).toEqual([events.detected]);
+    expect(await byActor(['luma'])).toEqual([events.workflow, events.detected]);
     expect(await byActor(['workflow'])).toEqual([events.workflow]);
     expect(await byActor(['luma', people.ben])).toEqual([
       events.access,
+      events.workflow,
       events.detected,
       events.ben,
     ]);

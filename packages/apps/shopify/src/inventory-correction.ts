@@ -409,6 +409,7 @@ export function createShopifyInventoryCorrection(
   const service = createInventoryCorrection({
     store,
     candidates: query.candidates,
+    configurationKey: query.configurationKey,
     admission,
     policies,
     effects,

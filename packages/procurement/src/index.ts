@@ -59,3 +59,5 @@ export {
   followUpReceiptMatches,
   supplierFollowUpNote,
 } from './domain/follow-up-receipt.js';
+
+export { replenishmentApprovalCoversSend } from './domain/replenishment-approval.js';

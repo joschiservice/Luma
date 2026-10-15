@@ -48,9 +48,15 @@ it('explains empty views without implying healthy operations', () => {
 });
 
 it('names members and marks the reader and former members', () => {
-  const members = [{ userId: 'a', name: 'Alex Morgan' }];
-  expect(memberName('a', members, 'b')).toBe('Alex Morgan');
+  const members = [
+    { userId: 'a', name: 'Alex Morgan', email: 'alex@example.test' },
+    { userId: 'd', name: 'Alex Morgan', email: 'alex.other@example.test' },
+  ];
+  expect(memberName('a', members, 'b')).toBe('Alex Morgan · alex@example.test');
   expect(memberName('b', members, 'b')).toBe('You');
+  expect(memberName('d', members, 'b')).toBe(
+    'Alex Morgan · alex.other@example.test',
+  );
   expect(memberName('c', members, 'b')).toBe('Former member');
   expect(memberName(null, members, 'b')).toBeNull();
 });

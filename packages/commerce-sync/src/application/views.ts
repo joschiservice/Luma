@@ -5,6 +5,7 @@ import type {
   ScanTrigger,
   StreamStatus,
 } from '../domain/streams.js';
+import type { SyncWait } from '../domain/waiting.js';
 
 /** One record type's sync state as operators see it. */
 export interface SyncStreamView {
@@ -12,6 +13,12 @@ export interface SyncStreamView {
   status: StreamStatus;
   phase: 'backfill' | 'incremental';
   paused: boolean;
+  /** Current scheduling evidence; connection names are scoped to visible workspace sources. */
+  waiting:
+    | (Omit<SyncWait, 'connectionIds'> & {
+        connections: { connectionId: string; label: string }[];
+      })
+    | null;
   blocked: BlockReason | null;
   scan: {
     kind: ScanKind;

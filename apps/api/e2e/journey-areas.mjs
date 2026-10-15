@@ -408,6 +408,7 @@ const simulator = [
 
 // Web
 const webShell = [
+  'apps/web/src/features/account/**',
   'apps/web/src/routes/{index,app,app.index,app.workspaces.index,app.workspaces.new,sign-in,sign-up,sign-out}.tsx',
   'apps/web/src/features/apps/navigation.tsx',
   'apps/web/src/features/assistant/**',

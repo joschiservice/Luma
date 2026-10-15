@@ -873,12 +873,25 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const onPage = shown?.find((item) => item.id === search.item);
   const direct = useQuery({
     ...decisionOptions(organizationId, search.item ?? ''),
+    refetchInterval: 5000,
     enabled: !!search.item && !!data && !onPage,
   });
   // Keep an opened decision visible after it leaves the queue so its outcome stays readable.
   const current = onPage ?? direct.data ?? undefined;
   const [remembered, setRemembered] = useState<DecisionItem>();
-  if (current && current !== remembered) setRemembered(current);
+  const [changedProposal, setChangedProposal] = useState<{
+    id: string;
+    previous: DecisionItem['change'];
+  }>();
+  if (current && current !== remembered) {
+    if (
+      remembered?.id === current.id &&
+      JSON.stringify(current.change) !== JSON.stringify(remembered.change) &&
+      !current.outcome
+    )
+      setChangedProposal({ id: current.id, previous: remembered.change });
+    setRemembered(current);
+  }
   // A remembered item keeps its owner review mounted while the queue confirms it has left.
   const fallback = remembered?.id === search.item ? remembered : undefined;
   const departed =
@@ -1078,6 +1091,11 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             organizationId={organizationId}
             item={item}
             departed={departed}
+            previousChange={
+              changedProposal?.id === item.id
+                ? changedProposal.previous
+                : undefined
+            }
             members={memberList}
             self={self}
             assignmentAccess={
@@ -1115,16 +1133,18 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
               </>
             }
             review={
-              <OwnerReview
-                organizationId={organizationId}
-                owner={item.owner}
-                handover={item.kind === 'workflow_handover'}
-                onChange={() =>
-                  client.invalidateQueries({
-                    queryKey: decisionsKey(organizationId),
-                  })
-                }
-              />
+              item.outcome ? null : (
+                <OwnerReview
+                  organizationId={organizationId}
+                  owner={item.owner}
+                  handover={item.kind === 'workflow_handover'}
+                  onChange={() =>
+                    client.invalidateQueries({
+                      queryKey: decisionsKey(organizationId),
+                    })
+                  }
+                />
+              )
             }
           />
         ) : null

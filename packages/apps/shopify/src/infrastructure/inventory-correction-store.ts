@@ -89,7 +89,9 @@ export function createCorrectionStore(
           context.tenantId,
           run.target.connectionId,
           `${run.before.inventoryItemId}:${run.before.locationId}`,
-          run.before.revision,
+          run.configurationKey === undefined
+            ? run.before.revision
+            : JSON.stringify([run.before.revision, run.configurationKey]),
         ];
         await tx.query(
           'INSERT INTO shopify_inventory_claims(tenant_id,connection_id,target_key,revision,run_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',

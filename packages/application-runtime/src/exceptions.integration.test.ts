@@ -3389,7 +3389,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         subject_id: sku,
         scope: [pool, ...[connectionId, store].sort()],
         mismatch_since: now,
-        wait_until: new Date(now.getTime() + 1_800_000),
+        wait_until: new Date(now.getTime() + 120_000),
       },
     ]);
     expect(

@@ -42,6 +42,7 @@ function snapshot(
     input,
     configuration: {
       ...defaultConfiguration,
+      thresholds: corpus.thresholds,
       inventoryTolerance:
         input.exceptionClass === 'inventory_mismatch'
           ? input.facts.tolerance

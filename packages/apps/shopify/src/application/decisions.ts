@@ -61,6 +61,18 @@ function stage(
         },
       ],
     };
+  if (
+    'workflowRunId' in view &&
+    view.workflowRunId &&
+    (view.canExecute || view.approved)
+  )
+    return {
+      reason: 'run',
+      response: 'view_only',
+      deadline: view.expiresAt,
+      why: 'Approved. Luma will run this now through the workflow, then check the result independently.',
+      consequences: [],
+    };
   if (view.canExecute || view.approved)
     return {
       reason: 'run',
@@ -90,7 +102,10 @@ function stage(
     consequences: [
       {
         response: 'Approve',
-        text: 'The requester can run it until it expires. Shopify eligibility is checked again right before it runs.',
+        text:
+          'workflowRunId' in view && view.workflowRunId
+            ? 'Luma will run this now through the workflow, then check the result independently.'
+            : 'The requester can run it until it expires. Shopify eligibility is checked again right before it runs.',
       },
       {
         response: 'Reject',
@@ -247,6 +262,7 @@ export function correctionDecision(
   const observed = [before.observedAt, before.source.observedAt].sort()[0]!;
 
   return {
+    automatic: !!view.workflowRunId,
     id: decisionId(
       'inventory_correction',
       state.reason,

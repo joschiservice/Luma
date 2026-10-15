@@ -3,7 +3,7 @@
 `inventory-replenishment` drafts a purchase order when a mapped inventory position falls
 below its minimum. It is a built-in `workflow/2` process that needs no Exception. Its
 outcome is an independently verified **purchase-order draft**, not a supplier submission or
-received goods; sending the order is a separate approved step (see
+received goods; sending the order is a separately admitted step (see
 [Supplier commitments](supplier-commitments.md)).
 
 ## Rule and authority
@@ -56,7 +56,7 @@ quantity stops the run, and the next check proposes again.
 
 A proposal retains product identity, known current supplier terms or reviewed overrides, recent source-backed sales, stock cover estimates and existing draft/open orders. Missing prices, lead time and incomplete demand stay unknown. Unit cost and quantity produce an exact estimated value; stock cover is an estimate from recorded sales, not a demand forecast or confirmed incoming stock.
 
-The context is immutable across approvals and restarts. A later terms change does not rewrite what the person reviewed. Known unit prices and product descriptions carry into the internal draft; the purchasing system determines final supplier prices and tax at submission. These facts are informational and never replace stock, permission, policy, existing-order or dispatch checks. Quantity approval thresholds are labeled as quantity controls, not financial impact.
+The context is immutable across approvals and restarts. The draft review also freezes the linked purchasing destination. One still-current approval can cover sending an unchanged, independently verified draft to that destination, as the original requester. The requester chooses the delivery date at submission. Changed lines, supplier, destination, draft revision or policy require a new approval. Workspaces may require separate send review for every replenishment order, or at and above an exact currency amount; unknown prices and other currencies require separate review when a threshold is configured. A later terms change does not rewrite what the person reviewed. Known unit prices and product descriptions carry into the internal draft; the purchasing system determines final supplier prices and tax at submission. These facts are informational and never replace stock, permission, policy, existing-order or dispatch checks. Quantity approval thresholds are labeled as quantity controls, not financial impact.
 
 ## Durability and outcomes
 

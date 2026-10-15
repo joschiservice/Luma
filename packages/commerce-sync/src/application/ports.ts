@@ -69,6 +69,7 @@ interface PageCommit {
   deferred?: boolean;
   /** Admission waiting preserves the current checkpoint and does not claim an export is preparing. */
   deferReason?: 'export' | 'admission';
+  admissionWaitReason?: 'request_capacity' | 'admission_unavailable';
   dueAt?: string;
   /** Ledger entries to delete when they are still flagged missing. */
   forget?: ItemKey[];

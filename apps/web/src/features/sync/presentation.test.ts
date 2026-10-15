@@ -8,6 +8,7 @@ import {
   scanProgress,
   soon,
   streamState,
+  waitingStatement,
 } from './presentation';
 import {
   attention,
@@ -186,5 +187,43 @@ describe('link methods', () => {
       'Linked by a rule',
       'Matched on import',
     ]);
+  });
+});
+
+describe('waiting explanations', () => {
+  it('keeps the waiting label separate from paused and names capacity holders', () => {
+    const waiting = stream({
+      status: 'waiting',
+      waiting: {
+        reason: 'worker_capacity',
+        connections: [{ connectionId: 'cin7', label: 'Cin7 warehouse' }],
+        observedAt: '2026-10-14T13:00:00Z',
+        until: '2026-10-14T13:01:00Z',
+      },
+    });
+    expect(streamState(waiting)).toEqual({
+      state: 'waiting',
+      label: 'Waiting',
+    });
+    expect(waitingStatement(waiting)).toBe(
+      'Waiting for sync capacity. Currently syncing: Cin7 warehouse.',
+    );
+    expect(waitingStatement({ ...waiting, status: 'syncing' })).toBeNull();
+    expect(streamState({ ...waiting, status: 'paused' }).label).toBe('Paused');
+  });
+
+  it('explains budget waits and never invents a connection for them', () => {
+    const waiting = stream({
+      status: 'waiting',
+      waiting: {
+        reason: 'request_capacity',
+        connections: [],
+        observedAt: '2026-10-14T13:00:00Z',
+        until: '2026-10-14T13:01:00Z',
+      },
+    });
+    expect(waitingStatement(waiting)).toBe(
+      'Waiting for request capacity. Luma retries automatically.',
+    );
   });
 });

@@ -371,3 +371,65 @@ export const recentHistory: SyncOverview = {
     ),
   })),
 };
+
+/** Imports waiting for shared capacity while another connection reads recent changes. */
+export const waiting: SyncOverview = {
+  ...importing,
+  connections: importing.connections.map((connection, index) => ({
+    ...connection,
+    recordTypes: connection.recordTypes.map((item) => {
+      if (!item.stream) return item;
+      if (index === 1 && item.recordType === 'orders')
+        return {
+          ...item,
+          stream: {
+            ...item.stream,
+            status: 'syncing',
+            scan: {
+              kind: 'incremental',
+              startedAt: asOf,
+              since: '2026-09-29T08:50:00.000Z',
+              pages: 2,
+              records: 80,
+              total: null,
+            },
+          },
+        };
+      if (
+        index !== 0 ||
+        !['orders', 'fulfillments', 'products'].includes(item.recordType)
+      )
+        return item;
+
+      return {
+        ...item,
+        stream: {
+          ...item.stream,
+          status: 'waiting',
+          waiting: {
+            reason:
+              item.recordType === 'orders'
+                ? 'worker_capacity'
+                : item.recordType === 'fulfillments'
+                  ? 'orders'
+                  : 'request_capacity',
+            connections:
+              item.recordType === 'orders'
+                ? [
+                    {
+                      connectionId: importing.connections[1]!.connectionId,
+                      label: importing.connections[1]!.label,
+                    },
+                  ]
+                : [],
+            observedAt: asOf,
+            until:
+              item.recordType === 'fulfillments'
+                ? null
+                : '2026-09-29T09:01:00.000Z',
+          },
+        },
+      };
+    }),
+  })),
+};

@@ -584,8 +584,8 @@ export function createCaseWorkflows(deps: {
           ),
           enable: { label: 'Turn on', destination: 'workflow_rules' },
           idle: found.signals
-            ? `Luma waits for a ${unit}, then starts a run.`
-            : `Luma waits for detection to confirm a ${unit}, then starts a run.`,
+            ? `Luma waits for the next ${unit}, then starts a run.`
+            : `Luma waits for detection to confirm the next ${unit}, then starts a run.`,
         }),
       },
       versions: [

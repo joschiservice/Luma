@@ -16,7 +16,7 @@ import {
   regionOptions,
   workspaceName,
 } from '../../kit/identity/data';
-import { regionLabel } from './region-choice';
+import { regionLabel } from '../../kit/identity/region';
 
 /**
  * Lists the person's workspaces, marking those where their access is suspended. Entry mode
@@ -172,7 +172,11 @@ export function NewWorkspace() {
     <EntryFrame actions={<a href="/sign-out">{m.identity_sign_out_link()}</a>}>
       <section className="entry-panel" aria-labelledby="new-workspace-title">
         <h1 id="new-workspace-title">{m.identity_new_workspace_title()}</h1>
-        <p>{m.identity_new_workspace_lead()}</p>
+        <p>
+          {m.identity_new_workspace_lead({
+            region: regionLabel(region.data.region),
+          })}
+        </p>
         <p>
           {m.identity_region_workspace({
             region: regionLabel(region.data.region),

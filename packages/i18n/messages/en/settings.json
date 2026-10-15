@@ -585,5 +585,19 @@
   "settings_approvals_read_only_notice": "These approval rules are read-only for your role. Changing them requires {permission}.",
   "settings_source_inactive": "This connection is not active. Restore its access before reading fresh source evidence.",
   "settings_source_missing_capability": "Purchase-order reading is unavailable on this connection. Use a connection with that capability and grant it read access.",
-  "settings_source_app_unavailable": "The connected app is unavailable. Restore its installation before reading fresh source evidence."
+  "settings_source_app_unavailable": "The connected app is unavailable. Restore its installation before reading fresh source evidence.",
+  "settings_detection_title": "Issue detection",
+  "settings_detection_help": "These limits apply to the next detection check. A new setting requires fresh review of existing stock corrections. Times are in seconds; zero confirms stock gaps immediately.",
+  "settings_detection_tolerance": "Stock quantity tolerance",
+  "settings_detection_propagation": "Stock confirmation window (seconds)",
+  "settings_detection_oversell": "Oversell risk confirmation window (seconds)",
+  "settings_detection_stuck": "Fulfillment delay limit (seconds)",
+  "settings_replenishment_approval_title": "Replenishment purchase orders",
+  "settings_replenishment_approval_help": "One approval can cover creating the draft and sending the unchanged order to the reviewed supplier connection. The requester chooses the delivery date when sending. Changed drafts, destinations, expired grants and changed policy require a new review.",
+  "settings_replenishment_separate_send": "Always review sending separately",
+  "settings_replenishment_separate_help": "Require another approval after the replenishment draft is created.",
+  "settings_replenishment_threshold": "Separate send approval at or above this amount (blank for no threshold)",
+  "settings_replenishment_currency": "Threshold currency",
+  "settings_display_timezone": "Display time zone on this device",
+  "settings_display_timezone_workspace": "Use workspace time zone"
 }

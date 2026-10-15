@@ -10,7 +10,7 @@ import {
   quantityLabels,
   stockFreshness,
   stockQuantity,
-  syncExplanation,
+  StockSyncWindow,
 } from './presentation';
 
 /** Quantities a position compares across sources, in column order. */
@@ -141,13 +141,7 @@ export function inventoryField(
           )
         : empty();
     case 'sync':
-      return position.sync ? (
-        <span title={syncExplanation(position.sync, position.differences)}>
-          {m.inventory_state_syncing()}
-        </span>
-      ) : (
-        empty()
-      );
+      return position.sync ? <StockSyncWindow position={position} /> : empty();
     case 'unit':
       return unitOfMeasure(position.unit);
     default:

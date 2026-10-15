@@ -45,6 +45,12 @@ const subjectLabels: Record<string, string> = {
 const capabilityLabels: Record<string, string> = {
   'orders.shipping-method.write': 'shipping method correction',
   'procurement.purchase-order.create': 'purchase-order draft',
+  'inventory.available.reconcile': 'Shopify stock correction',
+  'purchase-orders.submit': 'supplier order submission',
+  'fulfillment.hold.release': 'fulfillment hold release',
+  'fulfillment.open': 'fulfillment recovery',
+  'fulfillment.move': 'fulfillment location change',
+  'orders.quantity.edit': 'order quantity change',
 };
 
 const humanize = (value: string) =>
@@ -89,6 +95,7 @@ export interface CaseDecisionFacts {
   class: string;
   state: string;
   subject: {
+    label?: string | null;
     subjectKind?: string;
     subjectId?: string;
     scope?: string[];
@@ -156,7 +163,7 @@ export function presentCase(
   const label = classLabels[facts.class] ?? 'Operational issue';
   const kind = facts.subject?.subjectKind ?? null;
   const subject = kind
-    ? `${subjectLabels[kind] ?? humanize(kind)} ${facts.subject?.subjectId ?? ''}`.trim()
+    ? `${subjectLabels[kind] ?? 'Record'} ${facts.subject?.label ?? (facts.subject?.subjectId && !/^[0-9a-f-]{36}$/i.test(facts.subject.subjectId) ? facts.subject.subjectId : '')}`.trim()
     : label;
   const current =
     facts.diagnosis_status !== 'pending' &&
@@ -323,6 +330,7 @@ export function presentCase(
 
 /** The procurement owner's pending purchase-order proposal, as the queue reads it. */
 export interface ReplenishmentProposal {
+  previousQuantity?: number | undefined;
   context?: { productTitle: string | null } | null;
   runId: string;
   definitionId: string;
@@ -356,6 +364,13 @@ export function presentReplenishment(
   const unit = item.unit;
 
   return {
+    ...(item.previousQuantity !== undefined
+      ? {
+          previousChange: [
+            { label: 'Quantity', value: plural(item.previousQuantity, unit) },
+          ],
+        }
+      : {}),
     id: `replenishment:${item.runId}`,
     kind: 'replenishment',
     reason: 'approval',
@@ -369,7 +384,7 @@ export function presentReplenishment(
     consequences: [
       {
         response: 'Approve',
-        text: 'Luma checks stock, open orders and the supplier again, then creates a purchase-order draft and verifies it with a fresh read. Nothing is sent to the supplier.',
+        text: 'Luma checks stock, open orders and the supplier again, then creates a purchase-order draft and verifies it with a fresh read. Nothing is sent now. Under the workspace rules, this approval can also cover sending the unchanged draft to the reviewed supplier destination.',
       },
       {
         response: 'Reject',

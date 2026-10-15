@@ -217,6 +217,7 @@ export interface AppDependencies {
   apps?: AppService;
   appRegistry?: AppRegistry;
   cases?: CaseService;
+  connectionCoverage?: import('@luma/connections').CoverageReader;
   connections?: ConnectionManagement;
   sourceAuthority?: AuthoritySettings;
   sourceEnvironments?: SourceEnvironments;
@@ -242,6 +243,8 @@ export function buildApp(
 ) {
   const app = Fastify({
     ...options,
+    // Composite decision IDs exceed the router's 100-character default when URL encoded.
+    routerOptions: { maxParamLength: 600, ...options.routerOptions },
     requestIdHeader: false,
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
@@ -487,6 +490,7 @@ export function buildApp(
       connections: connectionRoutes(
         dependencies.connections,
         dependencies.sales?.enabled,
+        dependencies.connectionCoverage,
       ),
       sourceEnvironments: sourceEnvironmentRoutes(
         dependencies.sourceEnvironments,

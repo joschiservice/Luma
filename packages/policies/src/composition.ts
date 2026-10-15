@@ -18,9 +18,11 @@ export function createPolicies(
   refreshContext: PolicyDependencies['refreshContext'],
   appendEvidence: PolicyDependencies['appendEvidence'],
   autonomy?: PolicyDependencies['autonomy'],
+  coveredApproval?: PolicyDependencies['coveredApproval'],
 ) {
   return createPolicyService({
     autonomy,
+    coveredApproval,
     repository: createPolicyRepository(db),
     refreshContext,
     appendEvidence,

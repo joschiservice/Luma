@@ -144,39 +144,84 @@ export function createScheduledDetection(options: {
       options.internalOrdersEnabled ?? (async () => false),
     ),
   );
-  const monitor = createDetectionMonitor({
-    sources,
-    orders: {
-      ...quantities,
-      refresh: (context, orderId, maxAgeMs) =>
-        orders.refresh(context, orderId, maxAgeMs),
-    },
-    capabilities: options.capabilities,
-    exceptions: {
-      ingest: (...args) => exceptions().ingest(...args),
-      list: (...args) => exceptions().list(...args),
-      verify: (...args) => exceptions().verify(...args),
-    },
-    diagnose: (context, exceptionId) =>
-      options.detection().diagnoses.run(context, exceptionId),
-    // A fresh read is current when it became the source's projection of the linked position.
-    project: async (context, observation, positionId) => {
-      const outcome = await commerce.ingestion.ingest(
-        context,
-        `detection:${observation.id}`,
-        { capability: 'inventory.read', observation },
-      );
+  const buildMonitor = (configuration: Configuration) =>
+    createDetectionMonitor({
+      sources,
+      orders: {
+        ...quantities,
+        refresh: (context, orderId, maxAgeMs) =>
+          orders.refresh(context, orderId, maxAgeMs),
+      },
+      capabilities: options.capabilities,
+      exceptions: {
+        ingest: (...args) => exceptions().ingest(...args),
+        list: (...args) => exceptions().list(...args),
+        verify: (...args) => exceptions().verify(...args),
+      },
+      diagnose: (context, exceptionId) =>
+        options.detection().diagnoses.run(context, exceptionId),
+      // A fresh read is current when it became the source's projection of the linked position.
+      project: async (context, observation, positionId) => {
+        const outcome = await commerce.ingestion.ingest(
+          context,
+          `detection:${observation.id}`,
+          { capability: 'inventory.read', observation },
+        );
 
-      return outcome.status === 'applied' && outcome.entityId === positionId;
+        return outcome.status === 'applied' && outcome.entityId === positionId;
+      },
+      authority,
+      configuration,
+      ...(options.holdOverdueSeconds
+        ? { holdOverdueSeconds: options.holdOverdueSeconds }
+        : {}),
+      hash: (value) => createHash('sha256').update(value).digest('hex'),
+      ...(options.log ? { log: options.log } : {}),
+    });
+
+  const base = buildMonitor(options.configuration ?? defaultConfiguration);
+
+  async function forContext(context: TenantContext) {
+    if (options.configuration) return base;
+    const settings = await options.database.transaction(
+      context.tenantId,
+      async (tx) =>
+        (
+          await tx.query<{
+            detection: {
+              inventoryTolerance: string;
+              propagationSeconds: number;
+              oversellPropagationSeconds: number;
+              stuckSeconds: number;
+            };
+          }>('SELECT detection FROM workspace_settings WHERE tenant_id=$1', [
+            context.tenantId,
+          ])
+        ).rows[0]?.detection,
+    );
+    if (!settings) return base;
+    const { inventoryTolerance, ...thresholds } = settings;
+    const configuration = {
+      ...defaultConfiguration,
+      inventoryTolerance,
+      thresholds: { ...defaultConfiguration.thresholds, ...thresholds },
+    };
+    if (JSON.stringify(configuration) === JSON.stringify(defaultConfiguration))
+      return base;
+    configuration.version = `${defaultConfiguration.version}:${createHash('sha256').update(JSON.stringify(configuration)).digest('hex').slice(0, 16)}`;
+
+    return buildMonitor(configuration);
+  }
+
+  const monitor = {
+    tick: async (context: TenantContext) =>
+      (await forContext(context)).tick(context),
+    verifier: {
+      ...base.verifier,
+      evaluate: async (...args: Parameters<typeof base.verifier.evaluate>) =>
+        (await forContext(args[0])).verifier.evaluate(...args),
     },
-    authority,
-    configuration: options.configuration ?? defaultConfiguration,
-    ...(options.holdOverdueSeconds
-      ? { holdOverdueSeconds: options.holdOverdueSeconds }
-      : {}),
-    hash: (value) => createHash('sha256').update(value).digest('hex'),
-    ...(options.log ? { log: options.log } : {}),
-  });
+  };
 
   return {
     ...monitor,

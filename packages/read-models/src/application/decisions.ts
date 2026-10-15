@@ -99,7 +99,7 @@ export type ReplenishmentDecisionReader = (
 export interface DecisionQueue {
   /** Rejects a cursor produced by another view, filter or page size with a 400 error. */
   list(context: TenantContext, query: DecisionQuery): Promise<DecisionList>;
-  /** Returns the current item with this ID, or null when it no longer needs a person. */
+  /** Returns current work or an authorized persisted outcome for retained decision links. */
   find(context: TenantContext, id: string): Promise<DecisionItem | null>;
 }
 

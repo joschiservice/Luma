@@ -42,6 +42,16 @@ export interface PolicyRepository {
 }
 
 export interface PolicyDependencies {
+  /** Trusted owner evidence for an unchanged later step covered by an existing approval. */
+  coveredApproval?:
+    | ((
+        context: TenantContext,
+        action: ProposedAction,
+        policyVersion: string,
+        permission: string,
+      ) => Promise<Approval | null>)
+    | undefined;
+
   autonomy?: Pick<ScopedAutonomy, 'evaluate'> | undefined;
   repository: PolicyRepository;
   appendEvidence(event: PolicyEvidence): Promise<void>;
@@ -169,10 +179,35 @@ export function createPolicyService(deps: PolicyDependencies) {
           workspace.required || scoped?.outcome === 'approval_required',
           workspace.requireIndependentApproval,
         );
+        const candidate =
+          baseline.outcome === 'approval_required' &&
+          !approval &&
+          scoped?.outcome !== 'approval_required'
+            ? await deps.coveredApproval?.(
+                fresh,
+                action,
+                policyVersion,
+                capability.permission,
+              )
+            : null;
+        const covered =
+          candidate &&
+          candidate.outcome === 'approved' &&
+          candidate.tenantId === fresh.tenantId &&
+          candidate.policyVersion === policyVersion &&
+          candidate.requesterId === fresh.actor.id &&
+          Date.parse(candidate.expiresAt) > now.getTime() &&
+          (!workspace.requireIndependentApproval ||
+            candidate.approverId !== fresh.actor.id)
+            ? candidate
+            : null;
+        const evaluated = covered
+          ? { outcome: 'allowed' as const, reason: 'covered_approval' as const }
+          : baseline;
         const { outcome, reason } =
-          baseline.outcome !== 'denied' && scoped?.outcome === 'denied'
+          evaluated.outcome !== 'denied' && scoped?.outcome === 'denied'
             ? { outcome: 'denied' as const, reason: 'scoped_autonomy' as const }
-            : baseline;
+            : evaluated;
         const decision: PolicyDecision = {
           id: deps.id(),
           correlationId: context.requestId,
@@ -187,6 +222,7 @@ export function createPolicyService(deps: PolicyDependencies) {
           ...(scoped?.admission ? { autonomy: scoped.admission } : {}),
           ...(scoped?.reason ? { autonomyBlock: scoped.reason } : {}),
           permission: capability.permission,
+          ...(covered ? { approvalId: covered.id } : {}),
           ...(approval && reason === 'authorized'
             ? { approvalId: approval.id }
             : {}),
@@ -197,6 +233,7 @@ export function createPolicyService(deps: PolicyDependencies) {
               Date.parse(action.preconditions.validUntil),
               now.getTime() + 30_000,
               ...(approval ? [Date.parse(approval.expiresAt)] : []),
+              ...(covered ? [Date.parse(covered.expiresAt)] : []),
             ),
           ).toISOString(),
         };

@@ -48,7 +48,8 @@ export function formatNumber(
 export function formatExactQuantity(value: string) {
   if (!/^-?\d+(?:\.\d+)?$/.test(value))
     throw new RangeError('Expected a decimal quantity');
-  const [whole, fraction] = value.split('.');
+  const [whole, rawFraction] = value.split('.');
+  const fraction = rawFraction?.replace(/0+$/, '');
   const formatter = cached(
     numberFormats,
     { maximumFractionDigits: 0 },

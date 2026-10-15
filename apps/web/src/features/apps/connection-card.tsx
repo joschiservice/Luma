@@ -18,6 +18,9 @@ import {
   DialogTrigger,
 } from '@luma/ui/components/primitives/dialog';
 import { StateDot } from '@luma/ui/components/primitives/state';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { connectionHealthLabel } from '@luma/ui/lib/connection-health';
+import { operatorCodeLabel } from '@luma/ui/lib/operator-code';
 import { Link } from '@tanstack/react-router';
 import { Check, Minus, ShieldCheck, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -137,14 +140,17 @@ export function ConnectionCard({
         </div>
         <Badge
           tone={
-            connection.status === 'active'
+            connection.coverage?.health === 'healthy' ||
+            (!connection.coverage && connection.status === 'active')
               ? 'success'
               : terminal
                 ? 'neutral'
                 : 'warning'
           }
         >
-          {statuses[connection.status]}
+          {connection.coverage?.health
+            ? connectionHealthLabel(connection.coverage.health).label
+            : statuses[connection.status]}
         </Badge>
       </CardHeader>
       <p>
@@ -206,6 +212,35 @@ export function ConnectionCard({
           </span>
         </p>
       ) : null}
+      {connection.coverage?.streams?.map((stream) => (
+        <section key={stream.recordType}>
+          <strong>
+            {operatorCodeLabel(
+              `${stream.recordType === 'fulfillments' ? 'fulfillment' : stream.recordType}.read`,
+            )}
+          </strong>
+          <p>
+            {m.connections_last_success()} ·{' '}
+            {stream.lastSuccessfulAt ? (
+              <WorkspaceDate value={stream.lastSuccessfulAt} />
+            ) : (
+              m.common_not_reported()
+            )}
+          </p>
+          {stream.lastError ? (
+            <p>{operatorCodeLabel(stream.lastError)}</p>
+          ) : null}
+          {stream.issueIds.map((exceptionId) => (
+            <Link
+              key={exceptionId}
+              to="/app/$organizationId/exceptions/$exceptionId/detail"
+              params={{ organizationId, exceptionId }}
+            >
+              {m.connections_open_issue()}
+            </Link>
+          ))}
+        </section>
+      ))}
       <div className="connection-access">
         <h4>
           <ShieldCheck size={15} aria-hidden="true" />

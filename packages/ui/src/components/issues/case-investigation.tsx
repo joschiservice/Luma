@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { operatorCodeMessages } from '../../lib/operator-code';
 import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
@@ -49,7 +50,10 @@ import { IssueSection } from './issue-section';
  * as `inventory_position` → “Inventory position”. Prefer a named label where one exists.
  */
 export function caseLabel(value: string) {
-  return value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
+  return (
+    operatorCodeMessages[value]?.() ??
+    value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase())
+  );
 }
 
 /** Renders a case timestamp in the workspace display timezone. */

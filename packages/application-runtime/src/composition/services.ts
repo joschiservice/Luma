@@ -49,10 +49,13 @@ import {
 } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 
+import { createReplenishmentApprovalCoverage } from './replenishment-approval.js';
+
 /** Creates the policy and execution services used by workflow activities. */
 export function createSafetyServices(
   database: string | TenantDatabase,
-  identity: Pick<IdentityService, 'refreshContext'>,
+  identity: Pick<IdentityService, 'refreshContext'> &
+    Partial<Pick<IdentityService, 'resolveWorkflowContext'>>,
   registry: EffectRegistry,
   admissionOptions: {
     eligible(context: TenantContext, step: BoundActionStep): Promise<boolean>;
@@ -115,6 +118,9 @@ export function createSafetyServices(
     identity.refreshContext,
     policyAudit(audit),
     autonomy,
+    identity.resolveWorkflowContext
+      ? createReplenishmentApprovalCoverage(db, identity.resolveWorkflowContext)
+      : undefined,
   );
   const provisioning = createAdmissionStore(db);
   const engine = createExecution(
@@ -341,7 +347,8 @@ export function createCommerceServices(database: string | TenantDatabase) {
 /** Connect the operator boundary to persisted proposals and the existing policy authority. */
 export function createDeskServices(
   db: TenantDatabase,
-  identity: Pick<IdentityService, 'refreshContext'>,
+  identity: Pick<IdentityService, 'refreshContext'> &
+    Partial<Pick<IdentityService, 'resolveWorkflowContext'>>,
   effects: EffectRegistry = { resolve: async () => null },
   options: {
     diffEnabled?: DeskDependencies['diffEnabled'];
@@ -433,7 +440,8 @@ export function policyAudit(audit: AuditLog) {
 /** Trusted composition publishes and activates playbooks; activities receive only the service. */
 export function createResolutionPlaybooks(
   db: TenantDatabase,
-  identity: Pick<IdentityService, 'refreshContext'>,
+  identity: Pick<IdentityService, 'refreshContext'> &
+    Partial<Pick<IdentityService, 'resolveWorkflowContext'>>,
   safety: Pick<
     ReturnType<typeof createSafetyServices>,
     'execution' | 'provisioning'

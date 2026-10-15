@@ -23,6 +23,7 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { connectionHealthLabel } from '@luma/ui/lib/connection-health';
 import { quantityUnit } from '@luma/ui/lib/units';
 import { Link } from '@tanstack/react-router';
 import {
@@ -681,11 +682,17 @@ function CohortItem({
           </small>
         </div>
         <div className="operational-breakdown">
-          {item.reasons.map((reason) => (
-            <Badge key={reason} tone="warning">
-              {reasonLabel(reason)}
+          {item.health ? (
+            <Badge tone="warning">
+              {connectionHealthLabel(item.health).label}
             </Badge>
-          ))}
+          ) : (
+            item.reasons.map((reason) => (
+              <Badge key={reason} tone="warning">
+                {reasonLabel(reason)}
+              </Badge>
+            ))
+          )}
         </div>
       </>
     );

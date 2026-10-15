@@ -258,6 +258,7 @@ export async function readPurchasingActionTimeline(
               : 'luma',
         evidenceRefs:
           proof?.observationRefs ?? execution.attempt.effectEvidenceRefs ?? [],
+        actorId: execution.attempt.requestedBy,
         quantity: action.quantity,
         revision: action.revision,
       });
