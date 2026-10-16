@@ -54,9 +54,7 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
     path: '/tmp/luma51-browser/before.png',
     fullPage: true,
   });
-  await page
-    .getByRole('button', { name: 'Technical details', exact: true })
-    .click();
+  await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await page.getByLabel('TypeScript source', { exact: true }).waitFor();
   await mkdir('/tmp/luma51-browser', { recursive: true });
   await page.screenshot({

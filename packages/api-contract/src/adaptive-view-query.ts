@@ -4,9 +4,9 @@ import { collectionCatalogs } from './collection-catalogs.js';
 import {
   type CollectionCondition,
   type CollectionDomain,
-  collectionDomainSchema,
   type CollectionGrouping,
   collectionViewStateSchema,
+  savedViewDomainSchema,
 } from './collections.js';
 
 /** Record lists that saved views of format 1 can describe. */
@@ -199,7 +199,7 @@ const actionsSchema = adaptiveViewQueryV1Schema.shape.actions;
 export const adaptiveViewQuerySchema = z
   .object({
     version: z.literal(2),
-    domain: collectionDomainSchema,
+    domain: savedViewDomainSchema,
     state: collectionViewStateSchema,
     metrics: metricsSchema,
     charts: chartsSchema,

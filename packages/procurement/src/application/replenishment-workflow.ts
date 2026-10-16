@@ -784,6 +784,7 @@ export function createReplenishmentService(deps: {
           name: version.definition.name,
           purpose: version.definition.intent,
           category: 'procurement',
+          trigger: version.applicability.trigger,
           capability: 'procurement.purchase-order.create',
           systems: ['luma'],
           availableVersion: version.version,

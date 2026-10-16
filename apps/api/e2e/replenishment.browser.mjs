@@ -40,7 +40,11 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   page.on('pageerror', (error) => errors.push(error.message));
   const path = `/app/${f.manifest.organizationId}/workflows/inventory-replenishment`;
   await page.goto(path);
-  await page.getByRole('heading', { name: 'Ready to set up' }).waitFor();
+  // Replenishment is set up through its stock rules, so it opens there while it's off.
+  await page
+    .getByRole('tab', { name: 'Stock rules', selected: true })
+    .waitFor();
+  await page.getByText('Off', { exact: true }).first().waitFor();
   await page
     .getByRole('button', { name: 'Add stock rules', exact: true })
     .click();
@@ -87,7 +91,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   expect((await f.request('/replenishment')).rules).toHaveLength(1);
   await dialog.getByRole('button', { name: 'Done', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
-  await page.getByRole('heading', { name: 'Running' }).waitFor();
+  await page.getByText('On', { exact: true }).first().waitFor();
   await page.getByText('Watching', { exact: true }).waitFor();
   await page.screenshot({
     path: '/tmp/luma71-replenishment-desktop.png',
@@ -108,7 +112,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     page.getByText('Waiting for another approver', { exact: true }),
   ).toBeVisible();
   await page.goto(path);
-  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await page.getByRole('tab', { name: /^Runs/, selected: true }).waitFor();
   await page
     .getByRole('heading', { name: new RegExp(`50 × ${sku}$`) })
     .waitFor();
@@ -121,7 +125,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   const approver = await contextFor(f.approverCookie);
   const review = await approver.newPage();
   await review.goto(path);
-  // The waiting decision is the next action on the overview.
+  // The waiting decision is the next step on every tab.
   await review
     .getByText('Review 1 waiting decision', { exact: true })
     .waitFor();
@@ -131,7 +135,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
       .first()
       .getAttribute('href'),
   ).toContain(`item=replenishment%3A${run.id}`);
-  await review.getByRole('button', { name: 'Activity', exact: true }).click();
+  await review.getByRole('tab', { name: /^Runs/, selected: true }).waitFor();
   await review.getByRole('button', { name: 'Approve 50 units' }).click();
   await review.getByText('Decision recorded.', { exact: false }).waitFor();
   await f.temporal.client.workflow
@@ -188,6 +192,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await review.getByRole('link', { name: 'Open purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
   // The stock record shows the same readiness and returns to the original context.
+  await page.getByRole('tab', { name: 'Stock rules' }).click();
   await page.getByRole('link', { name: 'Stock record' }).first().click();
   const coverage = page.getByRole('region', { name: 'Replenishment' });
   await coverage.getByText('Running', { exact: true }).waitFor();
@@ -199,9 +204,8 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**${path}*`);
   await page.setViewportSize({ width: 375, height: 812 });
-  await page
-    .getByRole('region', { name: 'Rules', exact: true })
-    .scrollIntoViewIfNeeded();
+  await page.getByRole('tab', { name: 'Stock rules' }).click();
+  await page.getByText('Watching', { exact: true }).first().waitFor();
   await page.screenshot({
     path: '/tmp/luma71-replenishment-mobile.png',
     fullPage: true,

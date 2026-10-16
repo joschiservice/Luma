@@ -112,6 +112,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
   await page.goto(`/app/${tenantId}/workflows/${definition.id}`);
   await page.getByRole('combobox', { name: 'Version', exact: true }).click();
   await page.getByRole('option', { name: 'v0.1.0', exact: true }).click();
+  await page.getByRole('tab', { name: 'Setup' }).click();
   const form = page.getByRole('region', { name: 'Trigger', exact: true });
   await form.getByRole('combobox', { name: 'Choose a record' }).click();
   await page.getByRole('option', { name: '#1042', exact: true }).click();
@@ -152,6 +153,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     ).rows[0].count,
   ).toBe('1');
   await page.reload();
+  await page.getByRole('tab', { name: /^Runs/ }).click();
   await page
     .getByRole('heading', { name: 'Recent runs', exact: true })
     .waitFor();
@@ -163,8 +165,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     .first()
     .waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Rules', exact: true }).click();
+  await page.getByRole('tab', { name: 'Setup' }).click();
   await expect(
     form.getByText(
       'Scheduled starts for custom workflows are not available yet. Choose another trigger to run this workflow.',
@@ -317,8 +318,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     .getByRole('heading', { name: 'Inventory check' })
     .first()
     .waitFor();
-  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Activity' }).click();
+  await page.getByRole('tab', { name: /^Runs/ }).click();
   const timeline = page.getByRole('list', { name: 'Step progress' });
   // Steps read by their business title, not their ID.
   await timeline.getByText('Refresh context', { exact: true }).waitFor();

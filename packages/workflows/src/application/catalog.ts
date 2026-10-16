@@ -10,6 +10,7 @@ import type { PolicyService } from '@luma/policies';
 
 import type { EvaluateCode } from '../domain/code-evaluation.js';
 import type { PlaybookVersion } from '../domain/playbook.js';
+import type { PlaybookSummary } from '../domain/playbook-library.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
 import type { ProcessStepOutput } from '../domain/process.js';
 import { presentProcessVersion } from '../domain/process-presentation.js';
@@ -145,6 +146,12 @@ export function createWorkflowCatalog(deps: {
     return fresh;
   }
 
+  /** Resolution playbooks fix detected issues, so each starts when its issue type is detected. */
+  const legacySummary = (summary: PlaybookSummary) => ({
+    ...summary,
+    category: 'resolution',
+    trigger: { kind: 'exception' as const, issueType: summary.issueType },
+  });
   const metadata = (version: PublishedWorkflowVersion) => ({
     category: version.definition.category,
     applicability: version.applicability,
@@ -252,6 +259,7 @@ export function createWorkflowCatalog(deps: {
         name: current.definition.name,
         purpose: current.definition.intent,
         category: current.definition.category,
+        trigger: current.applicability.trigger,
         capability: views[0]!.capability,
         issueType: current.context.kind,
         systems: [] as string[],
@@ -405,7 +413,7 @@ export function createWorkflowCatalog(deps: {
 
     return {
       ...detail,
-      summary: { ...detail.summary, category: 'resolution' },
+      summary: legacySummary(detail.summary),
       versions: detail.versions.map((v) => {
         const source = versions.find((item) => item.version === v.version);
         if (!source) throw new Error('Published version is unavailable');
@@ -681,7 +689,7 @@ export function createWorkflowCatalog(deps: {
       return [
         ...(replenishmentDetail ? [replenishmentDetail.summary] : []),
         ...caseSummaries,
-        ...legacy.map((v) => ({ ...v, category: 'resolution' })),
+        ...legacy.map(legacySummary),
         ...(await Promise.all(
           [...groups.values()]
             .filter(

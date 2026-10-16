@@ -7,6 +7,7 @@ import type {
 import type { ProcessWorkflowVersion } from '../domain/process.js';
 import type { presentProcessVersion } from '../domain/process-presentation.js';
 import type { WorkflowReadiness } from '../domain/readiness.js';
+import type { WorkflowTrigger } from '../domain/workflow.js';
 import type { presentTriggerRun } from './trigger-presentation.js';
 
 /**
@@ -47,7 +48,10 @@ export type WorkflowDetail = Omit<
   'summary' | 'versions' | 'activations'
 > & {
   presentation: string;
-  summary: Omit<PlaybookDetail['summary'], 'issueType'> & { category: string };
+  summary: Omit<PlaybookDetail['summary'], 'issueType'> & {
+    category: string;
+    trigger: WorkflowTrigger;
+  };
   versions: (ReturnType<typeof presentProcessVersion> &
     Pick<ProcessWorkflowVersion, 'inputs' | 'context' | 'applicability'> & {
       format: 'workflow/2';

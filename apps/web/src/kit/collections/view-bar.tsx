@@ -1,9 +1,10 @@
 import './collections.css';
 
-import type {
-  AdaptiveView,
-  CollectionMemberState,
-  CollectionViewState,
+import {
+  type AdaptiveView,
+  type CollectionMemberState,
+  type CollectionViewState,
+  savedViewDomainSchema,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
@@ -126,7 +127,8 @@ export function CollectionViewBar({
     segmentLabel(view.ref.kind === 'builtin' ? view.ref.segment : '');
   const query = (state: CollectionViewState) => ({
     version: 2 as const,
-    domain: view.domain,
+    // Only lists with saved views render the view bar.
+    domain: savedViewDomainSchema.parse(view.domain),
     state,
     metrics: saved?.query.metrics ?? [],
     charts: saved?.query.charts ?? [],

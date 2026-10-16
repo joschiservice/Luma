@@ -112,6 +112,8 @@ A configurable list page provides, in this order:
 - A view that asks for something the reader's list can't do needs repair, not a broader read: check conditions against the catalog and the reader's permissions before asking, map the engine's "Condition N" messages to their chips, and offer to remove what is unsupported.
 - `CollectionViewBar` shows built-in and saved views as one row of overflowing tabs in the member's view order, so a page doesn't add its own tabs for built-in views. Pass counts, icons and descriptions of built-in views in `segments`. Each tab links to its view, so it can open in a new browser tab. A catalog without a default sort gets a Sort menu built by the page whose first option names the API's default order; it maps to a view without a sort and is offered only when the open view has none, because the URL can't express removing a saved sort. Columns that depend on run-time data, such as one per catalog source, go in `extraColumns` with letter-and-digit IDs, and `defaultColumns` shows them in views without their own columns.
 
+A list that filters in the browser and has no record reader, such as the workflow library, can register a catalog only for member state, such as collapsed groups, and keep its own URL parameters. `savedViewDomainSchema` excludes it, so it offers no saved views or exports and never renders the view bar.
+
 `SyncCoverage` condenses what each source has imported into one line. It leads with sources that need attention and says the list is incomplete while any import runs.
 
 ## Issue views

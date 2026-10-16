@@ -1,5 +1,6 @@
 import './adaptive.css';
 
+import { savedViewDomainSchema } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -34,7 +35,7 @@ export function CollectionSummaryBand({
     ...previewOptions(organizationId, {
       ...(saved?.query ?? {
         version: 2,
-        domain: view.domain,
+        domain: savedViewDomainSchema.parse(view.domain),
         metrics: [],
         charts: [],
         actions: [],

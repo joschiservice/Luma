@@ -17000,7 +17000,8 @@
                 "issues",
                 "decisions",
                 "inbox",
-                "activity"
+                "activity",
+                "workflows"
               ],
               "type": "string"
             }
@@ -17028,7 +17029,8 @@
                         "issues",
                         "decisions",
                         "inbox",
-                        "activity"
+                        "activity",
+                        "workflows"
                       ],
                       "type": "string"
                     },
@@ -17698,7 +17700,8 @@
                 "issues",
                 "decisions",
                 "inbox",
-                "activity"
+                "activity",
+                "workflows"
               ],
               "type": "string"
             }
@@ -18184,7 +18187,8 @@
                         "issues",
                         "decisions",
                         "inbox",
-                        "activity"
+                        "activity",
+                        "workflows"
                       ],
                       "type": "string"
                     },
@@ -18854,7 +18858,8 @@
                 "issues",
                 "decisions",
                 "inbox",
-                "activity"
+                "activity",
+                "workflows"
               ],
               "type": "string"
             }
@@ -18882,7 +18887,8 @@
                         "issues",
                         "decisions",
                         "inbox",
-                        "activity"
+                        "activity",
+                        "workflows"
                       ],
                       "type": "string"
                     },
@@ -19554,7 +19560,8 @@
                 "issues",
                 "decisions",
                 "inbox",
-                "activity"
+                "activity",
+                "workflows"
               ],
               "type": "string"
             }
@@ -29707,6 +29714,29 @@
                                             "type": "null"
                                           }
                                         ]
+                                      },
+                                      "recent": {
+                                        "type": "array",
+                                        "maxItems": 10,
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "state": {
+                                              "enum": [
+                                                "verified",
+                                                "unresolved",
+                                                "in_progress",
+                                                "ended"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "at": {
+                                              "type": "string",
+                                              "format": "date-time"
+                                            }
+                                          },
+                                          "required": ["state", "at"]
+                                        }
                                       }
                                     },
                                     "required": [
@@ -29714,7 +29744,8 @@
                                       "verified",
                                       "unresolved",
                                       "inProgress",
-                                      "latest"
+                                      "latest",
+                                      "recent"
                                     ]
                                   },
                                   {
@@ -32227,6 +32258,87 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "trigger": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "exception"
+                                  },
+                                  "issueType": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": ["kind", "issueType"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "manual"
+                                  }
+                                },
+                                "required": ["kind"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "event"
+                                  },
+                                  "eventType": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": ["kind", "eventType"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "schedule"
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": ["kind", "at"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "condition"
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "equals": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["kind", "field", "equals"]
+                              }
+                            ]
+                          },
                           "readiness": {
                             "type": "object",
                             "properties": {
@@ -32495,6 +32607,29 @@
                                             "type": "null"
                                           }
                                         ]
+                                      },
+                                      "recent": {
+                                        "type": "array",
+                                        "maxItems": 10,
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "state": {
+                                              "enum": [
+                                                "verified",
+                                                "unresolved",
+                                                "in_progress",
+                                                "ended"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "at": {
+                                              "type": "string",
+                                              "format": "date-time"
+                                            }
+                                          },
+                                          "required": ["state", "at"]
+                                        }
                                       }
                                     },
                                     "required": [
@@ -32502,7 +32637,8 @@
                                       "verified",
                                       "unresolved",
                                       "inProgress",
-                                      "latest"
+                                      "latest",
+                                      "recent"
                                     ]
                                   },
                                   {
@@ -32583,6 +32719,7 @@
                           "blockers",
                           "activeVersions",
                           "category",
+                          "trigger",
                           "readiness"
                         ]
                       }
@@ -32776,6 +32913,87 @@
                         "category": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "trigger": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "exception"
+                                },
+                                "issueType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "issueType"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "manual"
+                                }
+                              },
+                              "required": ["kind"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "event"
+                                },
+                                "eventType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "eventType"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "schedule"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": ["kind", "at"]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "const": "condition"
+                                },
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "equals": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": ["kind", "field", "equals"]
+                            }
+                          ]
                         },
                         "readiness": {
                           "type": "object",
@@ -33045,6 +33263,29 @@
                                           "type": "null"
                                         }
                                       ]
+                                    },
+                                    "recent": {
+                                      "type": "array",
+                                      "maxItems": 10,
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "state": {
+                                            "enum": [
+                                              "verified",
+                                              "unresolved",
+                                              "in_progress",
+                                              "ended"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          }
+                                        },
+                                        "required": ["state", "at"]
+                                      }
                                     }
                                   },
                                   "required": [
@@ -33052,7 +33293,8 @@
                                     "verified",
                                     "unresolved",
                                     "inProgress",
-                                    "latest"
+                                    "latest",
+                                    "recent"
                                   ]
                                 },
                                 {
@@ -33133,6 +33375,7 @@
                         "blockers",
                         "activeVersions",
                         "category",
+                        "trigger",
                         "readiness"
                       ]
                     },

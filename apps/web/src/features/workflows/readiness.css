@@ -6,49 +6,6 @@
   gap: 6px;
 }
 
-.workflow-readiness {
-  --readiness-color: var(--signal);
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-  padding: 18px 20px;
-  border-radius: var(--radius-panel);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-panel);
-  font-size: 13px;
-}
-
-.workflow-readiness[data-state='degraded'] {
-  --readiness-color: var(--state-warning);
-}
-
-.workflow-readiness[data-state='blocked'] {
-  --readiness-color: var(--state-error);
-}
-
-.workflow-readiness-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.workflow-readiness-head h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 24px;
-  letter-spacing: -0.015em;
-}
-
-.workflow-readiness-eyebrow {
-  margin: 0 0 2px;
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  font-weight: 500;
-}
-
 /* The single most useful action, emphasized by state. */
 .workflow-next {
   display: grid;
@@ -144,70 +101,6 @@
   font-size: 12.5px;
 }
 
-.workflow-readiness .workflow-readiness-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  overflow: hidden;
-  border-radius: 10px;
-  background: var(--line);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.workflow-readiness .workflow-readiness-facts > div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: 4px;
-  padding: 12px 14px;
-  background: var(--surface-raised);
-}
-
-.workflow-readiness-facts dt {
-  color: var(--foreground-subtle);
-  font-size: 12px;
-}
-
-.workflow-readiness-facts dd {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.workflow-readiness-facts dd strong {
-  font-size: 13.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.workflow-readiness-facts dd > span {
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.workflow-readiness-approval {
-  margin: 0;
-}
-
-.workflow-readiness-approval summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--foreground-muted);
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-.workflow-readiness-approval ul {
-  margin: 8px 0 0;
-  padding-left: 20px;
-  color: var(--foreground-muted);
-  font-size: 12.5px;
-}
-
 /* A record's coverage: compact readiness beside the record's own facts. */
 .workflow-coverage {
   display: grid;
@@ -260,27 +153,13 @@
   gap: 6px 16px;
 }
 
-@media (max-width: 960px) {
-  .workflow-readiness .workflow-readiness-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 560px) {
-  .workflow-readiness {
-    padding: 16px;
-  }
-
   .workflow-next {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .workflow-next > a {
     justify-self: start;
-  }
-
-  .workflow-readiness .workflow-readiness-facts {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
