@@ -105,7 +105,9 @@ messages recorded by hand ([supplier commitments](supplier-commitments.md#suppli
 The record ID derives from the workspace and message, and procurement deduplicates by
 Message-ID, so rereads record nothing twice. A member without `procurement.manage` records a
 `forbidden` outcome on the timeline instead. Only messages new to the inbox are handed off;
-linking an order to an older thread does not resend its history.
+linking an order to an older thread does not resend its history. Incomplete message text,
+including content beyond the procurement handoff limit, stays in the inbox with a reason and
+is not handed to procurement as a complete supplier message.
 
 ## Documents
 
@@ -265,8 +267,10 @@ requests with 503.
 
 Execution reserves `v0:<action ID>` before the single dispatch, and the mailbox app refuses
 to send when the mailbox already holds a message with the reply's Message-ID
-(`luma.<reply ID>@<mailbox domain>`). A provider acceptance is not the outcome: a fresh read
-of the thread must find that Message-ID. The found message is marked as sent by Luma and
+(`luma.<reply ID>@<mailbox domain>`). A provider acceptance is not the outcome: a complete fresh read
+of the thread must find the exact Message-ID with provider-confirmed sent metadata, the
+reviewed recipients, body, threading headers and attachment bytes. Cached messages and
+partial reads never establish acceptance. The found message is marked as sent by Luma and
 linked from the reply, the thread's reply deadline clears as for any reply, and records
 linked to the thread show it there. Approvals, rejections, withheld sends and requests are
 thread events and audit entries.
@@ -282,7 +286,11 @@ lists approvals, approved replies for their requester and uncertain sends under 
 
 Message text and attachment content are kept for `MESSAGING_RETENTION_DAYS` (365 by default)
 after receipt and removed by the sync process; addresses, subjects, dates, digests, links and
-facts remain. Removing a document's content also removes its representation and its facts'
+facts remain. Draft and sent body copies have their own content deadline under the same
+retention policy. Removing source text clears its thread snippet and the thread's outbound
+body, attachment and citation copies in the same transaction. Unsent drafts and approvals
+are withheld; uncertain sends stay uncertain and are never dispatched again. Erasure also
+visits source messages already removed by retention. Removing a document's content also removes its representation and its facts'
 quotes, which are copies of the document text; values, locators and reviews stay. Text can
 also be removed on request from the thread. A Shopify customer
 redaction removes the text of messages to or from that customer's email, their attachment

@@ -212,7 +212,7 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
     version: 1,
     address: 'ops@shop.example',
     canRead: true,
-    canSend: false,
+    canSend: true,
     installerId: adminId,
   };
   let messaging: ReturnType<typeof createMessaging>;
@@ -1032,6 +1032,11 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
 
   it('removes message text on request and lists due replies for Needs you', async () => {
     const detail = await threadByProvider('t4');
+    const draft = await messaging.replies.draft(
+      adminContext(),
+      detail.thread.id,
+      { id: randomUUID() },
+    );
     const removed = await messaging.service.removeMessageText(
       adminContext(),
       detail.thread.id,
@@ -1039,6 +1044,10 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
       randomUUID(),
     );
     expect(removed.messages[0]).toMatchObject({ text: null });
+    expect(removed.thread.snippet).toBe('');
+    expect(removed.outbound.find((item) => item.id === draft.id)).toMatchObject(
+      { text: '', state: 'withheld', canRequest: false },
+    );
     expect(removed.messages[0]!.purgedAt).not.toBeNull();
     const due = await messaging.service.dueReplies(adminContext());
     expect(due.map((d) => d.threadId)).toContain(detail.thread.id);
@@ -1071,6 +1080,27 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
       "INSERT INTO shopify_installation_bindings(tenant_id,app,shop,connection_id) VALUES($1,'shopify','shop.myshopify.com',$2)",
       [tenant, connectionId],
     );
+    const before = await threadByProvider('t2');
+    const draft = await messaging.replies.draft(
+      adminContext(),
+      before.thread.id,
+      { id: randomUUID() },
+    );
+    await owner.query(
+      "UPDATE messaging_messages SET retain_until=now()-interval '1 day' WHERE tenant_id=$1 AND thread_id=$2",
+      [tenant, before.thread.id],
+    );
+    await runtime.query('SELECT purge_expired_messaging(200)');
+    expect(
+      (await threadByProvider('t2')).outbound.find(
+        (item) => item.id === draft.id,
+      )?.text,
+    ).toBe('');
+    // Erasure repairs a derived copy even when its source was already retention-purged.
+    await owner.query(
+      `UPDATE messaging_threads SET document=jsonb_set(document,'{snippet}','"legacy copy"'::jsonb) WHERE tenant_id=$1 AND id=$2`,
+      [tenant, before.thread.id],
+    );
     await owner.query(
       "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'])",
     );
@@ -1078,6 +1108,31 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
     expect(customer.messages[0]).toMatchObject({ text: null });
     expect(customer.thread.snippet).toBe('');
     expect(customer.links).toEqual([]);
+    await owner.query(
+      "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'])",
+    );
+    expect((await threadByProvider('t2')).thread.snippet).toBe('');
     expect((await threadByProvider('t1')).messages[0]!.text).not.toBeNull();
+  });
+  it('keeps truncated supplier messages visible without handing incomplete commitments to procurement', async () => {
+    const before = handedOff.length;
+    mailbox.push(
+      message('m-truncated', 't-truncated', {
+        from: anna,
+        to: [ops],
+        text: 'Confirmed 10 units. Later text was cut.',
+        truncated: true,
+        receivedAt: new Date().toISOString(),
+      }),
+    );
+    await messaging.service.syncMailbox(adminContext(), connectionId);
+    await drain();
+    const detail = await threadByProvider('t-truncated');
+    expect(detail.messages[0]).toMatchObject({ truncated: true });
+    expect(
+      detail.events.find((event) => event.type === 'handed_off')?.details
+        .outcome,
+    ).toBe('truncated');
+    expect(handedOff).toHaveLength(before);
   });
 });

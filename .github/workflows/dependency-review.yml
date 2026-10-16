@@ -1,0 +1,23 @@
+name: Dependency advisory review
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 2 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm audit:dependencies

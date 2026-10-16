@@ -126,6 +126,8 @@ export function createMessaging(db: TenantDatabase, options: MessagingOptions) {
     digest,
   });
   const replies = createReplies({
+    decodeAttachment: (base64) => new Uint8Array(Buffer.from(base64, 'base64')),
+    attachments: options.documents?.attachments,
     store,
     connections: options.connections,
     directory: options.directory,

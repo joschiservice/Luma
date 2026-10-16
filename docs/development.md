@@ -247,3 +247,13 @@ For a new deployment, run the shared migrations, then
 in `MIGRATION_DATABASE_URL`. Runtime roles cannot initialize or alter the cell record.
 The provisioning command rejects a different region once the record exists and rejects
 existing workspaces in another region. Database restore procedures must preserve this record.
+
+## Dependency advisories
+
+`pnpm audit:dependencies` checks production and development dependencies against current
+registry advisories. CI runs it on changes and weekly. Review reachability before accepting
+an exception in `tooling/dev/dependency-exceptions.json`: bind it to one advisory, module, dependency path and
+installed version, explain the affected feature and why it cannot be reached, name a reviewer
+and set an expiry. Expired reviews and newly affected versions fail the gate. Registry errors
+also fail rather than reporting a clean scan. Prefer compatible dependency updates; do not
+replace an old transport or compiler API with an incompatible override to silence a scanner.

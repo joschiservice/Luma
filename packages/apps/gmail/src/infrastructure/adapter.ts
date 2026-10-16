@@ -210,6 +210,7 @@ export function createGmailConnector(
         inReplyTo: parsed.inReplyTo,
         references: parsed.references,
         direction: parsed.direction,
+        providerSent: parsed.providerSent === true,
         from: parsed.from,
         to: parsed.to,
         cc: parsed.cc,
@@ -452,25 +453,13 @@ export function createGmailConnector(
         async (input, context) => {
           if (!context.idempotencyKey?.trim()) fail('invalid_input');
           const messageId = outboundMessageId(input.outboundId, mailbox);
-          // Refuse a second send: a message with this ID means an earlier attempt succeeded.
+          // An existing ID prevents redispatch, but search hits alone prove no send outcome.
           const existing = await client.listMessages({
             q: `rfc822msgid:${messageId}`,
             maxResults: 1,
             includeSpamTrash: true,
           });
-          const found = existing.messages?.[0];
-          if (found)
-            return {
-              status: 'accepted',
-              evidenceRefs: [
-                sentEvidenceId(
-                  options.tenantId,
-                  options.connectionId,
-                  found.id,
-                ),
-              ],
-              providerRequestId: null,
-            } satisfies WriteReceipt;
+          if (existing.messages?.length) fail('conflict');
           let raw: string;
           try {
             raw = composeMessage({

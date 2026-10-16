@@ -1,0 +1,11 @@
+[
+  {
+    "advisory": "GHSA-67mh-4wv8-2f99",
+    "module": "esbuild",
+    "version": "0.18.20",
+    "reason": "Drizzle Kit's legacy @esbuild-kit/core-utils uses transformSync for configuration loading. Luma does not start this esbuild development server; Vite uses esbuild 0.28.2. The affected serve API is unreachable through this dependency path. Remove the legacy loader when Drizzle Kit supports it; avoid overriding its pre-1.0 API across incompatible releases.",
+    "reviewBy": "repository maintainers",
+    "expires": "2026-11-15",
+    "dependencyPathSuffix": "drizzle-kit>@esbuild-kit/esm-loader>@esbuild-kit/core-utils>esbuild"
+  }
+]

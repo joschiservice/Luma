@@ -33,8 +33,8 @@ export interface InstalledRuntimeOptions extends ProviderRuntimeOptions {
 function installedRuntime(options: InstalledRuntimeOptions) {
   return createCapabilityRuntime({
     record: options.record,
-    async resolve(context, id) {
-      const internal = await options.internalSource?.(context, id);
+    async resolve(context, id, request) {
+      const internal = await options.internalSource?.(context, id, request);
       if (internal) return internal;
       const connection = (await options.installations.list(context)).find(
         (c) => c.id === id,
@@ -47,11 +47,22 @@ function installedRuntime(options: InstalledRuntimeOptions) {
       const capabilities: ConnectorConnection['capabilities'] = {};
       let descriptor: ConnectorConnection | undefined;
       for (const capability of connection.permissions) {
-        if (!connection.granted.includes(capability)) continue;
+        if (
+          !connection.granted.includes(capability) ||
+          (request && request.capability !== capability)
+        )
+          continue;
+        let snapshot: Awaited<
+          ReturnType<typeof options.installations.credential>
+        >;
         const build = async (
           readPurpose?: ProviderRuntimeOptions['readPurpose'],
         ) => {
-          await options.installations.credential(context, id, capability);
+          snapshot = await options.installations.credential(
+            context,
+            id,
+            capability,
+          );
 
           return provider.build(context, id, capability, {
             ...options,
@@ -60,7 +71,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
         };
         let adapter: ConnectorConnection;
         try {
-          adapter = await build();
+          adapter = await build(request?.readPurpose);
         } catch (error) {
           if (
             error instanceof IdentityError &&
@@ -85,7 +96,19 @@ function installedRuntime(options: InstalledRuntimeOptions) {
               invocation: Parameters<typeof handler.run>[0],
               input: Parameters<typeof handler.run>[1],
             ) => {
-              const fresh = await build(invocation.readPurpose);
+              const authorized = await options.installations.credential(
+                context,
+                id,
+                capability,
+              );
+              const unchanged =
+                authorized.connection.version === snapshot.connection.version &&
+                authorized.connection.credentialVersion ===
+                  snapshot.connection.credentialVersion;
+              const fresh =
+                capability.endsWith('.read') && unchanged
+                  ? adapter
+                  : await build(invocation.readPurpose);
               const current = fresh.capabilities[capability] as typeof handler;
               if (!current)
                 throw new ConnectorError({
@@ -93,11 +116,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
                   effect: 'none',
                   retry: 'never',
                 });
-              const snapshot = await options.installations.credential(
-                context,
-                id,
-                capability,
-              );
+              const credentialVersion = snapshot.connection.credentialVersion;
               try {
                 return await current.run(invocation, input);
               } catch (error) {
@@ -110,7 +129,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
                   await options.installations.recordFailure(
                     context,
                     id,
-                    snapshot.connection.credentialVersion,
+                    credentialVersion,
                     error.failure.code,
                   );
                 }

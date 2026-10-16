@@ -5,7 +5,11 @@ import type { ConnectionsConfig, ModelGatewayConfig } from '@luma/config';
 import { createInstalledMessageRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { purgeExpiredMessaging } from '@luma/messaging/composition';
-import type { ModelGateway, TenantDatabase } from '@luma/platform';
+import type {
+  ModelGateway,
+  Observability,
+  TenantDatabase,
+} from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 
 import { createApplicationServices } from './application.js';
@@ -13,6 +17,7 @@ import {
   documentExtractionAvailability,
   supplierExtractionAvailability,
 } from './authoring.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 
 /**
  * Reads connected mailboxes in the background and removes message text after its retention
@@ -25,6 +30,7 @@ export function createMailboxSyncWorker(options: {
   database: TenantDatabase;
   identity: IdentityService;
   connections: ConnectionsConfig;
+  observability?: Observability;
   env?: Readonly<Record<string, string | undefined>>;
   retentionDays?: number;
   pollMs?: number;
@@ -41,6 +47,7 @@ export function createMailboxSyncWorker(options: {
   const host = createAppHost(options.database, {
     ...options.connections,
     refreshContext: options.identity.refreshContext,
+    featureEnabled: createTenantFeatureRelease(options.observability),
     ...(options.env ? { env: options.env } : {}),
   });
   // Messages are stored by messaging itself, never as commerce observations.
@@ -53,6 +60,9 @@ export function createMailboxSyncWorker(options: {
   const { messaging } = createApplicationServices({
     database: options.database,
     identity: options.identity,
+    ...(options.observability ? { observability: options.observability } : {}),
+    providerCatalog: host.providerCatalog,
+    connectionEnvironment: host.connectionEnvironment,
     // Approved replies are sent and uncertain sends checked through Action Admission.
     execution: { kind: 'enabled', effects: { resolve: async () => null } },
     ...(options.model ? { modelGateway: options.model.gateway } : {}),

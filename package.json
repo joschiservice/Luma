@@ -66,7 +66,8 @@
     "typecheck:tooling": "turbo run typecheck --filter=@luma/tooling",
     "lint:ui": "node tooling/style/check-ui.mjs",
     "dev:staff": "node tooling/dev/cli.mjs staff",
-    "test:region-eu": "LUMA_REGION=EU LUMA_ENABLED_REGIONS=EU node tooling/dev/test.mjs test --filter=@luma/application-runtime -- regions.integration.test.ts"
+    "test:region-eu": "LUMA_REGION=EU LUMA_ENABLED_REGIONS=EU node tooling/dev/test.mjs test --filter=@luma/application-runtime -- regions.integration.test.ts",
+    "audit:dependencies": "node tooling/dev/dependency-audit.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -82,7 +83,7 @@
     "globals": "^16.5.0",
     "knip": "6.34.0",
     "pg": "catalog:pg-8-23-0",
-    "postcss": "8.5.8",
+    "postcss": "8.5.28",
     "prettier": "^3.6.2",
     "turbo": "2.11.7",
     "typescript": "catalog:typescript-compatible-5-9-3",

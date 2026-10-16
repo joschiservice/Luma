@@ -129,6 +129,7 @@ const message = z
         inReplyTo: z.string().nullable(),
         references: z.array(z.string()),
         direction: z.enum(['inbound', 'outbound']),
+        providerSent: z.boolean().optional(),
         from: address,
         to: z.array(address),
         cc: z.array(address),
