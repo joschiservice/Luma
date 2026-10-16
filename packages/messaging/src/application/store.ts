@@ -145,6 +145,8 @@ export type { OutboundState } from '../domain/replies.js';
 
 /** The stored reply document; the reply owner fills it. */
 interface OutboundDocument {
+  /** Mailbox identity fixed when the reply is requested. Absent on legacy requests. */
+  fromAddress?: string;
   to: Address[];
   cc: Address[];
   subject: string;
@@ -153,6 +155,8 @@ interface OutboundDocument {
   composeDigest?: string;
   ownerHandoffAt?: string | null;
   attachmentsExpireAt?: string;
+  contentRetainUntil?: string;
+  contentPurgedAt?: string;
   deliveryCheckedAt?: string;
   /** Supplier work metadata is bound with the exact approved content. */
   procurement?: {
@@ -173,6 +177,8 @@ interface OutboundDocument {
   decisionId?: string | null;
   approverId?: string | null;
   sentMessageId?: string | null;
+  /** Provider read identity and time that independently verified the approved send. */
+  sendObservation?: { id: string; observedAt: string; messageId: string };
   language?: ReplyLanguage;
   inReplyTo?: string | null;
   references?: string[];

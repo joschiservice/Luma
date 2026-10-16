@@ -27,6 +27,8 @@ export interface MessageData {
   inReplyTo: string | null;
   references: string[];
   direction: 'inbound' | 'outbound';
+  /** True only when provider-owned metadata confirms a sent message. */
+  providerSent?: boolean;
   from: Address;
   to: Address[];
   cc: Address[];

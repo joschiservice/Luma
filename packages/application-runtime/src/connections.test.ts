@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { request } from 'node:https';
 import { Readable } from 'node:stream';
 
+import { createShopifyProvider } from '@luma/app-shopify';
 import type { InstallationCapability } from '@luma/connections';
 import * as connectorPublic from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
@@ -120,6 +121,82 @@ function fixture() {
 
   return { records, events, refreshContext, verify, service, ctx: context() };
 }
+
+describe('capability construction budget', () => {
+  it('builds only the requested adapter and keeps revocation and rotation current', async () => {
+    const f = fixture();
+    const permissions: InstallationCapability[] = [
+      'products.read',
+      'orders.read',
+      'inventory.read',
+      'fulfillment.read',
+      'returns.read',
+      'customers.read',
+    ];
+    f.verify.mockResolvedValue(permissions);
+    const connection = await f.service.install(f.ctx, {
+      ...input,
+      permissions,
+    });
+    await f.service.check(f.ctx, connection.id, 1);
+    const provider = createShopifyProvider({});
+    const build = vi.fn(provider.build);
+    const credential = vi.spyOn(f.service, 'credential');
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({
+        data: {
+          currentAppInstallation: { accessScopes: [] },
+          count: { count: 0, precision: 'EXACT' },
+          page: {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    );
+    const runtime = connectorComposition.createInstalledRuntime({
+      installations: f.service,
+      providers: [
+        {
+          ...provider,
+          build: async (...args) => {
+            if (args[2] !== 'products.read')
+              throw new Error('Unrelated capability unavailable');
+
+            return build(...args);
+          },
+        },
+      ],
+      fetch,
+      record: async () => {},
+      recordObservations: async () => {},
+    });
+    const read = () =>
+      runtime.read(f.ctx, {
+        connectionId: connection.id,
+        capability: 'products.read',
+        version: '0',
+        input: { limit: 1 },
+      });
+    const first = await read();
+    if (!first.ok) throw new Error(JSON.stringify(first.error));
+    expect(first).toMatchObject({ ok: true });
+    expect(build).toHaveBeenCalledOnce();
+    expect(credential).toHaveBeenCalledTimes(5);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await f.service.rotate(f.ctx, connection.id, 2, { token: 'rotated' });
+    await f.service.check(f.ctx, connection.id, 3);
+    expect(await read()).toMatchObject({ ok: true });
+    expect(
+      new Headers(fetch.mock.calls.at(-1)?.[1]?.headers).get(
+        'X-Shopify-Access-Token',
+      ),
+    ).toBe('rotated');
+    await f.service.disconnect(f.ctx, connection.id, 4, 'revoked');
+    expect(await read()).toMatchObject({ ok: false });
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+});
 
 describe('installed connection lifecycle', () => {
   it('encrypts setup, verifies grants, rotates, and deletes credentials on disconnect', async () => {

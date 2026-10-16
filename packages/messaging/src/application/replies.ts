@@ -19,6 +19,7 @@ import {
   stateMessages,
 } from '../domain/replies.js';
 import type { Address } from '../domain/threads.js';
+import type { AttachmentReader } from './document-ports.js';
 import type { Ingest } from './ingest.js';
 import type {
   MailboxConnections,
@@ -53,6 +54,7 @@ export interface ReplyDependencies {
   /** Reads threads to verify sends; without it, sends stay unconfirmed. */
   reader?: MessageReader | undefined;
   ingest: Ingest;
+  attachments?: AttachmentReader | undefined;
   refreshContext(context: TenantContext): Promise<TenantContext>;
   /** Resolves the requester's current membership to send or check as them. */
   resolveContext(
@@ -63,6 +65,8 @@ export interface ReplyDependencies {
   now(): Date;
   id(): string;
   digest(value: unknown): string;
+  /** Decodes the approved attachment bytes for comparison with independent provider reads. */
+  decodeAttachment(base64: string): Uint8Array;
   uuid(name: string): string;
   log(message: string, error?: unknown): void;
   retentionDays?: number;
@@ -110,6 +114,7 @@ function replyContent(outbound: OutboundRow, providerThreadId: string) {
 
   return {
     outboundId: outbound.id,
+    ...(document.fromAddress ? { fromAddress: document.fromAddress } : {}),
     connectionId: outbound.connectionId,
     thread: providerThreadId,
     to: document.to.map((a) => [a.address, a.name]),
@@ -153,18 +158,15 @@ function replyAction(
       evidenceRefs: [thread.id, outbound.id],
       validUntil: document.expiresAt!,
     },
-    expectedPostcondition: { rfcMessageIdPrefix: `luma.${outbound.id}@` },
+    expectedPostcondition: document.fromAddress
+      ? {
+          rfcMessageId: `luma.${outbound.id}@${document.fromAddress.split('@')[1]}`,
+        }
+      : { rfcMessageIdPrefix: `luma.${outbound.id}@` },
     risk: document.risk ?? 'high',
     proposedBy: { kind: 'user', id: outbound.requestedBy },
     expiresAt: document.expiresAt!,
   };
-}
-
-/** The stored message of a sent reply, found by the Message-ID the mailbox app derives. */
-function sentMessage(messages: readonly MessageRow[], outboundId: string) {
-  const prefix = `luma.${outboundId}@`;
-
-  return messages.find((m) => m.rfcMessageId?.toLowerCase().startsWith(prefix));
 }
 
 function basis(message: MessageRow): ReplyBasis {
@@ -378,9 +380,8 @@ export function createReplies(deps: ReplyDependencies) {
       }
       const found =
         execution.state === 'verified'
-          ? sentMessage(
-              await tx.messages.forThread(current.threadId),
-              outboundId,
+          ? (await tx.messages.forThread(current.threadId)).find(
+              (message) => message.id === current.document.sentMessageId,
             )
           : undefined;
       if (!found) {
@@ -518,6 +519,10 @@ export function createReplies(deps: ReplyDependencies) {
     tx: { thread: ThreadRow; mailbox: Mailbox; rules: MailboxRule[] },
   ) {
     let cursor: string | null = null;
+    const items: Extract<
+      Awaited<ReturnType<MessageReader['thread']>>,
+      { ok: true }
+    >['items'] = [];
     for (let page = 0; page < 10; page++) {
       const result = await deps.reader!.thread(
         context,
@@ -532,13 +537,14 @@ export function createReplies(deps: ReplyDependencies) {
           cursor,
         },
       );
-      if (!result.ok) return false;
+      if (!result.ok || !result.complete) return null;
+      items.push(...result.items);
       await deps.ingest(context, tx.mailbox, tx.rules, result.items);
-      if (!result.nextCursor) return true;
+      if (!result.nextCursor) return items;
       cursor = result.nextCursor;
     }
 
-    return true;
+    return null;
   }
 
   /**
@@ -558,6 +564,12 @@ export function createReplies(deps: ReplyDependencies) {
       )
         return null;
       const document = outbound.document;
+      if (
+        document.fromAddress &&
+        (await tx.mailboxes.get(outbound.connectionId))?.address !==
+          document.fromAddress
+      )
+        return null;
       const message: ReplyMessage = {
         outboundId: outbound.id,
         thread:
@@ -747,6 +759,9 @@ export function createReplies(deps: ReplyDependencies) {
               attachments: input.attachments ?? [],
               procurement: input.procurement,
               composeDigest: requestDigest,
+              contentRetainUntil: new Date(
+                deps.now().getTime() + (deps.retentionDays ?? 365) * 86_400_000,
+              ).toISOString(),
               attachmentsExpireAt: new Date(
                 deps.now().getTime() + (deps.retentionDays ?? 365) * 86_400_000,
               ).toISOString(),
@@ -940,6 +955,9 @@ export function createReplies(deps: ReplyDependencies) {
           cc: composed.cc,
           subject: composed.subject,
           text: composed.text,
+          contentRetainUntil: new Date(
+            now.getTime() + (deps.retentionDays ?? 365) * 86_400_000,
+          ).toISOString(),
           citations: composed.citations,
           consequential: consequentialReasons({
             subject: composed.subject,
@@ -1095,8 +1113,13 @@ export function createReplies(deps: ReplyDependencies) {
               !!current!.document.procurement || mailbox!.settings.approveAll,
           });
           const now = deps.now();
+          if (!mailbox!.address)
+            conflict(
+              'The mailbox address is unavailable. Reconnect it before sending.',
+            );
           const pending: OutboundRow = {
             ...current!,
+            document: { ...current!.document, fromAddress: mailbox!.address! },
             actionId: deps.uuid(
               `reply-action:${context.tenantId}:${current!.id}`,
             ),
@@ -1105,6 +1128,7 @@ export function createReplies(deps: ReplyDependencies) {
             state: 'approval_required',
             actionId: pending.actionId,
             document: {
+              fromAddress: pending.document.fromAddress!,
               consequential: reasons,
               risk: reasons.length ? 'high' : 'low',
               contentDigest: deps.digest(
@@ -1568,6 +1592,7 @@ export function createReplies(deps: ReplyDependencies) {
 
           return thread && mailbox
             ? {
+                outbound: outbound!,
                 thread,
                 mailbox,
                 rules: await tx.rules.active(thread.connectionId),
@@ -1575,29 +1600,138 @@ export function createReplies(deps: ReplyDependencies) {
             : null;
         },
       );
-      if (!data || !deps.reader)
-        return {
-          outcome: 'inconclusive' as const,
-          observationRefs: [outboundId],
-        };
-      if (!(await readThread(context, data)))
-        return {
-          outcome: 'inconclusive' as const,
-          observationRefs: [data.thread.id],
-        };
-      const found = sentMessage(
-        await deps.store.transaction(context.tenantId, (tx) =>
-          tx.messages.forThread(data.thread.id),
-        ),
-        outboundId,
+      const startedAt = deps.now().toISOString();
+      const inconclusive = () => ({
+        outcome: 'inconclusive' as const,
+        observationRefs: [outboundId],
+        observedAt: startedAt,
+      });
+      if (
+        !data ||
+        !deps.reader ||
+        !data.mailbox.address ||
+        !data.outbound.actionId ||
+        !data.outbound.document.contentDigest ||
+        data.outbound.document.contentPurgedAt ||
+        (data.outbound.document.fromAddress !== undefined &&
+          data.outbound.document.fromAddress !== data.mailbox.address) ||
+        deps.digest(
+          replyContent(data.outbound, data.thread.providerThreadId),
+        ) !== data.outbound.document.contentDigest
+      )
+        return inconclusive();
+      const fresh = await readThread(context, data);
+      if (!fresh) return inconclusive();
+      const expectedId = `luma.${outboundId}@${(data.outbound.document.fromAddress ?? data.mailbox.address).split('@')[1]}`;
+      const matches = fresh.filter(
+        (item) => item.data.rfcMessageId === expectedId,
+      );
+      if (matches.length !== 1) return inconclusive();
+      const found = matches[0]!;
+      const { observationId, observedAt } = found;
+      if (
+        !observationId ||
+        !observedAt ||
+        Date.parse(observedAt) < Date.parse(startedAt) ||
+        !Number.isFinite(Date.parse(observedAt))
+      )
+        return inconclusive();
+      const message = found.data;
+      const approved = data.outbound.document;
+      const addresses = (values: readonly Address[]) =>
+        values
+          .map((value) =>
+            canonicalJson([value.address.toLowerCase(), value.name]),
+          )
+          .sort();
+      const same = (left: unknown, right: unknown) =>
+        canonicalJson(left) === canonicalJson(right);
+      if (
+        !message.providerSent ||
+        message.direction !== 'outbound' ||
+        message.truncated ||
+        message.from.address.toLowerCase() !==
+          data.mailbox.address.toLowerCase() ||
+        !same(addresses(message.to), addresses(approved.to)) ||
+        !same(addresses(message.cc), addresses(approved.cc)) ||
+        message.subject !== approved.subject ||
+        message.text !== approved.text ||
+        message.inReplyTo !== (approved.inReplyTo ?? null) ||
+        !same(message.references, approved.references ?? []) ||
+        message.attachments.length !== (approved.attachments ?? []).length
+      )
+        return inconclusive();
+      for (const [index, attachment] of (
+        approved.attachments ?? []
+      ).entries()) {
+        const actual = message.attachments[index]!;
+        if (
+          !deps.attachments ||
+          actual.filename !== attachment.filename ||
+          actual.mimeType !== attachment.mimeType
+        )
+          return inconclusive();
+        const expected = deps.decodeAttachment(attachment.base64);
+        const content = await deps.attachments.read(
+          context,
+          data.thread.connectionId,
+          {
+            message: { externalId: found.providerMessageId, scopeKey: '' },
+            attachment: actual.attachment,
+            maxBytes: expected.length,
+          },
+        );
+        if (
+          !content.ok ||
+          expected.length !== content.bytes.length ||
+          !expected.every((byte, index) => byte === content.bytes[index])
+        )
+          return inconclusive();
+      }
+      const stored = await deps.store.transaction(
+        context.tenantId,
+        async (tx) => {
+          const current = await tx.outbound.get(outboundId);
+          if (
+            !current ||
+            current.document.contentDigest !==
+              data.outbound.document.contentDigest ||
+            deps.digest(replyContent(current, data.thread.providerThreadId)) !==
+              data.outbound.document.contentDigest
+          )
+            return null;
+          const message = (await tx.messages.forThread(data.thread.id)).find(
+            (item) => item.providerMessageId === found.providerMessageId,
+          );
+          if (
+            !message ||
+            message.purgedAt ||
+            message.direction !== 'outbound' ||
+            message.text !== approved.text
+          )
+            return null;
+          await save(tx, current, {
+            document: {
+              sentMessageId: message.id,
+              sendObservation: {
+                id: observationId,
+                observedAt,
+                messageId: message.id,
+              },
+            },
+          });
+
+          return message;
+        },
       );
 
-      return found
-        ? { outcome: 'passed' as const, observationRefs: [found.id] }
-        : {
-            outcome: 'inconclusive' as const,
-            observationRefs: [data.thread.id],
-          };
+      return stored
+        ? {
+            outcome: 'passed' as const,
+            observationRefs: [stored.id],
+            observedAt,
+          }
+        : inconclusive();
     },
   };
 }

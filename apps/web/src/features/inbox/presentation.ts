@@ -534,6 +534,8 @@ export function eventText(
         return m.messaging_event_handed_off_forbidden();
       if (details.outcome === 'empty')
         return m.messaging_event_handed_off_empty();
+      if (details.outcome === 'truncated')
+        return m.messaging_event_handed_off_truncated();
 
       return details.record
         ? m.messaging_event_handed_off({ record: details.record })
