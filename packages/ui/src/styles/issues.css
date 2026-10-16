@@ -52,24 +52,11 @@
   border-bottom: 1px solid var(--line);
 }
 
-.issue-view-tabs {
-  min-width: 0;
-}
-
-.issue-view-tabs [data-slot='tabs-trigger'] {
-  text-decoration: none;
-}
-
-.issue-view-tabs [data-slot='tabs-trigger'] svg {
-  width: 14px;
-  height: 14px;
-}
-
-.issue-view-tabs [data-slot='tabs-trigger'][data-view='needs_you'] svg {
+.issue-view-icon[data-view='needs_you'] {
   color: var(--state-approval);
 }
 
-.issue-view-tabs [data-slot='tabs-trigger'][data-view='active'] svg {
+.issue-view-icon[data-view='active'] {
   color: var(--signal);
 }
 

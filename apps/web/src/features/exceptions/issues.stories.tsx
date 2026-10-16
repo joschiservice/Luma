@@ -14,7 +14,7 @@ import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector
 import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
-import { IssueViewTabs } from '@luma/ui/components/issues/issue-view-tabs';
+import { issueViews } from '@luma/ui/components/issues/issue-views';
 import {
   resolutionProgress,
   resolutionReview,
@@ -24,6 +24,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import {
   type CollectionFilter,
   CollectionToolbar,
+  CollectionViews,
 } from '@luma/ui/components/primitives/collection-toolbar';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -153,18 +154,14 @@ function IssuesExample({
                   onClear={() => setFilters({})}
                   onRefresh={() => {}}
                   views={
-                    <IssueViewTabs
+                    <CollectionViews
+                      label={m.issues_views_label()}
                       value={view}
-                      renderLink={(next) => (
-                        <a
-                          href={`#${next}`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setView(next);
-                            setPage(1);
-                          }}
-                        />
-                      )}
+                      views={issueViews()}
+                      onChange={(next) => {
+                        setView(next);
+                        setPage(1);
+                      }}
                     />
                   }
                 />

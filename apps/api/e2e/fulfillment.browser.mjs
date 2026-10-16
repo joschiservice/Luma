@@ -167,7 +167,11 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   await save.getByLabel('Name').fill('Deadlines by status');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Deadlines by status', exact: true })
+    .getByRole('tab', {
+      name: 'Deadlines by status',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),

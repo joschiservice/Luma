@@ -15,7 +15,7 @@ import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { CollectionPreview } from '@luma/ui/components/primitives/collection-preview';
 import {
   CollectionToolbar,
-  CollectionViews,
+  type CollectionView,
 } from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
@@ -527,15 +527,11 @@ export function FulfillmentPage() {
                 view={view}
                 path="fulfillment"
                 segmentLabel={fulfillmentSegmentLabel}
+                segments={fulfillmentViews(data?.counts)}
                 exportColumns={controls.columns.map((id) => ({
                   id,
                   label: fulfillmentPresentation[id]?.label() ?? id,
                 }))}
-              />
-              <FulfillmentTabs
-                value={view.ref.kind === 'builtin' ? view.ref.segment : null}
-                counts={data?.counts}
-                onChange={(next) => view.open(`builtin:${next}`)}
               />
             </>
           }
@@ -688,33 +684,17 @@ export function FulfillmentPage() {
   );
 }
 
-/**
- * The built-in views as tabs with their counts under the current search and conditions. A saved
- * view selects no tab.
- */
-export function FulfillmentTabs({
-  value,
-  counts,
-  onChange,
-}: {
-  value: string | null;
-  counts?: FulfillmentList['counts'] | undefined;
-  onChange: (segment: string) => void;
-}) {
-  return (
-    <CollectionViews
-      label={m.fulfillment_list_views_label()}
-      value={value}
-      views={fulfillmentCatalog.segments.map((segment) => ({
-        value: segment,
-        label: fulfillmentSegmentLabel(segment),
-        description: (viewDescriptions as Record<string, string>)[segment],
-        count: counts?.[segment as FulfillmentSegment],
-        attention: warningViews.has(segment),
-      }))}
-      onChange={onChange}
-    />
-  );
+/** The built-in views with their counts under the current search and conditions. */
+export function fulfillmentViews(
+  counts?: FulfillmentList['counts'] | undefined,
+): CollectionView<string>[] {
+  return fulfillmentCatalog.segments.map((segment) => ({
+    value: segment,
+    label: fulfillmentSegmentLabel(segment),
+    description: (viewDescriptions as Record<string, string>)[segment],
+    count: counts?.[segment as FulfillmentSegment],
+    attention: warningViews.has(segment),
+  }));
 }
 
 /**

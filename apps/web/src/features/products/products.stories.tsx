@@ -6,7 +6,10 @@ import type {
   ProductList,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -28,7 +31,7 @@ import { IdentityLinksView } from '../sync/identity-links';
 import { listingColumn, productGroupLabel } from './collection';
 import { productOptions } from './data';
 import { ProductDetailView } from './detail';
-import { ProductsEmpty, ProductsView, ProductTabs } from './page';
+import { ProductsEmpty, ProductsView, productViews } from './page';
 import { ProductPreview } from './preview';
 import { ProductResults } from './results';
 
@@ -584,9 +587,10 @@ function ListPreview({ state }: { state: string }) {
         toolbar={
           <CollectionToolbar
             views={
-              <ProductTabs
+              <CollectionViews
+                label={m.products_list_views_label()}
                 value={segment}
-                counts={hidden ? undefined : shown.counts}
+                views={productViews(hidden ? undefined : shown.counts)}
                 onChange={setSegment}
               />
             }

@@ -79,7 +79,7 @@ test('works supplier and customer threads, documents, replies and mailbox rules'
   await page.waitForURL(`**${inboxPath}**`);
 
   // The list shows both threads with their counts.
-  const views = page.getByRole('tablist', { name: 'Thread views' });
+  const views = page.getByRole('tablist', { name: 'Views' });
   await expect(views.getByRole('tab', { name: /Open/ })).toContainText('2');
   await expect(views.getByRole('tab', { name: /Unassigned/ })).toContainText(
     '2',

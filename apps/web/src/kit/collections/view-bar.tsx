@@ -10,6 +10,10 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
+  type CollectionView as CollectionViewOption,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,11 +24,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@luma/ui/components/primitives/dropdown-menu';
@@ -36,7 +36,7 @@ import {
 import { Input } from '@luma/ui/components/primitives/input';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowDown, ArrowUp, ChevronDown, Ellipsis } from 'lucide-react';
+import { ArrowDown, ArrowUp, Ellipsis } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
@@ -55,15 +55,18 @@ import type { CollectionView } from './use-collection-view';
 type Sharing = AdaptiveView['sharing'];
 
 /**
- * The view bar of a list page: the view menu with built-in, personal and shared views, the
- * Modified state with Save, Save as new view and Reset, and view options. Saving never shares a
- * view more widely than the member may; sharing never grants record access.
+ * The view bar of a list page: built-in, personal and shared views as tabs, with those that
+ * don't fit in a More menu, the Modified state with Save, Save as new view and Reset, and view
+ * options. Each tab links to its view, so it can open in a new browser tab. A list with a single
+ * view and no saved views shows no tabs. Saving never shares a view more widely than the member
+ * may; sharing never grants record access.
  */
 export function CollectionViewBar({
   organizationId,
   view,
   path,
   segmentLabel,
+  segments,
   exportColumns,
 }: {
   organizationId: string;
@@ -74,6 +77,8 @@ export function CollectionViewBar({
    */
   path: string;
   segmentLabel: (segment: string) => string;
+  /** Descriptions, icons and counts of the built-in views, by segment. */
+  segments?: readonly CollectionViewOption<string>[] | undefined;
   /** The visible columns and their headings; offers CSV export to members who may export. */
   exportColumns?: readonly { id: string; label: string }[] | undefined;
 }) {
@@ -162,191 +167,180 @@ export function CollectionViewBar({
 
     return () => clearTimeout(timeout);
   }, [undo]);
-  const pinPath = `${path}${path.includes('?') ? '&' : '?'}view=${view.ref.kind === 'saved' ? view.ref.id : view.ref.segment}`;
+  const viewPath = (id: string) =>
+    `${path}${path.includes('?') ? '&' : '?'}view=${encodeURIComponent(id)}`;
+  const pinPath = viewPath(
+    view.ref.kind === 'saved' ? view.ref.id : view.ref.segment,
+  );
   const pinned = layout?.pinned.some((pin) => pin.path === pinPath) ?? false;
-  const builtins = view.views.filter((item) => item.kind === 'builtin');
-  const mine = view.views.filter(
-    (item) => item.kind === 'saved' && item.view.sharing.scope === 'private',
-  );
-  const shared = view.views.filter(
-    (item) => item.kind === 'saved' && item.view.sharing.scope !== 'private',
-  );
   const label = (item: (typeof view.views)[number]) =>
     item.kind === 'saved' ? item.view.name : segmentLabel(item.segment);
 
+  const grouped = view.views.some((item) => item.kind === 'saved');
+  const views = view.views.map((item): CollectionViewOption<string> => ({
+    ...(item.kind === 'builtin'
+      ? segments?.find((segment) => segment.value === item.segment)
+      : undefined),
+    value: item.key,
+    label: label(item),
+    href: `/app/${organizationId}/${viewPath(item.kind === 'saved' ? item.view.id : item.segment)}`,
+    group: grouped
+      ? item.kind === 'builtin'
+        ? m.collections_views_builtin()
+        : item.view.sharing.scope === 'private'
+          ? m.collections_views_mine()
+          : m.collections_views_shared()
+      : undefined,
+  }));
+
   return (
-    <div className="collection-view-bar">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" className="collection-view-trigger">
-              <span>{name}</span>
-              <ChevronDown aria-hidden="true" />
-            </Button>
+    <div
+      className="collection-view-bar"
+      data-views={views.length > 1 ? '' : undefined}
+    >
+      {views.length > 1 ? (
+        <CollectionViews
+          label={m.collections_views_label()}
+          value={
+            views.some((item) => item.value === view.key) ? view.key : null
           }
+          views={views}
+          onChange={(key) => view.open(key)}
+          overflow
         />
-        <DropdownMenuContent className="collection-view-menu">
-          <DropdownMenuRadioGroup
-            value={view.key}
-            onValueChange={(key: string) => view.open(key)}
-          >
-            {[
-              [m.collections_views_builtin(), builtins],
-              [m.collections_views_mine(), mine],
-              [m.collections_views_shared(), shared],
-            ].map(([title, items]) =>
-              Array.isArray(items) && items.length ? (
-                <DropdownMenuGroup key={String(title)}>
-                  <DropdownMenuLabel>{String(title)}</DropdownMenuLabel>
-                  {items.map((item) => (
-                    <DropdownMenuRadioItem
-                      key={item.key}
-                      value={item.key}
-                      // Opening a view is navigation, so the menu closes.
-                      closeOnClick
-                    >
-                      {label(item)}
-                      {view.defaultView === item.key ? (
-                        <Badge className="collection-view-default">
-                          {m.collections_view_default()}
-                        </Badge>
-                      ) : null}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuGroup>
-              ) : null,
-            )}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {view.modified ? (
-        <>
-          <Badge tone="info">{m.collections_view_modified()}</Badge>
-          {saved?.canEdit ? (
-            <Button
-              variant="outline"
-              onClick={() => update.mutate()}
-              disabled={update.isPending}
-            >
-              {m.collections_view_save()}
-            </Button>
-          ) : null}
-          {view.savedViewsAvailable ? (
-            <Button
-              variant="outline"
-              onClick={() => setDialog({ kind: 'save-as' })}
-            >
-              {m.collections_view_save_as()}
-            </Button>
-          ) : null}
-          <Button variant="ghost" onClick={view.reset}>
-            {m.collections_view_reset()}
-          </Button>
-        </>
       ) : null}
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={m.collections_view_options()}
-            >
-              <Ellipsis aria-hidden="true" />
+      <div className="collection-view-actions">
+        {view.modified ? (
+          <>
+            <Badge tone="info">{m.collections_view_modified()}</Badge>
+            {saved?.canEdit ? (
+              <Button
+                variant="outline"
+                onClick={() => update.mutate()}
+                disabled={update.isPending}
+              >
+                {m.collections_view_save()}
+              </Button>
+            ) : null}
+            {view.savedViewsAvailable ? (
+              <Button
+                variant="outline"
+                onClick={() => setDialog({ kind: 'save-as' })}
+              >
+                {m.collections_view_save_as()}
+              </Button>
+            ) : null}
+            <Button variant="ghost" onClick={view.reset}>
+              {m.collections_view_reset()}
             </Button>
-          }
-        />
-        <DropdownMenuContent align="end">
-          {view.savedViewsAvailable && !view.modified ? (
-            <DropdownMenuItem onClick={() => setDialog({ kind: 'save-as' })}>
-              {saved
-                ? m.collections_view_duplicate()
-                : m.collections_view_save_as()}
-            </DropdownMenuItem>
-          ) : null}
-          {saved ? (
-            <DropdownMenuItem
-              render={
-                <Link
-                  to="/app/$organizationId/views/$viewId"
-                  params={{ organizationId, viewId: saved.id }}
-                  search={{ manage: true }}
-                />
-              }
-            >
-              {m.collections_view_manage()}
-            </DropdownMenuItem>
-          ) : null}
-          {saved?.canEdit ? (
-            <>
-              <DropdownMenuItem onClick={() => setDialog({ kind: 'rename' })}>
-                {m.collections_view_rename_sharing()}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDialog({ kind: 'archive' })}>
-                {m.collections_view_archive()}
-              </DropdownMenuItem>
-            </>
-          ) : null}
-          {exportColumns?.length && permissions.can('lists.export') ? (
-            <DropdownMenuItem
-              disabled={exporting.isPending}
-              onClick={() => exporting.mutate()}
-            >
-              {m.collections_export()}
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem
-            onClick={() => {
-              void navigator.clipboard
-                ?.writeText(window.location.href)
-                .then(() => setCopied(true));
-            }}
-          >
-            {m.collections_view_copy_link()}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
-              view.setDefaultView(
-                view.defaultView === view.key ? null : view.key,
-              )
+          </>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={m.collections_view_options()}
+              >
+                <Ellipsis aria-hidden="true" />
+              </Button>
             }
-          >
-            {view.defaultView === view.key
-              ? m.collections_view_clear_default()
-              : m.collections_view_make_default()}
-          </DropdownMenuItem>
-          {layout ? (
+          />
+          <DropdownMenuContent align="end">
+            {view.savedViewsAvailable && !view.modified ? (
+              <DropdownMenuItem onClick={() => setDialog({ kind: 'save-as' })}>
+                {saved
+                  ? m.collections_view_duplicate()
+                  : m.collections_view_save_as()}
+              </DropdownMenuItem>
+            ) : null}
+            {saved ? (
+              <DropdownMenuItem
+                render={
+                  <Link
+                    to="/app/$organizationId/views/$viewId"
+                    params={{ organizationId, viewId: saved.id }}
+                    search={{ manage: true }}
+                  />
+                }
+              >
+                {m.collections_view_manage()}
+              </DropdownMenuItem>
+            ) : null}
+            {saved?.canEdit ? (
+              <>
+                <DropdownMenuItem onClick={() => setDialog({ kind: 'rename' })}>
+                  {m.collections_view_rename_sharing()}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDialog({ kind: 'archive' })}
+                >
+                  {m.collections_view_archive()}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+            {exportColumns?.length && permissions.can('lists.export') ? (
+              <DropdownMenuItem
+                disabled={exporting.isPending}
+                onClick={() => exporting.mutate()}
+              >
+                {m.collections_export()}
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
-              disabled={!pinned && layout.pinned.length >= 12}
+              onClick={() => {
+                void navigator.clipboard
+                  ?.writeText(window.location.href)
+                  .then(() => setCopied(true));
+              }}
+            >
+              {m.collections_view_copy_link()}
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() =>
-                saveLayout({
-                  pinned: pinned
-                    ? layout.pinned.filter((pin) => pin.path !== pinPath)
-                    : [
-                        ...layout.pinned,
-                        { path: pinPath, label: name.slice(0, 120) },
-                      ],
-                })
+                view.setDefaultView(
+                  view.defaultView === view.key ? null : view.key,
+                )
               }
             >
-              {pinned ? m.collections_view_unpin() : m.collections_view_pin()}
+              {view.defaultView === view.key
+                ? m.collections_view_clear_default()
+                : m.collections_view_make_default()}
             </DropdownMenuItem>
-          ) : null}
-          {view.views.length > 1 ? (
-            <DropdownMenuItem onClick={() => setDialog({ kind: 'order' })}>
-              {m.collections_view_order()}
+            {layout ? (
+              <DropdownMenuItem
+                disabled={!pinned && layout.pinned.length >= 12}
+                onClick={() =>
+                  saveLayout({
+                    pinned: pinned
+                      ? layout.pinned.filter((pin) => pin.path !== pinPath)
+                      : [
+                          ...layout.pinned,
+                          { path: pinPath, label: name.slice(0, 120) },
+                        ],
+                  })
+                }
+              >
+                {pinned ? m.collections_view_unpin() : m.collections_view_pin()}
+              </DropdownMenuItem>
+            ) : null}
+            {view.views.length > 1 ? (
+              <DropdownMenuItem onClick={() => setDialog({ kind: 'order' })}>
+                {m.collections_view_order()}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() =>
+                void view.resetPage().then((previous) => setUndo(previous))
+              }
+            >
+              {m.collections_view_reset_page()}
             </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() =>
-              void view.resetPage().then((previous) => setUndo(previous))
-            }
-          >
-            {m.collections_view_reset_page()}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <span className="sr-only" role="status">
         {copied ? m.collections_view_link_copied() : ''}
       </span>

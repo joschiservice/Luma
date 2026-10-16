@@ -351,7 +351,7 @@ export function NeedsYouView({
   segment?: DecisionView | undefined;
   /** A saved view is open, so no built-in view tab is current. */
   savedView?: boolean | undefined;
-  /** The view menu with saved views. */
+  /** The view bar with built-in and saved views; without it the built-in views are plain tabs. */
   viewBar?: ReactNode;
   /** The Display menu. */
   display?: ReactNode;
@@ -496,45 +496,46 @@ export function NeedsYouView({
           onRefresh={onRefresh}
           views={
             <>
-              {viewBar}
-              <Tabs
-                value={savedView ? null : segment}
-                className="decisions-views"
-              >
-                <TabsList
-                  aria-label={m.decisions_views_label()}
-                  activateOnFocus={false}
+              {viewBar ?? (
+                <Tabs
+                  value={savedView ? null : segment}
+                  className="decisions-views"
                 >
-                  {views.map((option) => (
-                    <TabsTrigger
-                      key={option}
-                      value={option}
-                      nativeButton={false}
-                      render={
-                        <Link
-                          to="/app/$organizationId/needs-you"
-                          params={{ organizationId }}
-                          search={{ view: option, item: search.item }}
-                          resetScroll={false}
-                          onClick={(event) => {
-                            if (!onOpenView || event.metaKey || event.ctrlKey)
-                              return;
-                            event.preventDefault();
-                            onOpenView(option);
-                          }}
-                        />
-                      }
-                    >
-                      {viewLabels[option]()}
-                      {list ? (
-                        <Badge>
-                          {formatNumber(list.counts.views[option] ?? 0)}
-                        </Badge>
-                      ) : null}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+                  <TabsList
+                    aria-label={m.decisions_views_label()}
+                    activateOnFocus={false}
+                  >
+                    {views.map((option) => (
+                      <TabsTrigger
+                        key={option}
+                        value={option}
+                        nativeButton={false}
+                        render={
+                          <Link
+                            to="/app/$organizationId/needs-you"
+                            params={{ organizationId }}
+                            search={{ view: option, item: search.item }}
+                            resetScroll={false}
+                            onClick={(event) => {
+                              if (!onOpenView || event.metaKey || event.ctrlKey)
+                                return;
+                              event.preventDefault();
+                              onOpenView(option);
+                            }}
+                          />
+                        }
+                      >
+                        {viewLabels[option]()}
+                        {list ? (
+                          <Badge>
+                            {formatNumber(list.counts.views[option] ?? 0)}
+                          </Badge>
+                        ) : null}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
             </>
           }
           search={
@@ -1001,13 +1002,17 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       organizationId={organizationId}
       search={search}
       segment={segment}
-      savedView={view.ref.kind === 'saved'}
       viewBar={
         <CollectionViewBar
           organizationId={organizationId}
           view={view}
           path="needs-you"
           segmentLabel={(value) => viewLabels[decisionView(value)]()}
+          segments={views.map((option) => ({
+            value: option,
+            label: viewLabels[option](),
+            count: data ? (data.counts.views[option] ?? 0) : undefined,
+          }))}
         />
       }
       display={controls.display}
@@ -1150,7 +1155,6 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       }
       properties={controls.properties}
       density={state.density}
-      onOpenView={(option) => view.open(`builtin:${option}`)}
       list={data}
       loading={list.isPending && !failure}
       refreshing={list.isFetching}
