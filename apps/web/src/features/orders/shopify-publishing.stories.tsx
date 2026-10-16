@@ -1,6 +1,6 @@
 import type { AppUiProps } from '@luma/app-host/web';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { type ComponentType, lazy, Suspense, useMemo } from 'react';
+import { type ComponentType, useMemo } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 const modules = import.meta.glob<{
@@ -11,9 +11,9 @@ const modules = import.meta.glob<{
   }>;
 }>('../../../../../packages/apps/*/src/web/shipment-publishing.tsx');
 const load = Object.values(modules)[0];
-const Publishing = load
-  ? lazy(async () => ({ default: (await load()).ShopifyShipmentPublishing }))
-  : null;
+// Import the app while the story file loads: its first Vite compile can outlast a story's
+// test time limit in parallel runs, and story loaders count toward that limit.
+const Publishing = load ? (await load()).ShopifyShipmentPublishing : null;
 const connectionId = '11111111-1111-4111-8111-111111111111',
   downstreamConnectionId = '22222222-2222-4222-8222-222222222222',
   orderId = 'gid://shopify/Order/2001';
@@ -168,30 +168,19 @@ function Preview({
     };
   }, [disabled, uncertain]);
 
-  return (
-    <Suspense fallback={<p>Loading…</p>}>
-      {Publishing ? (
-        <Publishing
-          connectionId={connectionId}
-          orderId={orderId}
-          services={services}
-        />
-      ) : null}
-    </Suspense>
-  );
+  return Publishing ? (
+    <Publishing
+      connectionId={connectionId}
+      orderId={orderId}
+      services={services}
+    />
+  ) : null;
 }
 
 const meta = {
   title: 'Orders/Shopify shipment publishing',
   component: Preview,
   parameters: { layout: 'padded' },
-  loaders: [
-    async () => {
-      await load?.();
-
-      return {};
-    },
-  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;

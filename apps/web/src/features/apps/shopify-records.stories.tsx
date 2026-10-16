@@ -1,6 +1,6 @@
 import type { AppUiProps } from '@luma/app-host/web';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { type ComponentType, lazy, Suspense } from 'react';
+import { type ComponentType } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
@@ -9,7 +9,9 @@ const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
 const load = Object.entries(modules).find(([path]) =>
   path.includes('/shopify/'),
 )?.[1];
-const Shopify = load ? lazy(load) : null;
+// Import the app while the story file loads: its first Vite compile can outlast a story's
+// test time limit in parallel runs, and story loaders count toward that limit.
+const Shopify = load ? (await load()).default : null;
 const connectionId = '11111111-1111-4111-8111-111111111111';
 const organizationId = '22222222-2222-4222-8222-222222222222';
 const timestamp = '2026-09-28T08:00:00Z';
@@ -119,20 +121,18 @@ function Preview({ slot = 'page' }: { slot?: 'page' | 'record' }) {
   };
 
   return (
-    <Suspense fallback={<p>Loading Shopify…</p>}>
-      <Shopify
-        organizationId={organizationId}
-        slot={slot}
-        can={() => true}
-        record={
-          slot === 'record'
-            ? { kind: 'order', connectionId, externalId: gid('Order') }
-            : undefined
-        }
-        services={services}
-        done={async () => {}}
-      />
-    </Suspense>
+    <Shopify
+      organizationId={organizationId}
+      slot={slot}
+      can={() => true}
+      record={
+        slot === 'record'
+          ? { kind: 'order', connectionId, externalId: gid('Order') }
+          : undefined
+      }
+      services={services}
+      done={async () => {}}
+    />
   );
 }
 
@@ -140,12 +140,6 @@ const meta = {
   title: 'Apps/Shopify records',
   component: Preview,
   parameters: { layout: 'fullscreen' },
-  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
-  loaders: [
-    async () => {
-      await load?.();
-    },
-  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;

@@ -1,7 +1,7 @@
 import type { AppUiProps } from '@luma/app-host/web';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { type ComponentType, lazy, Suspense, useMemo, useState } from 'react';
+import { type ComponentType, useMemo, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
@@ -13,9 +13,9 @@ const modules = import.meta.glob<{
   }>;
 }>('../../../../../packages/apps/*/src/web/inventory-correction.tsx');
 const load = Object.values(modules)[0];
-const Correction = load
-  ? lazy(async () => ({ default: (await load()).ShopifyInventoryCorrection }))
-  : null;
+// Import the app while the story file loads: its first Vite compile can outlast a story's
+// test time limit in parallel runs, and story loaders count toward that limit.
+const Correction = load ? (await load()).ShopifyInventoryCorrection : null;
 const positionId = '11111111-1111-4111-8111-111111111111',
   connectionId = '22222222-2222-4222-8222-222222222222',
   sourceConnectionId = '33333333-3333-4333-8333-333333333333';
@@ -222,11 +222,9 @@ function Preview({
     <main className="inventory-page">
       <style>{appStyles}</style>
       <PageHeader title="LINEN-SHIRT-M" description="Tokyo warehouse · units" />
-      <Suspense fallback={<p>Loading correction…</p>}>
-        {Correction ? (
-          <Correction positionId={positionId} services={services} />
-        ) : null}
-      </Suspense>
+      {Correction ? (
+        <Correction positionId={positionId} services={services} />
+      ) : null}
     </main>
   );
 }
@@ -235,12 +233,6 @@ const meta = {
   title: 'Inventory/Shopify stock correction',
   component: Preview,
   parameters: { layout: 'fullscreen' },
-  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
-  loaders: [
-    async () => {
-      await load?.();
-    },
-  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;
