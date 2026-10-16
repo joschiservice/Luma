@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
+import { defineConfig } from 'eslint/config';
 import prettier from 'eslint-config-prettier';
 import jsdoc from 'eslint-plugin-jsdoc';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -10,7 +11,7 @@ import tseslint from 'typescript-eslint';
 import architecture from './tooling/architecture/eslint-plugin.mjs';
 import ui from './tooling/style/eslint-plugin.mjs';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       '**/dist/**',
