@@ -1164,6 +1164,22 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     );
     expect(runs.rows.at(-1)).toEqual({ kind: 'backfill', unchanged: 3 });
 
+    // Members read one sync's runs, newest first; other streams' runs stay out.
+    const history = await service.runs(context('viewer'), orders!.id);
+    expect(history.runs.map((run) => [run.kind, run.trigger])).toEqual([
+      ['backfill', 'operator'],
+      ['backfill', 'connection'],
+    ]);
+    expect(history.runs[0]).toMatchObject({
+      recordType: 'orders',
+      connectionId: shop,
+      outcome: 'completed',
+      unchanged: 3,
+    });
+    await expect(service.runs(context(), randomUUID())).rejects.toMatchObject({
+      statusCode: 404,
+    });
+
     // An older snapshot of a changed order is retained, never selected.
     const later = (seconds: number) =>
       new Date(Date.now() + seconds * 1000).toISOString();
@@ -1188,6 +1204,120 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         (r) => r.capability === 'orders.read' && r.updatedSince,
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('pages a sync’s runs and problem records and controls a connection’s syncs together', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    await drain();
+    const orders = (await stream('orders'))!;
+
+    // Runs page newest first; the cursor continues after the last run of a page.
+    await owner.query(
+      `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,full_scan,started_at,outcome,pages,records,changed)
+      SELECT $1,gen_random_uuid(),$2,'incremental','schedule',false,now()-n*interval '1 hour','completed',1,0,0
+      FROM generate_series(1,24) n`,
+      [tenant, orders.id],
+    );
+    const first = await service.runs(context('viewer'), orders.id);
+    expect(first.runs).toHaveLength(20);
+    expect(first.nextCursor).toBe(first.runs.at(-1)!.id);
+    const second = await service.runs(
+      context('viewer'),
+      orders.id,
+      first.nextCursor!,
+    );
+    expect(second.runs).toHaveLength(5);
+    expect(second.nextCursor).toBeNull();
+    expect(first.runs[0]).toMatchObject({ kind: 'backfill' });
+    expect(
+      new Set([...first.runs, ...second.runs].map((run) => run.id)).size,
+    ).toBe(25);
+    expect(
+      (await service.runs(context(), orders.id, randomUUID())).runs,
+    ).toEqual([]);
+
+    // Problem records list one state in source key order, 25 per page.
+    await owner.query(
+      `INSERT INTO commerce_sync_items(tenant_id,connection_id,record_type,resource,scope_key,external_id,digest,status,
+        problem,first_seen_at,last_seen_at,changed_at,first_seen_by)
+      SELECT $1,$2,'orders','order','',lpad(n::text,3,'0'),'d','failed','The source record does not match Luma’s record rules',
+        now(),now(),now(),'backfill' FROM generate_series(1,27) n`,
+      [tenant, shop],
+    );
+    await owner.query(
+      `UPDATE commerce_sync_items SET missing_since=now() WHERE tenant_id=$1 AND record_type='orders' AND external_id='1'`,
+      [tenant],
+    );
+    const failed = await service.records(
+      context('viewer'),
+      orders.id,
+      'failed',
+    );
+    expect(failed.records).toHaveLength(25);
+    expect(failed.records[0]).toMatchObject({
+      externalId: '001',
+      state: 'failed',
+      problem: 'The source record does not match Luma’s record rules',
+      entityId: null,
+    });
+    const rest = await service.records(
+      context('viewer'),
+      orders.id,
+      'failed',
+      failed.nextCursor!,
+    );
+    expect(rest.records.map((item) => item.externalId)).toEqual(['026', '027']);
+    expect(rest.nextCursor).toBeNull();
+    const missing = await service.records(context(), orders.id, 'missing');
+    expect(missing.records).toEqual([
+      expect.objectContaining({
+        externalId: '1',
+        state: 'missing',
+        entityId: expect.any(String),
+        missingSince: expect.any(String),
+      }),
+    ]);
+    await expect(
+      service.records(context(), orders.id, 'failed', 'not-a-cursor'),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    await expect(
+      service.records(context(), randomUUID(), 'failed'),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    // A connection command changes every stream it applies to in one step, and is idempotent.
+    const streams = async () =>
+      (
+        await owner.query<{ paused: boolean }>(
+          'SELECT paused FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=$2',
+          [tenant, shop],
+        )
+      ).rows;
+    const total = (await streams()).length;
+    expect(total).toBeGreaterThan(1);
+    await service.command(context(), orders.id, 'pause');
+    const paused = await service.commandConnection(context(), shop, 'pause');
+    expect(paused.updated).toBe(total - 1);
+    expect(paused.connection.connectionId).toBe(shop);
+    expect((await streams()).every((row) => row.paused)).toBe(true);
+    expect(
+      (await service.commandConnection(context(), shop, 'pause')).updated,
+    ).toBe(0);
+    expect(
+      (await service.commandConnection(context(), shop, 'retry')).updated,
+    ).toBe(0);
+    const resumed = await service.commandConnection(context(), shop, 'resume');
+    expect(resumed.updated).toBe(total);
+    expect((await streams()).some((row) => row.paused)).toBe(false);
+    expect(
+      (await service.commandConnection(context(), shop, 'retry')).updated,
+    ).toBe(total);
+    await expect(
+      service.commandConnection(context('viewer'), shop, 'pause'),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      service.commandConnection(context(), randomUUID(), 'pause'),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect((await streams()).some((row) => row.paused)).toBe(false);
   });
 
   it('defers admission without recording a failure or advancing the history checkpoint', async () => {

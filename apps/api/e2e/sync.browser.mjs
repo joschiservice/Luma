@@ -9,6 +9,11 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const f = await syncFixture(t, origin);
+  await f.db.owner.query(
+    `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,full_scan,started_at,outcome,pages,records,changed)
+      VALUES($1,gen_random_uuid(),$2,'backfill','connection',true,now()-interval '20 minutes','running',2,50,50)`,
+    [f.org.id, f.stream],
+  );
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
     t,
@@ -45,14 +50,18 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   await page.getByRole('link', { name: 'Open Data sync', exact: true }).click();
   await page.getByRole('heading', { name: 'Data sync', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Importing history' }).waitFor();
-  const progress = page.getByRole('progressbar', {
-    name: 'Orders history import',
-  });
+  // The row's meter; the detail pane shows the same import beside the list.
+  const progress = page
+    .getByRole('list', { name: /^Record types from / })
+    .getByRole('progressbar', {
+      name: 'Orders history import',
+    });
   expect(await progress.getAttribute('aria-valuetext')).toBe(
     '50 of 120 orders',
   );
+  // Record types a connection doesn't sync collapse into one line under it.
   await page
-    .getByText('Not part of this connection', { exact: true })
+    .getByText(/^Not part of this connection: /)
     .first()
     .waitFor();
   await page.screenshot({ path: '/tmp/luma96-sync-light.png', fullPage: true });
@@ -64,14 +73,25 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     [f.org.id, f.stream],
   );
   await page.getByRole('button', { name: 'Refresh sync status' }).click();
-  await page
-    .getByRole('group', { name: 'Orders: Waiting for rate limit', exact: true })
-    .waitFor();
+  const waitingRow = page.getByRole('link', {
+    name: 'Orders: Waiting for rate limit',
+    exact: true,
+  });
+  await waitingRow.waitFor();
+  // The row opens the sync's detail beside the list, which explains the wait.
+  await waitingRow.click();
+  await page.waitForURL(/[?&]stream=/);
+  const detail = page.getByRole('region', { name: 'Sync details' });
   await expect(
-    page.getByText(
+    detail.getByText(
       'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
     ),
   ).toBeVisible();
+  // Run history loads for the open sync only.
+  await expect(
+    detail.getByText('History import', { exact: true }).last(),
+  ).toBeVisible();
+  await expect(detail.getByText('50 imported or updated')).toBeVisible();
   await expect(
     page.getByText('50 of 120 orders', { exact: true }),
   ).toBeVisible();
@@ -104,7 +124,7 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   );
   await page.getByRole('button', { name: 'Refresh sync status' }).click();
   await page
-    .getByRole('group', { name: 'Orders: Importing history', exact: true })
+    .getByRole('link', { name: 'Orders: Importing history', exact: true })
     .waitFor();
   await expect(
     page.getByText('Waiting for sync capacity. Currently syncing: JTL-Wawi.'),
@@ -117,8 +137,8 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     [f.org.id, f.stream],
   );
   await page.getByRole('button', { name: 'Refresh sync status' }).click();
-  await page.getByText('Recent history imported', { exact: true }).waitFor();
-  await page.getByText('Preparing history', { exact: true }).waitFor();
+  await detail.getByText(/^Recent history since/).waitFor();
+  await page.getByText('Preparing history', { exact: true }).first().waitFor();
   expect(await progress.getAttribute('aria-valuetext')).toBe(
     'The source is preparing an export',
   );
@@ -127,14 +147,52 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     fullPage: true,
   });
 
-  await page
-    .getByRole('button', { name: 'Orders sync actions' })
-    .first()
-    .click();
-  await page.getByRole('menuitem', { name: 'Pause' }).click();
-  await page.getByText('Sync paused.', { exact: false }).waitFor();
-  await page.getByRole('group', { name: 'Orders: Paused' }).waitFor();
+  await detail.getByRole('button', { name: 'Pause', exact: true }).click();
+  // The outcome shows next to the sync it changed.
+  await detail.getByText('Sync paused.', { exact: false }).waitFor();
+  await page.getByRole('link', { name: 'Orders: Paused' }).waitFor();
   await page.getByRole('heading', { name: 'History import paused' }).waitFor();
+  await detail.getByRole('button', { name: 'Resume', exact: true }).waitFor();
+
+  // Escape closes the detail and keeps the list in place.
+  await page.keyboard.press('Escape');
+  await expect(detail).toBeHidden();
+  await expect(page).not.toHaveURL(/[?&]stream=/);
+
+  // A link naming a connection and record type, as issues use, opens that sync.
+  await f.db.owner.query(
+    `INSERT INTO commerce_sync_items(tenant_id,connection_id,record_type,resource,scope_key,external_id,digest,status,
+      problem,first_seen_at,last_seen_at,changed_at,first_seen_by)
+    VALUES($1,$2,'orders','order','tokyo.myshopify.com','gid://shopify/Order/9','d','failed',
+      'The source record does not match Luma’s record rules',now(),now(),now(),'backfill')`,
+    [f.org.id, f.store],
+  );
+  await page.goto(`/app/${f.org.id}/sync?connection=${f.store}&type=orders`);
+  await page.waitForURL(new RegExp(`[?&]stream=${f.stream}`));
+  await expect(page).not.toHaveURL(/[?&]connection=/);
+  // Records that couldn't import are listed by source ID beneath their count.
+  await detail.getByRole('button', { name: 'Show orders' }).click();
+  const failed = detail.getByRole('list', { name: '1 order couldn’t import' });
+  await expect(failed.getByText('gid://shopify/Order/9')).toBeVisible();
+  await expect(
+    failed.getByText('The source record does not match Luma’s record rules'),
+  ).toBeVisible();
+
+  // Connection-wide commands change every matching sync in one request.
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Tokyo store sync actions' }).click();
+  await page.getByRole('menuitem', { name: 'Resume all' }).click();
+  await page
+    .getByText('Resumed 1 sync of Tokyo store with your access.')
+    .waitFor();
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT paused FROM commerce_sync_streams WHERE tenant_id=$1 AND id=$2',
+        [f.org.id, f.stream],
+      )
+    ).rows,
+  ).toEqual([{ paused: false }]);
 
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.screenshot({
@@ -150,7 +208,8 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     ),
   ).toBe(true);
   await page
-    .getByText('Recent history imported', { exact: true })
+    .getByText(/recent history complete/)
+    .first()
     .scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '/tmp/luma122-sync-recent-mobile.png',

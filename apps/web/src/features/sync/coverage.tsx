@@ -23,6 +23,8 @@ import {
 
 export interface CoverageItem {
   id: string;
+  /** The sync this source's line describes, which its link opens in Data sync. */
+  streamId: string;
   label: string;
   state: OperationalState;
   /** What Luma holds, such as "importing orders (8%)" or "orders since 31 Jul 2026". */
@@ -83,6 +85,7 @@ export function coverageItems(
     return [
       {
         id: connection.connectionId,
+        streamId: stream.id,
         label: connection.label,
         state: state.state,
         text,
@@ -229,8 +232,9 @@ export function coverageSummary(
 }
 
 /**
- * States which sources a record list covers in one line, with per-source detail and a link to
- * Data sync behind a disclosure. Renders nothing until a sync exists for the record type.
+ * States which sources a record list covers in one line, with per-source detail behind a
+ * disclosure. Each source opens its sync in Data sync; a final link opens the whole page.
+ * Renders nothing until a sync exists for the record type.
  */
 export function SyncCoverage({
   organizationId,
@@ -257,7 +261,17 @@ export function SyncCoverage({
           <li key={item.id}>
             <StateDot state={item.state} />
             <span>
-              <strong>{item.label}</strong>{' '}
+              <Link
+                to="/app/$organizationId/sync"
+                params={{ organizationId }}
+                search={{ stream: item.streamId }}
+                aria-label={m.sync_coverage_open_source({
+                  records: recordTypes[type].noun,
+                  connection: item.label,
+                })}
+              >
+                <strong>{item.label}</strong>
+              </Link>{' '}
               {[
                 item.problem,
                 item.text,

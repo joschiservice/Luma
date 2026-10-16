@@ -16,9 +16,14 @@ import {
 import { syncWait } from '../domain/waiting.js';
 import type { AutoLinkService } from './automatic-links.js';
 import type {
+  ConnectionCommand,
+  ItemKey,
   LinkRequest,
+  RecordState,
   StreamCommand,
   StreamCoverage,
+  SyncRecordProblem,
+  SyncRun,
   SyncStore,
 } from './ports.js';
 import type {
@@ -27,6 +32,8 @@ import type {
   LinkRequestView,
   SyncConnectionView,
   SyncOverview,
+  SyncRecordView,
+  SyncRunView,
   SyncStreamView,
 } from './views.js';
 
@@ -53,6 +60,77 @@ export interface SyncServiceDependencies {
 
 const manage = (context: TenantContext) =>
   hasPermission(context, 'sync.manage');
+
+/** Runs per page of one stream's history. */
+const streamRunLimit = 20;
+
+/** Records per page of one stream's record list. */
+const recordPageSize = 25;
+
+/** Encodes a record's source key as an opaque page cursor. */
+const recordCursor = (item: Record<keyof ItemKey, string>) =>
+  Buffer.from(
+    JSON.stringify([item.resource, item.scopeKey, item.externalId]),
+  ).toString('base64url');
+
+function readRecordCursor(cursor: string): Record<keyof ItemKey, string> {
+  try {
+    const value: unknown = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8'),
+    );
+    if (
+      Array.isArray(value) &&
+      value.length === 3 &&
+      value.every((part): part is string => typeof part === 'string')
+    ) {
+      const [resource = '', scopeKey = '', externalId = ''] = value;
+
+      return { resource, scopeKey, externalId };
+    }
+  } catch {
+    // Reported below like any other unreadable cursor.
+  }
+  throw new IdentityError(
+    422,
+    'VALIDATION_ERROR',
+    'This page link is no longer valid. Start from the first page.',
+  );
+}
+
+const recordView = (record: SyncRecordProblem): SyncRecordView => ({
+  externalId: record.externalId,
+  resource: record.resource,
+  state: record.state,
+  problem: record.problem,
+  entityId: record.entityId,
+  sourceCreatedAt: record.sourceCreatedAt,
+  lastSeenAt: record.lastSeenAt,
+  missingSince: record.missingSince,
+});
+
+function runView(run: SyncRun): SyncRunView {
+  return {
+    id: run.id,
+    connectionId: run.connectionId,
+    recordType: run.recordType,
+    kind: run.kind,
+    trigger: run.trigger,
+    since: run.since,
+    createdSince: run.createdSince ?? null,
+    fullScan: run.fullScan,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    outcome: run.outcome,
+    pages: run.pages,
+    records: run.records,
+    changed: run.changed,
+    unchanged: run.unchanged,
+    pending: run.pending,
+    failed: run.failed,
+    missing: run.missing,
+    errors: run.errors,
+  };
+}
 
 function streamView(
   stream: SyncStream,
@@ -164,6 +242,29 @@ export function createSyncService(deps: SyncServiceDependencies) {
     return deps.sourcePolicy?.(context) ?? { hidden: [], fixed: [] };
   }
 
+  /**
+   * Resolves a stream read when its connection is listed and not withheld; otherwise reports
+   * the stream as not found.
+   */
+  async function visible<T extends { connectionId: string }>(
+    context: TenantContext,
+    read: Promise<T | null>,
+  ): Promise<T> {
+    const [result, connections, policy] = await Promise.all([
+      read,
+      deps.connections.list(context),
+      sourcePolicy(context),
+    ]);
+    if (
+      !result ||
+      policy.hidden.includes(result.connectionId) ||
+      !connections.some((connection) => connection.id === result.connectionId)
+    )
+      throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
+
+    return result;
+  }
+
   async function overview(context: TenantContext): Promise<SyncOverview> {
     const fresh = await deps.refreshContext(context);
     const [connections, data, policy] = await Promise.all([
@@ -249,27 +350,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
         }),
       runs: data.runs
         .filter((run) => !policy.hidden.includes(run.connectionId))
-        .map((run) => ({
-          id: run.id,
-          connectionId: run.connectionId,
-          recordType: run.recordType,
-          kind: run.kind,
-          trigger: run.trigger,
-          since: run.since,
-          createdSince: run.createdSince ?? null,
-          fullScan: run.fullScan,
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
-          outcome: run.outcome,
-          pages: run.pages,
-          records: run.records,
-          changed: run.changed,
-          unchanged: run.unchanged,
-          pending: run.pending,
-          failed: run.failed,
-          missing: run.missing,
-          errors: run.errors,
-        })),
+        .map(runView),
       canManage: manage(fresh),
       asOf: asOf.toISOString(),
     };
@@ -277,6 +358,62 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   return {
     overview,
+    /**
+     * Reads one page of a stream's runs, newest first; `before` continues after a run of the
+     * previous page. A stream of a withheld or no longer listed connection is reported as not
+     * found, like its other routes.
+     */
+    async runs(
+      context: TenantContext,
+      streamId: string,
+      before?: string,
+    ): Promise<{ runs: SyncRunView[]; nextCursor: string | null }> {
+      const fresh = await deps.refreshContext(context);
+      const history = await visible(
+        fresh,
+        deps.store.runs(fresh.tenantId, streamId, streamRunLimit + 1, before),
+      );
+      const runs = history.runs.slice(0, streamRunLimit);
+
+      return {
+        runs: runs.map(runView),
+        nextCursor:
+          history.runs.length > streamRunLimit ? runs.at(-1)!.id : null,
+      };
+    },
+    /**
+     * Lists one page of a stream's records that are waiting, could not be imported or are no
+     * longer found, in source key order, under the same visibility as its runs. Throws 422 for
+     * a cursor this route did not issue.
+     */
+    async records(
+      context: TenantContext,
+      streamId: string,
+      state: RecordState,
+      cursor?: string,
+    ): Promise<{ records: SyncRecordView[]; nextCursor: string | null }> {
+      const fresh = await deps.refreshContext(context);
+      const after = cursor ? readRecordCursor(cursor) : undefined;
+      const page = await visible(
+        fresh,
+        deps.store.records(
+          fresh.tenantId,
+          streamId,
+          state,
+          recordPageSize + 1,
+          after,
+        ),
+      );
+      const records = page.records.slice(0, recordPageSize);
+
+      return {
+        records: records.map(recordView),
+        nextCursor:
+          page.records.length > recordPageSize
+            ? recordCursor(records.at(-1)!)
+            : null,
+      };
+    },
     /** Reads automatic link rules with their current outcomes. */
     autoLinkRules: (context: TenantContext) =>
       automaticLinks().autoLinkRules(context),
@@ -318,6 +455,36 @@ export function createSyncService(deps: SyncServiceDependencies) {
       if (!view) throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
 
       return view;
+    },
+    /**
+     * Pauses, resumes or retries every sync of one connection that the command changes, in one
+     * transaction, and returns how many changed with the connection's updated state. Resuming
+     * and retrying continue with the caller's access.
+     */
+    async commandConnection(
+      context: TenantContext,
+      connectionId: string,
+      command: ConnectionCommand,
+    ): Promise<{ updated: number; connection: SyncConnectionView }> {
+      const fresh = await manager(context);
+      const listed = (await overview(fresh)).connections.some(
+        (connection) => connection.connectionId === connectionId,
+      );
+      if (!listed)
+        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+      const updated = await deps.store.commandConnection(
+        fresh.tenantId,
+        connectionId,
+        command,
+        fresh.actor.id,
+      );
+      const connection = (await overview(fresh)).connections.find(
+        (item) => item.connectionId === connectionId,
+      );
+      if (!connection)
+        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+
+      return { updated: updated.length, connection };
     },
     /** Reads source identity, suggestions and recent link requests with current access. */
     async identity(

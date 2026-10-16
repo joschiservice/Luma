@@ -85,6 +85,9 @@ export function ConnectionCard({
   const lock = useRef(false);
   const summary =
     sync && syncAsOf && appAvailable ? connectionSummary(sync, syncAsOf) : null;
+  const synced = (recordType: string) =>
+    sync?.recordTypes.find((item) => item.recordType === recordType)?.stream
+      ?.id;
   // People disconnect; only providers revoke, and a revoked connection can be reconnected.
   const terminal = connection.status === 'disconnected';
   const revoked = connection.status === 'revoked';
@@ -208,41 +211,58 @@ export function ConnectionCard({
           <StateDot state={summary.state} />
           <span>
             {summary.text}{' '}
-            <Link to="/app/$organizationId/sync" params={{ organizationId }}>
+            <Link
+              to="/app/$organizationId/sync"
+              params={{ organizationId }}
+              search={{ connection: connection.id }}
+            >
               {m.connections_card_view_sync()}
             </Link>
           </span>
         </p>
       ) : null}
-      {connection.coverage?.streams?.map((stream) => (
-        <section key={stream.recordType}>
-          <strong>
-            {operatorCodeLabel(
-              `${stream.recordType === 'fulfillments' ? 'fulfillment' : stream.recordType}.read`,
-            )}
-          </strong>
-          <p>
-            {m.connections_last_success()} ·{' '}
-            {stream.lastSuccessfulAt ? (
-              <WorkspaceDate value={stream.lastSuccessfulAt} />
-            ) : (
-              m.common_not_reported()
-            )}
-          </p>
-          {stream.lastError ? (
-            <p>{operatorCodeLabel(stream.lastError)}</p>
-          ) : null}
-          {stream.issueIds.map((exceptionId) => (
-            <Link
-              key={exceptionId}
-              to="/app/$organizationId/exceptions/$exceptionId/detail"
-              params={{ organizationId, exceptionId }}
-            >
-              {m.connections_open_issue()}
-            </Link>
-          ))}
-        </section>
-      ))}
+      {connection.coverage?.streams?.map((stream) => {
+        const label = operatorCodeLabel(
+          `${stream.recordType === 'fulfillments' ? 'fulfillment' : stream.recordType}.read`,
+        );
+        const streamId = synced(stream.recordType);
+
+        return (
+          <section key={stream.recordType}>
+            <strong>{label}</strong>
+            <p>
+              {m.connections_last_success()} ·{' '}
+              {stream.lastSuccessfulAt ? (
+                <WorkspaceDate value={stream.lastSuccessfulAt} />
+              ) : (
+                m.common_not_reported()
+              )}
+            </p>
+            {stream.lastError ? (
+              <p>{operatorCodeLabel(stream.lastError)}</p>
+            ) : null}
+            {streamId ? (
+              <Link
+                to="/app/$organizationId/sync"
+                params={{ organizationId }}
+                search={{ stream: streamId }}
+                aria-label={m.connections_open_sync_label({ type: label })}
+              >
+                {m.connections_open_sync()}
+              </Link>
+            ) : null}
+            {stream.issueIds.map((exceptionId) => (
+              <Link
+                key={exceptionId}
+                to="/app/$organizationId/exceptions/$exceptionId/detail"
+                params={{ organizationId, exceptionId }}
+              >
+                {m.connections_open_issue()}
+              </Link>
+            ))}
+          </section>
+        );
+      })}
       <div className="connection-access">
         <h4>
           <ShieldCheck size={15} aria-hidden="true" />

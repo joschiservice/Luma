@@ -2,33 +2,26 @@ import './sync.css';
 
 import type {
   SyncCommand,
+  SyncConnectionCommand,
   SyncConnectionView,
   SyncOverview,
-  SyncRecordType,
+  SyncRecordState,
   SyncStreamView,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@luma/ui/components/primitives/alert';
+import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@luma/ui/components/primitives/card';
+import { Card } from '@luma/ui/components/primitives/card';
+import { CollectionList } from '@luma/ui/components/primitives/collection-list';
+import { CollectionPreview } from '@luma/ui/components/primitives/collection-preview';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
-import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,13 +32,26 @@ import {
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Progress } from '@luma/ui/components/primitives/progress';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
-import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageTitle } from '@luma/ui/components/workspace/page-header';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
 import {
-  CircleCheck,
+  listShortcutGroup,
+  ShortcutHelp,
+} from '@luma/ui/components/primitives/shortcut-help';
+import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import {
+  ChevronRight,
   History,
   MoreHorizontal,
   Pause,
@@ -53,9 +59,8 @@ import {
   Plug,
   RefreshCw,
   RotateCcw,
-  ScanSearch,
 } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { statuses } from '../../kit/connections/presentation';
 import { ProviderIcon } from '../../kit/connections/provider-icon';
@@ -63,62 +68,127 @@ import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { AutomaticLinks } from './automatic-links';
-import { sendSyncCommand, syncKey, syncOptions } from './data';
+import {
+  sendConnectionCommand,
+  sendSyncCommand,
+  syncKey,
+  syncOptions,
+  syncRecordsOptions,
+  syncRunsOptions,
+} from './data';
 import {
   ago,
+  type AttentionItem,
+  attentionItems,
+  connectionCommands,
   count,
-  coverageStatement,
-  day,
+  coverageBrief,
+  focusStream,
   overallState,
   providerName,
-  records,
+  recordNote,
   recordTypes,
-  runSummary,
-  scanKinds,
   scanProgress,
   soon,
   streamState,
-  triggers,
+  syncFigures,
+  syncHealth,
+  type SyncItem,
+  syncItems,
   unavailableReason,
-  waitingStatement,
 } from './presentation';
+import {
+  closedRecords,
+  type ProblemRecords,
+  type RunHistory,
+  StreamDetail,
+  type SyncMessage,
+} from './stream-detail';
 
-/** Connects the Data sync page to workspace-scoped queries and sync commands. */
+/** The commands the sync list handles, for shortcut help. */
+const shortcuts: readonly ListShortcut[] = [
+  'next',
+  'previous',
+  'preview',
+  'escape',
+  'help',
+];
+
+/**
+ * Connects Data sync to workspace-scoped queries, the open sync in the address and sync
+ * commands. One command runs at a time; a connection-wide command changes that connection's
+ * syncs together or not at all. A link naming a connection and record type opens its sync.
+ */
 export function SyncPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId/sync' });
+  const search = useSearch({ from: '/app/$organizationId/sync' });
+  const navigate = useNavigate({ from: '/app/$organizationId/sync' });
   const query = useQuery(syncOptions(organizationId));
   const { can } = usePermissions(organizationId);
   const client = useQueryClient();
   const [pending, setPending] = useState<string | null>(null);
-  const [message, setMessage] = useState<{
-    tone: 'success' | 'danger';
-    text: string;
-  } | null>(null);
+  const [message, setMessage] = useState<SyncMessage | null>(null);
   const lock = useRef(false);
+  const open = search.stream;
+  const openStream = query.data
+    ? syncItems(query.data).find((item) => item.stream.id === open)?.stream
+    : undefined;
+  const runs = useInfiniteQuery(syncRunsOptions(organizationId, openStream));
+  const [listed, setListed] = useState<{
+    streamId: string;
+    state: SyncRecordState;
+  } | null>(null);
+  const listing = openStream && listed?.streamId === open ? listed : null;
+  const records = useInfiniteQuery(syncRecordsOptions(organizationId, listing));
+  const target =
+    query.data && search.connection && !open
+      ? focusStream(query.data, search.connection, search.type)
+      : undefined;
+
+  useEffect(() => {
+    if (!query.data || (!search.connection && !search.type)) return;
+    // Replace the link's connection and type with the sync they name, so Back skips them.
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        connection: undefined,
+        type: undefined,
+        stream: previous.stream ?? target,
+      }),
+      replace: true,
+      resetScroll: false,
+    });
+  }, [query.data, search.connection, search.type, target, navigate]);
+
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
 
-  async function command(stream: SyncStreamView, action: SyncCommand) {
+  async function run(
+    target: string,
+    send: () => Promise<string>,
+    streamId?: string,
+  ) {
     if (lock.current) return;
     lock.current = true;
-    setPending(stream.id);
+    setPending(target);
     setMessage(null);
     try {
-      await sendSyncCommand(organizationId, stream.id, action);
-      setMessage({ tone: 'success', text: commandMessages[action]() });
+      setMessage({ tone: 'success', text: await send(), streamId });
     } catch (error) {
       setMessage({
         tone: 'danger',
         text:
           error instanceof IdentityError && error.status === 403
             ? m.sync_command_forbidden()
-            : m.sync_command_failed(),
+            : streamId
+              ? m.sync_command_failed()
+              : m.sync_command_all_failed(),
+        streamId,
       });
-    } finally {
-      await client.invalidateQueries({ queryKey: syncKey(organizationId) });
-      lock.current = false;
-      setPending(null);
     }
+    await client.invalidateQueries({ queryKey: syncKey(organizationId) });
+    lock.current = false;
+    setPending(null);
   }
 
   return (
@@ -132,7 +202,60 @@ export function SyncPage() {
       canManage={can('sync.manage')}
       pending={pending}
       message={message}
-      command={(stream, action) => void command(stream, action)}
+      open={open}
+      onOpenChange={(stream) =>
+        void navigate({
+          search: (previous) => ({ ...previous, stream }),
+          resetScroll: false,
+        })
+      }
+      history={{
+        runs: runs.data?.pages.flatMap((page) => page.runs),
+        loading: runs.isPending,
+        error: runs.isError && !runs.isFetchNextPageError,
+        more: runs.hasNextPage,
+        loadingMore: runs.isFetchingNextPage,
+        moreError: runs.isFetchNextPageError,
+        loadMore: () => void runs.fetchNextPage(),
+      }}
+      records={{
+        state: listing?.state ?? null,
+        onStateChange: (state) =>
+          setListed(open && state ? { streamId: open, state } : null),
+        records: records.data?.pages.flatMap((page) => page.records),
+        loading: records.isPending,
+        error: records.isError && !records.isFetchNextPageError,
+        more: records.hasNextPage,
+        loadingMore: records.isFetchingNextPage,
+        loadMore: () => void records.fetchNextPage(),
+      }}
+      command={(stream, action) =>
+        void run(
+          stream.id,
+          async () => {
+            await sendSyncCommand(organizationId, stream.id, action);
+
+            return commandMessages[action]();
+          },
+          stream.id,
+        )
+      }
+      commandAll={(connection, action) =>
+        void run(connection.connectionId, async () => {
+          const { updated } = await sendConnectionCommand(
+            organizationId,
+            connection.connectionId,
+            action,
+          );
+
+          return updated
+            ? connectionMessages[action]({
+                count: updated,
+                connection: connection.label,
+              })
+            : m.sync_command_all_unchanged({ connection: connection.label });
+        })
+      }
       automaticLinks={
         query.data ? (
           <AutomaticLinks
@@ -156,7 +279,20 @@ const commandMessages: Record<SyncCommand, () => string> = {
   reimport: m.sync_command_reimport,
 };
 
-/** Presents import progress, sync health and record coverage for every connection. */
+const connectionMessages: Record<
+  SyncConnectionCommand,
+  (inputs: { count: number; connection: string }) => string
+> = {
+  retry: m.sync_command_all_retry,
+  pause: m.sync_command_all_paused,
+  resume: m.sync_command_all_resumed,
+};
+
+/**
+ * Presents Data sync: the workspace's sync health, what needs a person, every connection's
+ * syncs as rows and, beside them, the open sync's detail. Rows open the detail pane, which
+ * also follows J and K.
+ */
 export function SyncView({
   organizationId,
   overview,
@@ -167,7 +303,12 @@ export function SyncView({
   canManage,
   pending = null,
   message = null,
+  open,
+  onOpenChange,
+  history = { loading: false, error: false },
+  records = closedRecords,
   command,
+  commandAll,
   refresh,
   automaticLinks,
 }: {
@@ -179,12 +320,112 @@ export function SyncView({
   offline?: boolean;
   refreshing?: boolean;
   canManage: boolean;
+  /** The sync or connection a command is updating. */
   pending?: string | null;
-  message?: { tone: 'success' | 'danger'; text: string } | null;
+  message?: SyncMessage | null;
+  /** The sync open in the detail pane. */
+  open?: string | undefined;
+  onOpenChange: (stream: string | undefined) => void;
+  history?: RunHistory;
+  /** The open sync's listed problem records. */
+  records?: ProblemRecords;
   command: (stream: SyncStreamView, action: SyncCommand) => void;
+  commandAll: (
+    connection: SyncConnectionView,
+    action: SyncConnectionCommand,
+  ) => void;
   refresh: () => void;
 }) {
   const manage = canManage && (overview?.canManage ?? true);
+  const rows = useRef<HTMLDivElement>(null);
+  const [help, setHelp] = useState(false);
+  const [reimport, setReimport] = useState<SyncItem | null>(null);
+  const items = overview ? syncItems(overview) : [];
+  const keys = items.map((item) => item.stream.id);
+  const openItem = items.find((item) => item.stream.id === open);
+  const keyboard = useListKeyboard({
+    rows,
+    count: keys.length,
+    keys,
+    preview: { open, onOpenChange },
+    onShowHelp: () => setHelp(true),
+  });
+  const busy = pending !== null;
+  const paneMessage =
+    message?.streamId && message.streamId === open ? message : null;
+  const pageMessage = paneMessage ? null : message;
+
+  const list = (
+    <div className="sync-content">
+      {pageMessage ? (
+        <Alert tone={pageMessage.tone} role="status">
+          {pageMessage.text}
+        </Alert>
+      ) : null}
+      {overview ? (
+        <>
+          <SyncStatus overview={overview} />
+          <Attention
+            organizationId={organizationId}
+            items={attentionItems(overview, manage)}
+            canManage={manage}
+            busy={busy}
+            command={command}
+            onReimport={setReimport}
+            onOpen={onOpenChange}
+          />
+          {overview.connections.length ? (
+            <section
+              className="sync-connections"
+              aria-labelledby="sync-connections-title"
+            >
+              <h2 id="sync-connections-title" className="sync-section-title">
+                {m.sync_connections_title()}
+                <span className="sync-section-count">
+                  {count(overview.connections.length)}
+                </span>
+              </h2>
+              <div ref={rows} className="sync-connection-list">
+                {overview.connections.map((connection) => (
+                  <ConnectionSync
+                    key={connection.connectionId}
+                    organizationId={organizationId}
+                    connection={connection}
+                    asOf={overview.asOf}
+                    canManage={manage}
+                    busy={busy}
+                    pending={pending === connection.connectionId}
+                    open={open}
+                    focusedKey={keyboard.focusedKey}
+                    onOpen={onOpenChange}
+                    commandAll={commandAll}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <Empty>
+              <Plug size={28} aria-hidden="true" />
+              <h2>{m.sync_empty_title()}</h2>
+              <p>{m.sync_empty_description()}</p>
+              <Link
+                className={buttonVariants({ variant: 'outline' })}
+                to="/app/$organizationId/apps"
+                params={{ organizationId }}
+              >
+                {m.sync_empty_action()}
+              </Link>
+            </Empty>
+          )}
+          {automaticLinks}
+          <p className="sync-footnote">
+            {m.sync_footnote()}{' '}
+            <a href="/docs/data-sync">{m.sync_footnote_link()}</a>
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
 
   return (
     <main className="sync-page">
@@ -207,144 +448,375 @@ export function SyncView({
           </Button>
         </Alert>
       ) : null}
-      {message ? (
-        <Alert tone={message.tone} role="status">
-          {message.text}
-        </Alert>
-      ) : null}
-      {loading && !overview ? (
-        <div className="sync-loading" role="status">
-          {m.sync_loading()}
-        </div>
-      ) : null}
+      {loading && !overview ? <SyncLoading /> : null}
       {overview ? (
-        <>
-          <SyncSummary overview={overview} />
-          {overview.connections.length ? (
-            overview.connections.map((connection) => (
-              <ConnectionSync
-                key={connection.connectionId}
+        <CollectionPreview
+          className="sync-split"
+          open={!!open}
+          list={list}
+          label={m.sync_detail_label()}
+          title={
+            openItem
+              ? m.sync_detail_title({
+                  type: recordTypes[openItem.type].title,
+                  connection: openItem.connection.label,
+                })
+              : undefined
+          }
+          preview={
+            openItem ? (
+              <StreamDetail
+                key={openItem.stream.id}
                 organizationId={organizationId}
-                connection={connection}
+                item={openItem}
                 asOf={overview.asOf}
                 canManage={manage}
-                pending={pending}
+                busy={busy}
+                pending={pending === openItem.stream.id}
+                message={paneMessage}
+                history={history}
+                records={records}
                 command={command}
+                onReimport={() => setReimport(openItem)}
               />
-            ))
-          ) : (
-            <Empty>
-              <Plug size={28} aria-hidden="true" />
-              <h2>{m.sync_empty_title()}</h2>
-              <p>{m.sync_empty_description()}</p>
-              <Link
-                className={buttonVariants({ variant: 'outline' })}
-                to="/app/$organizationId/apps"
-                params={{ organizationId }}
-              >
-                {m.sync_empty_action()}
-              </Link>
-            </Empty>
-          )}
-          {automaticLinks}
-          <RecentRuns overview={overview} />
-          <p className="sync-footnote">
-            {m.sync_footnote()}{' '}
-            <a href="/docs/data-sync">{m.sync_footnote_link()}</a>
-          </p>
-        </>
+            ) : open ? (
+              <div className="sync-detail-missing" role="status">
+                <h3>{m.sync_detail_missing_title()}</h3>
+                <p>{m.sync_detail_missing_description()}</p>
+              </div>
+            ) : null
+          }
+          onClose={() => onOpenChange(undefined)}
+        />
       ) : null}
+      <ReimportDialog
+        item={reimport}
+        onClose={() => setReimport(null)}
+        onConfirm={(item) => {
+          setReimport(null);
+          command(item.stream, 'reimport');
+        }}
+      />
+      <ShortcutHelp
+        open={help}
+        onOpenChange={setHelp}
+        groups={[listShortcutGroup(shortcuts)]}
+      />
     </main>
   );
 }
 
-function SyncSummary({ overview }: { overview: SyncOverview }) {
-  const summary = overallState(overview);
-  const streams = overview.connections.flatMap((connection) =>
-    connection.recordTypes.flatMap(({ stream }) => (stream ? [stream] : [])),
+function SyncLoading() {
+  return (
+    <div className="sync-loading" role="status">
+      <span className="sr-only">{m.sync_loading()}</span>
+      <span className="lu-skeleton sync-skeleton-status" />
+      <span className="lu-skeleton sync-skeleton-connection" />
+      <span className="lu-skeleton sync-skeleton-connection" />
+    </div>
   );
-  const imported = streams.reduce((sum, s) => sum + s.records.total, 0);
-  const lastCheck = streams
-    .map((stream) => stream.lastFullScanAt)
-    .filter((value): value is string => !!value)
-    .sort()[0];
+}
+
+/** The workspace summary: one sentence, syncs per state and how fresh the records are. */
+function SyncStatus({ overview }: { overview: SyncOverview }) {
+  const summary = overallState(overview);
+  const health = syncHealth(overview);
+  const figures = syncFigures(overview);
+  const now = Date.parse(overview.asOf);
+  const time = (value: string | null) =>
+    value ? (
+      <span title={value}>{ago(value, now)}</span>
+    ) : (
+      m.sync_summary_not_yet()
+    );
 
   return (
-    <Card as="section" className="sync-summary" aria-labelledby="sync-summary">
-      <div className="sync-summary-main">
+    <Card as="section" className="sync-status" aria-labelledby="sync-status">
+      <div className="sync-status-main">
         <StateDot state={summary.state} />
         <div>
-          <h2 id="sync-summary">{summary.title}</h2>
+          <h2 id="sync-status">{summary.title}</h2>
           <p>{summary.detail}</p>
         </div>
       </div>
-      <dl className="sync-summary-stats">
-        <div>
-          <dt>{m.sync_summary_records()}</dt>
-          <dd>{count(imported)}</dd>
+      {health.length ? (
+        <div className="sync-health">
+          <div className="sync-health-bar" aria-hidden="true">
+            {health.map((group) => (
+              <span
+                key={group.group}
+                data-state={group.state}
+                style={{ flexGrow: group.count }}
+              />
+            ))}
+          </div>
+          <ul className="sync-health-legend" aria-label={m.sync_health_label()}>
+            {health.map((group) => (
+              <li key={group.group}>
+                <StateDot state={group.state} />
+                {group.label}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div>
-          <dt>{m.sync_summary_connections()}</dt>
-          <dd>{count(overview.connections.length)}</dd>
-        </div>
-        <div>
-          <dt>{m.sync_summary_oldest_check()}</dt>
-          <dd>
-            {lastCheck ? (
-              <span title={lastCheck}>
-                {ago(lastCheck, Date.parse(overview.asOf))}
-              </span>
-            ) : (
-              m.sync_summary_not_yet()
-            )}
-          </dd>
-        </div>
-      </dl>
+      ) : null}
+      {figures.total ? (
+        <dl className="sync-figures">
+          <div>
+            <dt>{m.sync_summary_records()}</dt>
+            <dd>{count(figures.records)}</dd>
+          </div>
+          <div>
+            <dt>{m.sync_summary_history()}</dt>
+            <dd>
+              {m.sync_summary_history_value({
+                done: figures.imported,
+                total: figures.total,
+              })}
+            </dd>
+          </div>
+          <div>
+            <dt>{m.sync_summary_oldest_sync()}</dt>
+            <dd>
+              {figures.neverSynced && figures.neverSynced < figures.total
+                ? m.sync_summary_not_synced({ count: figures.neverSynced })
+                : time(figures.oldestSync)}
+            </dd>
+          </div>
+          <div>
+            <dt>{m.sync_summary_oldest_check()}</dt>
+            <dd>{time(figures.oldestCheck)}</dd>
+          </div>
+        </dl>
+      ) : null}
     </Card>
   );
 }
 
+/** What needs a person, each with the step that resolves it. */
+function Attention({
+  organizationId,
+  items,
+  canManage,
+  busy,
+  command,
+  onReimport,
+  onOpen,
+}: {
+  organizationId: string;
+  items: AttentionItem[];
+  canManage: boolean;
+  busy: boolean;
+  command: (stream: SyncStreamView, action: SyncCommand) => void;
+  onReimport: (item: SyncItem) => void;
+  onOpen: (stream: string) => void;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <section className="sync-attention" aria-labelledby="sync-attention-title">
+      <h2 id="sync-attention-title" className="sync-section-title">
+        {m.sync_attention_title()}
+        <span className="sync-section-count">{count(items.length)}</span>
+      </h2>
+      <ul>
+        {items.map((entry) => (
+          <li key={entry.key} data-tone={entry.tone}>
+            <div className="sync-attention-text">
+              <span className="sync-attention-context">
+                {entry.item ? (
+                  <>
+                    {(() => {
+                      const Icon = recordTypes[entry.item.type].Icon;
+
+                      return <Icon size={13} aria-hidden="true" />;
+                    })()}
+                    {m.sync_detail_title({
+                      type: recordTypes[entry.item.type].title,
+                      connection: entry.connection.label,
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <ProviderIcon provider={entry.connection.provider} />
+                    {entry.connection.label}
+                  </>
+                )}
+              </span>
+              <strong>{entry.title}</strong>
+              <p>{entry.detail}</p>
+            </div>
+            <div className="sync-attention-actions">
+              <AttentionAction
+                organizationId={organizationId}
+                entry={entry}
+                canManage={canManage}
+                busy={busy}
+                command={command}
+                onReimport={onReimport}
+              />
+              {entry.item ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onOpen(entry.item!.stream.id)}
+                >
+                  {m.sync_attention_details()}
+                </Button>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AttentionAction({
+  organizationId,
+  entry,
+  canManage,
+  busy,
+  command,
+  onReimport,
+}: {
+  organizationId: string;
+  entry: AttentionItem;
+  canManage: boolean;
+  busy: boolean;
+  command: (stream: SyncStreamView, action: SyncCommand) => void;
+  onReimport: (item: SyncItem) => void;
+}) {
+  const { action, item, connection } = entry;
+  if (action === 'connection' && connection.appId)
+    return (
+      <Link
+        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+        to="/app/$organizationId/apps/$appId/settings"
+        params={{ organizationId, appId: connection.appId }}
+        hash={`connection-${connection.connectionId}`}
+      >
+        {m.sync_connection_manage()}
+      </Link>
+    );
+  if (!canManage || !item) return null;
+  if (action === 'resume')
+    return (
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={() => command(item.stream, 'resume')}
+      >
+        <Play aria-hidden="true" /> {m.sync_notice_principal_resume()}
+      </Button>
+    );
+  if (action === 'retry')
+    return (
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={() => command(item.stream, 'retry')}
+      >
+        <RefreshCw aria-hidden="true" /> {m.sync_action_retry_now()}
+      </Button>
+    );
+  if (action === 'reimport')
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => onReimport(item)}
+      >
+        <History aria-hidden="true" />{' '}
+        {m.sync_notice_older_action({ records: recordTypes[item.type].noun })}
+      </Button>
+    );
+
+  return null;
+}
+
+/** One connection: its overall state, a row per sync and the record types it doesn't sync. */
 function ConnectionSync({
   organizationId,
   connection,
   asOf,
   canManage,
+  busy,
   pending,
-  command,
+  open,
+  focusedKey,
+  onOpen,
+  commandAll,
 }: {
   organizationId: string;
   connection: SyncConnectionView;
   asOf: string;
   canManage: boolean;
-  pending: string | null;
-  command: (stream: SyncStreamView, action: SyncCommand) => void;
+  busy: boolean;
+  pending: boolean;
+  open: string | undefined;
+  focusedKey: string | undefined;
+  onOpen: (stream: string) => void;
+  commandAll: (
+    connection: SyncConnectionView,
+    action: SyncConnectionCommand,
+  ) => void;
 }) {
   const titleId = `sync-${connection.connectionId}`;
+  const items = syncItems({
+    connections: [connection],
+    runs: [],
+    canManage,
+    asOf,
+  });
+  const summary = overallState({
+    connections: [connection],
+    runs: [],
+    canManage: false,
+    asOf,
+  });
+  const unavailable = connection.recordTypes.filter((item) => !item.stream);
+  const reasons = new Map<string, string[]>();
+  for (const item of unavailable) {
+    const reason = unavailableReason(item.availability, connection);
+    reasons.set(reason, [
+      ...(reasons.get(reason) ?? []),
+      recordTypes[item.recordType].title,
+    ]);
+  }
+  const commands = connectionCommands(connection);
+  const now = Date.parse(asOf);
 
   return (
-    <Card as="section" className="sync-connection" aria-labelledby={titleId}>
-      <CardHeader>
+    <Card
+      as="section"
+      className="sync-connection"
+      aria-labelledby={titleId}
+      data-pending={pending || undefined}
+    >
+      <header className="sync-connection-header">
         <div className="sync-connection-identity">
           <ProviderIcon provider={connection.provider} />
           <div>
-            <p className="eyebrow">{providerName(connection.provider)}</p>
-            <CardTitle as="h2" id={titleId}>
-              {connection.label}
-            </CardTitle>
+            <h3 id={titleId}>{connection.label}</h3>
+            <p>{providerName(connection.provider)}</p>
           </div>
         </div>
         <div className="sync-connection-meta">
-          <Badge
-            tone={
-              connection.status === 'active'
-                ? 'success'
-                : ['disconnected', 'revoked'].includes(connection.status)
+          {connection.status !== 'active' ? (
+            <Badge
+              tone={
+                ['disconnected', 'revoked'].includes(connection.status)
                   ? 'neutral'
                   : 'warning'
-            }
-          >
-            {statuses[connection.status]}
-          </Badge>
+              }
+            >
+              {statuses[connection.status]}
+            </Badge>
+          ) : summary.state !== 'idle' ? (
+            <StatePill state={summary.state}>{summary.title}</StatePill>
+          ) : null}
           {connection.appId ? (
             <Link
               className="sync-manage-link"
@@ -356,174 +828,16 @@ function ConnectionSync({
             </Link>
           ) : null}
         </div>
-      </CardHeader>
-      {connection.status !== 'active' ? (
-        <CardDescription>{m.sync_connection_inactive()}</CardDescription>
-      ) : null}
-      <ul
-        className="sync-streams"
-        aria-label={m.sync_connection_record_types({
-          connection: connection.label,
-        })}
-      >
-        {connection.recordTypes.map((item) => (
-          <li key={item.recordType}>
-            {item.stream ? (
-              <StreamRow
-                type={item.recordType}
-                stream={item.stream}
-                asOf={asOf}
-                canManage={canManage}
-                pending={pending === item.stream.id}
-                command={command}
-              />
-            ) : (
-              <div className="sync-stream sync-stream-unavailable">
-                <RecordType type={item.recordType} />
-                <span className="sync-stream-muted sync-stream-reason">
-                  {unavailableReason(item.availability, connection)}
-                </span>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-function RecordType({ type }: { type: SyncRecordType }) {
-  const info = recordTypes[type];
-
-  return (
-    <span className="sync-record-type">
-      <info.Icon size={15} aria-hidden="true" />
-      <strong>{info.title}</strong>
-    </span>
-  );
-}
-
-function StreamRow({
-  type,
-  stream,
-  asOf,
-  canManage,
-  pending,
-  command,
-}: {
-  type: SyncRecordType;
-  stream: SyncStreamView;
-  asOf: string;
-  canManage: boolean;
-  pending: boolean;
-  command: (stream: SyncStreamView, action: SyncCommand) => void;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  const now = Date.parse(asOf);
-  const state = streamState(stream);
-  const progress = ['importing', 'syncing', 'waiting'].includes(stream.status)
-    ? scanProgress(type, stream)
-    : null;
-  const waiting = waitingStatement(stream);
-  const coverage = coverageStatement(type, stream);
-  const noun = recordTypes[type].noun;
-  const label = m.sync_stream_label({
-    type: recordTypes[type].title,
-    state: state.label,
-  });
-  const startsNow = stream.nextRunAt
-    ? Date.parse(stream.nextRunAt) - now < 10_000
-    : false;
-
-  return (
-    <div className="sync-stream" aria-label={label} role="group">
-      <RecordType type={type} />
-      <div className="sync-stream-status">
-        <StatePill state={state.state}>{state.label}</StatePill>
-        {waiting ? <small className="sync-stream-note">{waiting}</small> : null}
-        {progress ? (
-          <div className="sync-stream-progress">
-            {stream.status !== 'waiting' ? (
-              <Progress
-                value={progress.value}
-                label={
-                  stream.scan?.kind === 'backfill'
-                    ? m.sync_stream_progress_backfill({
-                        type: recordTypes[type].title,
-                      })
-                    : m.sync_stream_progress_sync({
-                        type: recordTypes[type].title,
-                      })
-                }
-                valueText={progress.text}
-              />
-            ) : null}
-            <small>{progress.text}</small>
-          </div>
-        ) : null}
-      </div>
-      <div className="sync-stream-coverage">
-        {stream.coverage.recentCompletedAt &&
-        stream.coverage.recentFrom &&
-        stream.phase === 'backfill' ? (
-          <span className="sync-recent-coverage">
-            <CircleCheck size={14} aria-hidden="true" />
-            {stream.records.failed || stream.records.pending
-              ? m.sync_stream_recent_read()
-              : m.sync_stream_recent_imported()}
-          </span>
-        ) : null}
-        <p>{coverage.text}</p>
-      </div>
-      <div className="sync-stream-time">
-        {stream.lastSuccessAt ? (
-          <span title={stream.lastSuccessAt}>
-            {m.sync_stream_synced({ time: ago(stream.lastSuccessAt, now) })}
-          </span>
-        ) : (
-          <span>{m.sync_stream_not_synced()}</span>
-        )}
-        {stream.status === 'waiting' &&
-        stream.waiting?.until &&
-        [
-          'request_capacity',
-          'admission_unavailable',
-          'provider_cooldown',
-        ].includes(stream.waiting.reason) ? (
-          <small title={stream.waiting.until}>
-            {m.sync_stream_next_retry({
-              time: soon(stream.waiting.until, now),
-            })}
-          </small>
-        ) : stream.status !== 'waiting' &&
-          stream.nextRunAt &&
-          (!stream.scan ||
-            stream.status === 'retrying' ||
-            stream.status === 'failing') ? (
-          <small title={stream.nextRunAt}>
-            {startsNow
-              ? m.sync_stream_starting_now()
-              : stream.error
-                ? m.sync_stream_next_retry({
-                    time: soon(stream.nextRunAt, now),
-                  })
-                : m.sync_stream_next_check({
-                    time: soon(stream.nextRunAt, now),
-                  })}
-          </small>
-        ) : null}
-      </div>
-      <div className="sync-stream-actions">
-        {canManage ? (
+        {canManage && items.length ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button
                   variant="ghost"
                   size="icon"
-                  disabled={pending}
-                  aria-label={m.sync_stream_actions({
-                    type: recordTypes[type].title,
+                  disabled={busy}
+                  aria-label={m.sync_connection_actions({
+                    connection: connection.label,
                   })}
                 />
               }
@@ -531,275 +845,223 @@ function StreamRow({
               <MoreHorizontal aria-hidden="true" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {stream.paused ? (
-                <DropdownMenuItem onClick={() => command(stream, 'resume')}>
-                  <Play aria-hidden="true" /> {m.sync_action_resume()}
+              {commands.retry.length ? (
+                <DropdownMenuItem
+                  onClick={() => commandAll(connection, 'retry')}
+                >
+                  <RefreshCw aria-hidden="true" /> {m.sync_action_sync_all()}
                 </DropdownMenuItem>
-              ) : (
+              ) : null}
+              {commands.resume.length ? (
+                <DropdownMenuItem
+                  onClick={() => commandAll(connection, 'resume')}
+                >
+                  <Play aria-hidden="true" /> {m.sync_action_resume_all()}
+                </DropdownMenuItem>
+              ) : null}
+              {commands.pause.length ? (
                 <>
-                  <DropdownMenuItem onClick={() => command(stream, 'retry')}>
-                    <RefreshCw aria-hidden="true" />
-                    {stream.error
-                      ? m.sync_action_retry_now()
-                      : m.sync_action_sync_now()}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={stream.phase === 'backfill'}
-                    onClick={() => command(stream, 'reconcile')}
-                  >
-                    <ScanSearch aria-hidden="true" />{' '}
-                    {m.sync_action_check_all()}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setConfirm(true)}>
-                    <History aria-hidden="true" /> {m.sync_action_reimport()}
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => command(stream, 'pause')}>
-                    <Pause aria-hidden="true" /> {m.sync_action_pause()}
+                  <DropdownMenuItem
+                    onClick={() => commandAll(connection, 'pause')}
+                  >
+                    <Pause aria-hidden="true" /> {m.sync_action_pause_all()}
                   </DropdownMenuItem>
                 </>
-              )}
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-      </div>
-      <StreamNotices
-        type={type}
-        stream={stream}
-        now={now}
-        canManage={canManage}
-        pending={pending}
-        command={command}
-        onReimport={() => setConfirm(true)}
-      />
-      <Dialog open={confirm} onOpenChange={setConfirm}>
-        <DialogContent>
-          <DialogTitle>{m.sync_reimport_title({ records: noun })}</DialogTitle>
-          <DialogDescription>
-            {m.sync_reimport_description({ records: noun })}
-          </DialogDescription>
-          <div className="sync-dialog-actions">
-            <Button variant="outline" onClick={() => setConfirm(false)}>
-              {m.common_cancel()}
-            </Button>
-            <Button
-              onClick={() => {
-                setConfirm(false);
-                command(stream, 'reimport');
-              }}
-            >
-              <RotateCcw aria-hidden="true" /> {m.sync_reimport_confirm()}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function StreamNotices({
-  type,
-  stream,
-  now,
-  canManage,
-  pending,
-  command,
-  onReimport,
-}: {
-  type: SyncRecordType;
-  stream: SyncStreamView;
-  now: number;
-  canManage: boolean;
-  pending: boolean;
-  command: (stream: SyncStreamView, action: SyncCommand) => void;
-  onReimport: () => void;
-}) {
-  const notices = [];
-  const noun = recordTypes[type].noun;
-  if (stream.blocked === 'principal_unavailable')
-    notices.push(
-      <Alert key="principal" tone="warning">
-        <AlertTitle>{m.sync_notice_principal_title()}</AlertTitle>
-        <AlertDescription>
-          {canManage
-            ? m.sync_notice_principal_manage()
-            : m.sync_notice_principal_view()}
-        </AlertDescription>
-        {canManage ? (
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={() => command(stream, 'resume')}
-          >
-            <Play aria-hidden="true" /> {m.sync_notice_principal_resume()}
-          </Button>
-        ) : null}
-      </Alert>,
-    );
-  else if (stream.error)
-    notices.push(
-      <Alert
-        key="error"
-        tone={stream.status === 'failing' ? 'danger' : 'warning'}
-      >
-        <AlertTitle>
-          {stream.status === 'failing'
-            ? m.sync_notice_failing_title({ count: stream.error.attempts })
-            : m.sync_notice_failed_title()}
-        </AlertTitle>
-        <AlertDescription>
-          {stream.error.code === 'rate_limited'
-            ? m.sync_wait_provider_cooldown()
-            : stream.error.message}{' '}
-          {stream.nextRunAt
-            ? m.sync_notice_next_attempt({ time: soon(stream.nextRunAt, now) })
-            : ''}{' '}
-          {rich(m.sync_notice_last_failure, {
-            date: <WorkspaceDate value={stream.error.at} />,
+      </header>
+      {items.length ? (
+        <CollectionList
+          label={m.sync_connection_record_types({
+            connection: connection.label,
           })}
-        </AlertDescription>
-        {canManage ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending}
-            onClick={() => command(stream, 'retry')}
-          >
-            <RefreshCw aria-hidden="true" /> {m.sync_action_retry_now()}
-          </Button>
-        ) : null}
-      </Alert>,
-    );
-  if (stream.coverage.olderHistoryAvailable)
-    notices.push(
-      <Alert key="older" tone="success">
-        <AlertTitle>{m.sync_notice_older_title({ records: noun })}</AlertTitle>
-        <AlertDescription>
-          {stream.coverage.historyFrom
-            ? m.sync_notice_older_description({
-                records: noun,
-                date: coverageDay(stream),
-              })
-            : m.sync_notice_older_description_undated({ records: noun })}
-        </AlertDescription>
-        {canManage ? (
-          <Button size="sm" disabled={pending} onClick={onReimport}>
-            <History aria-hidden="true" />{' '}
-            {m.sync_notice_older_action({ records: noun })}
-          </Button>
-        ) : null}
-      </Alert>,
-    );
-  else if (stream.coverage.historyFrom && stream.phase === 'incremental')
-    notices.push(
-      <Alert key="limited" tone="info">
-        <AlertTitle>
-          {m.sync_notice_limited_title({ records: noun })}
-        </AlertTitle>
-        <AlertDescription>
-          {stream.coverage.historyRequirement
-            ? m.sync_notice_limited_access({
-                records: noun,
-                date: coverageDay(stream),
-              })
-            : m.sync_notice_limited_description({
-                records: noun,
-                date: coverageDay(stream),
+          variant="plain"
+          className="sync-streams"
+          items={items}
+          itemKey={(item) => item.stream.id}
+          current={open}
+          focusedKey={focusedKey}
+          link={(item) => (
+            <Link
+              to="/app/$organizationId/sync"
+              params={{ organizationId }}
+              search={{ stream: item.stream.id }}
+              resetScroll={false}
+              aria-label={m.sync_stream_label({
+                type: recordTypes[item.type].title,
+                state: streamState(item.stream).label,
               })}
-        </AlertDescription>
-      </Alert>,
-    );
-  const waiting = stream.records.pending;
-  const failed = stream.records.failed;
-  if (waiting)
-    notices.push(
-      <p key="waiting" className="sync-stream-note">
-        {m.sync_note_waiting({ records: records(type, waiting) })}
-      </p>,
-    );
-  if (failed)
-    notices.push(
-      <p key="failed" className="sync-stream-note">
-        {stream.problems.length
-          ? m.sync_note_failed_reasons({
-              records: records(type, failed),
-              reasons: stream.problems.join('; '),
-            })
-          : m.sync_note_failed({ records: records(type, failed) })}
-      </p>,
-    );
-  if (stream.records.retired)
-    notices.push(
-      <p key="retired" className="sync-stream-note">
-        {m.sync_note_retired({
-          records: records(type, stream.records.retired),
-        })}
-      </p>,
-    );
-  if (stream.records.missing)
-    notices.push(
-      <p key="missing" className="sync-stream-note">
-        {m.sync_note_missing({
-          records: records(type, stream.records.missing),
-        })}
-      </p>,
-    );
+              onClick={(event) => {
+                if (
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                event.preventDefault();
+                onOpen(item.stream.id);
+              }}
+            />
+          )}
+          leading={(item) => {
+            const Icon = recordTypes[item.type].Icon;
 
-  return notices.length ? (
-    <div className="sync-stream-notices">{notices}</div>
-  ) : null;
+            return <Icon size={16} aria-hidden="true" />;
+          }}
+          title={(item) => recordTypes[item.type].title}
+          description={(item) => <StreamBrief item={item} />}
+          status={(item) => {
+            const state = streamState(item.stream);
+
+            return <StatePill state={state.state}>{state.label}</StatePill>;
+          }}
+          properties={['progress', 'synced']}
+          property={(item, key) =>
+            key === 'progress' ? (
+              <StreamProgress item={item} />
+            ) : (
+              <StreamFreshness stream={item.stream} now={now} />
+            )
+          }
+        />
+      ) : null}
+      {unavailable.length ? (
+        <p className="sync-connection-unavailable">
+          {[...reasons].map(([reason, types]) => (
+            <span key={reason}>
+              {m.sync_unavailable_types({
+                reason,
+                types: formatList(types),
+              })}
+            </span>
+          ))}
+        </p>
+      ) : null}
+    </Card>
+  );
 }
 
-const coverageDay = (stream: SyncStreamView) =>
-  day(stream.coverage.historyFrom!);
-
-function RecentRuns({ overview }: { overview: SyncOverview }) {
-  const labels = new Map(
-    overview.connections.map((connection) => [
-      connection.connectionId,
-      connection.label,
-    ]),
-  );
-  if (!overview.runs.length) return null;
+function StreamBrief({ item }: { item: SyncItem }) {
+  const note = recordNote(item.type, item.stream);
 
   return (
-    <Disclosure className="sync-runs">
-      <summary>{m.sync_runs_title()}</summary>
-      <ol>
-        {overview.runs.map((run) => (
-          <li key={run.id}>
-            {run.outcome === 'completed' ? (
-              <CircleCheck size={15} aria-hidden="true" />
-            ) : (
-              <StateDot
-                state={run.outcome === 'running' ? 'running' : 'idle'}
-              />
-            )}
-            <span className="sync-run-main">
-              <strong>
-                {run.createdSince
-                  ? m.sync_run_kind_recent()
-                  : scanKinds[run.kind]()}{' '}
-                · {recordTypes[run.recordType].title}
-              </strong>
-              <small>
-                {[
-                  labels.get(run.connectionId) ?? m.sync_run_connection(),
-                  triggers[run.trigger](),
-                  run.outcome === 'cancelled' ? m.sync_run_replaced() : '',
-                  run.errors ? m.sync_run_retried({ count: run.errors }) : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </small>
-            </span>
-            <span className="sync-run-summary">{runSummary(run)}</span>
-            <small className="sync-run-time">
-              <WorkspaceDate value={run.startedAt} />
-            </small>
-          </li>
-        ))}
-      </ol>
-    </Disclosure>
+    <span className="sync-stream-brief">
+      <span>{coverageBrief(item.type, item.stream)}</span>
+      {note ? <span className="sync-stream-flag">{note}</span> : null}
+    </span>
+  );
+}
+
+/** A compact progress meter for a running read; nothing when no read runs. */
+function StreamProgress({ item }: { item: SyncItem }) {
+  const { stream, type } = item;
+  if (!['importing', 'syncing', 'waiting'].includes(stream.status)) return null;
+  const progress = scanProgress(type, stream);
+  if (!progress) return null;
+
+  return (
+    <span className="sync-stream-progress">
+      {stream.status !== 'waiting' ? (
+        <Progress
+          value={progress.value}
+          label={
+            stream.scan?.kind === 'backfill'
+              ? m.sync_stream_progress_backfill({
+                  type: recordTypes[type].title,
+                })
+              : m.sync_stream_progress_sync({ type: recordTypes[type].title })
+          }
+          valueText={progress.text}
+        />
+      ) : null}
+      <small>{progress.text}</small>
+    </span>
+  );
+}
+
+/** When a sync last read successfully, and the next retry while it waits or fails. */
+function StreamFreshness({
+  stream,
+  now,
+}: {
+  stream: SyncStreamView;
+  now: number;
+}) {
+  const retry =
+    stream.status === 'waiting' && stream.waiting?.until
+      ? [
+          'request_capacity',
+          'admission_unavailable',
+          'provider_cooldown',
+        ].includes(stream.waiting.reason)
+        ? stream.waiting.until
+        : null
+      : ['retrying', 'failing'].includes(stream.status)
+        ? stream.nextRunAt
+        : null;
+
+  return (
+    <span className="sync-stream-time">
+      {stream.lastSuccessAt ? (
+        <span title={stream.lastSuccessAt}>
+          {m.sync_stream_synced({ time: ago(stream.lastSuccessAt, now) })}
+        </span>
+      ) : (
+        <span>{m.sync_stream_not_synced()}</span>
+      )}
+      {retry ? (
+        <small title={retry}>
+          {m.sync_stream_next_retry({ time: soon(retry, now) })}
+        </small>
+      ) : null}
+      <ChevronRight
+        className="sync-stream-chevron"
+        size={16}
+        aria-hidden="true"
+      />
+    </span>
+  );
+}
+
+function ReimportDialog({
+  item,
+  onClose,
+  onConfirm,
+}: {
+  item: SyncItem | null;
+  onClose: () => void;
+  onConfirm: (item: SyncItem) => void;
+}) {
+  const [shown, setShown] = useState(item);
+  if (item && item !== shown) setShown(item);
+  const noun = shown ? recordTypes[shown.type].noun : '';
+
+  return (
+    <Dialog
+      open={!!item}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogTitle>{m.sync_reimport_title({ records: noun })}</DialogTitle>
+        <DialogDescription>
+          {m.sync_reimport_description({ records: noun })}
+        </DialogDescription>
+        <div className="sync-dialog-actions">
+          <Button variant="outline" onClick={onClose}>
+            {m.common_cancel()}
+          </Button>
+          <Button onClick={() => item && onConfirm(item)}>
+            <RotateCcw aria-hidden="true" /> {m.sync_reimport_confirm()}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

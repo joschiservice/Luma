@@ -16,6 +16,7 @@ import { connectionsOptions } from '../../kit/connections/data';
 import { RecordAssistance } from '../../kit/record-assistance';
 import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { CaseOrderChangePlan } from '../orders/change-plan';
+import { capabilityRecordType } from '../sync/presentation';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';
@@ -119,6 +120,20 @@ function IssueWorkspace({
               {connection.status === 'active'
                 ? m.exceptions_open_connection()
                 : m.exceptions_reconnect({ connection: connection.label })}{' '}
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          ) : null}
+          {item?.class === 'sync_failure' &&
+          item.subject.kind === 'connection' ? (
+            <Link
+              to="/app/$organizationId/sync"
+              params={{ organizationId }}
+              search={{
+                connection: item.subject.id,
+                type: capabilityRecordType(item.subject.scope[0]),
+              }}
+            >
+              {m.exceptions_open_sync()}{' '}
               <ArrowRight size={14} aria-hidden="true" />
             </Link>
           ) : null}

@@ -91,5 +91,7 @@
   "connections_health_importing": "Importing",
   "connections_health_disconnected": "Disconnected",
   "connections_last_success": "Last successful full read",
-  "connections_open_issue": "Open connection issue"
+  "connections_open_issue": "Open connection issue",
+  "connections_open_sync": "Open sync",
+  "connections_open_sync_label": "Open the sync for {type}"
 }

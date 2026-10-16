@@ -1,4 +1,5 @@
 import type {
+  SyncCommand,
   SyncConnectionView,
   SyncOverview,
   SyncRecordType,
@@ -522,7 +523,7 @@ export function overallState(overview: SyncOverview): {
 }
 
 /** Names of each kind of sync run, called during render. */
-export const scanKinds: Record<SyncRunView['kind'], Message> = {
+const scanKinds: Record<SyncRunView['kind'], Message> = {
   backfill: m.sync_run_kind_backfill,
   incremental: m.sync_run_kind_incremental,
   reconcile: m.sync_run_kind_reconcile,
@@ -574,4 +575,397 @@ export function connectionSummary(
           detail: summary.detail,
         }),
       };
+}
+
+/** One sync with the connection it reads from. */
+export interface SyncItem {
+  connection: SyncConnectionView;
+  type: SyncRecordType;
+  stream: SyncStreamView;
+}
+
+/** Every sync in the workspace, in the order Data sync lists them. */
+export function syncItems(overview: SyncOverview): SyncItem[] {
+  return overview.connections.flatMap((connection) =>
+    connection.recordTypes.flatMap(({ recordType, stream }) =>
+      stream ? [{ connection, type: recordType, stream }] : [],
+    ),
+  );
+}
+
+/** Groups of the workspace health bar, from most to least urgent. */
+export type HealthGroup =
+  'attention' | 'retrying' | 'importing' | 'waiting' | 'paused' | 'current';
+
+const healthGroups: Record<
+  HealthGroup,
+  { state: OperationalState; label: (inputs: { count: number }) => string }
+> = {
+  attention: { state: 'error', label: m.sync_health_attention },
+  retrying: { state: 'attention', label: m.sync_health_retrying },
+  importing: { state: 'running', label: m.sync_health_importing },
+  waiting: { state: 'waiting', label: m.sync_health_waiting },
+  paused: { state: 'idle', label: m.sync_health_paused },
+  current: { state: 'verified', label: m.sync_health_current },
+};
+
+/**
+ * Places a sync in one health group. Reading changes after the history import counts as up to
+ * date, because the records it holds are complete; the read only adds newer changes.
+ */
+function healthGroup(stream: SyncStreamView): HealthGroup {
+  if (stream.status === 'failing' || stream.status === 'blocked')
+    return 'attention';
+  if (stream.status === 'retrying') return 'retrying';
+  if (stream.status === 'paused') return 'paused';
+  if (stream.status === 'waiting') return 'waiting';
+  if (stream.phase === 'backfill') return 'importing';
+
+  return 'current';
+}
+
+/** Counts syncs per health group, leaving out empty groups. */
+export function syncHealth(overview: SyncOverview) {
+  const counts = new Map<HealthGroup, number>();
+  for (const { stream } of syncItems(overview)) {
+    const group = healthGroup(stream);
+    counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
+
+  return (Object.keys(healthGroups) as HealthGroup[]).flatMap((group) => {
+    const count = counts.get(group);
+
+    return count
+      ? [
+          {
+            group,
+            count,
+            state: healthGroups[group].state,
+            label: healthGroups[group].label({ count }),
+          },
+        ]
+      : [];
+  });
+}
+
+/**
+ * The sync a link to a connection should open: the one for `type` when given, otherwise the
+ * connection's most urgent sync by health group, first in list order among equals. Undefined
+ * when the connection has no such sync.
+ */
+export function focusStream(
+  overview: SyncOverview,
+  connectionId: string,
+  type?: SyncRecordType,
+) {
+  const order = Object.keys(healthGroups);
+  const items = syncItems(overview).filter(
+    (item) =>
+      item.connection.connectionId === connectionId &&
+      (!type || item.type === type),
+  );
+  const rank = (item: SyncItem) => order.indexOf(healthGroup(item.stream));
+
+  return items.reduce<SyncItem | undefined>(
+    (best, item) => (!best || rank(item) < rank(best) ? item : best),
+    undefined,
+  )?.stream.id;
+}
+
+/** Workspace figures beside the summary: what Luma holds and how fresh it is. */
+export function syncFigures(overview: SyncOverview) {
+  const streams = syncItems(overview).map((item) => item.stream);
+  const oldest = (values: (string | null)[]) =>
+    values.includes(null)
+      ? null
+      : (values.filter((value): value is string => !!value).sort()[0] ?? null);
+
+  return {
+    records: streams.reduce((sum, stream) => sum + stream.records.total, 0),
+    imported: streams.filter((stream) => stream.phase === 'incremental').length,
+    total: streams.length,
+    /** The least recent successful read, or null while any sync has none. */
+    oldestSync: oldest(streams.map((stream) => stream.lastSuccessAt)),
+    /** Syncs that haven't read successfully yet. */
+    neverSynced: streams.filter((stream) => !stream.lastSuccessAt).length,
+    /** The least recent full check, or null while any imported sync has none. */
+    oldestCheck: oldest(
+      streams
+        .filter((stream) => stream.phase === 'incremental')
+        .map((stream) => stream.lastFullScanAt),
+    ),
+  };
+}
+
+/** What a person can do from an item that needs attention. */
+type AttentionAction = 'resume' | 'retry' | 'reimport' | 'connection';
+
+/** A sync or connection that needs a person, with the step that resolves it. */
+export interface AttentionItem {
+  key: string;
+  tone: 'danger' | 'warning' | 'info';
+  connection: SyncConnectionView;
+  /** The sync it concerns; absent when the whole connection needs attention. */
+  item?: SyncItem;
+  title: string;
+  detail: string;
+  action: AttentionAction | null;
+}
+
+const tones = { danger: 0, warning: 1, info: 2 } as const;
+
+/**
+ * Lists what needs a person, most urgent first: inactive connections, syncs that are blocked or
+ * failing, records Luma couldn't import and older history that became available. Automatic
+ * retries and waits are left out, because Luma resolves them on its own.
+ */
+export function attentionItems(
+  overview: SyncOverview,
+  canManage: boolean,
+): AttentionItem[] {
+  const items: AttentionItem[] = [];
+  for (const connection of overview.connections) {
+    const streams = syncItems({ ...overview, connections: [connection] });
+    if (connection.status !== 'active' && streams.length)
+      items.push({
+        key: `connection-${connection.connectionId}`,
+        tone: 'warning',
+        connection,
+        title: m.sync_attention_connection_title({
+          connection: connection.label,
+        }),
+        detail: m.sync_connection_inactive(),
+        action: connection.appId ? 'connection' : null,
+      });
+    for (const item of streams) {
+      const { stream, type } = item;
+      const noun = recordTypes[type].noun;
+      const key = (kind: string) => `${stream.id}-${kind}`;
+      if (stream.blocked === 'principal_unavailable')
+        items.push({
+          key: key('principal'),
+          tone: 'danger',
+          connection,
+          item,
+          title: m.sync_notice_principal_title(),
+          detail: canManage
+            ? m.sync_notice_principal_manage()
+            : m.sync_notice_principal_view(),
+          action: 'resume',
+        });
+      else if (stream.blocked === 'capability_removed')
+        items.push({
+          key: key('access'),
+          tone: 'danger',
+          connection,
+          item,
+          title: m.sync_attention_access_title({ records: noun }),
+          detail: m.sync_attention_access_detail(),
+          action: connection.appId ? 'connection' : null,
+        });
+      else if (stream.status === 'failing' && stream.error)
+        items.push({
+          key: key('failing'),
+          tone: 'danger',
+          connection,
+          item,
+          title: m.sync_notice_failing_title({ count: stream.error.attempts }),
+          detail: errorText(stream),
+          action: 'retry',
+        });
+      if (stream.records.failed)
+        items.push({
+          key: key('failed'),
+          tone: 'warning',
+          connection,
+          item,
+          title: m.sync_attention_failed_title({
+            records: records(type, stream.records.failed),
+          }),
+          detail: stream.problems.length
+            ? m.sync_attention_failed_reasons({
+                reasons: stream.problems.join('; '),
+              })
+            : m.sync_attention_failed_detail(),
+          action: null,
+        });
+      if (stream.coverage.olderHistoryAvailable)
+        items.push({
+          key: key('older'),
+          tone: 'info',
+          connection,
+          item,
+          title: m.sync_notice_older_title({ records: noun }),
+          detail: stream.coverage.historyFrom
+            ? m.sync_notice_older_description({
+                records: noun,
+                date: day(stream.coverage.historyFrom),
+              })
+            : m.sync_notice_older_description_undated({ records: noun }),
+          action: 'reimport',
+        });
+    }
+  }
+
+  return items.sort((a, b) => tones[a.tone] - tones[b.tone]);
+}
+
+/** The stored failure of a sync as a sentence; rate limits read as an automatic wait. */
+function errorText(stream: SyncStreamView) {
+  if (!stream.error) return '';
+
+  return stream.error.code === 'rate_limited'
+    ? m.sync_wait_provider_cooldown()
+    : stream.error.message;
+}
+
+/**
+ * The short coverage line of a sync row, such as "18,342 orders since 2 Mar 2019" or
+ * "1,240 orders so far". The detail pane states the full coverage.
+ */
+export function coverageBrief(type: SyncRecordType, stream: SyncStreamView) {
+  const total = stream.records.total;
+  const held = records(type, total);
+  if (stream.phase === 'backfill')
+    return !total
+      ? m.sync_brief_nothing_yet()
+      : stream.coverage.recentCompletedAt && stream.coverage.recentFrom
+        ? m.sync_brief_recent({ records: held })
+        : m.sync_brief_so_far({ records: held });
+  if (!total) return m.sync_brief_none({ records: recordTypes[type].noun });
+  if (stream.coverage.historyFrom)
+    return m.sync_brief_shared_from({
+      records: held,
+      date: day(stream.coverage.historyFrom),
+    });
+  if (ranges[type] && stream.coverage.oldest)
+    return m.sync_brief_since({
+      records: held,
+      date: day(stream.coverage.oldest),
+    });
+
+  return held;
+}
+
+/** The most important record problem of a sync, for its row, or null when there is none. */
+export function recordNote(type: SyncRecordType, stream: SyncStreamView) {
+  const { failed, pending, missing } = stream.records;
+  if (failed) return m.sync_brief_failed({ records: records(type, failed) });
+  if (missing) return m.sync_brief_missing({ records: records(type, missing) });
+  if (pending) return m.sync_brief_pending({ records: records(type, pending) });
+
+  return null;
+}
+
+/**
+ * One sentence on what a sync is doing and what happens next, for its detail pane. Waits,
+ * failures and blocks explain themselves; healthy syncs say how Luma keeps them current.
+ */
+export function streamExplanation(stream: SyncStreamView, canManage: boolean) {
+  const waiting = waitingStatement(stream);
+  if (waiting) return waiting;
+  switch (stream.status) {
+    case 'paused':
+      return m.sync_explain_paused();
+    case 'blocked':
+      return stream.blocked === 'principal_unavailable'
+        ? canManage
+          ? m.sync_notice_principal_manage()
+          : m.sync_notice_principal_view()
+        : stream.blocked === 'capability_removed'
+          ? m.sync_attention_access_detail()
+          : m.sync_connection_inactive();
+    case 'failing':
+    case 'retrying':
+      return errorText(stream);
+    case 'importing':
+      return stream.scan?.waitingForExport
+        ? m.sync_explain_preparing()
+        : m.sync_explain_importing();
+    case 'syncing':
+      return stream.scan?.kind === 'reconcile' || stream.scan?.since === null
+        ? m.sync_explain_checking()
+        : m.sync_explain_reading();
+    default:
+      return m.sync_explain_current();
+  }
+}
+
+const capabilityTypes: Record<string, SyncRecordType> = {
+  'orders.read': 'orders',
+  'fulfillment.read': 'fulfillments',
+  'products.read': 'products',
+  'inventory.read': 'inventory',
+  'customers.read': 'customers',
+  'returns.read': 'returns',
+  'inventory.transfers.read': 'inventory_transfers',
+  'inventory.shipments.read': 'inventory_shipments',
+};
+
+/** The record type a connection read capability imports, such as orders for `orders.read`. */
+export const capabilityRecordType = (capability: string | undefined) =>
+  capability ? capabilityTypes[capability] : undefined;
+
+/** The record list each type appears in. */
+export const recordLists = {
+  orders: '/app/$organizationId/orders',
+  fulfillments: '/app/$organizationId/fulfillment',
+  products: '/app/$organizationId/products',
+  inventory: '/app/$organizationId/inventory',
+  inventory_transfers: '/app/$organizationId/inventory/transfers',
+  inventory_shipments: '/app/$organizationId/inventory/transfers',
+  customers: '/app/$organizationId/customers',
+  returns: '/app/$organizationId/returns',
+} as const satisfies Record<SyncRecordType, string>;
+
+/** Formats how long a run took, such as "12 s", "4 min" or "1 h 20 min". */
+export function runDuration(
+  run: Pick<SyncRunView, 'startedAt' | 'finishedAt'>,
+  now: number,
+) {
+  const end = run.finishedAt ? Date.parse(run.finishedAt) : now;
+  const seconds = Math.max(
+    0,
+    Math.round((end - Date.parse(run.startedAt)) / 1000),
+  );
+  const unit = (value: number, unit: 'second' | 'minute' | 'hour') =>
+    formatNumber(value, { style: 'unit', unit, unitDisplay: 'short' });
+  if (seconds < 60) return unit(seconds, 'second');
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return unit(minutes, 'minute');
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+
+  return rest
+    ? m.sync_run_duration_hours({
+        hours: unit(hours, 'hour'),
+        minutes: unit(rest, 'minute'),
+      })
+    : unit(hours, 'hour');
+}
+
+/** The name of a run's kind, distinguishing the recent-history window. */
+export const runKind = (run: SyncRunView) =>
+  run.createdSince ? m.sync_run_kind_recent() : scanKinds[run.kind]();
+
+/**
+ * Commands that apply to each sync of a connection: syncing reads every sync that isn't paused
+ * or waiting for someone, pausing stops every running one, and resuming continues paused syncs
+ * and those whose person left.
+ */
+export function connectionCommands(connection: SyncConnectionView) {
+  const streams = syncItems({
+    connections: [connection],
+    runs: [],
+    canManage: false,
+    asOf: '',
+  }).map((item) => item.stream);
+
+  return {
+    retry: streams.filter((stream) => !stream.paused && !stream.blocked),
+    pause: streams.filter((stream) => !stream.paused),
+    resume: streams.filter(
+      (stream) => stream.paused || stream.blocked === 'principal_unavailable',
+    ),
+  } satisfies Partial<Record<SyncCommand, SyncStreamView[]>>;
 }

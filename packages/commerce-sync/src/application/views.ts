@@ -70,7 +70,7 @@ export interface SyncConnectionView {
   }[];
 }
 
-interface SyncRunView {
+export interface SyncRunView {
   id: string;
   connectionId: string;
   recordType: RecordType;
@@ -91,6 +91,19 @@ interface SyncRunView {
   failed: number;
   missing: number | null;
   errors: number;
+}
+
+/** A source record that is waiting, could not be imported or is no longer found. */
+export interface SyncRecordView {
+  externalId: string;
+  resource: string;
+  state: 'pending' | 'failed' | 'missing';
+  problem: string | null;
+  /** The canonical record Luma imported it as, when it has one. */
+  entityId: string | null;
+  sourceCreatedAt: string | null;
+  lastSeenAt: string;
+  missingSince: string | null;
 }
 
 export interface SyncOverview {

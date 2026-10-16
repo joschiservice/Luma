@@ -17,7 +17,12 @@ import {
   linkInputSchema,
   linkRequestSchema,
   syncCommandSchema,
+  syncConnectionCommandResultSchema,
+  syncConnectionCommandSchema,
   syncOverviewSchema,
+  syncRecordListSchema,
+  syncRecordStateSchema,
+  syncRunHistorySchema,
   syncStreamSchema,
 } from '../sync.js';
 
@@ -76,6 +81,45 @@ export const syncContract = {
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(z.object({ params: organizationParamsSchema }))
     .output(syncOverviewSchema),
+  runs: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/sync/{streamId}/runs',
+      summary: 'Review a sync’s runs',
+      description:
+        'Lists one sync’s runs, newest first, 20 per page: history imports, change syncs and full checks, what started each, and how many records were imported, unchanged, waiting, not imported or no longer found. A running run shows its progress so far. Pass `nextCursor` as `before` for older runs.',
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          streamId: z.string().uuid(),
+        }),
+        query: z.object({ before: z.string().uuid().optional() }),
+      }),
+    )
+    .output(syncRunHistorySchema),
+  records: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/sync/{streamId}/records',
+      summary: 'List a sync’s problem records',
+      description:
+        'Lists one sync’s source records in one state, 25 per page in source key order: `pending` records wait for a record they depend on, `failed` records could not be imported and `missing` records were imported before but recent full checks no longer found them. Each shows its source ID, the reason when Luma knows it, and the Luma record it was imported as. Pass `nextCursor` as `cursor` for the next page; a cursor from another request returns 422.',
+    })
+    .meta({ access: anyMember, errors: [400, 401, 403, 404, 422, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          streamId: z.string().uuid(),
+        }),
+        query: z.object({
+          state: syncRecordStateSchema,
+          cursor: z.string().min(1).max(2048).optional(),
+        }),
+      }),
+    )
+    .output(syncRecordListSchema),
   command: endpoint
     .route({
       method: 'POST',
@@ -97,6 +141,27 @@ export const syncContract = {
       }),
     )
     .output(syncStreamSchema),
+  connectionCommand: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/organizations/{organizationId}/sync/connections/{connectionId}/commands',
+      summary: 'Control a connection’s syncs',
+      description:
+        'Requires `sync.manage`. Applies one command to every sync of a connection it changes, together: `pause` pauses running syncs, `resume` resumes paused syncs and syncs whose person lost access, and `retry` syncs every sync that is neither paused nor blocked now. Resuming and retrying continue with the caller’s access. Returns how many syncs changed and the connection’s updated state. Commands are idempotent.',
+    })
+    .meta({
+      access: requires('sync.manage'),
+      errors: [400, 401, 403, 404, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          connectionId: z.string().uuid(),
+        }),
+        body: syncConnectionCommandSchema,
+      }),
+    )
+    .output(syncConnectionCommandResultSchema),
   identity: endpoint
     .route({
       method: 'GET',

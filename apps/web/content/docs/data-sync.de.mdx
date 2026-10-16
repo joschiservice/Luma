@@ -24,24 +24,30 @@ Lieferanten und Lieferantenbestellungen aus JTL erscheinen hier nicht. Die [Besc
 
 ## Den Import verfolgen [#follow-the-import]
 
-Oben fasst die Seite alle Abgleiche zusammen, etwa **Verlauf wird importiert**, **Aktuell** oder **2 Abgleiche müssen geprüft werden**, dazu **Datensätze in Luma**, **Verbindungen** und die **Älteste vollständige Prüfung**. Darunter listet jede Verbindung ihre Datensatztypen mit:
+Oben fasst die Seite alle Abgleiche zusammen, etwa **Verlauf wird importiert**, **Aktuell** oder **2 Abgleiche müssen geprüft werden**. Ein Balken zählt die Abgleiche nach Status, und vier Kennzahlen zeigen, wie viele und wie aktuelle Daten vorliegen: **Datensätze in Luma**, **Verlauf importiert**, der **Älteste Abgleich** und die **Älteste vollständige Prüfung**.
 
-- **Status**, etwa **Neuerer Verlauf wird importiert**, **Änderungen werden gelesen** oder **Aktuell**.
-- **Fortschritt** während eines Lesevorgangs, als Anzahl und als Prozentsatz, wenn die Quelle ihre Gesamtzahl meldet.
-- **Abdeckung**: wie viele Datensätze Luma hat und welchen Zeitraum sie abdecken.
-- Wann zuletzt abgeglichen wurde und wann die nächste Prüfung oder der nächste Versuch fällig ist.
+**Muss geprüft werden** erscheint, wenn ein Abgleich oder eine Verbindung eine Person braucht: ein Abgleich, der wiederholt fehlschlägt oder darauf wartet, dass ihn jemand fortsetzt, eine Verbindung, die nicht aktiv ist, Datensätze, die Luma nicht importieren konnte, oder älterer Verlauf, der verfügbar geworden ist. Jeder Eintrag bietet den Schritt, der ihn löst, etwa **Jetzt erneut versuchen**, **Mit meinem Zugriff fortsetzen**, **Verbindung verwalten** oder **Ältere Bestellungen importieren**. Automatische Wiederholungen und Wartezeiten stehen dort nicht; Luma löst sie selbst.
 
-**Letzte Abgleichsläufe** listet jeden Verlaufsimport, Änderungsabgleich und jede vollständige Prüfung, was sie gestartet hat und wie viele Datensätze importiert, unverändert, wartend, nicht importiert oder nicht mehr gefunden sind.
+Darunter listet jede Verbindung ihre Datensatztypen mit ihrem Status, etwa **Verlauf wird importiert**, **Änderungen werden gelesen** oder **Aktuell**, mit dem, was Luma hat, dem Fortschritt eines laufenden Lesevorgangs und dem letzten Abgleich. Datensatztypen, die die Verbindung nicht abgleicht, stehen zusammengefasst in einer Zeile unter der Verbindung.
 
-Du kannst Luma nutzen, während der Verlauf importiert wird; Datensätze erscheinen, sobald sie ankommen. Bestellungen, Produkte, Fulfillment, Bestand, Retouren und Kunden zeigen über ihrer Liste eine einzeilige Zusammenfassung **Abdeckung**. Sie sagt, wenn die Liste noch unvollständig ist oder eine Quelle geprüft werden muss. Mit **Datenabgleich öffnen** siehst du die Einzelheiten.
+Wähle einen Datensatztyp aus, oder bewege dich mit **J** und **K** und drücke die **Leertaste**, um seine Details neben der Liste zu öffnen. Die Details erklären, was der Abgleich gerade tut und was als Nächstes passiert, und zeigen:
+
+- **Verlaufsimport**: seinen Fortschritt. Bei Shopify kommt zuerst der neuere Verlauf, danach der ältere.
+- **Abdeckung** und **Datensätze**: was Luma hat, eine Grenze, die die Quelle setzt, und Datensätze, die warten, nicht importiert werden konnten oder bei der letzten vollständigen Prüfung nicht gefunden wurden. **Anzeigen** listet diese Datensätze mit ihrer Quell-ID und dem Grund auf; **In Datensätzen suchen** öffnet einen Datensatz, den Luma bereits hat. **Öffnen** führt zur Liste dieser Datensätze.
+- **Zeitplan**: den letzten erfolgreichen Lesevorgang, die letzte vollständige Prüfung und die nächste Prüfung oder den nächsten Versuch.
+- **Abgleichsläufe**: Verlaufsimporte, Änderungsabgleiche und vollständige Prüfungen, die neuesten zuerst, mit dem, was sie gestartet hat, wie lange sie gedauert haben und wie viele Datensätze importiert, unverändert, wartend, nicht importiert oder nicht mehr gefunden sind. **Ältere Läufe anzeigen** geht weiter zurück.
+
+Der geöffnete Abgleich ist Teil der Seitenadresse, sodass du einen Link darauf teilen kannst. Mit **Escape** schließt du die Details.
+
+Du kannst Luma nutzen, während der Verlauf importiert wird; Datensätze erscheinen, sobald sie ankommen. Bestellungen, Produkte, Fulfillment, Bestand, Retouren und Kunden zeigen über ihrer Liste eine einzeilige Zusammenfassung **Abdeckung**. Sie sagt, wenn die Liste noch unvollständig ist oder eine Quelle geprüft werden muss. Öffne sie und wähle eine Quelle, um ihren Abgleich zu sehen, oder wähle **Datenabgleich öffnen** für alle Abgleiche. Probleme zu einem fehlgeschlagenen Lesen einer Verbindung und die Verbindungskarten unter **Apps verwalten** verlinken ebenfalls auf den betroffenen Abgleich.
 
 ## Abdeckung verstehen [#understand-coverage]
 
-Shopify importiert zuerst die neueren Bestellungen, dann deren Fulfillments, Retouren und Erstattungen und danach im Hintergrund den älteren Verlauf. **Neuerer Verlauf importiert** heißt, der neuere Zeitraum ist vollständig; der ältere Verlauf hat einen eigenen Fortschritt und bleibt unvollständig, bis er fertig ist. Fulfillments und Retouren zeigen **Wartet auf Bestellungen**, bis die zugehörigen Bestellungen importiert sind.
+Shopify importiert zuerst die neueren Bestellungen, dann deren Fulfillments, Retouren und Erstattungen und danach im Hintergrund den älteren Verlauf. **Neuerer Verlauf vollständig** heißt, der neuere Zeitraum ist importiert; der ältere Verlauf hat einen eigenen Fortschritt und bleibt unvollständig, bis er fertig ist. Fulfillments und Retouren zeigen **Wartet auf Bestellungen**, bis die zugehörigen Bestellungen importiert sind.
 
 **Verlauf wird vorbereitet** heißt, die Quelle erstellt einen Export, daher gibt es eventuell noch keinen Fortschritt. Du kannst die Seite verlassen. Luma macht selbstständig weiter und setzt nach einer Unterbrechung dort fort, wo es aufgehört hat.
 
-Die Abdeckung zeigt genau, was Luma hat, und behauptet nie mehr. Manche Quellen geben nur den neueren Verlauf frei: Shopify gibt Bestellungen der letzten 60 Tage frei, es sei denn, der Zugriff auf ältere Bestellungen ist genehmigt. Der Datenabgleich zeigt dann **Nur neuere Bestellungen bereitgestellt** mit dem Datum, ab dem der Verlauf vorliegt. Luma behält alles, was es importiert, daher wächst die Abdeckung mit der Zeit. Werden ältere Datensätze verfügbar, zeigt der Datenabgleich **Ältere Bestellungen sind jetzt verfügbar** mit einer Schaltfläche, um sie zu importieren.
+Die Abdeckung zeigt genau, was Luma hat, und behauptet nie mehr. Manche Quellen geben nur den neueren Verlauf frei: Shopify gibt Bestellungen der letzten 60 Tage frei, es sei denn, der Zugriff auf ältere Bestellungen ist genehmigt. Der Datenabgleich zeigt dann das Datum, ab dem der Verlauf vorliegt, etwa **3.100 Bestellungen · bereitgestellt ab 31.07.2026**. Luma behält alles, was es importiert, daher wächst die Abdeckung mit der Zeit. Werden ältere Datensätze verfügbar, zeigt der Datenabgleich **Ältere Bestellungen sind jetzt verfügbar** mit einer Schaltfläche, um sie zu importieren.
 
 Manche Datensätze brauchen Aufmerksamkeit. **Warten auf zugehörige Datensätze** heißt, Luma importiert sie, sobald die Datensätze vorliegen, von denen sie abhängen. **Import nicht möglich** nennt Datensätze, die Luma nicht lesen konnte, mit dem Grund. **Bei der letzten vollständigen Prüfung nicht gefunden** listet Datensätze, die die Quelle nicht mehr liefert. Luma behält ihre aktuellen Daten, bis eine Löschung bestätigt ist. Bei Shopify-Bestellungen, Produkten und Lagerbeständen prüft Luma den Datensatz unabhängig erneut. Bestätigte Löschungen oder getrennte Lagerbestände fließen nicht mehr in aktuelle Ansichten ein; Nachweise und Verknüpfungen bleiben erhalten. Ältere Bestellungen benötigen Zugriff auf den vollständigen Verlauf, bevor eine Löschung bestätigt werden kann.
 
@@ -55,12 +61,14 @@ Luma erkennt Datensätze, die es schon hat. Ein erneuter Import desselben Verlau
 
 ## Abgleich starten, pausieren oder neu importieren [#run-pause-or-re-import-a-sync]
 
-Enthält deine Rolle **Importe verwalten**, hat jeder Datensatztyp ein Aktionsmenü:
+Enthält deine Rolle **Importe verwalten**, listen die Details jedes Abgleichs seine Befehle und was sie bewirken:
 
 - **Jetzt abgleichen** liest sofort erneut aus der Quelle.
-- **Alle Datensätze prüfen** startet eine vollständige Prüfung.
+- **Alle Datensätze prüfen** startet eine vollständige Prüfung. Das ist möglich, sobald der Verlaufsimport abgeschlossen ist.
 - **Verlauf neu importieren** liest alles erneut ein, was die Quelle bereitstellt. Datensätze, die bereits in Luma sind, bleiben verfügbar und werden nicht doppelt angelegt. Bei großen Datenmengen kann das eine Weile dauern.
 - **Pausieren** hält den Abgleich an. Bereits importierte Datensätze bleiben verfügbar. **Fortsetzen** setzt ihn fort.
+
+Um alle Abgleiche einer Verbindung auf einmal zu steuern, etwa während einer Wartung deines ERP, öffne das Menü **…** neben der Verbindung und wähle **Alle jetzt abgleichen**, **Alle pausieren** oder **Alle fortsetzen**. Luma ändert die Abgleiche der Verbindung gemeinsam; schlägt der Befehl fehl, ändert sich keiner.
 
 Ohne **Importe verwalten** kannst du jeden Abgleich verfolgen, aber nicht ändern.
 

@@ -1,6 +1,8 @@
 import type {
   SyncConnectionView,
   SyncOverview,
+  SyncRecordView,
+  SyncRunView,
   SyncStreamView,
 } from '@luma/api-contract';
 
@@ -470,4 +472,131 @@ export const rateLimited: SyncOverview = {
       };
     }),
   })),
+};
+
+/** The latest runs of Shopify's orders sync while its history imports. */
+export const orderRuns: SyncRunView[] = [
+  importing.runs[0]!,
+  {
+    ...importing.runs[0]!,
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    kind: 'incremental',
+    trigger: 'webhook',
+    since: '2026-09-29T08:30:00.000Z',
+    fullScan: false,
+    startedAt: '2026-09-29T08:35:00.000Z',
+    finishedAt: '2026-09-29T08:35:04.000Z',
+    outcome: 'completed',
+    pages: 1,
+    records: 3,
+    changed: 2,
+    unchanged: 1,
+    errors: 0,
+  },
+  {
+    ...importing.runs[0]!,
+    id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    createdSince: '2026-08-30T08:00:00.000Z',
+    startedAt: '2026-09-29T08:00:00.000Z',
+    finishedAt: '2026-09-29T08:31:00.000Z',
+    outcome: 'completed',
+    pages: 40,
+    records: 980,
+    changed: 980,
+    errors: 0,
+  },
+];
+
+/** Older Shopify history became available, and some JTL products couldn't import. */
+export const opportunities: SyncOverview = {
+  ...current,
+  connections: [
+    {
+      ...current.connections[0]!,
+      recordTypes: current.connections[0]!.recordTypes.map((item) =>
+        item.recordType === 'orders' && item.stream
+          ? {
+              ...item,
+              stream: {
+                ...item.stream,
+                coverage: {
+                  ...item.stream.coverage,
+                  olderHistoryAvailable: true,
+                },
+              },
+            }
+          : item,
+      ),
+    },
+    {
+      ...jtl,
+      recordTypes: jtl.recordTypes.map((item) =>
+        item.recordType === 'products' && item.stream
+          ? {
+              ...item,
+              stream: {
+                ...item.stream,
+                records: counted(905, { failed: 2 }),
+                problems: ['The product has no SKU code'],
+              },
+            }
+          : item.recordType === 'inventory' && item.stream
+            ? {
+                ...item,
+                stream: { ...item.stream, status: 'up_to_date', error: null },
+              }
+            : item,
+      ),
+    },
+  ],
+};
+
+/** The two JTL products that couldn't import; one was imported before its SKU code was removed. */
+export const productProblems: SyncRecordView[] = [
+  {
+    externalId: '10442',
+    resource: 'product',
+    state: 'failed',
+    problem: 'The product has no SKU code',
+    entityId: null,
+    sourceCreatedAt: '2026-09-20T09:00:00.000Z',
+    lastSeenAt: '2026-09-29T08:55:00.000Z',
+    missingSince: null,
+  },
+  {
+    externalId: '10518',
+    resource: 'product',
+    state: 'failed',
+    problem: 'The product has no SKU code',
+    entityId: '99999999-9999-4999-8999-999999999999',
+    sourceCreatedAt: '2026-04-02T09:00:00.000Z',
+    lastSeenAt: '2026-09-29T08:55:00.000Z',
+    missingSince: null,
+  },
+];
+
+/** A JTL connection that was disconnected, so its syncs stop. */
+export const disconnected: SyncOverview = {
+  ...current,
+  connections: [
+    ...current.connections,
+    {
+      ...jtl,
+      status: 'disconnected',
+      recordTypes: jtl.recordTypes.map((item) =>
+        item.stream
+          ? {
+              ...item,
+              stream: {
+                ...item.stream,
+                status: 'blocked',
+                blocked: 'connection_inactive',
+                error: null,
+                nextRunAt: null,
+              },
+            }
+          : item,
+      ),
+    },
+  ],
 };
