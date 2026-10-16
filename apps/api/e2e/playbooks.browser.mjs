@@ -76,7 +76,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .getByRole('button', { name: 'Remove System filter: JTL Cloud' })
     .click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByRole('tab', { name: /^Enabled 0$/ }).click();
+  await page.getByRole('tab', { name: /^On 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
   await page.getByRole('tab', { name: /^All workflows 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
@@ -89,8 +89,12 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     (url.searchParams.get('q') ?? '').includes('shipping'),
   );
   await page.getByRole('link', { name }).click();
-  await page.getByRole('heading', { name: 'How it works' }).waitFor();
-  await page.getByRole('heading', { name: 'Ready to set up' }).waitFor();
+  // A workflow that is off opens on how it works, with the setup step first.
+  await page
+    .getByRole('tab', { name: 'How it works', selected: true })
+    .waitFor();
+  await page.getByRole('heading', { name: 'Review activation' }).waitFor();
+  await page.getByText('Off', { exact: true }).first().waitFor();
   await mkdir('/tmp/luma72-browser', { recursive: true });
   await page.screenshot({
     path: '/tmp/luma72-browser/overview-desktop.png',
@@ -159,15 +163,23 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .getByRole('button', { name: 'Activate reviewed version', exact: true })
     .click();
   await dialog.getByRole('button', { name: 'Retry activation' }).click();
+  await page.getByText('On', { exact: true }).first().waitFor();
+  // Turning it on keeps the reader on the tab they chose.
+  await page
+    .getByRole('tab', { name: 'How it works', selected: true })
+    .waitFor();
+  await page.getByRole('tab', { name: 'Setup' }).click();
   await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
-  await page.getByRole('heading', { name: 'Running' }).waitFor();
   // Losing write access keeps the workflow enabled but visibly blocked, with the repair.
   await db.owner.query(
     `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read"]') WHERE id=$1`,
     [connectionId],
   );
   await page.reload();
-  await page.getByRole('heading', { name: 'Can’t run right now' }).waitFor();
+  await page.getByText('Can’t run', { exact: true }).first().waitFor();
+  await page
+    .getByRole('heading', { name: 'Repair access in Connections' })
+    .waitFor();
   const repair = page
     .getByRole('link', { name: 'Repair access in Connections' })
     .first();
@@ -184,13 +196,15 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .click();
   await page.getByRole('tab', { name: /^Needs attention 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByText('Blocked', { exact: true }).first().waitFor();
+  await page.getByText('Can’t run', { exact: true }).first().waitFor();
   await db.owner.query(
     `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read","orders.shipping-method.write"]') WHERE id=$1`,
     [connectionId],
   );
   await page.getByRole('link', { name }).click();
-  await page.getByRole('heading', { name: 'Running' }).waitFor();
+  await page.getByText('On', { exact: true }).first().waitFor();
+  // A workflow that is on opens on its runs.
+  await page.getByRole('tab', { name: /^Runs/, selected: true }).waitFor();
   expect(
     (
       await db.owner.query(
@@ -242,10 +256,12 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     [tenantId, runId, 'b'.repeat(64), outcome],
   );
   await page.reload();
-  await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
+  // The only recent run opens straight away.
   await page
-    .getByText('workflow failure detected', { exact: true })
-    .last()
+    .getByRole('button', {
+      name: /Waiting for approval.*Workflow issue detected/,
+    })
+    .and(page.locator('[aria-expanded="true"]'))
     .waitFor();
   await page
     .getByText(
@@ -291,6 +307,8 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.screenshot({ path: '/tmp/luma72-browser/runs-desktop.png' });
   expect(await page.locator('body').innerText()).not.toMatch(/playbook/i);
 
+  await page.getByRole('tab', { name: 'Setup' }).click();
+  await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
   await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
   await page.getByText('Scope and review details', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
@@ -318,7 +336,16 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await page.getByRole('heading', { name: 'How it works' }).waitFor();
+  // Every activation was revoked, so the workflow is paused and opens on its runs.
+  await page.getByRole('tab', { name: /^Runs/, selected: true }).waitFor();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: '/tmp/luma72-browser/runs-mobile.png' });
+  await page.getByRole('tab', { name: 'How it works' }).click();
+  await page.getByRole('heading', { name: 'Verify the result' }).waitFor();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -328,28 +355,13 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     path: '/tmp/luma72-browser/overview-mobile.png',
     fullPage: false,
   });
-  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Activity', exact: true }).click();
-  await page.screenshot({ path: '/tmp/luma72-browser/runs-mobile.png' });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Rules', exact: true }).click();
-  await expect
-    .poll(() =>
-      page
-        .getByRole('region', { name: 'Rules', exact: true })
-        .evaluate((node) => node === document.activeElement),
-    )
-    .toBe(true);
-  await page.keyboard.press('Tab');
+  await page.getByRole('tab', { name: 'Setup' }).click();
+  await page.waitForURL((url) => url.hash === '#rules');
+  await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
   expect(
     await page
       .getByRole('button', { name: 'Review activation', exact: true })
-      .evaluate((node) => node === document.activeElement),
+      .isEnabled(),
   ).toBe(true);
   await page.screenshot({
     path: '/tmp/luma72-browser/detail-mobile.png',

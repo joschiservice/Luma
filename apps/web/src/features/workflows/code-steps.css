@@ -79,39 +79,13 @@
 }
 
 .code-step-tabs {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
   min-width: 0;
 }
 
 .code-step-tabs [data-slot='tabs-list'] {
-  align-self: stretch;
   justify-content: flex-start;
-  gap: 16px;
-  height: auto;
-  padding: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-}
-
-.code-step-tabs [data-slot='tabs-trigger'] {
-  flex: none;
-  height: 34px;
-  padding: 0 2px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-
-.code-step-tabs [data-slot='tabs-trigger'][data-active] {
-  border-bottom-color: var(--signal);
-  background: none;
-  box-shadow: none;
-  color: var(--foreground);
+  width: 100%;
 }
 
 .code-source-toolbar {

@@ -14,7 +14,7 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
-import { CaseWorkflowPanel } from './case';
+import { CaseWorkflowAction, CaseWorkflowPanel } from './case';
 
 const readiness = (
   overrides: Partial<WorkflowReadiness> = {},
@@ -68,6 +68,7 @@ const detail = (state: State): WorkflowDetail => ({
   summary: {
     id: 'shopify-stock-correction',
     name: 'Correct Shopify stock from the ERP',
+    trigger: { kind: 'exception', issueType: 'inventory_mismatch' },
     purpose:
       'When Shopify shows a different available quantity than the ERP for linked stock, propose setting Shopify to the ERP quantity.',
     category: 'inventory',
@@ -181,7 +182,16 @@ function Preview({ state }: { state: State }) {
               className="workflows-page"
               style={{ maxWidth: 760, margin: 'auto', padding: 24 }}
             >
-              <CaseWorkflowPanel organizationId="org" detail={detail(state)} />
+              <div className="workflow-stack">
+                <div>
+                  <CaseWorkflowAction
+                    organizationId="org"
+                    detail={detail(state)}
+                    notify={() => undefined}
+                  />
+                </div>
+                <CaseWorkflowPanel detail={detail(state)} />
+              </div>
             </main>
           </QueryClientProvider>
         ),

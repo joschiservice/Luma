@@ -21,6 +21,7 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { personLabel } from '@luma/ui/lib/actor';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { Power } from 'lucide-react';
 import { useState } from 'react';
 
 import { IdentityError } from '../../kit/identity/data';
@@ -171,24 +172,26 @@ export function CaseActivationForm({
   );
 }
 
-/** Shows whether a case workflow is on, as whom, and lets people with permission to enable workflows turn it on or off. */
-export function CaseWorkflowPanel({
+/**
+ * Turns a case workflow on or off for people with permission to enable workflows, after they
+ * review its version and approval behavior. Reports the result through `notify`.
+ */
+export function CaseWorkflowAction({
   organizationId,
   detail,
+  notify,
 }: {
   organizationId: string;
   detail: WorkflowDetail;
+  notify: (message: string) => void;
 }) {
   const client = useQueryClient();
   const [activating, setActivating] = useState(false);
   const [revoking, setRevoking] = useState<WorkflowActivationView | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const active = detail.activations.find((item) => item.active);
   const blocked = detail.summary.readiness.state === 'blocked';
-  const refresh = () =>
-    client.invalidateQueries({ queryKey: workflowsKey(organizationId) });
   const revoke = async () => {
     if (!revoking || pending) return;
     setPending(true);
@@ -201,14 +204,108 @@ export function CaseWorkflowPanel({
         revoking.artifactDigest,
       );
       setRevoking(null);
-      setMessage(m.workflows_case_turned_off());
-      await refresh();
+      notify(m.workflows_case_turned_off());
+      await client.invalidateQueries({
+        queryKey: workflowsKey(organizationId),
+      });
     } catch (failure) {
       setError(workflowError(failure));
     } finally {
       setPending(false);
     }
   };
+  if (!detail.canManage) return null;
+
+  return (
+    <>
+      {active ? (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setRevoking(active);
+            setError('');
+          }}
+        >
+          <Power aria-hidden="true" />
+          {m.workflows_case_turn_off()}
+        </Button>
+      ) : (
+        <Button
+          disabled={blocked}
+          title={blocked ? m.workflows_case_blocked() : undefined}
+          onClick={() => setActivating(true)}
+        >
+          <Power aria-hidden="true" />
+          {m.workflows_case_turn_on()}
+        </Button>
+      )}
+      <Dialog
+        open={activating}
+        onOpenChange={(open) => {
+          if (!open) setActivating(false);
+        }}
+      >
+        <DialogContent className="workflow-dialog">
+          <DialogTitle>
+            {m.workflows_case_dialog_title({ name: detail.summary.name })}
+          </DialogTitle>
+          <DialogDescription>
+            {m.workflows_case_dialog_description()}
+          </DialogDescription>
+          <CaseActivationForm
+            organizationId={organizationId}
+            detail={detail}
+            cancel={() => setActivating(false)}
+            done={async () => {
+              setActivating(false);
+              notify(m.workflows_case_turned_on());
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={revoking !== null}
+        onOpenChange={(open) => {
+          if (!open && !pending) setRevoking(null);
+        }}
+      >
+        <DialogContent className="workflow-dialog">
+          <DialogTitle>{m.workflows_case_off_title()}</DialogTitle>
+          <DialogDescription>
+            {m.workflows_case_off_description()}
+          </DialogDescription>
+          {error ? <p role="alert">{error}</p> : null}
+          <div className="workflow-dialog-actions">
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => setRevoking(null)}
+            >
+              {m.common_cancel()}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => void revoke()}
+            >
+              {pending
+                ? m.workflows_case_turning_off()
+                : m.workflows_case_turn_off()}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * Shows whether a case workflow is on and as whom, which cases start it, and why it can't be
+ * turned on yet. The page header holds the control that turns it on or off.
+ */
+export function CaseWorkflowPanel({ detail }: { detail: WorkflowDetail }) {
+  const active = detail.activations.find((item) => item.active);
+  const blocked = detail.summary.readiness.state === 'blocked';
 
   return (
     <Card
@@ -217,16 +314,8 @@ export function CaseWorkflowPanel({
       aria-labelledby="case-title"
     >
       <CardTitle id="case-title">{m.workflows_case_title()}</CardTitle>
-      <p>
-        {m.workflows_case_explanation({
-          explanation: detail.summary.readiness.coverage.explanation,
-        })}
-      </p>
-      {message ? (
-        <Alert tone="success" role="status">
-          {message}
-        </Alert>
-      ) : null}
+      <p>{detail.summary.readiness.coverage.explanation}</p>
+      <p>{detail.summary.readiness.approval.summary}</p>
       <div className="workflow-case-status" role="status">
         {active ? (
           <>
@@ -259,88 +348,9 @@ export function CaseWorkflowPanel({
       </div>
       {!detail.canManage ? (
         <p>{m.workflows_case_cannot_manage()}</p>
-      ) : active ? (
-        <Button
-          variant="outline"
-          onClick={() => {
-            setRevoking(active);
-            setError('');
-          }}
-        >
-          {m.workflows_case_turn_off()}
-        </Button>
-      ) : (
-        <>
-          {blocked ? (
-            <Alert tone="warning" id="case-activation-reason">
-              {m.workflows_case_blocked()}
-            </Alert>
-          ) : null}
-          <Button
-            disabled={blocked}
-            aria-describedby={blocked ? 'case-activation-reason' : undefined}
-            onClick={() => setActivating(true)}
-          >
-            {m.workflows_case_turn_on()}
-          </Button>
-        </>
-      )}
-      <Dialog
-        open={activating && detail.canManage}
-        onOpenChange={(open) => {
-          if (!open) setActivating(false);
-        }}
-      >
-        <DialogContent className="workflow-dialog">
-          <DialogTitle>
-            {m.workflows_case_dialog_title({ name: detail.summary.name })}
-          </DialogTitle>
-          <DialogDescription>
-            {m.workflows_case_dialog_description()}
-          </DialogDescription>
-          <CaseActivationForm
-            organizationId={organizationId}
-            detail={detail}
-            cancel={() => setActivating(false)}
-            done={async () => {
-              setActivating(false);
-              setMessage(m.workflows_case_turned_on());
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={revoking !== null && detail.canManage}
-        onOpenChange={(open) => {
-          if (!open && !pending) setRevoking(null);
-        }}
-      >
-        <DialogContent className="workflow-dialog">
-          <DialogTitle>{m.workflows_case_off_title()}</DialogTitle>
-          <DialogDescription>
-            {m.workflows_case_off_description()}
-          </DialogDescription>
-          {error ? <p role="alert">{error}</p> : null}
-          <div className="workflow-dialog-actions">
-            <Button
-              variant="outline"
-              disabled={pending}
-              onClick={() => setRevoking(null)}
-            >
-              {m.common_cancel()}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={pending}
-              onClick={() => void revoke()}
-            >
-              {pending
-                ? m.workflows_case_turning_off()
-                : m.workflows_case_turn_off()}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      ) : !active && blocked ? (
+        <Alert tone="warning">{m.workflows_case_blocked()}</Alert>
+      ) : null}
     </Card>
   );
 }

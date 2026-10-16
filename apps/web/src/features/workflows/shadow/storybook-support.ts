@@ -35,6 +35,7 @@ const summary: Omit<WorkflowSummary, 'readiness'> = {
   purpose: 'Apply the mapped shipping method.',
   capability: 'orders.shipping-method.write',
   category: 'resolution',
+  trigger: { kind: 'exception', issueType: 'shipping_method_mismatch' },
   systems: ['jtl-cloud'],
   availableVersion: '0.1.0',
   activeVersions: ['0.1.0'],

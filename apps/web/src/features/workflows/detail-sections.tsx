@@ -13,18 +13,20 @@ import { Empty } from '@luma/ui/components/primitives/empty';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { authorLabel, personLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { Plug, ShieldCheck, Target, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import {
-  workflowCategoryLabel,
-  workflowSystemLabel,
-  workflowTriggerLabel,
-} from './presentation';
-import { WorkflowReadinessPanel } from './readiness';
+import { workflowSystemLabel, workflowTriggerLabel } from './presentation';
+import { coverageLabel } from './readiness';
+
+const versionSources = {
+  pilot: m.workflows_versions_source_pilot,
+  resolution: m.workflows_versions_source_resolution,
+  native: m.workflows_versions_source_native,
+} satisfies Record<WorkflowVersionView['provenance']['kind'], () => string>;
 
 /** States what success means for a version in operator language. */
-function successDefinition(version: WorkflowVersionView) {
+export function successDefinition(version: WorkflowVersionView) {
   if (version.format === 'workflow/2')
     return version.finalOutcome ?? m.workflows_overview_success_handoff();
 
@@ -33,76 +35,42 @@ function successDefinition(version: WorkflowVersionView) {
     : m.workflows_overview_success_default();
 }
 
-const versionSources = {
-  pilot: m.workflows_versions_source_pilot,
-  resolution: m.workflows_versions_source_resolution,
-  native: m.workflows_versions_source_native,
-} satisfies Record<WorkflowVersionView['provenance']['kind'], () => string>;
-
 /**
- * Puts purpose, trigger, success and readiness first, followed by the steps in business
- * language. Technical identifiers live in Technical details.
+ * Explains a version as one flow: what starts it, its steps in business language, and what counts
+ * as success. Approval and coverage sit beside the flow. Technical identifiers live in Details.
  */
 export function WorkflowOverview({
   detail,
   version,
-  organizationId,
 }: {
   detail: WorkflowDetail;
   version: WorkflowVersionView;
-  organizationId: string;
 }) {
+  const { approval, coverage } = detail.summary.readiness;
+
   return (
-    <section
-      className="workflow-overview"
-      aria-label={m.workflows_overview_label()}
-    >
-      <div className="workflow-intent">
-        <p className="workflow-eyebrow">
-          {workflowCategoryLabel(version.category)}
-        </p>
-        <p>{detail.summary.purpose}</p>
-      </div>
-      <div className="workflow-contract-flow">
-        <div>
-          <span className="workflow-contract-label">
-            <Zap size={14} aria-hidden="true" /> {m.workflows_overview_when()}
-          </span>
-          <strong>{workflowTriggerLabel(version.applicability.trigger)}</strong>
-          <p>{m.workflows_overview_when_help()}</p>
-        </div>
-        <ArrowRight
-          className="workflow-contract-arrow"
-          size={18}
-          aria-hidden="true"
-        />
-        <div>
-          <span className="workflow-contract-label">
-            <ShieldCheck size={14} aria-hidden="true" />{' '}
-            {m.workflows_overview_success()}
-          </span>
-          <strong>{successDefinition(version)}</strong>
-          <p>{m.workflows_overview_success_help()}</p>
-        </div>
-      </div>
-      <WorkflowReadinessPanel
-        organizationId={organizationId}
-        definitionId={detail.summary.id}
-        readiness={detail.summary.readiness}
-      />
-      <Card
-        as="section"
-        className="workflow-section"
-        aria-labelledby="steps-title"
-      >
-        <CardTitle as="h2" id="steps-title">
+    <div className="workflow-overview">
+      <section className="workflow-flow-card" aria-labelledby="steps-title">
+        <h2 id="steps-title" className="sr-only">
           {m.workflows_overview_steps_title()}
-        </CardTitle>
-        <ol className="workflow-steps">
+        </h2>
+        <ol className="workflow-flow">
+          <li className="workflow-flow-edge" data-edge="start">
+            <span className="workflow-flow-marker" aria-hidden="true">
+              <Zap size={14} />
+            </span>
+            <div>
+              <span className="workflow-flow-label">
+                {m.workflows_overview_when()}
+              </span>
+              <h3>{workflowTriggerLabel(version.applicability.trigger)}</h3>
+              <p>{m.workflows_overview_when_help()}</p>
+            </div>
+          </li>
           {version.steps.map((step, i) => (
             <li key={step.id}>
-              <span className="workflow-step-number" aria-hidden="true">
-                {String(i + 1).padStart(2, '0')}
+              <span className="workflow-flow-marker" aria-hidden="true">
+                {i + 1}
               </span>
               <div>
                 <h3>{step.title}</h3>
@@ -110,12 +78,65 @@ export function WorkflowOverview({
               </div>
             </li>
           ))}
+          <li className="workflow-flow-edge" data-edge="end">
+            <span className="workflow-flow-marker" aria-hidden="true">
+              <ShieldCheck size={14} />
+            </span>
+            <div>
+              <span className="workflow-flow-label">
+                {m.workflows_overview_success()}
+              </span>
+              <h3>{successDefinition(version)}</h3>
+              <p>{m.workflows_overview_success_help()}</p>
+            </div>
+          </li>
         </ol>
         <p className="workflow-caption">
-          {m.workflows_overview_versions_caption()}
+          {detail.versions.length > 1
+            ? m.workflows_overview_versions_caption()
+            : m.workflows_overview_version_caption({
+                version: version.version,
+              })}
         </p>
-      </Card>
-    </section>
+      </section>
+      <aside className="workflow-overview-aside">
+        <section aria-labelledby="approval-title">
+          <h2 id="approval-title">
+            <ShieldCheck size={15} aria-hidden="true" />
+            {m.workflows_readiness_approval()}
+          </h2>
+          <p>{approval.summary}</p>
+          {approval.details.length ? (
+            <ul>
+              {approval.details.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+        <section aria-labelledby="coverage-title">
+          <h2 id="coverage-title">
+            <Target size={15} aria-hidden="true" />
+            {m.workflows_readiness_covers()}
+          </h2>
+          <p>
+            <strong>{coverageLabel(coverage)}</strong>
+          </p>
+          <p>{coverage.explanation}</p>
+        </section>
+        <section aria-labelledby="systems-title">
+          <h2 id="systems-title">
+            <Plug size={15} aria-hidden="true" />
+            {m.workflows_overview_systems()}
+          </h2>
+          <p>
+            {detail.summary.systems.length
+              ? formatList(detail.summary.systems.map(workflowSystemLabel))
+              : m.workflows_library_no_system()}
+          </p>
+        </section>
+      </aside>
+    </div>
   );
 }
 

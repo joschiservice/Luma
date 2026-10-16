@@ -1,44 +1,67 @@
 import './readiness.css';
 
 import type { ReadinessRepair, WorkflowReadiness } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { buttonVariants } from '@luma/ui/components/primitives/button';
-import { Card } from '@luma/ui/components/primitives/card';
-import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import {
   type OperationalState,
+  StateDot,
   StatePill,
 } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link, useLocation } from '@tanstack/react-router';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { ArrowRight, TriangleAlert } from 'lucide-react';
 import { useId } from 'react';
 
-const enablementLabels = {
-  enabled: m.workflows_enablement_enabled,
-  paused: m.workflows_enablement_paused,
-  not_enabled: m.workflows_enablement_not_enabled,
-} satisfies Record<WorkflowReadiness['enablement'], () => string>;
+import { workflowStatus } from './presentation';
 
-const readinessLabels = {
-  ready: m.workflows_readiness_ready,
-  degraded: m.workflows_readiness_degraded,
-  blocked: m.workflows_readiness_blocked,
-} satisfies Record<WorkflowReadiness['state'], () => string>;
+type RecentOutcome = NonNullable<
+  WorkflowReadiness['outcomes']
+>['recent'][number];
 
-const approvalModes = {
-  every_action: m.workflows_readiness_approval_every,
-  risk_based: m.workflows_readiness_approval_risk,
-  no_actions: m.workflows_readiness_approval_none,
-} satisfies Record<WorkflowReadiness['approval']['mode'], () => string>;
+const recentStates = {
+  verified: 'verified',
+  unresolved: 'attention',
+  in_progress: 'waiting',
+  ended: 'idle',
+} satisfies Record<RecentOutcome['state'], OperationalState>;
 
-const pillStates: Record<WorkflowReadiness['state'], OperationalState> = {
-  ready: 'running',
-  degraded: 'attention',
-  blocked: 'error',
-};
+/**
+ * Shows how the latest runs ended as a row of state marks, oldest first, named by their counts
+ * for assistive technology and on hover. Only an independent verification shows as verified.
+ */
+export function RecentRuns({ recent }: { recent: readonly RecentOutcome[] }) {
+  const parts = [
+    { state: 'verified', label: m.workflows_outcomes_verified },
+    { state: 'unresolved', label: m.workflows_outcomes_unresolved },
+    { state: 'in_progress', label: m.workflows_outcomes_in_progress },
+    { state: 'ended', label: m.workflows_outcomes_ended },
+  ] as const;
+  const results = formatList(
+    parts.flatMap(({ state, label }) => {
+      const count = recent.filter((run) => run.state === state).length;
+
+      return count ? [label({ count })] : [];
+    }),
+  );
+  const label = m.workflows_recent_runs_label({
+    count: recent.length,
+    results,
+  });
+
+  return (
+    <span
+      className="workflow-recent-runs"
+      role="img"
+      aria-label={label}
+      title={label}
+    >
+      {[...recent].reverse().map((run, index) => (
+        <StateDot key={`${run.at}:${index}`} state={recentStates[run.state]} />
+      ))}
+    </span>
+  );
+}
 
 /** One sentence that combines enablement and readiness, such as "Can’t run right now". */
 export function readinessHeadline(readiness: WorkflowReadiness) {
@@ -50,35 +73,20 @@ export function readinessHeadline(readiness: WorkflowReadiness) {
   return m.workflows_headline_ready();
 }
 
-/** Whether a workflow belongs in the "Needs attention" view. */
-export function needsAttention(readiness: WorkflowReadiness) {
-  return (
-    readiness.state !== 'ready' ||
-    (readiness.waiting.count ?? 0) > 0 ||
-    readiness.outcomes?.latest?.state === 'unresolved'
-  );
-}
-
-/** Shows whether a workflow is turned on and whether it can run, as two separate labels. */
+/**
+ * Shows a workflow's status in one label, such as "On" or "Needs setup", followed by decisions
+ * waiting for a person and a latest run that needs review.
+ */
 export function ReadinessPills({
   readiness,
 }: {
   readiness: WorkflowReadiness;
 }) {
+  const status = workflowStatus(readiness);
+
   return (
     <span className="workflow-readiness-pills">
-      <Badge tone={readiness.enablement === 'enabled' ? 'info' : 'neutral'}>
-        {enablementLabels[readiness.enablement]()}
-      </Badge>
-      <StatePill
-        state={
-          readiness.state === 'ready' && readiness.enablement !== 'enabled'
-            ? 'idle'
-            : pillStates[readiness.state]
-        }
-      >
-        {readinessLabels[readiness.state]()}
-      </StatePill>
+      <StatePill state={status.state}>{status.label}</StatePill>
       {(readiness.waiting.count ?? 0) > 0 ? (
         <StatePill state="approval">
           {m.workflows_waiting_count({ count: readiness.waiting.count ?? 0 })}
@@ -251,43 +259,40 @@ export function coverageLabel(coverage: WorkflowReadiness['coverage']) {
       });
 }
 
-function waitingLabel(waiting: WorkflowReadiness['waiting']) {
-  if (waiting.count === null) return m.workflows_waiting_in_needs_you();
-  if (waiting.count === 0) return m.workflows_waiting_none();
-
-  return m.workflows_waiting_count({ count: waiting.count });
-}
-
-function outcomeLabel(outcomes: WorkflowReadiness['outcomes']) {
-  if (!outcomes) return m.workflows_outcomes_not_tracked();
-  if (!outcomes.runs) return m.workflows_outcomes_no_runs();
-
-  return [
-    m.workflows_outcomes_verified({ count: outcomes.verified }),
-    ...(outcomes.unresolved
-      ? [m.workflows_outcomes_unresolved({ count: outcomes.unresolved })]
-      : []),
-    ...(outcomes.inProgress
-      ? [m.workflows_outcomes_in_progress({ count: outcomes.inProgress })]
-      : []),
-  ].join(' · ');
+/** Whether readiness asks for something: a repair, an issue, or setup before the workflow runs. */
+export function hasNextStep(readiness: WorkflowReadiness) {
+  return (
+    !!readiness.nextAction.repair ||
+    readiness.issues.length > 0 ||
+    readiness.state !== 'ready'
+  );
 }
 
 /**
- * Puts the next action first, then the issues behind it and what the workflow covers, who
- * approves, what waits and what recent runs established.
+ * Puts the one next thing to do first, with its repair, then the other issues behind it. When the
+ * page header already offers setup, such as Turn on, a plain setup step names it without a second
+ * control; a setup step for a specific record keeps its link.
  */
-export function WorkflowReadinessPanel({
+export function WorkflowNextStep({
   organizationId,
   definitionId,
   readiness,
+  setupInHeader = false,
 }: {
   organizationId: string;
   definitionId: string;
   readiness: WorkflowReadiness;
+  /** Whether the page header holds the control that sets the workflow up or turns it on. */
+  setupInHeader?: boolean;
 }) {
   const title = useId();
   const { nextAction, issues } = readiness;
+  const repair =
+    setupInHeader &&
+    nextAction.repair?.destination === 'workflow_rules' &&
+    !nextAction.repair.recordId
+      ? null
+      : nextAction.repair;
   // The next action already states the first issue; list the rest below it.
   const others = issues.filter(
     (issue) =>
@@ -296,34 +301,32 @@ export function WorkflowReadinessPanel({
   );
 
   return (
-    <Card
-      as="section"
-      className="workflow-readiness"
+    <section
+      className="workflow-next-step"
       data-state={readiness.state}
+      data-enablement={readiness.enablement}
       aria-labelledby={title}
     >
-      <div className="workflow-readiness-head">
+      <div className="workflow-next-step-main">
+        <span className="workflow-next-step-icon" aria-hidden="true">
+          {readiness.state === 'ready' ? (
+            <ArrowRight size={15} />
+          ) : (
+            <TriangleAlert size={15} />
+          )}
+        </span>
         <div>
-          <p className="workflow-readiness-eyebrow">
-            {m.workflows_readiness_eyebrow()}
-          </p>
-          <h2 id={title}>{readinessHeadline(readiness)}</h2>
-        </div>
-        <ReadinessPills readiness={readiness} />
-      </div>
-      <div className="workflow-next" data-state={readiness.state}>
-        <span className="workflow-next-label">{m.workflows_next()}</span>
-        <div>
-          <strong>{nextAction.label}</strong>
+          <p className="workflow-next-step-eyebrow">{m.workflows_next()}</p>
+          <h2 id={title}>{nextAction.label}</h2>
           <p>{nextAction.description}</p>
         </div>
-        {nextAction.repair ? (
+        {repair ? (
           <RepairLink
             organizationId={organizationId}
             definitionId={definitionId}
-            repair={nextAction.repair}
+            repair={repair}
             className={buttonVariants({
-              variant: readiness.state === 'ready' ? 'outline' : 'default',
+              variant: readiness.state === 'blocked' ? 'default' : 'outline',
               size: 'sm',
             })}
           />
@@ -362,68 +365,6 @@ export function WorkflowReadinessPanel({
           ))}
         </ul>
       ) : null}
-      <dl className="workflow-readiness-facts">
-        <div>
-          <dt>{m.workflows_readiness_covers()}</dt>
-          <dd>
-            <strong>{coverageLabel(readiness.coverage)}</strong>
-            <span>{readiness.coverage.explanation}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>{m.workflows_readiness_approval()}</dt>
-          <dd>
-            <strong>{approvalModes[readiness.approval.mode]()}</strong>
-            <span>{readiness.approval.summary}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>{m.workflows_readiness_waiting()}</dt>
-          <dd>
-            <strong>{waitingLabel(readiness.waiting)}</strong>
-            {readiness.waiting.repair &&
-            (readiness.waiting.count === null ||
-              readiness.waiting.count > 0) ? (
-              <RepairLink
-                organizationId={organizationId}
-                definitionId={definitionId}
-                repair={readiness.waiting.repair}
-              />
-            ) : (
-              <span>{m.workflows_readiness_waiting_help()}</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>{m.workflows_readiness_results()}</dt>
-          <dd>
-            <strong>{outcomeLabel(readiness.outcomes)}</strong>
-            {readiness.outcomes?.latest ? (
-              <span>
-                {rich(m.workflows_readiness_latest, {
-                  summary: readiness.outcomes.latest.summary,
-                  date: <WorkspaceDate value={readiness.outcomes.latest.at} />,
-                })}
-              </span>
-            ) : (
-              <span>{m.workflows_readiness_verified_help()}</span>
-            )}
-          </dd>
-        </div>
-      </dl>
-      {readiness.approval.details.length ? (
-        <Disclosure className="workflow-readiness-approval">
-          <summary>
-            <ShieldCheck size={14} aria-hidden="true" />{' '}
-            {m.workflows_readiness_approval_details()}
-          </summary>
-          <ul>
-            {readiness.approval.details.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </Disclosure>
-      ) : null}
-    </Card>
+    </section>
   );
 }
