@@ -3,22 +3,40 @@ title: Betriebliche Entwicklung und bestätigte Ergebnisse lesen
 description: Sieh, wo Arbeit wartet, wie sich Bestellungen, Fulfillment, Bestand, Probleme und Lieferantenbestellungen entwickeln, welche Probleme bestätigt behoben wurden, und öffne die Datensätze hinter jeder Zahl.
 ---
 
-**Auswertungen** zeigt deinen Betrieb in Zahlen: was gerade wartet, wie sich die Arbeit über die Zeit entwickelt und welche Probleme Luma mit oder ohne Hilfe einer Person als behoben bestätigt hat. Jede Zahl und jeder Balken öffnet genau die Datensätze, die gezählt wurden. Öffne die Auswertungen in der Seitenleiste oder drücke **G** und dann **M**. Du brauchst **Auswertungen ansehen**.
+**Auswertungen** zeigt deinen Betrieb in Zahlen. Die Seite beantwortet drei Fragen, eine pro Ansicht: was gerade wartet, wie sich Bestellungen und Probleme über die Zeit entwickeln und welche Probleme Luma mit oder ohne Hilfe einer Person als behoben bestätigt hat. Jede Zahl und jeder Balken öffnet genau die Datensätze, die gezählt wurden. Öffne die Auswertungen in der Seitenleiste oder drücke **G** und dann **M**. Um eine Ansicht direkt zu öffnen, suche mit **⌘K** oder **Strg K** nach **Jetzt**, **Entwicklung** oder **Ergebnisse**. Du brauchst **Auswertungen ansehen**.
+
+## Ansicht wählen [#choose-a-view]
+
+Wechsle oben auf der Seite zwischen **Jetzt**, **Entwicklung** und **Ergebnisse**. Die Werkzeugleiste daneben enthält nur die Filter, die die Ansicht verwendet; ein Filter erscheint also nie dort, wo er nichts bewirkt.
+
+Das rechte Ende der Werkzeugleiste gilt für jede Ansicht:
+
+- **Verbindungen aktuell** oder wie viele Verbindungen Aufmerksamkeit brauchen. Wähle den Eintrag, um die Datensynchronisierung zu öffnen und zu sehen, welche Abrufe veraltet sind oder fehlschlagen. Solange du keine Quelle verbunden hast, steht dort **Noch keine Verbindungen**.
+- **Live-Aktualisierung** heißt, dass sich die Zahlen der Ansicht mit den Daten ändern. Stoppen die Aktualisierungen oder lassen sich die Zahlen der Ansicht nicht lesen, steht dort **Wird neu verbunden…**, **Offline** oder **Keine Aktualisierung**, und die Bereiche blenden Zahlen aus, die sie nicht aktuell halten können.
+- **Auswertungen aktualisieren** liest die Zahlen und Diagramme der Ansicht neu. Unter **Ergebnisse** verschiebt es außerdem das Ende eines fortlaufenden Zeitraums, etwa der letzten 30 Tage, auf jetzt.
+
+Die Ansicht und ihre Filter sind Teil der Adresse, sodass du eine Ansicht teilen, in der Seitenleiste anheften oder später wieder aufrufen kannst.
 
 ## Sehen, wo Arbeit wartet [#see-where-work-is-waiting]
 
-**Wo Arbeit wartet** zählt, was jetzt deinen nächsten Schritt brauchen könnte, gruppiert nach **Probleme**, **Überwachter Bestand**, **Beschaffung** und **Verbindungen**. Wähle eine Zahl, um zu sehen, wie sie gezählt wird, eine Aufschlüsselung nach Grund und die passenden Datensätze. Die erste Seite bleibt aktuell. Auf weiteren Seiten bleibt die Liste stehen, während du liest; ändert sich die Anzahl, wähle **Neueste anzeigen**, um zur aktuellen ersten Seite zurückzukehren.
+**Jetzt** beginnt mit **Braucht Aufmerksamkeit**: die Zahlen, bei denen gerade jemand gebraucht wird, etwa Probleme, die Aufmerksamkeit brauchen, Bestand unter Mindestbestand und Bestellungen, die auf dich warten. Wähle eine davon, um ihre Datensätze zu sehen. Sind alle Zahlen bekannt und braucht keine jemanden, steht dort **Gerade braucht nichts deine Aufmerksamkeit**. Sind einige Zahlen unbekannt, sagt die Zeile das, statt nichts zu melden.
 
-Die Zahlen aktualisieren sich live. Stoppen die Aktualisierungen, zeigt der Bereich **Offline** oder **Keine Aktualisierung** und blendet Zahlen aus, die er nicht aktuell halten kann. Wähle **Übersicht aktualisieren**, um es erneut zu versuchen.
+Darunter folgt **Wo Arbeit wartet**: was deinen nächsten Schritt brauchen könnte, gruppiert nach **Bestellungen**, **Probleme**, **Überwachter Bestand** und **Beschaffung**. Eine Zahl, bei der jemand handeln muss, etwa Probleme mit Handlungsbedarf oder Bestellungen, die auf dich warten, ist hervorgehoben, wenn sie nicht null ist. Wähle eine Zahl, um zu sehen, wie sie gezählt wird, eine Aufschlüsselung nach Grund und die passenden Datensätze. Die erste Seite bleibt aktuell. Auf weiteren Seiten bleibt die Liste stehen, während du liest; ändert sich die Anzahl, wähle **Neueste anzeigen**, um zur aktuellen ersten Seite zurückzukehren.
 
-## Zeitraum und Quelle wählen [#choose-a-time-range-and-source]
+Bestellungen zählen einmal, auch wenn sie in mehreren verbundenen Systemen vorkommen. Die Gruppe **Bestellungen** zeigt, wenn ihre Daten veraltet sind. Die Zahlen umfassen nur Bestellungen, die Luma gelesen hat; eine Null beweist also nicht, dass es keine gibt.
 
-Nutze unter **Betriebliche Entwicklung** die Filter über den Diagrammen:
+Darunter zeigen die Diagramme unter **Rückstand und Risiko** offene Fulfillment-Arbeit, überwachten Bestand und die Phasen der Lieferantenbestellungen, wie sie gerade stehen. Mit **Quelle** zeigst du Fulfillment und Bestand einer einzelnen Verbindung.
 
-- **Zeitraum**: **Letzte 7 Tage** oder **Letzte 30 Tage** nach Tagen, oder **Letzte 13 Wochen** nach Wochen. Tage und Wochen folgen der Zeitzone deines Workspace, Wochen beginnen am Montag. Der laufende Tag oder die laufende Woche ist mit **Heute bis jetzt** oder **Diese Woche bis jetzt** markiert.
-- **Quelle**: **Alle Quellen** oder eine Verbindung. Diagramme zu Lumas eigenen Datensätzen, etwa Problemen und Lieferantenbestellungen, werden nicht nach Quelle aufgeteilt.
+## Entwicklung verfolgen [#follow-trends]
 
-Beide Filter sind Teil der Adresse, sodass du eine Ansicht teilen, in der Seitenleiste anheften oder später wieder aufrufen kannst.
+**Entwicklung** zeigt eingegangene Bestellungen und erkannte Probleme über einen Zeitraum:
+
+- **Zeitraum**: **7 Tage** oder **30 Tage** nach Tagen, oder **13 Wochen** nach Wochen. Tage und Wochen folgen der Zeitzone deines Workspace, Wochen beginnen am Montag. Der laufende Tag oder die laufende Woche ist mit **Heute bis jetzt** oder **Diese Woche bis jetzt** markiert.
+- **Quelle**: **Alle Quellen** oder eine Verbindung. Probleme sind eigene Datensätze von Luma und werden daher nicht nach Quelle aufgeteilt.
+
+Jedes Diagramm beginnt mit seiner Summe, dem **Tagesdurchschnitt** oder **Wochendurchschnitt** und dem **Stärksten Tag** oder der **Stärksten Woche**. Der Durchschnitt verwendet nur Zeiträume mit vollständigen Daten und lässt den laufenden weg, damit ein teilweise importierter oder noch nicht abgeschlossener Zeitraum ihn nicht drückt. Wähle den stärksten Zeitraum, um seine Datensätze zu öffnen.
+
+**Vorperiode** vergleicht die Summe mit demselben Abschnitt des Zeitraums davor: bei den letzten 7 Tagen mit den 7 Tagen davor, bis zur selben Tageszeit. **+12 % ggü. 140** heißt zum Beispiel 12 % mehr als die 140, die damals gezählt wurden. Wähle den Wert, um diese 140 Datensätze zu öffnen. Ist einer der Zeiträume nicht vollständig importiert, eine Quelle nicht aktuell oder hatte Luma noch keine Probleme erkannt, steht dort **Nicht vergleichbar**, statt einer Veränderung, die nur fehlende Datensätze zeigen würde.
 
 ## Was jedes Diagramm zählt [#what-each-chart-counts]
 
@@ -28,14 +46,14 @@ Beide Filter sind Teil der Adresse, sodass du eine Ansicht teilen, in der Seiten
 - **Erkannte Probleme**: Probleme nach Art und nach dem Tag, an dem Luma sie zuerst erkannt hat. Ein wieder geöffnetes Problem bleibt an dem Tag, an dem es zuerst erkannt wurde.
 - **Lieferantenbestellungen**: Lieferantenbestellungen, die weder abgeschlossen noch storniert sind, nach der Phase, die ihre Nachweise belegen. **Eingegangen** heißt, dass in deiner Warenwirtschaft ein Wareneingang gebucht wurde. **Überfällig** heißt, eine Bestätigung oder Lieferung des Lieferanten ist verspätet.
 
-Fulfillment-Rückstand, Bestandsrisiko und Lieferantenbestellungen zeigen den aktuellen Stand. Luma rekonstruiert keine früheren Zustände, die es nie gelesen hat, daher haben diese Diagramme keine Historie. Öffne bei jedem Diagramm **Was dieses Diagramm nicht zeigt**, um seine Grenzen zu sehen.
+Fulfillment-Rückstand, Bestandsrisiko und Lieferantenbestellungen zeigen den aktuellen Stand. Luma rekonstruiert keine früheren Zustände, die es nie gelesen hat, daher haben diese Diagramme keine Historie und stehen unter **Jetzt**. Öffne bei jedem Diagramm **Über diese Daten**, um Zeitraum, Quellen und Grenzen zu sehen.
 
 ## Unbekannt von null unterscheiden [#tell-unknown-from-zero]
 
 Null heißt, Luma hat geprüft und nichts gefunden. Unbekannt heißt, Luma fehlen die Nachweise zum Zählen. Jedes Diagramm zeigt, was zutrifft:
 
-- **Zeitraum**, **Quellen** und **Datenstand** beschreiben, worauf das Diagramm beruht. Der **Datenstand** ist der Zeitpunkt des ältesten vollständigen Abrufs über alle Quellen; spätere Änderungen sind eventuell noch nicht gezählt.
-- Jede Quelle zeigt ihren Zustand, etwa **Vollständig**, **Begrenzte Historie**, **Import läuft**, **Veraltet** oder **Nicht vollständig importiert**. Bei einer nicht vollständig importierten Quelle können Datensätze fehlen; sie lassen sich daher nicht ausschließen.
+- Die Zeile unter jedem Diagramm nennt seine Quellen und seinen **Datenstand**: den Zeitpunkt des ältesten vollständigen Abrufs über alle Quellen. Spätere Änderungen sind eventuell noch nicht gezählt.
+- Schränkt eine Quelle die Zahlen ein, steht sie mit ihrem Zustand unter dem Diagramm, etwa **Begrenzte Historie**, **Import läuft**, **Veraltet** oder **Nicht vollständig importiert**. Bei einer nicht vollständig importierten Quelle können Datensätze fehlen; sie lassen sich daher nicht ausschließen. **Über diese Daten** listet alle Quellen, auch vollständige.
 - Ein schraffierter Balken mit **Nicht importiert** liegt vor der importierten Historie einer Quelle. Seine Anzahl ist unbekannt, nicht null.
 - Kann nichts die Datensätze melden, etwa bei **Noch keine Quelle meldet Bestellungen** oder **Keine aktiven Nachschubregeln**, zeigt das Diagramm keine Zahlen statt Nullen. Es bietet **Quelle verbinden** oder **Nachschubregeln einrichten** an.
 
@@ -43,17 +61,17 @@ Kann ein Diagramm nicht geladen werden, zeigt es **Diagramm nicht verfügbar** u
 
 ## Die Datensätze hinter einem Balken öffnen [#open-the-records-behind-a-bar]
 
-Wähle einen Balken, einen Abschnitt, einen Legendeneintrag oder einen Wert in der Tabellenansicht. Ein Bereich listet genau die dort gezählten Datensätze, Stand des Zeitpunkts, zu dem das Diagramm geladen wurde, und zeigt, ob die Summe zum Diagramm passt. Haben sich Datensätze inzwischen geändert, wähle **Diagramm aktualisieren**, um neu zu zählen.
+Wähle einen Balken, einen Abschnitt, einen Legendeneintrag, den stärksten Zeitraum oder einen Wert in der Tabellenansicht. Ein Bereich listet genau die dort gezählten Datensätze, Stand des Zeitpunkts, zu dem das Diagramm geladen wurde, und zeigt, ob die Summe zum Diagramm passt. Haben sich Datensätze inzwischen geändert, wähle **Diagramm aktualisieren**, um neu zu zählen.
 
 Im Bereich kannst du jede Bestellung, jedes Fulfillment, jede Bestandsposition, jedes Problem und jede Lieferantenbestellung öffnen, **In „Wartet auf dich“ entscheiden** wählen, wenn eine Entscheidung zum Datensatz wartet, oder die passende Ansicht in Bestellungen, Fulfillment, Probleme oder Beschaffung öffnen. Mit der Zurück-Taste des Browsers kehrst du zum Diagramm mit demselben geöffneten Bereich zurück.
 
 ## Diagramme mit Tastatur oder Screenreader nutzen [#use-the-charts-with-a-keyboard-or-screen-reader]
 
-Jedes Diagramm ist ein Halt in der Tab-Reihenfolge. Mit den Pfeiltasten wechselst du zwischen den Balken, mit Pos1 und Ende springst du zum ersten und letzten, mit der Eingabetaste öffnest du die Datensätze eines Balkens. Jeder Balken wird mit Zeitraum, Summe und Anteilen angesagt. Schalte ein Diagramm auf **Tabelle**, um dieselben Werte als Tabelle zu sehen; jeder Wert öffnet seine Datensätze.
+Zwischen **Jetzt**, **Entwicklung** und **Ergebnisse** wechselst du mit den Pfeiltasten; mit der Eingabetaste öffnest du eine Ansicht. Jedes Diagramm ist ein Halt in der Tab-Reihenfolge. Mit den Pfeiltasten wechselst du zwischen den Balken, mit Pos1 und Ende springst du zum ersten und letzten, mit der Eingabetaste öffnest du die Datensätze eines Balkens. Jeder Balken wird mit Zeitraum, Summe und Anteilen angesagt. Schalte ein Diagramm auf **Tabelle**, um dieselben Werte als Tabelle zu sehen; jeder Wert öffnet seine Datensätze.
 
 ## Bestätigte Ergebnisse und menschliche Hilfe [#verified-outcomes-and-human-help]
 
-**Bestätigte Ergebnisse und menschliche Hilfe** zeigt, welche Probleme bestätigt behoben wurden, wo Personen geholfen haben und wo Luma das noch nicht feststellen kann.
+**Ergebnisse** zeigt, welche Probleme bestätigt behoben wurden, wo Personen geholfen haben und wo Luma das noch nicht feststellen kann. Wähle die Gruppe in der Werkzeugleiste:
 
 1. Wähle die **Umgebung**: **Live-Betrieb**, **Partnerpilot**, **Simuliert**, **Schattenmodus** oder **Unbekannte Umgebung**. Alles außer dem Live-Betrieb ist mit **Nicht in Live-Ergebnissen enthalten** markiert.
 2. Wähle den **Erkennungszeitraum**: **In den letzten 24 Stunden erkannt** oder **In den letzten 7 Tagen erkannt**.
@@ -70,12 +88,19 @@ So werden Probleme gezählt:
 
 Ein Problem wurde automatisch gelöst, wenn es für Automatisierung geeignet war, bestätigt wurde und ein vollständiger Nachweis zeigt, dass keine Person geholfen hat. Diese Probleme zählen unter **Ohne Hilfe gelöst**. Das Modul **Lösungsergebnisse** unter **Start** zeigt dieselben Live-Ergebnisse als **Automatisch gelöst** und als **Automatische Lösungsquote**. [Workflow-Tests](/docs/shadow-mode) zählen nie als Live-Ergebnisse.
 
+Wenn dein Workspace Einkaufsergebnisse erfasst, zeigt **Ergebnisse** auch **Beobachtete Einkaufsergebnisse**: ob Bestand nach dem Wareneingang einer Lieferantenbestellung verfügbar blieb und wo ein Fehlbestand beobachtet wurde oder das Ergebnis unbekannt ist.
+
 ## Lösungsleistung prüfen [#review-resolution-performance]
 
-Wenn der Bereich in deinem Workspace verfügbar ist, wähle unter **Lösungsleistung** sieben
-Tage, 30 Tage oder einen eigenen Zeitraum. Eigene Grenzen sind ausdrückliche UTC-Zeitpunkte;
-der Bericht zeigt sie in deiner Workspace-Zeitzone. Filtere nach Verbindung, Problemklasse
-und Umgebung. Live-Betrieb ist die Vorgabe; simulierte Arbeit und Piloten bleiben getrennt.
+Wenn der Bereich in deinem Workspace verfügbar ist, zeigt **Ergebnisse** stattdessen die
+**Lösungsleistung**. Wähle in der Werkzeugleiste sieben Tage, 30 Tage oder einen eigenen
+Zeitraum. Eigene Grenzen sind ausdrückliche UTC-Zeitpunkte; der Bericht zeigt sie in deiner
+Workspace-Zeitzone. Filtere nach Verbindung, Problemklasse und Umgebung. Live-Betrieb ist die
+Vorgabe; simulierte Arbeit und Piloten bleiben getrennt.
+
+Der Bericht beginnt mit der **Automatischen Lösungsquote**, der **Veränderung erkannter
+Probleme** gegenüber dem vorherigen, gleich langen Zeitraum und der Zahl der Probleme, die
+**Verifiziert in der Stichprobe** sind.
 
 **Erkannte Probleme** zählt die erste Erkennung im Zeitraum. **Im Zeitraum verifiziert**
 zählt unabhängige Prüfungen darin, auch für früher erkannte Probleme. Eignung und menschliche
@@ -83,8 +108,9 @@ Beteiligung verwenden weiterhin die Erkennungsgruppe einschließlich noch offene
 Arbeit. Angenommene Änderungen, fehlgeschlagene Prüfungen und manuelles Schließen zählen
 nicht als verifiziert.
 
-Öffne eine Zahl für genau ihre Probleme und Nachweise. Die Tagestabelle verwendet UTC-Tage;
-ein Tag oder eine wiederkehrende Klasse grenzt den Bericht ein. Verbindungs- und erfasste
+Öffne eine Zahl für genau ihre Probleme und Nachweise. Die Tageszahlen verwenden UTC-Tage;
+ein Tag im Diagramm oder in seiner **Tabelle** oder eine wiederkehrende Klasse grenzt den
+Bericht ein. Verbindungs- und erfasste
 Workflow-Versionszeilen bieten dieselben genauen Filter. Mit Zurück im Browser stellst du
 den vorherigen Zeitraum wieder her. Ändert sich die Gruppe beim Blättern, aktualisiere sie.
 
@@ -94,7 +120,3 @@ geeigneten Gruppe. Vergleiche verwenden gleich lange Zeiträume mit ausreichend 
 Fällen und erklären keine Ursachen. **Der Datenstand ist unbekannt** bedeutet, dass die
 Zahlen erfasste Probleme und keine vollständige Anbieterabdeckung zeigen. Versionsgruppen
 können sich über mehrere Versuche überschneiden; addiere sie nicht zur Gesamtzahl.
-
-## Bestellungen mit offener Arbeit [#orders-that-need-work]
-
-**Bestellungen mit offener Arbeit** zählt Bestellungen, die Aufmerksamkeit brauchen, etwa überfällige Bestellungen und Bestellungen, die auf dich warten. Jede Bestellung zählt einmal, auch wenn sie in mehreren verbundenen Systemen vorkommt. Wähle **Passende Bestellungen anzeigen**, um sie zu sehen, oder öffne sie in Bestellungen. Der Bereich zeigt, ob die Daten aktuell sind, **Daten veraltet** oder **Noch keine Bestelldaten**. Die Zahlen umfassen nur Bestellungen, die Luma gelesen hat; eine Null beweist also nicht, dass es keine gibt.

@@ -313,3 +313,14 @@ describe('plain text', () => {
     });
   });
 });
+
+describe('combined CSV cutoffs', () => {
+  it.each(['x'.repeat(1001), Array.from({ length: 101 }, () => 'x').join(',')])(
+    'keeps early truncation at the exact row boundary',
+    (first) => {
+      const result = parseCsv(first + '\n' + 'short\n'.repeat(4999));
+      expect(result.rows).toHaveLength(5000);
+      expect(result.truncated).toBe(true);
+    },
+  );
+});

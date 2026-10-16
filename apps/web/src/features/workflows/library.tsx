@@ -1,11 +1,17 @@
 import './workflows.css';
 
-import type { WorkflowDraft, WorkflowSummary } from '@luma/api-contract';
+import {
+  type WorkflowDraft,
+  workflowsCatalog,
+  type WorkflowSummary,
+} from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
+import { CollectionGroups } from '@luma/ui/components/primitives/collection-groups';
 import {
   CollectionToolbar,
   CollectionViews,
@@ -23,28 +29,41 @@ import {
 } from '@tanstack/react-router';
 import {
   ChevronRight,
+  CircleCheck,
   FilePenLine,
   Plug,
   Plus,
   Search,
   Workflow,
+  Zap,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
+import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';
-import { workflowCategoryLabel, workflowSystemLabel } from './presentation';
 import {
   needsAttention,
-  ReadinessPills,
-  RepairLink,
-  unitCount,
-} from './readiness';
+  workflowCategoryLabel,
+  workflowDomain,
+  workflowLifecycle,
+  workflowLifecycleLabel,
+  workflowLifecycles,
+  workflowSystemLabel,
+  workflowTriggerKindLabel,
+  workflowTriggerKinds,
+  workflowTriggerLabel,
+} from './presentation';
+import { ReadinessPills, RecentRuns, RepairLink, unitCount } from './readiness';
 
-/** Library views. Enablement and readiness are separate, so a view never hides a blocker. */
+/**
+ * Library views. "On" and "Off" follow enablement alone, so a view never hides a blocker; "Needs
+ * attention" collects what is on but can't fully run, waits for a person or ended unresolved.
+ */
 const statusNames = {
   attention: m.workflows_library_view_attention,
   enabled: m.workflows_library_view_enabled,
@@ -64,6 +83,8 @@ const inView = (item: WorkflowSummary, status: string | undefined) =>
 export interface WorkflowFilters {
   q?: string | undefined;
   system?: string | undefined;
+  /** A trigger kind, such as `exception`. */
+  trigger?: string | undefined;
   status?: string | undefined;
 }
 
@@ -81,6 +102,11 @@ export function parseWorkflowFilters(
     system:
       typeof value.system === 'string' && value.system.length <= 100
         ? value.system
+        : '',
+    trigger:
+      typeof value.trigger === 'string' &&
+      workflowTriggerKinds.some((kind) => kind === value.trigger)
+        ? value.trigger
         : '',
     status:
       typeof value.status === 'string' &&
@@ -105,6 +131,9 @@ export function parseWorkflowDetailSearch(
   return { ...parseWorkflowFilters(value), ...(setup ? { setup } : {}) };
 }
 
+/** Scopes remembered collapsed groups to the lifecycle grouping. */
+const groupPrefix = 'lifecycle=';
+
 /** Lists searchable published workflows in the active workspace. */
 export function WorkflowsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
@@ -113,12 +142,36 @@ export function WorkflowsPage() {
   const query = useQuery(workflowsOptions(organizationId));
   const drafts = useQuery(draftsOptions(organizationId));
   const permissions = usePermissions(organizationId);
+  // Only personal display settings are kept as list state: the library has no saved views, and
+  // its filters stay in its own URL parameters.
+  const view = useCollectionView({
+    catalog: workflowsCatalog,
+    organizationId,
+    search: {},
+    navigate: () => {
+      // The page never opens another view, so the hook never navigates.
+    },
+  });
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
 
   return (
     <WorkflowLibraryView
       organizationId={organizationId}
+      collapsed={view.display.collapsedGroups
+        .filter((id) => id.startsWith(groupPrefix))
+        .map((id) => id.slice(groupPrefix.length))}
+      onCollapsedChange={(key, closed) =>
+        view.setDisplay({
+          ...view.display,
+          collapsedGroups: [
+            ...view.display.collapsedGroups.filter(
+              (id) => id !== `${groupPrefix}${key}`,
+            ),
+            ...(closed ? [`${groupPrefix}${key}`] : []),
+          ].slice(-100),
+        })
+      }
       drafts={drafts.data}
       canCreate={permissions.can('workflows.author')}
       items={
@@ -145,6 +198,8 @@ export function WorkflowLibraryView({
   canCreate = false,
   filters,
   change,
+  collapsed,
+  onCollapsedChange,
   loading,
   refreshing,
   error,
@@ -156,28 +211,94 @@ export function WorkflowLibraryView({
   canCreate?: boolean;
   filters: WorkflowFilters;
   change: (filters: WorkflowFilters) => void;
+  /** Collapsed lifecycle groups and drafts, a personal display setting. */
+  collapsed: readonly string[];
+  onCollapsedChange: (key: string, collapsed: boolean) => void;
   loading?: boolean;
   refreshing?: boolean;
   error?: string | undefined;
   refresh: () => void;
 }) {
   const search = (filters.q ?? '').trim().toLowerCase();
+  const matches = (...values: string[]) =>
+    values.join(' ').toLowerCase().includes(search);
   const matching = items?.filter(
     (item) =>
       (!filters.system || item.systems.includes(filters.system)) &&
-      [
+      (!filters.trigger || item.trigger.kind === filters.trigger) &&
+      matches(
         item.name,
         item.purpose,
         workflowCategoryLabel(item.category),
-        ...item.systems,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(search),
+        workflowTriggerLabel(item.trigger),
+        ...item.systems.map(workflowSystemLabel),
+      ),
   );
   const filtered = matching?.filter((item) => inView(item, filters.status));
   const count = (value: string) =>
     matching?.filter((item) => inView(item, value)).length ?? 0;
+  // Drafts never run, so they only appear beside every workflow, not in a status view.
+  const shownDrafts =
+    !filters.status && !filters.system && !filters.trigger
+      ? (drafts ?? []).filter((draft) =>
+          matches(
+            draft.content.definition.name || m.workflows_drafts_untitled(),
+          ),
+        )
+      : [];
+  const groups: {
+    key: string;
+    label: string;
+    count: number;
+    content: ReactNode;
+  }[] = [
+    ...workflowLifecycles.flatMap((lifecycle) => {
+      const rows = (filtered ?? []).filter(
+        (item) => workflowLifecycle(item.readiness) === lifecycle,
+      );
+
+      return rows.length
+        ? [
+            {
+              key: lifecycle,
+              label: workflowLifecycleLabel(lifecycle),
+              count: rows.length,
+              content: (
+                <ul
+                  className="workflow-rows"
+                  aria-label={workflowLifecycleLabel(lifecycle)}
+                >
+                  {rows.map((item) => (
+                    <WorkflowRow
+                      key={item.id}
+                      item={item}
+                      organizationId={organizationId}
+                      filters={filters}
+                    />
+                  ))}
+                </ul>
+              ),
+            },
+          ]
+        : [];
+    }),
+    ...(shownDrafts.length
+      ? [
+          {
+            key: 'drafts',
+            label: m.workflows_drafts_title(),
+            count: shownDrafts.length,
+            content: (
+              <DraftList
+                organizationId={organizationId}
+                drafts={shownDrafts}
+                canEdit={canCreate}
+              />
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="workflows-page workflow-library-page">
@@ -195,13 +316,6 @@ export function WorkflowLibraryView({
         }
       />
       <OfflineNotice />
-      {drafts?.length ? (
-        <DraftList
-          organizationId={organizationId}
-          drafts={drafts}
-          canEdit={canCreate}
-        />
-      ) : null}
       <div className="workflow-collection">
         <CollectionToolbar
           views={
@@ -217,6 +331,7 @@ export function WorkflowLibraryView({
                     ? m.workflows_library_view_all()
                     : statusNames[value](),
                 count: items ? count(value === 'all' ? '' : value) : undefined,
+                attention: value === 'attention',
               }))}
               onChange={(view) =>
                 change({ ...filters, status: view === 'all' ? '' : view })
@@ -231,6 +346,25 @@ export function WorkflowLibraryView({
             maxLength: 200,
           }}
           filters={[
+            {
+              kind: 'choice',
+              key: 'trigger',
+              label: m.workflows_library_filter_trigger(),
+              icon: Zap,
+              value: filters.trigger || undefined,
+              options: workflowTriggerKinds
+                .filter(
+                  (kind) =>
+                    kind === filters.trigger ||
+                    items?.some((item) => item.trigger.kind === kind),
+                )
+                .map((value) => ({
+                  value,
+                  label: workflowTriggerKindLabel(value),
+                })),
+              onChange: (trigger) =>
+                change({ ...filters, trigger: trigger ?? '' }),
+            },
             {
               kind: 'choice',
               key: 'system',
@@ -267,7 +401,7 @@ export function WorkflowLibraryView({
         ) : null}
         {error && !items ? null : loading ? (
           <WorkflowLoading />
-        ) : !items?.length ? (
+        ) : !items?.length && !shownDrafts.length ? (
           <Empty className="workflow-empty">
             <Workflow size={28} aria-hidden="true" />
             <h2>{m.workflows_library_empty_title()}</h2>
@@ -280,104 +414,28 @@ export function WorkflowLibraryView({
               {m.workflows_library_new()}
             </Link>
           </Empty>
-        ) : !filtered?.length ? (
+        ) : groups.length ? (
+          <CollectionGroups
+            label={m.workflows_library_groups_label()}
+            groups={groups}
+            collapsed={collapsed}
+            onCollapsedChange={onCollapsedChange}
+          />
+        ) : filters.status === 'attention' &&
+          !search &&
+          !filters.system &&
+          !filters.trigger ? (
+          <Empty className="workflow-empty">
+            <CircleCheck size={24} aria-hidden="true" />
+            <h2>{m.workflows_library_attention_empty_title()}</h2>
+            <p>{m.workflows_library_attention_empty_body()}</p>
+          </Empty>
+        ) : (
           <Empty className="workflow-empty">
             <Search size={24} aria-hidden="true" />
             <h2>{m.workflows_library_filtered_title()}</h2>
             <p>{m.workflows_library_filtered_body()}</p>
           </Empty>
-        ) : (
-          <ul
-            className="workflow-rows"
-            aria-label={m.workflows_library_list_label()}
-          >
-            {filtered.map((item) => {
-              const next = item.readiness.nextAction;
-
-              return (
-                <li key={item.id} className="workflow-row">
-                  <DomainIcon
-                    domain={
-                      item.category === 'resolution'
-                        ? 'workflows'
-                        : 'procurement'
-                    }
-                    size="md"
-                    className="workflow-row-icon"
-                  />
-                  <div className="workflow-row-content">
-                    <h2>
-                      <Link
-                        className="workflow-row-link"
-                        to="/app/$organizationId/workflows/$definitionId"
-                        params={{ organizationId, definitionId: item.id }}
-                        search={filters}
-                      >
-                        {item.name}
-                      </Link>
-                    </h2>
-                    <p>{item.purpose}</p>
-                    <div className="workflow-row-meta">
-                      <span>{workflowCategoryLabel(item.category)}</span>
-                      <span>
-                        {item.systems.map(workflowSystemLabel).join(' · ') ||
-                          m.workflows_library_no_system()}
-                      </span>
-                      <span>
-                        {item.readiness.coverage.covered === null
-                          ? m.workflows_library_coverage_unknown()
-                          : m.workflows_library_covers({
-                              coverage: unitCount(
-                                item.readiness.coverage.covered,
-                                item.readiness.coverage.unit,
-                              ),
-                            })}
-                      </span>
-                      <span>
-                        {m.workflows_version_short({
-                          version: item.availableVersion,
-                        })}
-                      </span>
-                    </div>
-                    <div
-                      className="workflow-row-next"
-                      data-state={item.readiness.state}
-                    >
-                      {next.repair ? (
-                        <>
-                          <span className="workflow-row-next-label">
-                            {m.workflows_next()}
-                          </span>
-                          <RepairLink
-                            organizationId={organizationId}
-                            definitionId={item.id}
-                            repair={next.repair}
-                            label={next.label}
-                            className="workflow-repair-link workflow-row-repair"
-                          />
-                          {item.readiness.state !== 'ready' ? (
-                            <span className="workflow-row-reason">
-                              {next.description}
-                            </span>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="workflow-row-reason">
-                          {next.description}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <ReadinessPills readiness={item.readiness} />
-                  <ChevronRight
-                    className="workflow-row-chevron"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                </li>
-              );
-            })}
-          </ul>
         )}
         {!loading && items ? (
           <p role="status" className="workflow-count">
@@ -389,6 +447,103 @@ export function WorkflowLibraryView({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * One workflow: what it does, where it stands and what happened recently. The title link covers
+ * the row; a repair link for the next step stays separately reachable.
+ */
+function WorkflowRow({
+  item,
+  organizationId,
+  filters,
+}: {
+  item: WorkflowSummary;
+  organizationId: string;
+  filters: WorkflowFilters;
+}) {
+  const { readiness } = item;
+  const next = readiness.nextAction;
+  const lifecycle = workflowLifecycle(readiness);
+  const outcomes = readiness.outcomes;
+  const showNext = lifecycle !== 'on' && lifecycle !== 'paused';
+
+  return (
+    <li className="workflow-row" data-lifecycle={lifecycle}>
+      <DomainIcon
+        domain={workflowDomain(item.category)}
+        size="md"
+        className="workflow-row-icon"
+      />
+      <div className="workflow-row-content">
+        <h3>
+          <Link
+            className="workflow-row-link"
+            to="/app/$organizationId/workflows/$definitionId"
+            params={{ organizationId, definitionId: item.id }}
+            search={filters}
+          >
+            {item.name}
+          </Link>
+        </h3>
+        <p className="workflow-row-purpose">{item.purpose}</p>
+        <div className="workflow-row-meta">
+          <span>{workflowCategoryLabel(item.category)}</span>
+          <span>{workflowTriggerLabel(item.trigger)}</span>
+          {item.systems.length ? (
+            <span>{formatList(item.systems.map(workflowSystemLabel))}</span>
+          ) : null}
+          {readiness.enablement !== 'not_enabled' ? (
+            <span>
+              {readiness.coverage.covered === null
+                ? m.workflows_library_coverage_unknown()
+                : m.workflows_library_covers({
+                    coverage: unitCount(
+                      readiness.coverage.covered,
+                      readiness.coverage.unit,
+                    ),
+                  })}
+            </span>
+          ) : null}
+          {outcomes?.latest ? (
+            <span>
+              {rich(m.workflows_library_last_run, {
+                date: <WorkspaceDate value={outcomes.latest.at} />,
+              })}
+            </span>
+          ) : null}
+          {outcomes?.runs ? (
+            <span>
+              {m.workflows_outcomes_verified({ count: outcomes.verified })}
+            </span>
+          ) : null}
+          {outcomes?.recent.length ? (
+            <RecentRuns recent={outcomes.recent} />
+          ) : null}
+        </div>
+        {showNext ? (
+          <div className="workflow-row-next" data-state={readiness.state}>
+            {next.repair && next.repair.destination !== 'server' ? (
+              <RepairLink
+                organizationId={organizationId}
+                definitionId={item.id}
+                repair={next.repair}
+                label={next.label}
+                className="workflow-repair-link workflow-row-repair"
+              />
+            ) : null}
+            <span className="workflow-row-reason">{next.description}</span>
+          </div>
+        ) : null}
+      </div>
+      <ReadinessPills readiness={readiness} />
+      <ChevronRight
+        className="workflow-row-chevron"
+        size={16}
+        aria-hidden="true"
+      />
+    </li>
   );
 }
 
@@ -410,64 +565,55 @@ function DraftList({
   } satisfies Record<WorkflowDraft['mode'], () => string>;
 
   return (
-    <section
-      className="workflow-drafts"
-      aria-labelledby="workflow-drafts-title"
-    >
-      <h2 id="workflow-drafts-title">{m.workflows_drafts_title()}</h2>
-      <ul className="workflow-rows">
-        {drafts.map((draft) => (
-          <li key={draft.id}>
-            <Link
-              className="workflow-row"
-              to="/app/$organizationId/workflows/drafts/$draftId"
-              params={{ organizationId, draftId: draft.id }}
-              search={{ view: 'build' }}
-            >
-              <FilePenLine
-                size={18}
-                aria-hidden="true"
-                className="workflow-row-icon"
-              />
-              <div className="workflow-row-content">
-                <h3>
-                  {draft.content.definition.name ||
-                    m.workflows_drafts_untitled()}
-                </h3>
-                <div className="workflow-row-meta">
-                  <span>{modes[draft.mode]()}</span>
-                  <span>
-                    {m.workflows_version({ version: draft.content.version })}
-                  </span>
-                  <span>
-                    {rich(m.workflows_drafts_edited, {
-                      date: <WorkspaceDate value={draft.updatedAt} />,
-                    })}
-                  </span>
-                  {draft.basedOn ? (
-                    <span>
-                      {m.workflows_drafts_based_on({
-                        workflow: draft.basedOn.definitionId,
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <Badge tone="neutral">
-                {canEdit
-                  ? m.workflows_drafts_badge()
-                  : m.workflows_drafts_badge_read_only()}
-              </Badge>
-              <ChevronRight
-                className="workflow-row-chevron"
-                size={16}
-                aria-hidden="true"
-              />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <ul className="workflow-rows" aria-label={m.workflows_drafts_title()}>
+      {drafts.map((draft) => (
+        <li key={draft.id} className="workflow-row" data-lifecycle="draft">
+          <span className="workflow-row-icon workflow-draft-icon">
+            <FilePenLine size={16} aria-hidden="true" />
+          </span>
+          <div className="workflow-row-content">
+            <h3>
+              <Link
+                className="workflow-row-link"
+                to="/app/$organizationId/workflows/drafts/$draftId"
+                params={{ organizationId, draftId: draft.id }}
+                search={{ view: 'build' }}
+              >
+                {draft.content.definition.name || m.workflows_drafts_untitled()}
+              </Link>
+            </h3>
+            <div className="workflow-row-meta">
+              <span>{modes[draft.mode]()}</span>
+              <span>
+                {m.workflows_version({ version: draft.content.version })}
+              </span>
+              <span>
+                {rich(m.workflows_drafts_edited, {
+                  date: <WorkspaceDate value={draft.updatedAt} />,
+                })}
+              </span>
+              {draft.basedOn ? (
+                <span>
+                  {m.workflows_drafts_based_on({
+                    workflow: draft.basedOn.definitionId,
+                  })}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <Badge tone="neutral">
+            {canEdit
+              ? m.workflows_drafts_badge()
+              : m.workflows_drafts_badge_read_only()}
+          </Badge>
+          <ChevronRight
+            className="workflow-row-chevron"
+            size={16}
+            aria-hidden="true"
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -83,6 +83,11 @@ describe('inbox presentation', () => {
     expect(eventText(event('handed_off', { record: 'PO-1' }), helpers)).toBe(
       'Recorded on PO-1',
     );
+    expect(
+      eventText(event('handed_off', { outcome: 'truncated' }), helpers),
+    ).toBe(
+      'Not recorded on the purchase order: the message text is incomplete',
+    );
     expect(eventText(event('deadline_set'), helpers)).toBe(
       'Reply deadline set to automatic',
     );

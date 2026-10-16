@@ -449,5 +449,6 @@
   "messaging_area_work": "Bearbeitung",
   "messaging_groups_label": "Threads nach {field}",
   "messaging_group_empty": "Keine Threads in dieser Gruppe",
-  "messaging_conditions_note": "Filter nutzen nur Eigenschaften des Threads, nie den Nachrichtentext."
+  "messaging_conditions_note": "Filter nutzen nur Eigenschaften des Threads, nie den Nachrichtentext.",
+  "messaging_event_handed_off_truncated": "Nicht an der Bestellung erfasst: Der Nachrichtentext ist unvollständig"
 }

@@ -191,13 +191,21 @@ evidence of ownership; admission resolves and authorizes the resource itself.
 
 ## Readiness
 
-Every workflow summary carries `readiness`: whether it is on, whether it can run, what it
-covers and what should happen next.
+Every workflow summary carries its current version's `trigger`, which the library shows and
+filters by, and `readiness`: whether it is on, whether it can run, what it covers and what
+should happen next. Resolution playbooks report their issue type as an `exception` trigger.
 
 - `enablement` (`enabled`, `paused`, `not_enabled`) says whether people turned it on.
+  `paused` means it was on and every activation or rule was revoked; activations are
+  permanent records, so it never returns to `not_enabled`. The web calls it "Turned off".
   `state` (`ready`, `degraded`, `blocked`) says whether it can run. They are independent:
   an enabled workflow whose connection lost access is enabled and blocked. Never derive one
   from the other, and never relax authority to make a state look healthy.
+- The web shows one status built from both without hiding either. Off and blocked reads as
+  needing setup, not as failing; the error state is reserved for a workflow that is on or
+  paused and can't run. "Needs attention" holds workflows that are on or paused and not ready,
+  and any with waiting decisions or an unresolved latest run, so a workflow nobody turned on
+  never raises an alarm.
 - Each issue names an affected record and a repair destination; `server` means only the
   operator of the Luma server can fix it. `blocking` stops the workflow; `degrading` stops
   part of its coverage.
@@ -207,7 +215,8 @@ covers and what should happen next.
   rules as admission with the current workspace setting. A medium capability floor means
   every action waits for a person; quantity thresholds only raise risk.
 - `outcomes` cover the 50 most recent runs. Only a verified result counts as verified;
-  runs that ended without acting are neither verified nor unresolved.
+  runs that ended without acting are neither verified nor unresolved. `outcomes.recent`
+  lists how the latest 10 ended, newest first, so a row can show a trend without run details.
 - `nextAction` picks the first blocking issue, then waiting decisions, partial coverage,
   setup and the latest unresolved run.
 - A case workflow whose human tasks name a role needs an active member with that role, and
@@ -276,9 +285,16 @@ refund and payment follow-ups only reread and hand over.
 
 A workflow detail may carry a `presentation` key that the web registry maps to domain
 controls; unknown keys keep the standard view. Register domain renderers there instead of
-checking definition IDs in the shared page. The replenishment view shows a purchase order
-only when it matches both the bound action target and the run provenance, and keeps the
-order's current status separate from the historical verification result.
+checking definition IDs in the shared page. A view may also supply the page's primary action,
+such as turning a case workflow on, and a name for the setup tab. The replenishment view shows
+a purchase order only when it matches both the bound action target and the run provenance, and
+keeps the order's current status separate from the historical verification result.
+
+The detail page's tabs are addressed by URL hash: `#activity` (runs), `#overview`, `#rules`
+(setup) and `#technical`. `#run-<id>` opens and focuses that run in any filter,
+`#shadow-report` the test results below the runs, and `#rule-<id>` a replenishment rule.
+Issues, Needs you, Activity, Procurement and stock records link with these hashes, so keep
+them stable.
 
 ## Test a draft
 

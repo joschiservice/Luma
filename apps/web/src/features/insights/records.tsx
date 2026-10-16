@@ -56,6 +56,8 @@ import {
   dataThroughText,
   definitions,
   moment,
+  previousLabel,
+  previousPoint,
   selectionTitle,
   selectionValue,
 } from './presentation';
@@ -146,12 +148,17 @@ export function RecordsSheet({
   const category = point
     ? chartCategories(data, timeZone).find((c) => c.key === point.key)
     : undefined;
+  const previous =
+    selection.point === previousPoint ? previousLabel(data, timeZone) : null;
   const badge = coverageBadge(data);
-  const series = definition.series().filter((s) => data.series.includes(s.id));
+  // The previous stretch has no counts per series to compare with.
+  const series = previous
+    ? []
+    : definition.series().filter((s) => data.series.includes(s.id));
   const scopeText = data.window
-    ? point
+    ? point || previous
       ? m.insights_records_scope_point({
-          period: category?.label ?? point.key,
+          period: previous ?? category?.label ?? point?.key ?? '',
           timeZone: data.window.timeZone,
         })
       : data.window.bucket === 'day'
@@ -342,6 +349,9 @@ function WorkspaceLink({
   const className = buttonVariants({ variant: 'outline', size: 'sm' });
   switch (chart) {
     case 'orders':
+      // Orders filter by whole days; the previous stretch ends at a time of day.
+      if (selection.point === previousPoint) return null;
+
       return (
         <Link
           className={className}

@@ -50,6 +50,7 @@ export function domainLabel(domain: CollectionDomain) {
     suppliers: m.adaptive_suppliers,
     inbox: m.identity_nav_inbox,
     activity: m.identity_nav_activity,
+    workflows: m.identity_nav_workflows,
   };
 
   return labels[domain]();

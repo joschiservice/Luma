@@ -1,6 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 
-import type { InsightCoverage, InsightPoint } from '../domain/insights.js';
+import type {
+  InsightCoverage,
+  InsightPoint,
+  InsightPointCoverage,
+} from '../domain/insights.js';
 
 export type { InsightSource } from '../domain/insights.js';
 
@@ -36,6 +40,18 @@ export interface InsightWindow {
   timeZone: string;
 }
 
+/**
+ * A timeline's counterpart in the preceding period: one range length before the window's start
+ * up to one range length before the evaluation time, so a partly elapsed day or week compares
+ * with the same part of its counterpart.
+ */
+interface InsightPreviousPeriod {
+  from: string;
+  before: string;
+  total: number;
+  coverage: InsightPointCoverage;
+}
+
 export interface InsightChartResponse {
   chart: InsightChart;
   kind: 'timeline' | 'breakdown';
@@ -47,6 +63,8 @@ export interface InsightChartResponse {
   sourceFilter: 'applied' | 'not_applicable';
   coverage: InsightCoverage;
   dataThrough: string | null;
+  /** Null for breakdowns. */
+  previous: InsightPreviousPeriod | null;
   asOf: string;
 }
 

@@ -80,8 +80,8 @@ before returning a page. Dropped messages are fetched but never stored or return
 ## Sending
 
 The adapter derives the RFC Message-ID `<luma.<outbound ID>@<mailbox domain>>`. Before
-sending it searches the mailbox, including spam and trash, for that ID and returns the
-existing message instead of sending again. Messages are plain-text UTF-8, threaded with
+sending it searches the mailbox, including spam and trash, for that ID and refuses another send when it exists. A search hit is a conflict, not
+acceptance evidence; only independent verification can establish acceptance. Messages are plain-text UTF-8, threaded with
 `In-Reply-To`, `References` and the Gmail thread ID; header values with line breaks are
 rejected.
 

@@ -345,3 +345,30 @@ describe('supplier purchasing mail', () => {
     ).toBeUndefined();
   });
 });
+
+describe('untrusted HTML limits', () => {
+  it('retains source truncation when hidden content hides a later correction', () => {
+    const html =
+      'Confirmed: 10 units<!--' +
+      'x'.repeat(2_000_000) +
+      '-->Correction: cancel that order';
+    const parsed = parseMessage(
+      message({ mimeType: 'text/html', body: { data: b64(html) } }),
+      'ops@shop.example',
+    );
+    expect(parsed.text).toBe('Confirmed: 10 units');
+    expect(parsed.truncated).toBe(true);
+  });
+
+  it('does not trust a forged From header as provider sent evidence', () => {
+    const parsed = parseMessage(
+      message({
+        mimeType: 'text/plain',
+        headers: headers({ From: 'ops@shop.example' }),
+        body: { data: b64('Forged') },
+      }),
+      'ops@shop.example',
+    );
+    expect(parsed.providerSent).toBe(false);
+  });
+});

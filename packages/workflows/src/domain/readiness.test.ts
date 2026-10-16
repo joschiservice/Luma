@@ -135,7 +135,27 @@ describe('summarizeOutcomes', () => {
       unresolved: 1,
       inProgress: 1,
       latest: { runId: 'a', state: 'ended' },
+      recent: [
+        { state: 'ended', at: '2026-10-03T08:00:00.000Z' },
+        { state: 'verified', at: '2026-10-02T08:00:00.000Z' },
+        { state: 'unresolved', at: '2026-10-01T08:00:00.000Z' },
+        { state: 'in_progress', at: '2026-09-30T08:00:00.000Z' },
+      ],
     });
+  });
+
+  it('lists only the most recent outcomes one by one', () => {
+    const summary = summarizeOutcomes(
+      Array.from({ length: 30 }, (_, index) => ({
+        id: String(index),
+        createdAt: '2026-10-01T08:00:00.000Z',
+        state: 'verified',
+      })),
+      String,
+    );
+
+    expect(summary.runs).toBe(30);
+    expect(summary.recent).toHaveLength(10);
   });
 });
 

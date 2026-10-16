@@ -50,6 +50,8 @@ export interface ApprovalBehavior {
   details: string[];
 }
 
+type OutcomeKind = 'verified' | 'unresolved' | 'in_progress' | 'ended';
+
 /** Results of recent runs. Only an independent verification counts as verified. */
 export interface OutcomeSummary {
   runs: number;
@@ -58,11 +60,16 @@ export interface OutcomeSummary {
   inProgress: number;
   latest: {
     runId: string;
-    state: 'verified' | 'unresolved' | 'in_progress' | 'ended';
+    state: OutcomeKind;
     at: string;
     summary: string;
   } | null;
+  /** How the most recent runs ended, newest first, at most `recentOutcomeLimit`. */
+  recent: { state: OutcomeKind; at: string }[];
 }
+
+/** Recent outcomes a summary lists one by one, enough to show a trend without run details. */
+const recentOutcomeLimit = 10;
 
 export interface WorkflowReadiness {
   /** Whether people turned the workflow on, separate from whether it can run. */
@@ -122,6 +129,9 @@ export function summarizeOutcomes(
           summary: describe(latest.run.state),
         }
       : null,
+    recent: classified
+      .slice(0, recentOutcomeLimit)
+      .map((item) => ({ state: item.kind, at: item.run.createdAt })),
   };
 }
 

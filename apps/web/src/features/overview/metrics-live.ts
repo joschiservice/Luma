@@ -49,6 +49,14 @@ export interface LiveMetricView<Response> extends LiveMetricRead<Response> {
 }
 
 /**
+ * Opens a widget's record dialog for one of its metrics from elsewhere on the page, such as a
+ * summary. Focus returns to `trigger` when the dialog closes.
+ */
+export interface MetricInspector {
+  inspect(metricId: string, trigger: HTMLButtonElement): void;
+}
+
+/**
  * The metric views a page can show. Leave out the ones the page does not render, and keep each
  * request stable between renders (a module constant or memoized value); a new request reads again.
  */

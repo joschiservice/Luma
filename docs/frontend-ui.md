@@ -85,7 +85,7 @@ List pages bind keys with `useListKeyboard`. Its shortcuts never fire while typi
 
 The toolbar and list sit directly on the page, which the shell already insets; don't wrap them in a raised panel. Tables use the framed `DataTable`, and row lists that aren't tables use the same thin border and row dividers, as in the Workflows library. Summaries above a list, such as Procurement's commitments, form one bordered band rather than separate raised cards.
 
-Use `CollectionViews` for button views; link-based views can keep `Tabs`.
+Use `CollectionViews` for button views; link-based views can keep `Tabs`. With `overflow`, views that don't fit the row move into a More menu instead of scrolling, and the open view always keeps its tab, taking the last visible slot when the member's order would hide it.
 
 ### List layout and preview
 
@@ -110,7 +110,9 @@ A configurable list page provides, in this order:
 - `CollectionViewBar` in the toolbar's `views`, `DescribedFilter` in `actions`, `controls.display` and `controls.sort`, then `SyncCoverage`, `CollectionSummaryBand`, `CollectionNotices`, `CollectionBulkActions` for the selected rows, the results and `Pagination`.
 - A route that hosts several lists keeps the list in a context key, as Procurement's `tab`, and passes it in the view bar's `path`, such as `procurement?tab=suppliers`; pins and saved-view links append `view` to it. Lists whose API can't filter or sort custom fields pass `customFilters: false`, so they show them as columns only.
 - A view that asks for something the reader's list can't do needs repair, not a broader read: check conditions against the catalog and the reader's permissions before asking, map the engine's "Condition N" messages to their chips, and offer to remove what is unsupported.
-- Built-in views that need their counts visible stay as `CollectionViews` tabs beside the view bar, with a `null` value while a saved view is open. A catalog without a default sort gets a Sort menu built by the page whose first option names the API's default order; it maps to a view without a sort and is offered only when the open view has none, because the URL can't express removing a saved sort. Columns that depend on run-time data, such as one per catalog source, go in `extraColumns` with letter-and-digit IDs, and `defaultColumns` shows them in views without their own columns.
+- `CollectionViewBar` shows built-in and saved views as one row of overflowing tabs in the member's view order, so a page doesn't add its own tabs for built-in views. Pass counts, icons and descriptions of built-in views in `segments`. Each tab links to its view, so it can open in a new browser tab. A catalog without a default sort gets a Sort menu built by the page whose first option names the API's default order; it maps to a view without a sort and is offered only when the open view has none, because the URL can't express removing a saved sort. Columns that depend on run-time data, such as one per catalog source, go in `extraColumns` with letter-and-digit IDs, and `defaultColumns` shows them in views without their own columns.
+
+A list that filters in the browser and has no record reader, such as the workflow library, can register a catalog only for member state, such as collapsed groups, and keep its own URL parameters. `savedViewDomainSchema` excludes it, so it offers no saved views or exports and never renders the view bar.
 
 `SyncCoverage` condenses what each source has imported into one line. It leads with sources that need attention and says the list is incomplete while any import runs.
 

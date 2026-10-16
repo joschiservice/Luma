@@ -17,7 +17,7 @@ import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector
 import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
-import { IssueViewTabs } from '@luma/ui/components/issues/issue-view-tabs';
+import { issueViews } from '@luma/ui/components/issues/issue-views';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
@@ -456,32 +456,13 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       <CollectionToolbar
         className="inbox-toolbar"
         views={
-          <>
-            <CollectionViewBar
-              organizationId={organizationId}
-              view={view}
-              path="exceptions"
-              segmentLabel={(value) => segmentLabels[caseView(value)]()}
-            />
-            <IssueViewTabs
-              value={view.ref.kind === 'saved' ? null : segment}
-              renderLink={(option) => (
-                <Link
-                  {...destination}
-                  search={{
-                    ...(search.shadow ? { shadow: search.shadow } : {}),
-                    view: option,
-                  }}
-                  resetScroll={false}
-                  onClick={(event) => {
-                    if (event.metaKey || event.ctrlKey) return;
-                    event.preventDefault();
-                    view.open(`builtin:${option}`);
-                  }}
-                />
-              )}
-            />
-          </>
+          <CollectionViewBar
+            organizationId={organizationId}
+            view={view}
+            path="exceptions"
+            segmentLabel={(value) => segmentLabels[caseView(value)]()}
+            segments={issueViews()}
+          />
         }
         search={{
           value: q || undefined,

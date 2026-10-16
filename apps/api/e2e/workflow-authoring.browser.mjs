@@ -227,8 +227,11 @@ test('creates workflows from templates and from scratch, then publishes without 
     .first()
     .waitFor({ state: 'attached' });
   expect(page.url()).toMatch(/\/workflows\/custom-/);
-  await page.getByText('Blocked', { exact: true }).first().waitFor();
-  await page.getByRole('heading', { name: 'Can’t run right now' }).waitFor();
+  // A published workflow that nothing can run yet needs setup; it isn't failing.
+  await page.getByText('Needs setup', { exact: true }).first().waitFor();
+  await page
+    .getByRole('tab', { name: 'How it works', selected: true })
+    .waitFor();
   await page.screenshot({
     path: `${screenshots}/published-desktop.png`,
     fullPage: true,

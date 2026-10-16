@@ -5,7 +5,10 @@ import type {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -25,7 +28,7 @@ import appStyles from '../../styles.css?inline';
 import { fulfillmentGroupLabel } from './collection';
 import { fulfillmentOptions } from './data';
 import { FulfillmentDetailView } from './detail';
-import { FulfillmentEmpty, FulfillmentTabs, FulfillmentView } from './page';
+import { FulfillmentEmpty, FulfillmentView, fulfillmentViews } from './page';
 import { orderLabel } from './presentation';
 import { FulfillmentPreview } from './preview';
 import { FulfillmentResults } from './results';
@@ -499,9 +502,10 @@ function ListPreview({ state }: { state: string }) {
         toolbar={
           <CollectionToolbar
             views={
-              <FulfillmentTabs
+              <CollectionViews
+                label={m.fulfillment_list_views_label()}
                 value={segment}
-                counts={hidden ? undefined : shown.counts}
+                views={fulfillmentViews(hidden ? undefined : shown.counts)}
                 onChange={setSegment}
               />
             }

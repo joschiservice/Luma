@@ -139,6 +139,15 @@ export const workflowReadinessSchema = z.object({
           summary: text,
         })
         .nullable(),
+      /** How the most recent runs ended, newest first. */
+      recent: z
+        .array(
+          z.object({
+            state: z.enum(['verified', 'unresolved', 'in_progress', 'ended']),
+            at: z.string().datetime(),
+          }),
+        )
+        .max(10),
     })
     .nullable(),
   nextAction: z.object({
@@ -150,7 +159,12 @@ export const workflowReadinessSchema = z.object({
 
 export const workflowSummarySchema = playbookSummarySchema
   .omit({ issueType: true })
-  .extend({ category: text, readiness: workflowReadinessSchema });
+  .extend({
+    category: text,
+    /** What starts the current version's runs. */
+    trigger: workflowTriggerSchema,
+    readiness: workflowReadinessSchema,
+  });
 
 export const workflowDetailSchema = playbookDetailSchema.extend({
   /** Selects an optional domain view; unknown keys use the standard workflow view. */

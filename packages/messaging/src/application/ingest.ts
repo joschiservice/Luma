@@ -207,7 +207,12 @@ export function createIngest(deps: IngestDependencies) {
       });
       if (!purchaseOrderId) continue;
       const body = candidate.data.text.trim().slice(0, handoffBodyLimit);
-      let outcome: 'recorded' | 'duplicate' | 'forbidden' | 'empty' = 'empty';
+      const truncated =
+        candidate.data.truncated ||
+        candidate.data.text.trim().length > handoffBodyLimit;
+      let outcome:
+        'recorded' | 'duplicate' | 'forbidden' | 'empty' | 'truncated' =
+        truncated ? 'truncated' : 'empty';
       try {
         if (
           await deps.store.transaction(context.tenantId, (tx) =>
@@ -215,7 +220,7 @@ export function createIngest(deps: IngestDependencies) {
           )
         )
           continue;
-        if (body)
+        if (body && !truncated)
           outcome = await deps.handoff.record(context, {
             purchaseOrderId,
             id: deps.uuid(
@@ -448,7 +453,12 @@ export function createIngest(deps: IngestDependencies) {
     const ownId = /^luma\.([A-Za-z0-9-]{1,64})@/.exec(
       data.rfcMessageId ?? '',
     )?.[1];
-    if (ownId) {
+    if (
+      ownId &&
+      data.providerSent &&
+      data.direction === 'outbound' &&
+      data.rfcMessageId === `luma.${ownId}@${mailbox.address?.split('@')[1]}`
+    ) {
       const outbound = await tx.outbound.get(ownId);
       if (outbound?.connectionId === mailbox.connectionId) {
         const pending = await tx.threads.get(outbound.threadId, true);

@@ -12,6 +12,15 @@ test('opens the exact records behind a chart point and returns to them', async (
   const f = await settingsFixture(t, origin);
   const work = await fulfillmentFixture(t, f);
   await work.issue();
+  // Placed in the previous 7-day stretch, so the comparison has a record to open.
+  const earlier = new Date(Date.now() - 9 * 24 * 3_600_000).toISOString();
+  await work.order({
+    external: 'order-405',
+    key: 'order-405',
+    updatedAt: earlier,
+    data: { displayNumber: '#405', placedAt: earlier },
+    lines: [{ external: 'line-405', quantity: '1' }],
+  });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
     t,
@@ -72,10 +81,10 @@ test('opens the exact records behind a chart point and returns to them', async (
   const card = page.locator('section[data-chart="orders"]');
   await expect(card).toContainText('Partial coverage');
   await expect(card).toContainText('Not fully imported');
-  // Without replenishment rules, stock risk says why instead of showing zeros.
-  await expect(page.locator('section[data-chart="stock"]')).toContainText(
-    'stock risk is unknown, not zero',
-  );
+  // Without complete history, the previous period isn't compared.
+  await expect(card.locator('.insights-stats')).toContainText('Not comparable');
+  // Current-state charts belong to Now; Trends shows only timelines.
+  expect(await page.locator('section[data-chart="stock"]').count()).toBe(0);
 
   // The keyboard reaches the chart in one stop and opens the latest day with orders.
   const bars = orders.getByRole('button');
@@ -116,6 +125,21 @@ test('opens the exact records behind a chart point and returns to them', async (
   await expect(sheet).toBeHidden();
   expect(new URL(page.url()).searchParams.get('chart')).toBeNull();
 
+  // Now keeps the source filter but leaves the range to Trends.
+  await page.getByRole('tab', { name: 'Now' }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('view'))
+    .toBe('now');
+  await expect(page.getByRole('group', { name: 'Time range' })).toHaveCount(0);
+  // Stock without rules is unknown, so the summary never says nothing needs attention.
+  await expect(
+    page.getByRole('region', { name: 'Needs attention' }),
+  ).toContainText(/some counts are unknown/);
+  // Without replenishment rules, stock risk says why instead of showing zeros.
+  await expect(page.locator('section[data-chart="stock"]')).toContainText(
+    'stock risk is unknown, not zero',
+  );
+
   // The table view opens the same records as the bars.
   const backlog = page.locator('section[data-chart="fulfillment"]');
   await backlog.getByRole('tab', { name: 'Table', exact: true }).click();
@@ -133,8 +157,19 @@ test('opens the exact records behind a chart point and returns to them', async (
   await checkScroll();
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
+  // The command menu opens a view directly.
+  await page.keyboard.press('Control+k');
+  await page
+    .getByRole('textbox', { name: 'Search workspace' })
+    .fill('outcomes');
+  await page.getByRole('link', { name: /^Insights: Outcomes/ }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('view'))
+    .toBe('outcomes');
+  await page.goBack();
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await orders.waitFor();
+  await backlog.waitFor();
   await checkScroll();
   expect(
     await page.evaluate(
@@ -142,6 +177,22 @@ test('opens the exact records behind a chart point and returns to them', async (
     ),
   ).toBe(true);
   await page.screenshot({ path: '/tmp/luma107-narrow.png', fullPage: true });
+
+  // The previous stretch opens its records like any chart point. Orders filter by whole
+  // days, so no Orders link is offered for a stretch that ends at a time of day.
+  await page.goto(
+    `/app/${f.org.id}/insights?range=7d&chart=orders&point=previous`,
+  );
+  await sheet
+    .getByRole('heading', { name: /^Orders · Previous period, / })
+    .waitFor();
+  await expect(sheet.getByRole('link', { name: /^#405/ })).toBeVisible();
+  await expect(sheet.locator('.insights-sheet-count')).toContainText(
+    'matches the chart',
+  );
+  await expect(
+    sheet.getByRole('link', { name: 'Open these orders in Orders' }),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -212,14 +263,14 @@ test('keeps a 503 chart stable during live import events and supports explicit r
     });
   });
   await page.clock.install();
-  await page.goto(`/app/${f.org.id}/insights`);
+  await page.goto(`/app/${f.org.id}/insights?view=trends`);
   const card = page.locator('section[data-chart="orders"]');
   await expect(card.getByRole('alert')).toContainText(
     'Order history is being prepared',
   );
   await page.clock.runFor(1000);
   await expect(
-    page.getByRole('button', { name: 'Refresh charts' }),
+    page.getByRole('button', { name: 'Refresh insights' }),
   ).toBeEnabled();
   const initialRequests = requests;
   for (let index = 0; index < 10; index++) {
@@ -228,7 +279,7 @@ test('keeps a 503 chart stable during live import events and supports explicit r
     );
     await page.clock.runFor(1000);
     await expect(
-      page.getByRole('button', { name: 'Refresh charts' }),
+      page.getByRole('button', { name: 'Refresh insights' }),
     ).toBeEnabled();
     await expect(card.getByRole('alert')).toContainText(
       'Order history is being prepared',

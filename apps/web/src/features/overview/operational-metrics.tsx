@@ -33,14 +33,24 @@ import {
   ClipboardList,
   Plug,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import {
+  type ReactNode,
+  type Ref,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   metricDescription,
   metricTimeSemantics,
   metricTitle,
 } from './metric-text';
-import { type LiveMetricView, usePagedMetric } from './metrics-live';
+import {
+  type LiveMetricView,
+  type MetricInspector,
+  usePagedMetric,
+} from './metrics-live';
 import {
   operationalMetricRequest,
   operationalMetricsOptions,
@@ -60,7 +70,8 @@ export interface MetricGroup {
   metrics?: string[];
 }
 
-const groups: MetricGroup[] = [
+/** The default groups: issues, monitored stock, procurement and connections. */
+export const operationalMetricGroups: MetricGroup[] = [
   {
     id: 'cases',
     title: m.overview_group_cases_title,
@@ -109,6 +120,15 @@ const reasonLabels: Record<string, () => string> = {
   unobserved: m.overview_reason_unobserved,
 };
 
+// A nonzero value of these metrics means someone has to act, so it is marked for attention.
+const attentionMetrics = new Set([
+  'cases.attention',
+  'inventory.below_minimum',
+  'inventory.replenishment_unknown',
+  'connections.needing_attention',
+  'resolution.incorrect_actions',
+]);
+
 // Reasons the server adds later fall back to their code until the client names them.
 const reasonLabel = (reason: string) => reasonLabels[reason]?.() ?? reason;
 
@@ -146,7 +166,10 @@ const purchaseOrderStatusLabels = {
 
 /**
  * Groups current operational priorities and opens their authorized matching records. `live` is
- * this widget's slice of the page's metric summary, read with `initialRequest`.
+ * this widget's slice of the page's metric summary, read with `initialRequest`. `embedded`
+ * leaves the live status and refresh to the page, which shows them once for all its sections.
+ * `leading` cards, such as another widget's group, join the start of the grid. `inspector`
+ * lets the page open a metric's record dialog.
  */
 export function OperationalMetrics({
   organizationId,
@@ -155,7 +178,10 @@ export function OperationalMetrics({
   heading = m.overview_pulse_title(),
   eyebrow,
   description = m.overview_pulse_description(),
-  metricGroups = groups,
+  metricGroups = operationalMetricGroups,
+  embedded = false,
+  leading,
+  inspector,
 }: {
   organizationId: string;
   live: LiveMetricView<OperationalMetricResponse>;
@@ -164,6 +190,9 @@ export function OperationalMetrics({
   eyebrow?: string;
   description?: string;
   metricGroups?: MetricGroup[];
+  embedded?: boolean;
+  leading?: ReactNode;
+  inspector?: Ref<MetricInspector>;
 }) {
   const initial = initialRequest ?? operationalMetricRequest;
   const { records, page, next, previous, first, connection } = usePagedMetric(
@@ -191,47 +220,121 @@ export function OperationalMetrics({
     first();
     void live.refetch();
   };
+  const inspect = (id: string, element: HTMLButtonElement) => {
+    trigger.current = element;
+    setSelected(id);
+    first();
+  };
+  useImperativeHandle(inspector, () => ({ inspect }));
 
   return (
-    <section className="operational-metrics" aria-label={heading}>
+    <section
+      className="operational-metrics"
+      aria-label={heading}
+      data-embedded={embedded ? '' : undefined}
+    >
       <header className="operational-heading">
         <div>
-          <p className="order-metrics-eyebrow">
-            {eyebrow ??
-              (initialRequest
-                ? m.overview_cohort_eyebrow()
-                : m.overview_pulse_eyebrow())}
-          </p>
+          {embedded ? null : (
+            <p className="order-metrics-eyebrow">
+              {eyebrow ??
+                (initialRequest
+                  ? m.overview_cohort_eyebrow()
+                  : m.overview_pulse_eyebrow())}
+            </p>
+          )}
           <h2>{heading}</h2>
           <p>{description}</p>
         </div>
-        <div className="operational-status">
-          <Badge tone={connection === 'live' ? 'neutral' : 'warning'}>
-            {connection === 'denied'
-              ? m.overview_live_access_changed()
-              : connection === 'offline'
-                ? m.overview_live_offline()
-                : live.isError
-                  ? m.overview_live_unavailable()
-                  : connection === 'live'
-                    ? m.overview_live_on()
-                    : connection === 'syncing'
-                      ? m.overview_live_updating()
-                      : m.overview_live_connecting()}
-          </Badge>
-          <RefreshButton
-            size="icon-sm"
-            label={m.overview_refresh_summary()}
-            refreshing={live.isFetching}
-            onClick={refresh}
-            disabled={
-              live.isPaused ||
-              connection === 'denied' ||
-              connection === 'offline'
-            }
-          />
-        </div>
+        {embedded ? null : (
+          <div className="operational-status">
+            <Badge tone={connection === 'live' ? 'neutral' : 'warning'}>
+              {connection === 'denied'
+                ? m.overview_live_access_changed()
+                : connection === 'offline'
+                  ? m.overview_live_offline()
+                  : live.isError
+                    ? m.overview_live_unavailable()
+                    : connection === 'live'
+                      ? m.overview_live_on()
+                      : connection === 'syncing'
+                        ? m.overview_live_updating()
+                        : m.overview_live_connecting()}
+            </Badge>
+            <RefreshButton
+              size="icon-sm"
+              label={m.overview_refresh_summary()}
+              refreshing={live.isFetching}
+              onClick={refresh}
+              disabled={
+                live.isPaused ||
+                connection === 'denied' ||
+                connection === 'offline'
+              }
+            />
+          </div>
+        )}
       </header>
+      {/* One grid holds the leading cards in every state, so they keep their place and state. */}
+      {leading || (data && !unavailable && !live.isPending) ? (
+        <div className="operational-groups">
+          {leading}
+          {data && !unavailable && !live.isPending
+            ? metricGroups.map((group) => {
+                const Icon = group.icon;
+
+                return (
+                  <Card as="div" className="operational-group" key={group.id}>
+                    <header>
+                      <Icon size={17} aria-hidden="true" />
+                      <div>
+                        <h3>{group.title()}</h3>
+                        <p>{group.subtitle()}</p>
+                      </div>
+                    </header>
+                    <div>
+                      {data.metrics
+                        .filter((m) =>
+                          group.metrics
+                            ? group.metrics.includes(m.definition.id)
+                            : m.definition.family === group.id,
+                        )
+                        .map((m) => (
+                          <button
+                            type="button"
+                            className="operational-row"
+                            key={m.definition.id}
+                            data-metric={m.definition.id}
+                            onClick={(event) =>
+                              inspect(m.definition.id, event.currentTarget)
+                            }
+                          >
+                            <span className="operational-label">
+                              {metricTitle(m.definition)}
+                              <small>{metricHint(m)}</small>
+                            </span>
+                            <strong
+                              className="operational-value"
+                              data-tone={
+                                attentionMetrics.has(m.definition.id) &&
+                                (m.value ?? 0) > 0 &&
+                                m.coverage !== 'unavailable'
+                                  ? 'attention'
+                                  : undefined
+                              }
+                            >
+                              {metricValue(m)}
+                            </strong>
+                            <ArrowUpRight size={14} aria-hidden="true" />
+                          </button>
+                        ))}
+                    </div>
+                  </Card>
+                );
+              })
+            : null}
+        </div>
+      ) : null}
       {unavailable ? (
         <CaseNotice
           error
@@ -250,60 +353,11 @@ export function OperationalMetrics({
       ) : live.isPending ? (
         <CaseLoading />
       ) : data ? (
-        <>
-          <div className="operational-groups">
-            {metricGroups.map((group) => {
-              const Icon = group.icon;
-
-              return (
-                <Card as="div" className="operational-group" key={group.id}>
-                  <header>
-                    <Icon size={17} aria-hidden="true" />
-                    <div>
-                      <h3>{group.title()}</h3>
-                      <p>{group.subtitle()}</p>
-                    </div>
-                  </header>
-                  <div>
-                    {data.metrics
-                      .filter((m) =>
-                        group.metrics
-                          ? group.metrics.includes(m.definition.id)
-                          : m.definition.family === group.id,
-                      )
-                      .map((m) => (
-                        <button
-                          type="button"
-                          className="operational-row"
-                          key={m.definition.id}
-                          data-metric={m.definition.id}
-                          onClick={(event) => {
-                            trigger.current = event.currentTarget;
-                            setSelected(m.definition.id);
-                            first();
-                          }}
-                        >
-                          <span className="operational-label">
-                            {metricTitle(m.definition)}
-                            <small>{metricHint(m)}</small>
-                          </span>
-                          <strong className="operational-value">
-                            {metricValue(m)}
-                          </strong>
-                          <ArrowUpRight size={14} aria-hidden="true" />
-                        </button>
-                      ))}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-          <p className="operational-footnote">
-            {rich(m.overview_footnote, {
-              time: <WorkspaceDate value={data.asOf} />,
-            })}
-          </p>
-        </>
+        <p className="operational-footnote">
+          {rich(m.overview_footnote, {
+            time: <WorkspaceDate value={data.asOf} />,
+          })}
+        </p>
       ) : null}
       <Dialog
         open={selected !== null}

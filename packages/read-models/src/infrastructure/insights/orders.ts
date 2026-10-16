@@ -18,7 +18,11 @@ import {
 import type { OrderReadQueries } from '../orders/list-query.js';
 import { iso, money, text } from '../orders/values.js';
 import { readSourceReads } from './coverage.js';
-import { bucketRelation, readWindow } from './window.js';
+import {
+  bucketRelation,
+  readPreviousWindow,
+  readRecordWindow,
+} from './window.js';
 
 const unavailable = () =>
   new IdentityError(
@@ -55,16 +59,11 @@ async function ready(tx: SqlTransaction, tenantId: string) {
 async function prepare(
   tx: SqlTransaction,
   tenantId: string,
-  query: InsightQuery,
+  query: InsightQuery & { point?: string | undefined },
   asOf: string,
 ) {
   await ready(tx, tenantId);
-  const { window, buckets } = await readWindow(
-    tx,
-    query.range,
-    query.timeZone,
-    asOf,
-  );
+  const { window, buckets } = await readRecordWindow(tx, query, asOf);
   const values: unknown[] = [
     tenantId,
     asOf,
@@ -113,6 +112,20 @@ export async function orderChart(
     window.from,
   );
   const through = dataThrough(sources);
+  const span = await readPreviousWindow(tx, window, asOf);
+  const previous = await tx.query<{ count: number }>(
+    `WITH ${rows} SELECT count(*)::int AS count FROM rows`,
+    [
+      tenantId,
+      asOf,
+      query.connectionId ?? null,
+      ['previous'],
+      [span.from],
+      [span.before],
+      span.from,
+      span.before,
+    ],
+  );
   const points = countPoints(
     buckets.map((bucket) => ({
       ...bucket,
@@ -138,6 +151,12 @@ export async function orderChart(
       excluded: excluded ? [{ reason: 'no_placed_time', count: excluded }] : [],
     },
     dataThrough: through,
+    previous: {
+      from: span.from,
+      before: span.before,
+      total: previous.rows[0]!.count,
+      coverage: pointCoverage(span, sources, through),
+    },
     asOf,
   };
 }

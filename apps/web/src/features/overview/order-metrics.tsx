@@ -22,8 +22,15 @@ import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
 import { Link, useLocation } from '@tanstack/react-router';
-import { ArrowRight, Clock3, ListChecks, PackageOpen } from 'lucide-react';
-import { useRef, useState } from 'react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Clock3,
+  ListChecks,
+  PackageOpen,
+  ShoppingCart,
+} from 'lucide-react';
+import { type Ref, useImperativeHandle, useRef, useState } from 'react';
 
 import {
   metricDescription,
@@ -31,7 +38,11 @@ import {
   metricTitle,
 } from './metric-text';
 import { metricsOptions } from './metrics-data';
-import { type LiveMetricView, usePagedMetric } from './metrics-live';
+import {
+  type LiveMetricView,
+  type MetricInspector,
+  usePagedMetric,
+} from './metrics-live';
 
 type Metric = MetricResponse['metrics'][number];
 
@@ -45,22 +56,38 @@ const coverageLabels = {
 /** The order view a page requests in its metric summary. */
 export const orderMetricRequest: MetricRequest = {};
 
+// One line under each order count in the group card; metrics added later show their description.
+const hints: Partial<Record<string, () => string>> = {
+  'orders.open': m.overview_orders_hint_open,
+  'orders.overdue': m.overview_orders_hint_overdue,
+  'orders.attention': m.overview_orders_hint_attention,
+};
+
 /**
  * Presents source-aware order counts and lets operators inspect their exact matching records.
  * `live` is this widget's slice of the page's metric summary, read with `orderMetricRequest`.
+ * The `group` variant is one card in a grid of metric groups; the page around it shows the
+ * live status and refresh, and the card states only what is specific to orders. `inspector`
+ * lets the page open the record dialog of an order metric.
  */
 export function OrderMetrics({
   organizationId,
   live,
+  variant = 'section',
+  inspector,
 }: {
   organizationId: string;
   live: LiveMetricView<MetricResponse>;
+  variant?: 'section' | 'group';
+  inspector?: Ref<MetricInspector>;
 }) {
   return (
     <LiveOrderMetrics
       key={organizationId}
       organizationId={organizationId}
       live={live}
+      variant={variant}
+      inspector={inspector}
     />
   );
 }
@@ -68,9 +95,13 @@ export function OrderMetrics({
 function LiveOrderMetrics({
   organizationId,
   live,
+  variant,
+  inspector,
 }: {
   organizationId: string;
   live: LiveMetricView<MetricResponse>;
+  variant: 'section' | 'group';
+  inspector: Ref<MetricInspector> | undefined;
 }) {
   const location = useLocation();
   const restoredMetric = new URLSearchParams(location.searchStr).get('metric');
@@ -103,6 +134,239 @@ function LiveOrderMetrics({
     first();
     void live.refetch();
   };
+
+  const dialog = (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) first();
+      }}
+    >
+      <DialogContent className="order-cohort-dialog" finalFocus={trigger}>
+        <DialogHeader>
+          <DialogTitle>
+            {metric
+              ? metricTitle(metric.definition)
+              : m.overview_orders_dialog_title_fallback()}
+          </DialogTitle>
+          <DialogDescription>
+            {m.overview_orders_dialog_description()}
+          </DialogDescription>
+        </DialogHeader>
+        {metric && shown ? (
+          <>
+            <div className="order-cohort-definition">
+              <Badge tone="neutral">
+                {m.overview_orders_rule_version({
+                  version: metric.definition.version,
+                })}
+              </Badge>
+              <p>{metricDescription(metric.definition)}</p>
+              <p>{metricTimeSemantics(metric.definition)}</p>
+            </div>
+            <dl className="order-cohort-facts">
+              <div>
+                <dt>{m.overview_orders_fact_matching()}</dt>
+                <dd>{formatNumber(metric.observedCount)}</dd>
+              </div>
+              <div>
+                <dt>{m.common_unknown()}</dt>
+                <dd>{formatNumber(metric.unknownCount)}</dd>
+              </div>
+              <div>
+                <dt>{m.overview_orders_fact_coverage()}</dt>
+                <dd>{coverageLabels[shown.coverage]()}</dd>
+              </div>
+            </dl>
+            <p className="order-cohort-note">
+              {shown.coverageExplanation}{' '}
+              {metric.unknownCount ? m.overview_orders_unknown_note() : ''}
+            </p>
+            <div className="order-cohort-timestamps">
+              <span>{m.overview_orders_scope()}</span>
+              <span>
+                {rich(m.overview_orders_calculated, {
+                  time: <WorkspaceDate value={shown.asOf} />,
+                })}
+              </span>
+              <span>
+                {shown.observedAt
+                  ? rich(m.overview_orders_latest, {
+                      time: <WorkspaceDate value={shown.observedAt} />,
+                    })
+                  : m.overview_orders_latest_none()}
+              </span>
+              <span>{m.overview_orders_completeness()}</span>
+            </div>
+            {changed ? (
+              <CaseNotice title={m.overview_orders_changed_title()}>
+                {m.overview_orders_changed_body()}{' '}
+                <Button variant="outline" size="sm" onClick={first}>
+                  {m.overview_records_show_latest()}
+                </Button>
+              </CaseNotice>
+            ) : null}
+            <Cohort metric={metric} organizationId={organizationId} />
+            <Link
+              className="order-cohort-open"
+              to="/app/$organizationId/orders"
+              params={{ organizationId }}
+              search={{ view: cohortViews[metric.definition.id] }}
+            >
+              {m.overview_orders_open_in_orders()}{' '}
+              <ArrowRight size={12} aria-hidden="true" />
+            </Link>
+            <div className="order-cohort-pagination">
+              <span>
+                {metric.observedCount
+                  ? m.overview_orders_range({
+                      from: Math.min(metric.offset + 1, metric.observedCount),
+                      to: Math.min(
+                        metric.offset + metric.items.length,
+                        metric.observedCount,
+                      ),
+                      total: metric.observedCount,
+                    })
+                  : m.overview_orders_none()}
+              </span>
+              <div>
+                <Button
+                  variant="outline"
+                  disabled={page === 1}
+                  onClick={previous}
+                >
+                  {m.common_previous()}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!metric.nextCursor}
+                  onClick={() => {
+                    if (metric.nextCursor) next(metric.nextCursor);
+                  }}
+                >
+                  {m.common_next()}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : records.isPending ? (
+          <CaseLoading />
+        ) : (
+          <CaseNotice error title={m.overview_orders_records_error_title()}>
+            {m.overview_orders_records_error_body()}{' '}
+            <Button variant="outline" onClick={refresh}>
+              {m.overview_orders_refresh()}
+            </Button>
+          </CaseNotice>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
+  const inspect = (id: string, element: HTMLButtonElement) => {
+    trigger.current = element;
+    setSelected(id);
+    first();
+    setOpen(true);
+  };
+  useImperativeHandle(inspector, () => ({ inspect }));
+
+  if (variant === 'group')
+    return (
+      <Card
+        as="section"
+        className="operational-group order-metrics-group"
+        aria-labelledby="order-metrics-title"
+      >
+        <header>
+          <ShoppingCart size={17} aria-hidden="true" />
+          <div>
+            <h3 id="order-metrics-title">{m.overview_orders_eyebrow()}</h3>
+            <p>{m.overview_orders_group_subtitle()}</p>
+          </div>
+        </header>
+        {connection === 'denied' ? (
+          <p className="operational-group-state">
+            {m.overview_orders_status_denied()}
+          </p>
+        ) : live.isPaused || connection === 'offline' ? (
+          <p className="operational-group-state">
+            <strong>{m.overview_orders_paused_title()}</strong>{' '}
+            {m.overview_orders_paused_body()}
+          </p>
+        ) : live.isError ? (
+          <p className="operational-group-state" role="alert">
+            <strong>{m.overview_orders_error_title()}</strong>{' '}
+            {m.overview_orders_error_body()}
+          </p>
+        ) : live.isPending || !data ? (
+          <div className="operational-group-loading" aria-hidden="true">
+            <span className="lu-skeleton" />
+            <span className="lu-skeleton" />
+            <span className="lu-skeleton" />
+          </div>
+        ) : (
+          <>
+            <div>
+              {data.metrics.map((item) => (
+                <button
+                  type="button"
+                  className="operational-row"
+                  key={item.definition.id}
+                  data-metric={item.definition.id}
+                  onClick={(event) =>
+                    inspect(item.definition.id, event.currentTarget)
+                  }
+                >
+                  <span className="operational-label">
+                    {metricTitle(item.definition)}
+                    <small>
+                      {data.coverage === 'unavailable'
+                        ? m.overview_orders_value_none()
+                        : (hints[item.definition.id]?.() ??
+                          metricDescription(item.definition))}
+                    </small>
+                  </span>
+                  <strong
+                    className="operational-value"
+                    data-tone={
+                      item.definition.id === 'orders.attention' &&
+                      data.coverage !== 'unavailable' &&
+                      item.observedCount > 0
+                        ? 'attention'
+                        : undefined
+                    }
+                  >
+                    {data.coverage === 'unavailable'
+                      ? m.common_empty_value()
+                      : formatNumber(item.observedCount)}
+                  </strong>
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            {data.observedAt ? (
+              <p className="operational-group-footer">
+                {data.freshness === 'fresh' ? null : (
+                  <Badge tone="warning">
+                    {data.freshness === 'stale'
+                      ? m.overview_orders_freshness_stale()
+                      : m.overview_orders_freshness_none()}
+                  </Badge>
+                )}
+                <span>
+                  {rich(m.overview_orders_latest, {
+                    time: <WorkspaceDate value={data.observedAt} />,
+                  })}
+                </span>
+              </p>
+            ) : null}
+          </>
+        )}
+        {dialog}
+      </Card>
+    );
 
   return (
     <section className="order-metrics" aria-labelledby="order-metrics-title">
@@ -204,12 +468,9 @@ function LiveOrderMetrics({
                   <p>{metricDescription(item.definition)}</p>
                   <Button
                     variant="ghost"
-                    onClick={(event) => {
-                      trigger.current = event.currentTarget;
-                      setSelected(item.definition.id);
-                      first();
-                      setOpen(true);
-                    }}
+                    onClick={(event) =>
+                      inspect(item.definition.id, event.currentTarget)
+                    }
                   >
                     {m.overview_orders_inspect()}{' '}
                     <ArrowRight size={14} aria-hidden="true" />
@@ -239,132 +500,7 @@ function LiveOrderMetrics({
           </div>
         </>
       ) : null}
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) first();
-        }}
-      >
-        <DialogContent className="order-cohort-dialog" finalFocus={trigger}>
-          <DialogHeader>
-            <DialogTitle>
-              {metric
-                ? metricTitle(metric.definition)
-                : m.overview_orders_dialog_title_fallback()}
-            </DialogTitle>
-            <DialogDescription>
-              {m.overview_orders_dialog_description()}
-            </DialogDescription>
-          </DialogHeader>
-          {metric && shown ? (
-            <>
-              <div className="order-cohort-definition">
-                <Badge tone="neutral">
-                  {m.overview_orders_rule_version({
-                    version: metric.definition.version,
-                  })}
-                </Badge>
-                <p>{metricDescription(metric.definition)}</p>
-                <p>{metricTimeSemantics(metric.definition)}</p>
-              </div>
-              <dl className="order-cohort-facts">
-                <div>
-                  <dt>{m.overview_orders_fact_matching()}</dt>
-                  <dd>{formatNumber(metric.observedCount)}</dd>
-                </div>
-                <div>
-                  <dt>{m.common_unknown()}</dt>
-                  <dd>{formatNumber(metric.unknownCount)}</dd>
-                </div>
-                <div>
-                  <dt>{m.overview_orders_fact_coverage()}</dt>
-                  <dd>{coverageLabels[shown.coverage]()}</dd>
-                </div>
-              </dl>
-              <p className="order-cohort-note">
-                {shown.coverageExplanation}{' '}
-                {metric.unknownCount ? m.overview_orders_unknown_note() : ''}
-              </p>
-              <div className="order-cohort-timestamps">
-                <span>{m.overview_orders_scope()}</span>
-                <span>
-                  {rich(m.overview_orders_calculated, {
-                    time: <WorkspaceDate value={shown.asOf} />,
-                  })}
-                </span>
-                <span>
-                  {shown.observedAt
-                    ? rich(m.overview_orders_latest, {
-                        time: <WorkspaceDate value={shown.observedAt} />,
-                      })
-                    : m.overview_orders_latest_none()}
-                </span>
-                <span>{m.overview_orders_completeness()}</span>
-              </div>
-              {changed ? (
-                <CaseNotice title={m.overview_orders_changed_title()}>
-                  {m.overview_orders_changed_body()}{' '}
-                  <Button variant="outline" size="sm" onClick={first}>
-                    {m.overview_records_show_latest()}
-                  </Button>
-                </CaseNotice>
-              ) : null}
-              <Cohort metric={metric} organizationId={organizationId} />
-              <Link
-                className="order-cohort-open"
-                to="/app/$organizationId/orders"
-                params={{ organizationId }}
-                search={{ view: cohortViews[metric.definition.id] }}
-              >
-                {m.overview_orders_open_in_orders()}{' '}
-                <ArrowRight size={12} aria-hidden="true" />
-              </Link>
-              <div className="order-cohort-pagination">
-                <span>
-                  {metric.observedCount
-                    ? m.overview_orders_range({
-                        from: Math.min(metric.offset + 1, metric.observedCount),
-                        to: Math.min(
-                          metric.offset + metric.items.length,
-                          metric.observedCount,
-                        ),
-                        total: metric.observedCount,
-                      })
-                    : m.overview_orders_none()}
-                </span>
-                <div>
-                  <Button
-                    variant="outline"
-                    disabled={page === 1}
-                    onClick={previous}
-                  >
-                    {m.common_previous()}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={!metric.nextCursor}
-                    onClick={() => {
-                      if (metric.nextCursor) next(metric.nextCursor);
-                    }}
-                  >
-                    {m.common_next()}
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : records.isPending ? (
-            <CaseLoading />
-          ) : (
-            <CaseNotice error title={m.overview_orders_records_error_title()}>
-              {m.overview_orders_records_error_body()}{' '}
-              <Button variant="outline" onClick={refresh}>
-                {m.overview_orders_refresh()}
-              </Button>
-            </CaseNotice>
-          )}
-        </DialogContent>
-      </Dialog>
+      {dialog}
     </section>
   );
 }

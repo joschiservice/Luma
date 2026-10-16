@@ -29,7 +29,14 @@ export type ReadResult =
   | {
       ok: true;
       /** Messages with the provider's message ID. */
-      items: { providerMessageId: string; data: MessageData }[];
+      items: {
+        providerMessageId: string;
+        data: MessageData;
+        observationId?: string;
+        observedAt?: string;
+      }[];
+      /** True only when the provider reports a complete page. */
+      complete?: boolean;
       nextCursor: string | null;
       retryAfterMs?: number | undefined;
     }

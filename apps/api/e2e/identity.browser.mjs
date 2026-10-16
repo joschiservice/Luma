@@ -101,7 +101,9 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await signIn(page);
   await heading(page, 'Issues');
   expect(new URL(page.url()).pathname).toBe(`/app/${first}/exceptions`);
-  await page.getByRole('button', { name: 'All open', exact: true }).waitFor();
+  await page
+    .getByRole('tab', { name: 'All open', exact: true, selected: true })
+    .waitFor();
   await page.goto('/app/workspaces/new');
   const second = await createWorkspace(page, 'South Studio');
   await page.goto('/app');

@@ -96,6 +96,10 @@ export interface CapabilityDependencies {
   resolve(
     context: TenantContext,
     connectionId: string,
+    request?: {
+      capability: Capability;
+      readPurpose?: InvocationContext['readPurpose'];
+    },
   ): Promise<ConnectorConnection | null>;
   /** Awaited evidence hook. No input, output, provider payload or exception text is included. */
   record(event: CapabilityEvent): Promise<void>;
@@ -133,9 +137,16 @@ function dispatchIdentity(
 
 /** Inject writes only into execution adapters; application callers receive the read port. */
 export function createCapabilityRuntime(deps: CapabilityDependencies) {
-  async function resolve(context: TenantContext, connectionId: string) {
+  async function resolve(
+    context: TenantContext,
+    connectionId: string,
+    request?: {
+      capability: Capability;
+      readPurpose?: InvocationContext['readPurpose'];
+    },
+  ) {
     requireTenant(context, context.tenantId);
-    const connection = await deps.resolve(context, connectionId);
+    const connection = await deps.resolve(context, connectionId, request);
     if (
       !connection ||
       connection.id !== connectionId ||
@@ -155,7 +166,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
     expectedDispatchIdentity?: string,
     beforeDispatch?: (firstDispatch?: boolean) => Promise<void>,
   ): Promise<CapabilityResult<K>> {
-    const connection = await resolve(context, request.connectionId);
+    const connection = await resolve(context, request.connectionId, request);
     if (!connection) return { ok: false, error: failure('unavailable') };
     if (
       expectedDispatchIdentity !== undefined &&
@@ -315,7 +326,9 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             intent.capabilityVersion !== '0'
           )
             return null;
-          const connection = await resolve(context, intent.connectionId);
+          const connection = await resolve(context, intent.connectionId, {
+            capability: binding.capability,
+          });
           const handler = connection?.capabilities[binding.capability];
           if (!connection || !handler || handler.descriptor.version !== '0')
             return null;

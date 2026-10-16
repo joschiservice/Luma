@@ -7,56 +7,62 @@ A workflow reacts to something, such as a person starting it, a schedule, low st
 
 ## Find a workflow
 
-Each workflow in the list shows two labels:
+The list groups workflows by what they need from you, and each one shows a single status:
 
-- **Enabled**, **Paused** or **Not set up**: whether someone turned it on. **Paused** means every activation or stock rule was revoked.
-- **Ready**, **Partly blocked** or **Blocked**: whether it can run now. An enabled workflow can still be blocked, for example when a connection lost access or stock stopped updating.
+- **Needs attention**: the workflow is on but **Can’t run** or runs **On with gaps**, a decision is waiting for a person, or its latest run ended unresolved.
+- **On**: the workflow is on and can run.
+- **Turned off**: someone turned the workflow off or revoked its stock rules, so no new runs start. Earlier runs stay in its history.
+- **Ready to turn on**: the workflow is **Off** and nothing stops you from turning it on.
+- **Needs setup**: the workflow is **Off** and needs something first, such as a connection or a supplier. It isn’t failing; nothing runs until it’s set up.
 
-**Next** names the one thing to do, with a link to the place that fixes it. **Covers** shows what the workflow watches, such as a number of stock positions. If Luma can’t tell, it says **Coverage unknown**, never zero.
+Each row says what starts the workflow, such as **Stock falls below the minimum**. Rows that need something name the next step, with a link to the place that fixes it. Rows for workflows that are on show what they cover, such as a number of stock positions, when they last ran and how many recent runs were verified. If Luma can’t tell what a workflow covers, it says **Coverage unknown**, never zero. A row of marks shows how the last runs ended, oldest first; point at it to read the counts.
 
-Use the views to find what needs you:
-
-- **Needs attention**: blocked or partly blocked workflows, workflows with decisions waiting, and workflows whose latest run ended unresolved.
-- **Enabled** and **Not enabled**: whether a workflow is turned on.
-
-Search by name, or filter by **System**. **Drafts** lists workflows that are still being written. Drafts never run.
+Use the views to narrow the list: **Needs attention**, **On** and **Off**. Search by name, purpose, area, trigger or system, or filter by **Starts when** and **System**. Select a group’s heading to collapse it; Luma remembers this for you on every device. **Drafts** lists workflows that are still being written. Drafts never run.
 
 ## Open a workflow
 
-The top of a workflow says whether it’s **Running**, **Running with gaps**, **Paused**, **Ready to set up** or **Can’t run right now**. Choose a version to see what it does. Published versions don’t change; choosing another version only changes what the page shows.
+The top of a workflow shows its status, what it does and its key facts: when it starts, what success means, how approval applies, what it covers, recent results and when it last ran. When something needs doing, **Next** names the one thing to do and links to the place that fixes it, with any other problems listed below it. The button that turns the workflow on or off, or reviews an activation, is at the top of the page.
 
-- **Overview** shows when the workflow starts, what success means and its readiness: the next action, anything blocking it, what it covers, how approval applies, what’s waiting for a person and recent results. **How it works** lists the steps in plain language.
-- **Activity** lists **Recent runs**. Each run shows what Luma found, the decision, the proposed change, the **Change status** and the **Check status**. For workflows that fix issues, **Test results** compares workflow tests with what your team did; see [Test a workflow safely](/docs/shadow-mode).
-- **Rules** is where you turn the workflow on or off and start runs, if your role allows it.
-- **Technical details** lists steps and actions, requirements and permissions, inputs and version history. You don’t need them to use the workflow.
+The page has four tabs. A workflow that is on opens on **Runs**; one that is off opens on **How it works**, or on **Stock rules** for replenishment.
+
+- **Runs** lists the 50 most recent runs. See [Follow a run](#follow-a-run).
+- **How it works** walks through the workflow from what starts it, through each step in plain language, to what counts as success, with who approves its changes and what it covers.
+- **Setup** shows whether the workflow is on and as whom, its activations, and the form that starts a run, if your role allows it. Replenishment calls this tab **Stock rules**.
+- **Details** lists steps and actions, requirements and permissions, inputs and version history. You don’t need them to use the workflow.
+
+When a workflow has several published versions, choose one at the top of the page to see what it does. Published versions don’t change; choosing another version only changes what the page shows.
 
 ## Follow a run
 
+Each run shows its status, the record it worked on, what started it, its version and when it started. Select a run to see its steps, the evidence each step recorded, any proposed change and how it was checked. Use **Needs a look**, **In progress** and **Verified** to filter runs. When other recent runs worked on the same record, **Show all runs for this record** narrows the list to them; **Show all runs** returns to the full list. A link to a run, for example from an issue or Needs you, opens it directly.
+
 A run’s status tells you where it stands:
 
-- **Running**, **Waiting** or **Waiting for approval**: the run is in progress. Changes that need approval wait in [Needs you](/docs/needs-you).
+- **Scheduled**, **Waiting to start**, **Running** or **Waiting**: the run is in progress.
+- **Waiting for approval**: a change waits for a person in [Needs you](/docs/needs-you). These runs appear under **Needs a look**.
 - **Verified**: Luma checked the result independently and it matched.
-- **Ended without changes**: the conditions weren’t met, so nothing changed.
+- **Not verified yet**: Luma hasn’t confirmed a result for this run.
+- **Ended without changes**, **Cancelled** or **Skipped**: nothing changed. A start is skipped when its time passed while the workspace was suspended.
 - **Rejected**: a person rejected the change.
 - **Verification failed** or **Couldn’t verify**: the change didn’t produce the expected result, or Luma couldn’t confirm it. Check the record before trying again.
 - **Handed to a person**: the run needs someone to take over.
 
-An accepted change isn’t success on its own. Only a passed check confirms it. Runs labeled **Pilot data**, **Simulated data** or **Shadow mode** never count as confirmed fixes.
+An accepted change isn’t success on its own. Only a passed check confirms it. Runs labeled **Pilot data**, **Simulated data** or **Shadow mode** never count as confirmed fixes. For workflows that fix issues, **Test results** below the runs compares workflow tests with what your team did; see [Test a workflow safely](/docs/shadow-mode).
 
 ## Turn a workflow on or off
 
-How you turn a workflow on depends on what it does. Look under **Rules**:
+How you turn a workflow on depends on what it does:
 
-- Workflows that start from issues: select **Turn on**, review what starts a run and who approves its changes, and confirm. Runs use the permissions of the person who turned it on, and the workflow shows their name. **Turn off** stops new runs; a waiting run won’t send new changes, and changes already made aren’t undone. You need **Publish and enable workflows**.
+- Workflows that start from issues: select **Turn on** at the top of the page, review what starts a run and who approves its changes, and confirm. Runs use the permissions of the person who turned it on, and the workflow shows their name. **Turn off** stops new runs; a waiting run won’t send new changes, and changes already made aren’t undone. You need **Publish and enable workflows**.
 - **Stock rules** for replenishment: see [Set up replenishment](#set-up-replenishment). You need **Manage procurement**.
-- Workflows that change specific orders: select **Review activation**, choose the connection and up to 100 orders, confirm that you reviewed them, and select **Activate reviewed version**. Other orders and future orders aren’t included. **Revoke activation** stops new runs; changes already sent may still finish. You need **Test and turn on issue workflows**.
-- Workflows you start yourself: under **Trigger**, select **Start workflow**, **Schedule start**, **Record event**, **Check condition** or **Record detected issue**, depending on how the workflow starts. A trigger only starts a run; it never approves a change. You can cancel a scheduled start from **Recent runs** before it begins. You need **Manage workflow triggers**.
+- Workflows that change specific orders: select **Review activation** at the top of the page, choose the connection and up to 100 orders, confirm that you reviewed them, and select **Activate reviewed version**. Other orders and future orders aren’t included. **Revoke activation** stops new runs; changes already sent may still finish. You need **Test and turn on issue workflows**.
+- Workflows you start yourself: select **Start a run**, or open **Setup**, then under **Trigger** select **Start workflow**, **Schedule start**, **Record event**, **Check condition** or **Record detected issue**, depending on how the workflow starts. A trigger only starts a run; it never approves a change. You can cancel a scheduled start from **Runs** before it begins. You need **Manage workflow triggers**.
 
 If you can’t make a change, the page says which part your role doesn’t allow.
 
 ## Set up replenishment
 
-Open **Replenish low stock** and select **Add stock rules** under **Rules**, or start from **Procurement** or a stock position. You can set up 25 stock positions at a time:
+Open **Replenish low stock** and select **Add stock rules** under **Stock rules**, or start from **Procurement** or a stock position. You can set up 25 stock positions at a time:
 
 1. Choose the supplier and the stock positions. Search by SKU or use the page controls; your selections stay selected across pages and searches. Positions that already have an active rule can’t be selected.
 2. Set the **Minimum stock**, **Target stock** and **High-risk quantity threshold**, then select **Preview rules**.

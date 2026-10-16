@@ -18,6 +18,15 @@ export const collectionDomainSchema = z.enum([
   'decisions',
   'inbox',
   'activity',
+  'workflows',
+]);
+
+/**
+ * Lists that saved views and exports can describe. The workflow library keeps only member state,
+ * such as collapsed groups: it filters in the browser and has no record reader.
+ */
+export const savedViewDomainSchema = collectionDomainSchema.exclude([
+  'workflows',
 ]);
 
 /**
@@ -360,6 +369,7 @@ export const collectionPermissions: Record<
   decisions: null,
   inbox: 'messages.read',
   activity: 'activity.read',
+  workflows: 'workflows.read',
 };
 
 export type CollectionDomain = z.infer<typeof collectionDomainSchema>;

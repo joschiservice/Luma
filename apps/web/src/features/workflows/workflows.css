@@ -12,7 +12,8 @@
   margin-bottom: 4px;
 }
 
-.workflows-page h2 {
+/* Shared group headers keep their own type. */
+.workflows-page h2:where(:not(.ui-collection-group-header)) {
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -52,29 +53,6 @@
   display: grid;
   gap: 14px;
   min-width: 0;
-}
-
-.workflow-search {
-  position: relative;
-  flex: 1;
-  min-width: 200px;
-}
-
-.workflow-search > svg {
-  position: absolute;
-  top: 50%;
-  left: 10px;
-  color: var(--foreground-subtle);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.workflow-search [data-slot='input'] {
-  padding-inline: 32px 34px;
-}
-
-.workflow-search input::-webkit-search-cancel-button {
-  display: none;
 }
 
 .workflow-rows,
@@ -148,30 +126,42 @@ li.workflow-row {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 2px 8px;
-  margin-top: 8px;
+  gap: 2px 10px;
+  margin-top: 6px;
   font-size: 12.5px;
 }
 
-.workflow-row-next-label {
-  color: var(--foreground-subtle);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .workflow-row .workflow-row-reason {
-  flex-basis: 100%;
+  min-width: 0;
   color: var(--foreground-subtle);
 }
 
-.workflow-row-next[data-state='blocked'] .workflow-row-next-label {
-  color: var(--state-error-text);
+.workflow-row-next[data-state='blocked'] .workflow-row-reason {
+  color: var(--foreground-muted);
 }
 
-.workflow-row-next[data-state='degraded'] .workflow-row-next-label {
-  color: var(--state-warning-text);
+/* Two lines say what a workflow does; the record page has the full purpose. */
+.workflow-row .workflow-row-purpose {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* Workflows that need setup before anyone can turn them on recede behind the ones in use. */
+.workflow-row[data-lifecycle='setup'] .workflow-row-icon {
+  opacity: 0.72;
+}
+
+.workflow-draft-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--foreground-subtle);
 }
 
 .workflow-row-content {
@@ -180,9 +170,11 @@ li.workflow-row {
   min-width: 0;
 }
 
-.workflow-row h2 {
+.workflow-row h3 {
   margin: 0;
   font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .workflow-row p {
@@ -193,38 +185,21 @@ li.workflow-row {
 .workflow-row-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 2px 0;
   margin-top: 4px;
   color: var(--foreground-subtle);
   font-size: 12px;
 }
 
-.workflow-row-meta span {
+.workflow-row-meta > span {
   overflow-wrap: anywhere;
 }
 
-.workflow-row-meta span + span::before {
+.workflow-row-meta > span + span::before {
   content: '·';
   margin: 0 7px;
   color: var(--foreground-faint);
-}
-
-.workflow-row .workflow-row-blocker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  color: var(--state-approval-text);
-  font-size: 12.5px;
-}
-
-.workflow-row .workflow-row-blocker::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--state-approval);
 }
 
 .workflow-row > [data-slot='badge'],
@@ -281,28 +256,6 @@ li.workflow-row {
   width: 48%;
 }
 
-/* Record */
-.workflow-action-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.workflow-version-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.workflow-version-controls [data-slot='select-trigger'] {
-  width: auto;
-  min-width: 150px;
-}
-
 .workflow-section {
   min-width: 0;
   padding: 18px 20px;
@@ -331,14 +284,14 @@ li.workflow-row {
   text-decoration: underline;
 }
 
-.workflows-page dl {
+.workflows-page dl:where(:not(.record-facts)) {
   display: grid;
   gap: 8px;
   margin: 14px 0;
   font-size: 12.5px;
 }
 
-.workflows-page dl > div {
+.workflows-page dl:where(:not(.record-facts)) > div {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
   gap: 12px;
@@ -403,38 +356,6 @@ li.workflow-row {
   display: grid;
   gap: 16px;
   padding: 4px 0 8px;
-}
-
-.workflow-intent {
-  display: grid;
-  gap: 6px;
-  max-width: 720px;
-}
-
-.workflow-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.workflow-eyebrow::first-letter {
-  text-transform: uppercase;
-}
-
-.workflow-eyebrow::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 1.5px;
-  background: var(--domain-workflows);
-}
-
-.workflow-intent > p:last-child {
-  color: var(--foreground-muted);
-  font-size: 14px;
 }
 
 .workflow-contract-flow {
@@ -559,16 +480,14 @@ li.workflow-row {
 
 /* Connections, activations and runs */
 .workflow-connection,
-.workflow-activation-record,
-.workflow-runs article {
+.workflow-activation-record {
   padding: 14px 0;
   border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
 
 .workflow-connection:last-of-type,
-.workflow-activation-record:last-child,
-.workflow-runs article:last-child {
+.workflow-activation-record:last-child {
   padding-bottom: 0;
 }
 
@@ -602,7 +521,6 @@ li.workflow-row {
   background: var(--surface-sunken);
 }
 
-.workflow-process-status,
 .workflow-case-status {
   display: flex;
   align-items: center;
@@ -818,16 +736,7 @@ li.workflow-row {
     padding: 16px;
   }
 
-  .workflow-version-controls {
-    width: 100%;
-    margin: 0;
-  }
-
-  .workflow-version-controls > * {
-    flex: 1;
-  }
-
-  .workflows-page dl > div {
+  .workflows-page dl:where(:not(.record-facts)) > div {
     grid-template-columns: 110px minmax(0, 1fr);
   }
 
@@ -884,4 +793,499 @@ li.workflow-row {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+/* Library groups: each lifecycle group is its own framed list under a labelled heading. */
+/* Record page: status, purpose and facts lead; the next step and tabs follow. */
+.workflow-detail-page {
+  gap: 14px;
+}
+
+.workflow-detail-meta {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-detail-purpose {
+  flex-basis: 100%;
+}
+
+.workflows-page .workflow-detail-purpose p {
+  max-width: 760px;
+  margin: 2px 0 0;
+  color: var(--foreground-muted);
+  font-size: 13.5px;
+  line-height: 21px;
+}
+
+.workflow-version-select[data-slot='select-trigger'] {
+  width: auto;
+  min-width: 132px;
+}
+
+/* The one next thing to do, accented by whether it blocks the workflow. */
+.workflow-next-step {
+  --next-color: var(--signal);
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--next-color) 6%, var(--surface-raised));
+  box-shadow:
+    inset 3px 0 0 var(--next-color),
+    var(--shadow-panel);
+}
+
+.workflow-next-step[data-state='degraded'] {
+  --next-color: var(--state-warning);
+}
+
+.workflow-next-step[data-state='blocked'][data-enablement='enabled'],
+.workflow-next-step[data-state='blocked'][data-enablement='paused'] {
+  --next-color: var(--state-error);
+}
+
+.workflow-next-step[data-state='blocked'][data-enablement='not_enabled'] {
+  --next-color: var(--state-warning);
+}
+
+.workflow-next-step-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.workflow-next-step-icon {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--next-color) 14%, transparent);
+  color: var(--next-color);
+}
+
+.workflow-next-step .workflow-next-step-eyebrow {
+  margin: 0;
+  color: var(--foreground-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-next-step h2 {
+  margin: 1px 0 0;
+  font-size: 14px;
+}
+
+.workflow-next-step-main p:last-child {
+  margin: 2px 0 0;
+  color: var(--foreground-muted);
+}
+
+.workflow-next-step .workflow-issues {
+  padding-left: 40px;
+}
+
+/* Tabs: links that keep their place in the URL hash, scrolling sideways when narrow. */
+.workflow-tabs {
+  gap: 0;
+  min-width: 0;
+}
+
+.workflow-tab-list[data-slot='tabs-list'] {
+  justify-content: flex-start;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workflow-tab-panel {
+  min-width: 0;
+  padding-top: 18px;
+}
+
+/* How it works: one flow from what starts a run to what counts as success. */
+.workflow-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  align-items: start;
+  gap: 16px;
+}
+
+.workflow-flow-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
+}
+
+.workflow-flow {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-flow > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+.workflow-flow > li:last-child {
+  padding-bottom: 0;
+}
+
+.workflow-flow > li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: 2px;
+  left: 13.5px;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+.workflow-flow-marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--foreground-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-flow-edge[data-edge='start'] .workflow-flow-marker {
+  background: var(--signal-soft);
+  box-shadow: none;
+  color: var(--signal-text);
+}
+
+.workflow-flow-edge[data-edge='end'] .workflow-flow-marker {
+  background: color-mix(in srgb, var(--state-success) 16%, transparent);
+  box-shadow: none;
+  color: var(--state-success-text);
+}
+
+.workflow-flow h3 {
+  margin: 4px 0 0;
+}
+
+.workflow-flow-edge h3 {
+  margin-top: 0;
+}
+
+.workflow-flow-label {
+  display: block;
+  margin-top: 1px;
+  color: var(--foreground-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-flow p {
+  margin: 2px 0 0;
+  color: var(--foreground-muted);
+}
+
+.workflow-flow-card .workflow-caption {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.workflow-overview-aside {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--line);
+  box-shadow: var(--shadow-panel);
+}
+
+.workflow-overview-aside > section {
+  padding: 14px 16px;
+  background: var(--surface-raised);
+}
+
+.workflow-overview-aside h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.workflow-overview-aside p {
+  margin: 0;
+  color: var(--foreground-muted);
+}
+
+.workflow-overview-aside p + p {
+  margin-top: 4px;
+}
+
+.workflow-overview-aside strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.workflow-overview-aside ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+/* Run history: compact rows that open into steps and evidence. */
+.workflow-runs {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.workflow-runs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-runs-head h2 {
+  margin: 0;
+}
+
+.workflow-runs-head p,
+.workflows-page .workflow-runs-note {
+  margin: 2px 0 0;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+/* Narrowed to one record: the explanation and its clear action share a line when they fit. */
+.workflow-runs-scope [data-slot='alert-content'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.workflow-run-list {
+  margin: 0;
+  padding: 0;
+  overflow: clip;
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  list-style: none;
+}
+
+.workflow-run + .workflow-run {
+  border-top: 1px solid var(--line);
+}
+
+.workflow-run article {
+  overflow-wrap: anywhere;
+}
+
+.workflow-run article:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.workflows-page .workflow-run-heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.workflow-run-toggle {
+  display: grid;
+  grid-template-columns: 15px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px 11px 12px;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast);
+}
+
+.workflow-run-toggle:hover {
+  background: var(--surface-hover);
+}
+
+.workflow-run-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.workflow-run-chevron {
+  color: var(--foreground-faint);
+  transition: transform var(--duration-fast);
+}
+
+.workflow-run-toggle[aria-expanded='true'] .workflow-run-chevron {
+  transform: rotate(90deg);
+}
+
+.workflow-run-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  min-width: 0;
+}
+
+.workflow-run-title > span:first-child {
+  font-weight: 600;
+}
+
+.workflow-run-trigger {
+  color: var(--foreground-subtle);
+  font-weight: 400;
+}
+
+.workflow-run-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.workflows-page .workflow-run-summary {
+  margin: -6px 0 0;
+  padding: 0 16px 11px 37px;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.workflow-run-body {
+  display: grid;
+  gap: 10px;
+  padding: 2px 16px 16px 37px;
+}
+
+.workflow-run-body:not([hidden]) {
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+}
+
+.workflow-run-body > * {
+  margin: 0;
+}
+
+.workflow-run[data-open] {
+  background: color-mix(in srgb, var(--surface-sunken) 45%, transparent);
+}
+
+.workflows-page .workflow-run-reason {
+  color: var(--foreground-muted);
+}
+
+.workflow-run-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.workflow-run-links a {
+  color: var(--signal-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.workflow-run-links a:hover {
+  text-decoration: underline;
+}
+
+.workflows-page .workflow-run-checks {
+  margin: 0;
+}
+
+.workflow-process-dot--waiting {
+  box-shadow: inset 0 0 0 1.5px var(--state-approval);
+}
+
+@media (max-width: 960px) {
+  .workflow-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-next-step-main {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .workflow-next-step-main > a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .workflow-next-step .workflow-issues {
+    padding-left: 0;
+  }
+
+  .workflow-run-toggle {
+    grid-template-columns: 15px minmax(0, 1fr);
+    row-gap: 6px;
+  }
+
+  .workflow-run-toggle > .lu-state-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .workflow-run-title,
+  .workflow-run-meta {
+    grid-column: 2;
+  }
+
+  .workflow-run-toggle > .lu-state-pill {
+    grid-row: 1;
+  }
+
+  .workflow-run-body,
+  .workflows-page .workflow-run-summary {
+    padding-left: 16px;
+  }
+
+  .workflow-flow-card {
+    padding: 16px;
+  }
+}
+
+/* Recent results: one state mark per run, oldest first. */
+.workflow-recent-runs {
+  display: inline-flex;
+  align-items: center;
 }

@@ -541,6 +541,7 @@ export function createCaseWorkflows(deps: {
         name: version.definition.name,
         purpose: version.definition.intent,
         category: version.definition.category,
+        trigger: version.applicability.trigger,
         capability: presented.capability,
         systems: [
           ...new Set(connections.map((connection) => connection.system)),

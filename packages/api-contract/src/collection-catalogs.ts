@@ -1041,6 +1041,19 @@ export const activityCatalog: CollectionCatalog = {
   ],
 };
 
+// The workflow library filters and groups its few dozen workflows in the browser; it keeps only
+// personal display settings, such as collapsed lifecycle groups, as list state.
+export const workflowsCatalog: CollectionCatalog = {
+  domain: 'workflows',
+  permission: 'workflows.read',
+  segments: ['all'],
+  defaultSort: null,
+  defaultColumns: ['name'],
+  layouts: ['list'],
+  search: 'url',
+  fields: [shown('name', 'text', 'luma')],
+};
+
 /** Every list's catalog. A list's fields gain filters, sorts and groups as its API adds them. */
 export const collectionCatalogs: Record<CollectionDomain, CollectionCatalog> = {
   orders: ordersCatalog,
@@ -1056,4 +1069,5 @@ export const collectionCatalogs: Record<CollectionDomain, CollectionCatalog> = {
   decisions: decisionsCatalog,
   inbox: inboxCatalog,
   activity: activityCatalog,
+  workflows: workflowsCatalog,
 };

@@ -19,7 +19,7 @@ export interface Bucket {
  * weeks (starting Monday) begin at local midnight; the last bucket ends at the start of the
  * next local day, so the current day or week is partial.
  */
-export async function readWindow(
+async function readWindow(
   tx: SqlTransaction,
   range: InsightRange,
   timeZone: string,
@@ -69,3 +69,67 @@ export async function readWindow(
  */
 export const bucketRelation = (keys: number, froms: number, befores: number) =>
   `buckets AS (SELECT * FROM unnest($${keys}::text[],$${froms}::timestamptz[],$${befores}::timestamptz[]) AS b(key,from_at,before_at))`;
+
+/** The point key that selects a timeline's previous stretch in record queries. */
+const previousPoint = 'previous';
+
+const rangeDays = { '7d': 7, '30d': 30, '13w': 91 } as const;
+
+/**
+ * The stretch of the preceding period that matches the elapsed part of `window`: it starts one
+ * range length before the window, at local midnight, and ends one range length before `asOf`
+ * in local time, so daylight saving changes don't shift it. `start` and `end` are its first
+ * and last local days.
+ */
+export async function readPreviousWindow(
+  tx: SqlTransaction,
+  window: InsightWindow,
+  asOf: string,
+): Promise<Bucket> {
+  const result = await tx.query<{
+    start: string;
+    end: string;
+    from: Date;
+    before: Date;
+  }>(
+    `WITH p AS (SELECT $1::date-$3::int AS first,
+       ($4::timestamptz AT TIME ZONE $2)-make_interval(days=>$3::int) AS until)
+     SELECT to_char(first,'YYYY-MM-DD') AS start,to_char(until::date,'YYYY-MM-DD') AS "end",
+      (first::timestamp AT TIME ZONE $2) AS "from",(until AT TIME ZONE $2) AS before FROM p`,
+    [window.start, window.timeZone, rangeDays[window.range], asOf],
+  );
+  const row = result.rows[0]!;
+
+  return {
+    key: previousPoint,
+    start: row.start,
+    end: row.end,
+    from: iso(row.from)!,
+    before: iso(row.before)!,
+  };
+}
+
+/**
+ * The window and buckets a record query matches. For `previousPoint`, the previous stretch is
+ * the window and its only bucket, so its records total the chart's `previous` count.
+ */
+export async function readRecordWindow(
+  tx: SqlTransaction,
+  query: { range: InsightRange; timeZone: string; point?: string | undefined },
+  asOf: string,
+): Promise<{ window: InsightWindow; buckets: Bucket[] }> {
+  const read = await readWindow(tx, query.range, query.timeZone, asOf);
+  if (query.point !== previousPoint) return read;
+  const span = await readPreviousWindow(tx, read.window, asOf);
+
+  return {
+    window: {
+      ...read.window,
+      start: span.start,
+      end: span.end,
+      from: span.from,
+      before: span.before,
+    },
+    buckets: [span],
+  };
+}

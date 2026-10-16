@@ -12,10 +12,21 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
-.collection-view-trigger {
-  font-weight: 600;
+/* View tabs take the row up to Refresh; Modified, Save and view options follow at its end and
+   wrap below the tabs when the row is too narrow for both. */
+.collection-view-bar[data-views] {
+  flex: 1 1 0;
+}
+
+.collection-view-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
 }
 
 .collection-view-notice {

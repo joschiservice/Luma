@@ -199,7 +199,11 @@ test('filters, saves views, previews, returns, loads older and new events and re
   await page.goto(`/app/${tenantId}/activity`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page
-    .getByRole('button', { name: 'My connection activity', exact: true })
+    .getByRole('tab', {
+      name: 'My connection activity',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
   await page
     .getByRole('button', { name: 'Edit Recorded by filter: Me', exact: true })

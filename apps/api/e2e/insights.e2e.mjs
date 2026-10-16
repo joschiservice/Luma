@@ -96,6 +96,13 @@ it('counts linked orders once, reconciles with the Orders list and states covera
     data: { displayNumber: '#404', placedAt: ago(24 * 40) },
     lines: line('line-404'),
   });
+  await work.order({
+    external: 'order-405',
+    key: 'order-405',
+    updatedAt: ago(24 * 9),
+    data: { displayNumber: '#405', placedAt: ago(24 * 9) },
+    lines: line('line-405'),
+  });
 
   const query = { range: '7d', timeZone: 'Europe/Berlin' };
   const { data, found } = await reconcile(f, 'orders', query);
@@ -112,12 +119,35 @@ it('counts linked orders once, reconciles with the Orders list and states covera
     },
   });
   expect(data.points).toHaveLength(7);
+  // The previous stretch runs one range length earlier, up to the same point of its day, and
+  // counts #405 with the same rules. Daylight saving can move it by an hour against UTC.
+  const week = 7 * 24 * hour;
+  expect(data.previous).toMatchObject({ total: 1, coverage: 'complete' });
+  expect(
+    Math.abs(
+      Date.parse(data.window.from) - Date.parse(data.previous.from) - week,
+    ),
+  ).toBeLessThanOrEqual(hour);
+  expect(
+    Math.abs(Date.parse(data.asOf) - Date.parse(data.previous.before) - week),
+  ).toBeLessThanOrEqual(hour);
+  // Its records total the count, with the same rules as the chart.
+  const before = await records(
+    f,
+    'orders',
+    query,
+    'previous',
+    undefined,
+    data.asOf,
+  );
+  expect(before.totalCount).toBe(data.previous.total);
+  expect(before.items.map((item) => item.number)).toEqual(['#405']);
   expect(data.coverage.sources.map((s) => [s.label, s.state])).toEqual([
     ['JTL-Wawi', 'not_synced'],
     ['Tokyo store', 'not_synced'],
   ]);
   const numbers = found.map(({ item }) => item.number).sort();
-  // #400 counts once; #403 has no placed time; #404 is outside the window.
+  // #400 counts once; #403 has no placed time; #404 and #405 are outside the window.
   expect(numbers).toEqual([
     '#200',
     '#201',
@@ -212,6 +242,8 @@ it('counts linked orders once, reconciles with the Orders list and states covera
     'complete',
     'partial',
   ]);
+  // Before the imported history, the previous stretch is unknown rather than zero.
+  expect(synced.previous.coverage).toBe('not_imported');
   const weekly = await f.request(
     f.member,
     `${f.base}/insights/orders?range=13w&timeZone=UTC`,
@@ -252,6 +284,7 @@ it('breaks open fulfillment work down by waiting time and its first signal', asy
     kind: 'breakdown',
     unit: 'fulfillment',
     window: null,
+    previous: null,
     series: ['held', 'overdue', 'stalled', 'none'],
     total: list.counts.open,
   });
@@ -289,6 +322,8 @@ it('charts issues, stock risk and purchase-order stages from their owners', asyn
     total: 2,
     sourceFilter: 'not_applicable',
     coverage: { state: 'complete' },
+    // Luma detected nothing before these issues, so the previous week is unknown, not empty.
+    previous: { total: 0, coverage: 'not_imported' },
   });
   expect(cases.data.points.at(-1).values.workflow_failure).toBe(2);
   expect(cases.found.map(({ item }) => item.attention)).toEqual([

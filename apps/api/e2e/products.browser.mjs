@@ -169,7 +169,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await save.getByLabel('Name').fill('Vendor listings');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Vendor listings', exact: true })
+    .getByRole('tab', { name: 'Vendor listings', exact: true, selected: true })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),

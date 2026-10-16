@@ -7,56 +7,62 @@ Ein Workflow reagiert auf etwas, etwa auf eine Person, die ihn startet, einen Ze
 
 ## Workflow finden [#find-a-workflow]
 
-Jeder Workflow in der Liste zeigt zwei Kennzeichnungen:
+Die Liste gruppiert Workflows danach, was sie von dir brauchen, und jeder zeigt einen einzigen Status:
 
-- **Aktiviert**, **Pausiert** oder **Nicht eingerichtet**: ob jemand ihn eingeschaltet hat. **Pausiert** bedeutet, dass jede Aktivierung oder Bestandsregel widerrufen wurde.
-- **Bereit**, **Teilweise blockiert** oder **Blockiert**: ob er jetzt laufen kann. Auch ein aktivierter Workflow kann blockiert sein, etwa wenn eine Verbindung den Zugriff verloren hat oder keine Bestandsdaten mehr kommen.
+- **Braucht Aufmerksamkeit**: Der Workflow ist eingeschaltet, aber **Läuft nicht** oder läuft **Ein, mit Lücken**, eine Entscheidung wartet auf eine Person, oder seine letzte Ausführung endete ungelöst.
+- **Ein**: Der Workflow ist eingeschaltet und kann laufen.
+- **Ausgeschaltet**: Jemand hat den Workflow ausgeschaltet oder seine Bestandsregeln widerrufen, daher starten keine neuen Ausführungen. Frühere Ausführungen bleiben im Verlauf.
+- **Bereit zum Einschalten**: Der Workflow ist **Aus**, und nichts hindert dich daran, ihn einzuschalten.
+- **Einrichtung nötig**: Der Workflow ist **Aus** und braucht zuerst etwas, etwa eine Verbindung oder einen Lieferanten. Er ist nicht fehlerhaft; es läuft nichts, bis er eingerichtet ist.
 
-**Nächster Schritt** nennt das eine, was zu tun ist, mit einem Link zu der Stelle, an der du es behebst. **Umfasst** zeigt, was der Workflow überwacht, etwa eine Anzahl Bestandspositionen. Kann Luma das nicht feststellen, steht dort **Umfang unbekannt**, nie null.
+Jede Zeile nennt, was den Workflow startet, etwa **Bestand fällt unter das Minimum**. Zeilen, die etwas brauchen, nennen den nächsten Schritt mit einem Link zu der Stelle, an der du ihn erledigst. Zeilen eingeschalteter Workflows zeigen, was sie umfassen, etwa eine Anzahl Bestandspositionen, wann sie zuletzt liefen und wie viele der letzten Ausführungen bestätigt wurden. Kann Luma nicht feststellen, was ein Workflow umfasst, steht dort **Umfang unbekannt**, nie null. Eine Reihe von Markierungen zeigt, wie die letzten Ausführungen endeten, die älteste zuerst; zeige darauf, um die Anzahlen zu lesen.
 
-Mit den Ansichten findest du, was dich braucht:
-
-- **Braucht Aufmerksamkeit**: blockierte oder teilweise blockierte Workflows, Workflows mit wartenden Entscheidungen und Workflows, deren letzte Ausführung ungelöst endete.
-- **Aktiviert** und **Nicht aktiviert**: ob ein Workflow eingeschaltet ist.
-
-Suche nach Namen oder filtere nach **System**. **Entwürfe** listet Workflows, an denen noch geschrieben wird. Entwürfe laufen nie.
+Mit den Ansichten grenzt du die Liste ein: **Braucht Aufmerksamkeit**, **Ein** und **Aus**. Suche nach Name, Zweck, Bereich, Auslöser oder System, oder filtere nach **Startet bei** und **System**. Wähle die Überschrift einer Gruppe, um sie einzuklappen; Luma merkt sich das für dich auf jedem Gerät. **Entwürfe** listet Workflows, an denen noch geschrieben wird. Entwürfe laufen nie.
 
 ## Workflow öffnen [#open-a-workflow]
 
-Oben steht, ob der Workflow **Läuft**, **Läuft mit Lücken**, **Pausiert**, **Bereit zur Einrichtung** oder **Derzeit nicht ausführbar** ist. Wähle eine Version, um zu sehen, was sie tut. Veröffentlichte Versionen ändern sich nicht. Eine andere Version auszuwählen ändert nur, was die Seite zeigt.
+Oben zeigt ein Workflow seinen Status, was er tut, und seine wichtigsten Fakten: wann er startet, was Erfolg heißt, wie die Genehmigung gilt, was er umfasst, die letzten Ergebnisse und wann er zuletzt lief. Wenn etwas zu tun ist, nennt **Nächster Schritt** das eine, was zu tun ist, und verlinkt die Stelle, an der du es behebst; weitere Probleme stehen darunter. Die Schaltfläche, die den Workflow ein- oder ausschaltet oder eine Aktivierung prüft, steht oben auf der Seite.
 
-- **Übersicht** zeigt, wann der Workflow startet, was Erfolg heißt, und seine Bereitschaft: die nächste Aktion, was ihn blockiert, was er umfasst, wie die Genehmigung gilt, was auf eine Person wartet und die letzten Ergebnisse. **So funktioniert es** beschreibt die Schritte in einfachen Worten.
-- **Aktivität** zeigt **Letzte Ausführungen**. Jede Ausführung zeigt, was Luma gefunden hat, die Entscheidung, die vorgeschlagene Änderung, den **Status der Änderung** und den **Status der Prüfung**. Bei Workflows, die Probleme beheben, vergleicht **Testergebnisse** die Workflow-Tests mit dem, was dein Team getan hat. Siehe [Workflow gefahrlos testen](/docs/shadow-mode).
-- Unter **Regeln** schaltest du den Workflow ein oder aus und startest Ausführungen, wenn deine Rolle es erlaubt.
-- **Technische Details** listet Schritte und Aktionen, Voraussetzungen und Berechtigungen, Eingaben und den Versionsverlauf. Du brauchst sie nicht, um den Workflow zu nutzen.
+Die Seite hat vier Tabs. Ein eingeschalteter Workflow öffnet mit **Ausführungen**, ein ausgeschalteter mit **So funktioniert es**, der Nachschub mit **Bestandsregeln**.
+
+- **Ausführungen** listet die 50 letzten Ausführungen. Siehe [Ausführung verfolgen](#follow-a-run).
+- **So funktioniert es** führt durch den Workflow: was ihn startet, jeder Schritt in einfachen Worten und was als Erfolg zählt, dazu wer seine Änderungen genehmigt und was er umfasst.
+- **Einrichtung** zeigt, ob der Workflow eingeschaltet ist und mit wessen Berechtigungen, seine Aktivierungen und das Formular, das eine Ausführung startet, wenn deine Rolle es erlaubt. Beim Nachschub heißt dieser Tab **Bestandsregeln**.
+- **Details** listet Schritte und Aktionen, Voraussetzungen und Berechtigungen, Eingaben und den Versionsverlauf. Du brauchst sie nicht, um den Workflow zu nutzen.
+
+Hat ein Workflow mehrere veröffentlichte Versionen, wählst du oben auf der Seite eine aus, um zu sehen, was sie tut. Veröffentlichte Versionen ändern sich nicht. Eine andere Version auszuwählen ändert nur, was die Seite zeigt.
 
 ## Ausführung verfolgen [#follow-a-run]
 
+Jede Ausführung zeigt ihren Status, den Datensatz, an dem sie gearbeitet hat, was sie gestartet hat, ihre Version und wann sie begann. Wähle eine Ausführung, um ihre Schritte, die Nachweise jedes Schritts, eine vorgeschlagene Änderung und deren Prüfung zu sehen. Mit **Zu prüfen**, **In Bearbeitung** und **Bestätigt** filterst du die Ausführungen. Haben andere aktuelle Ausführungen am selben Datensatz gearbeitet, grenzt **Alle Ausführungen für diesen Datensatz zeigen** die Liste auf sie ein; **Alle Ausführungen zeigen** kehrt zur vollständigen Liste zurück. Ein Link zu einer Ausführung, etwa aus einem Problem oder aus Wartet auf dich, öffnet sie direkt.
+
 Der Status einer Ausführung zeigt, wo sie steht:
 
-- **Läuft**, **Wartet** oder **Wartet auf Genehmigung**: Die Ausführung ist im Gang. Änderungen, die eine Genehmigung brauchen, warten unter [Wartet auf dich](/docs/needs-you).
+- **Geplant**, **Wartet auf Start**, **Läuft** oder **Wartet**: Die Ausführung ist im Gang.
+- **Wartet auf Genehmigung**: Eine Änderung wartet unter [Wartet auf dich](/docs/needs-you) auf eine Person. Diese Ausführungen erscheinen unter **Zu prüfen**.
 - **Bestätigt**: Luma hat das Ergebnis unabhängig geprüft, und es stimmt.
-- **Ohne Änderung beendet**: Die Bedingungen waren nicht erfüllt, daher wurde nichts geändert.
+- **Noch nicht bestätigt**: Luma hat für diese Ausführung noch kein Ergebnis bestätigt.
+- **Ohne Änderung beendet**, **Abgebrochen** oder **Übersprungen**: Es wurde nichts geändert. Ein Start wird übersprungen, wenn seine Zeit verstrich, während der Workspace gesperrt war.
 - **Abgelehnt**: Eine Person hat die Änderung abgelehnt.
 - **Prüfung fehlgeschlagen** oder **Nicht bestätigt**: Die Änderung hat nicht das erwartete Ergebnis gebracht, oder Luma konnte es nicht bestätigen. Prüfe den Datensatz, bevor du es erneut versuchst.
 - **An eine Person übergeben**: Jemand muss die Ausführung übernehmen.
 
-Eine angenommene Änderung ist für sich noch kein Erfolg. Erst eine bestandene Prüfung bestätigt sie. Ausführungen mit **Pilotdaten**, **Simulierte Daten** oder **Schattenmodus** zählen nie als bestätigte Korrekturen.
+Eine angenommene Änderung ist für sich noch kein Erfolg. Erst eine bestandene Prüfung bestätigt sie. Ausführungen mit **Pilotdaten**, **Simulierte Daten** oder **Schattenmodus** zählen nie als bestätigte Korrekturen. Bei Workflows, die Probleme beheben, vergleicht **Testergebnisse** unter den Ausführungen die Workflow-Tests mit dem, was dein Team getan hat. Siehe [Workflow gefahrlos testen](/docs/shadow-mode).
 
 ## Workflow ein- oder ausschalten [#turn-a-workflow-on-or-off]
 
-Wie du einen Workflow einschaltest, hängt davon ab, was er tut. Sieh unter **Regeln** nach:
+Wie du einen Workflow einschaltest, hängt davon ab, was er tut:
 
-- Workflows, die bei Problemen starten: Wähle **Einschalten**, prüfe, was eine Ausführung startet und wer ihre Änderungen genehmigt, und bestätige. Ausführungen nutzen die Berechtigungen der Person, die den Workflow eingeschaltet hat, und der Workflow zeigt ihren Namen. **Ausschalten** verhindert neue Ausführungen. Eine wartende Ausführung sendet keine neuen Änderungen, und bereits vorgenommene Änderungen werden nicht rückgängig gemacht. Du brauchst **Workflows veröffentlichen und aktivieren**.
+- Workflows, die bei Problemen starten: Wähle oben auf der Seite **Einschalten**, prüfe, was eine Ausführung startet und wer ihre Änderungen genehmigt, und bestätige. Ausführungen nutzen die Berechtigungen der Person, die den Workflow eingeschaltet hat, und der Workflow zeigt ihren Namen. **Ausschalten** verhindert neue Ausführungen. Eine wartende Ausführung sendet keine neuen Änderungen, und bereits vorgenommene Änderungen werden nicht rückgängig gemacht. Du brauchst **Workflows veröffentlichen und aktivieren**.
 - **Bestandsregeln** für den Nachschub: siehe [Nachschub einrichten](#set-up-replenishment). Du brauchst **Beschaffung verwalten**.
-- Workflows, die bestimmte Bestellungen ändern: Wähle **Aktivierung prüfen**, wähle die Verbindung und bis zu 100 Bestellungen, bestätige, dass du alles geprüft hast, und wähle **Geprüfte Version aktivieren**. Andere und künftige Bestellungen sind nicht enthalten. **Aktivierung widerrufen** verhindert neue Ausführungen. Bereits gesendete Änderungen können noch abgeschlossen werden. Du brauchst **Problem-Workflows testen und einschalten**.
-- Workflows, die du selbst startest: Wähle unter **Auslöser** je nach Startart **Workflow starten**, **Start planen**, **Ereignis erfassen**, **Bedingung prüfen** oder **Erkanntes Problem erfassen**. Ein Auslöser startet nur eine Ausführung und genehmigt nie eine Änderung. Einen geplanten Start kannst du unter **Letzte Ausführungen** abbrechen, bevor er beginnt. Du brauchst **Workflow-Auslöser verwalten**.
+- Workflows, die bestimmte Bestellungen ändern: Wähle oben auf der Seite **Aktivierung prüfen**, wähle die Verbindung und bis zu 100 Bestellungen, bestätige, dass du alles geprüft hast, und wähle **Geprüfte Version aktivieren**. Andere und künftige Bestellungen sind nicht enthalten. **Aktivierung widerrufen** verhindert neue Ausführungen. Bereits gesendete Änderungen können noch abgeschlossen werden. Du brauchst **Problem-Workflows testen und einschalten**.
+- Workflows, die du selbst startest: Wähle **Ausführung starten** oder öffne **Einrichtung** und wähle dann unter **Auslöser** je nach Startart **Workflow starten**, **Start planen**, **Ereignis erfassen**, **Bedingung prüfen** oder **Erkanntes Problem erfassen**. Ein Auslöser startet nur eine Ausführung und genehmigt nie eine Änderung. Einen geplanten Start kannst du unter **Ausführungen** abbrechen, bevor er beginnt. Du brauchst **Workflow-Auslöser verwalten**.
 
 Kannst du etwas nicht ändern, nennt die Seite, was deine Rolle nicht erlaubt.
 
 ## Nachschub einrichten [#set-up-replenishment]
 
-Öffne **Replenish low stock** und wähle unter **Regeln** **Bestandsregeln hinzufügen**, oder starte unter **Beschaffung** oder bei einer Bestandsposition. Du kannst 25 Bestandspositionen auf einmal einrichten:
+Öffne **Replenish low stock** und wähle unter **Bestandsregeln** **Bestandsregeln hinzufügen**, oder starte unter **Beschaffung** oder bei einer Bestandsposition. Du kannst 25 Bestandspositionen auf einmal einrichten:
 
 1. Wähle den Lieferanten und die Bestandspositionen. Suche nach SKU oder blättere mit den Seitensteuerelementen; deine Auswahl bleibt über Seiten und Suchen hinweg erhalten. Positionen mit einer aktiven Regel lassen sich nicht auswählen.
 2. Lege **Mindestbestand**, **Zielbestand** und **Schwelle für hohes Risiko** fest und wähle **Regeln in der Vorschau ansehen**.

@@ -165,8 +165,7 @@ export function createReplyEffects(
             replies().eligible(current, { subject, action }),
           verify: async (current) => ({
             ...(await replies().verify(current, intent.target.id)),
-            observedAt: new Date().toISOString(),
-            evaluatorVersion: 'message-reply/1',
+            evaluatorVersion: 'message-reply/2',
           }),
         })
         .resolve(context, intent);

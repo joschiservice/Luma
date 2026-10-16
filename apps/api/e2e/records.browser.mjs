@@ -109,10 +109,7 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   ).toBe(1);
 
   await page.goto(`/app/${fixture.org.id}/insights`);
-  await page
-    .getByRole('button', { name: 'Show matching orders' })
-    .first()
-    .click();
+  await page.locator('[data-metric="orders.open"]').click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('link', { name: 'Open order' }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();

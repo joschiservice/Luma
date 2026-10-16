@@ -461,7 +461,9 @@ export function selectionTitle(
   const point = data.points.find((p) => p.key === selection.point);
   const category = point
     ? chartCategories({ ...data, points: [point] }, timeZone)[0]!.label
-    : null;
+    : selection.point === previousPoint
+      ? previousLabel(data, timeZone)
+      : null;
   const series = definition.series().find((s) => s.id === selection.series);
   const noun = definition.records();
   const what =
@@ -470,11 +472,33 @@ export function selectionTitle(
   return category ? `${what} · ${category}` : what;
 }
 
+/** The point key that selects a timeline's previous stretch, as the API names it. */
+export const previousPoint = 'previous';
+
+/**
+ * Names a timeline's previous stretch with its bounds, such as "Previous period, 18 Aug – 16
+ * Sept 09:30". It ends at a time of day, which the end states. Null when there is none.
+ */
+export function previousLabel(data: InsightChartResponse, timeZone: string) {
+  if (!data.previous) return null;
+
+  return m.insights_previous_point({
+    from: formatDateTime(data.previous.from, {
+      day: 'numeric',
+      month: 'short',
+      timeZone,
+    }),
+    before: moment(data.previous.before, timeZone),
+  });
+}
+
 /** The value a selection showed on the chart. */
 export function selectionValue(
   data: InsightChartResponse,
   selection: { point?: string | undefined; series?: string | undefined },
 ) {
+  // The previous stretch has only a total.
+  if (selection.point === previousPoint) return data.previous?.total ?? 0;
   const points = selection.point
     ? data.points.filter((p) => p.key === selection.point)
     : data.points;
@@ -485,4 +509,90 @@ export function selectionValue(
       (selection.series ? (point.values[selection.series] ?? 0) : point.total),
     0,
   );
+}
+
+/** What a timeline's headline states besides its total. */
+export type TimelineStats = {
+  /** The mean per complete day or week, or null when no period is complete yet. */
+  average: number | null;
+  /** How many periods the average covers. */
+  averagedPeriods: number;
+  /** The period with the most records among those with known counts, or null when all are zero. */
+  peak: { key: string; label: string; total: number } | null;
+};
+
+/**
+ * Summarizes a timeline from the counts it can vouch for. The average uses only complete
+ * periods and leaves out the current, unfinished one, so a quiet morning or a partly imported
+ * week doesn't pull it down. The peak considers every period with a known count. Breakdowns
+ * have no periods and return null.
+ */
+export function timelineStats(
+  data: InsightChartResponse,
+): TimelineStats | null {
+  if (!data.window) return null;
+  const last = data.points.length - 1;
+  const complete = data.points.filter(
+    (point, index) => point.coverage === 'complete' && index !== last,
+  );
+  const known = data.points.filter(
+    (point) => point.coverage !== 'not_imported',
+  );
+  const top = known.reduce<InsightPoint | null>(
+    (best, point) => (point.total > (best?.total ?? 0) ? point : best),
+    null,
+  );
+
+  return {
+    average: complete.length
+      ? complete.reduce((sum, point) => sum + point.total, 0) / complete.length
+      : null,
+    averagedPeriods: complete.length,
+    peak: top
+      ? {
+          key: top.key,
+          label: bucketLabel(top, data.window.bucket),
+          total: top.total,
+        }
+      : null,
+  };
+}
+
+export type PeriodComparison =
+  | {
+      comparable: true;
+      previous: number;
+      difference: number;
+      /** The relative change, or null when the previous period counted nothing. */
+      ratio: number | null;
+    }
+  | { comparable: false };
+
+/**
+ * Compares a timeline with the same stretch of the previous period. Counts compare only when
+ * both stretches are fully known: every source current, every period but the running one
+ * complete, and the previous stretch within imported history. Otherwise the difference would
+ * reflect missing records rather than change. Breakdowns return null.
+ */
+export function periodComparison(
+  data: InsightChartResponse,
+): PeriodComparison | null {
+  if (!data.window || !data.previous) return null;
+  const last = data.points.length - 1;
+  if (
+    data.previous.coverage !== 'complete' ||
+    data.coverage.state !== 'complete' ||
+    data.points.some(
+      (point, index) => point.coverage !== 'complete' && index !== last,
+    )
+  )
+    return { comparable: false };
+  const previous = data.previous.total;
+
+  return {
+    comparable: true,
+    previous,
+    difference: data.total - previous,
+    ratio: previous ? (data.total - previous) / previous : null,
+  };
 }

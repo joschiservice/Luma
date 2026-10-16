@@ -8,13 +8,13 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
-import type { InsightsSearch } from '../insights/data';
 import insightStyles from '../insights/insights.css?inline';
 import type { LiveMetricView } from './metrics-live';
 import {
+  type ReportSearch,
   resolutionReportingRequest,
   ResolutionReportView,
 } from './resolution-report';
@@ -90,7 +90,7 @@ function response(partial: boolean, empty: boolean): OperationalMetricResponse {
 type State = 'normal' | 'partial' | 'empty' | 'offline' | 'loading';
 
 function Content({ state }: { state: State }) {
-  const [search, setSearch] = useState<InsightsSearch>({ reportWindow: '7d' });
+  const [search, setSearch] = useState<ReportSearch>({ reportWindow: '7d' });
   const data =
     state === 'loading'
       ? undefined
@@ -161,18 +161,28 @@ type Story = StoryObj<typeof meta>;
 export const Normal: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByText('50%', { exact: true })).toBeVisible();
     await expect(
-      canvas.getByText(
-        '50% resolved without human work (2 of 4 eligible incidents).',
-      ),
+      canvas.getByText('2 of 4 eligible issues resolved without human work.'),
     ).toBeVisible();
-    await expect(canvas.getAllByRole('table')).toHaveLength(3);
+    // Recurrence is a table; daily counts and durations are charts until a table is asked for.
+    await expect(canvas.getAllByRole('table')).toHaveLength(1);
     const verified = within(
       canvas.getByRole('group', { name: 'Daily counts (UTC) · Verified' }),
     );
     await expect(verified.queryByText('0.5', { exact: true })).toBeNull();
     await expect(verified.getByText('1', { exact: true })).toBeVisible();
+    await userEvent.click(canvas.getByRole('tab', { name: 'Table' }));
+    await expect(
+      canvas.getByRole('table', { name: 'Daily counts (UTC)' }),
+    ).toBeVisible();
   },
+};
+
+export const NormalDark: Story = { globals: { theme: 'dark' } };
+
+export const NormalNarrow: Story = {
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const Partial: Story = {

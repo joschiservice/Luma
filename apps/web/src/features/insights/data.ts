@@ -8,7 +8,7 @@ import { privateQueryDefaults } from '../../lib/private-query';
 
 const api = createWebApiClient();
 
-export const insightCharts = [
+const insightCharts = [
   'orders',
   'fulfillment',
   'stock',
@@ -23,11 +23,46 @@ export const insightRanges = [
 ] as const satisfies readonly InsightRange[];
 
 /**
- * URL state for Insights: the time range and source that scope every chart, and the chart
- * point whose records are open. Keeping the drilldown in the URL lets a reader open a record
- * and come back to the same records. `metric` restores the order metric dialog.
+ * The questions Insights answers, one per view: what is waiting now, how work develops over a
+ * range of days, and what Luma's handling achieved.
+ */
+const insightViews = ['now', 'trends', 'outcomes'] as const;
+
+export type InsightView = (typeof insightViews)[number];
+
+/** Charts that describe the state at the evaluation time; the others are timelines. */
+export const currentStateCharts = [
+  'fulfillment',
+  'stock',
+  'procurement',
+] as const satisfies readonly InsightChart[];
+
+/** Charts that count records over the selected range. */
+export const trendCharts = [
+  'orders',
+  'cases',
+] as const satisfies readonly InsightChart[];
+
+const outcomeEnvironments = [
+  'live',
+  'pilot',
+  'synthetic',
+  'shadow',
+  'observe_only',
+  'unknown',
+] as const;
+
+/**
+ * URL state for Insights: the view, the time range and source that scope the charts, and the
+ * chart point whose records are open. Keeping the drilldown in the URL lets a reader open a
+ * record and come back to the same records. `metric` restores the order metric dialog.
+ * `outcomeEnv` and `outcomeWindow` choose the verified-outcome cohort; `report*` scope the
+ * resolution report where it is released.
  */
 export const insightsSearch = z.object({
+  view: z.enum(insightViews).optional().catch(undefined),
+  outcomeEnv: z.enum(outcomeEnvironments).optional().catch(undefined),
+  outcomeWindow: z.enum(['24h', '7d']).optional().catch(undefined),
   reportArtifact: z.string().max(200).optional().catch(undefined),
   reportVersion: z.string().max(200).optional().catch(undefined),
   reportWindow: z.enum(['7d', '30d', 'custom']).optional().catch(undefined),
@@ -39,10 +74,7 @@ export const insightsSearch = z.object({
   reportEnd: z.string().datetime({ offset: true }).optional().catch(undefined),
   reportClass: z.string().min(1).max(100).optional().catch(undefined),
   reportSource: z.uuid().optional().catch(undefined),
-  reportEnv: z
-    .enum(['live', 'pilot', 'synthetic', 'shadow', 'observe_only', 'unknown'])
-    .optional()
-    .catch(undefined),
+  reportEnv: z.enum(outcomeEnvironments).optional().catch(undefined),
   range: z.enum(insightRanges).optional().catch(undefined),
   source: z.uuid().optional().catch(undefined),
   chart: z.enum(insightCharts).optional().catch(undefined),
@@ -52,6 +84,42 @@ export const insightsSearch = z.object({
 });
 
 export type InsightsSearch = z.infer<typeof insightsSearch>;
+
+const isTrendChart = (chart: InsightChart) =>
+  trendCharts.some((candidate) => candidate === chart);
+
+/**
+ * The view an address shows. Without `view`, an open chart, a time range or report filters
+ * select the view that holds them, so links made before views existed still open their records.
+ */
+export function insightsView(search: InsightsSearch): InsightView {
+  if (search.view) return search.view;
+  if (search.chart) return isTrendChart(search.chart) ? 'trends' : 'now';
+  if (search.metric?.startsWith('orders.')) return 'now';
+  if (search.range) return 'trends';
+  const outcomes = Object.entries(search).some(
+    ([key, value]) =>
+      value !== undefined &&
+      (key.startsWith('report') || key.startsWith('outcome')),
+  );
+
+  return outcomes ? 'outcomes' : 'now';
+}
+
+/**
+ * Applies a change to the address while keeping the view on screen, unless the change picks
+ * another one. `view` is written only when the rest of the address wouldn't select it, so
+ * closing an inferred view's records doesn't switch views, and addresses stay short.
+ */
+export function nextInsightsSearch(
+  search: InsightsSearch,
+  patch: Partial<InsightsSearch>,
+): InsightsSearch {
+  const view = patch.view ?? insightsView(search);
+  const next = { ...search, ...patch, view: undefined };
+
+  return insightsView(next) === view ? next : { ...next, view };
+}
 
 export type InsightScope = {
   range: InsightRange;

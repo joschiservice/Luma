@@ -449,5 +449,6 @@
   "messaging_area_work": "Work",
   "messaging_groups_label": "Threads by {field}",
   "messaging_group_empty": "No threads in this group",
-  "messaging_conditions_note": "Filters use thread properties only, never message text."
+  "messaging_conditions_note": "Filters use thread properties only, never message text.",
+  "messaging_event_handed_off_truncated": "Not recorded on the purchase order: the message text is incomplete"
 }

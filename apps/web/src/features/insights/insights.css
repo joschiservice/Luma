@@ -1,45 +1,175 @@
-.insights-trends {
-  margin: 8px 0 28px;
+/* Page: the toolbar, then the sections of the chosen view. */
+.insights {
+  display: grid;
+  gap: 28px;
+  max-width: 1440px;
+  min-width: 0;
+  margin: 0 auto;
   color: var(--foreground);
 }
 
-.insights-trends-header {
+.insights-toolbar {
+  position: sticky;
+  z-index: 5;
+  top: 0;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px 20px;
-  margin-bottom: 16px;
+  align-items: center;
+  gap: 8px 12px;
+  margin: -4px 0 -12px;
+  padding: 4px 0 8px;
+  background: var(--surface);
 }
 
-.insights-trends-header h2 {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-.insights-trends-header > div > p:last-child {
-  max-width: 62ch;
-  margin-top: 5px;
-  color: var(--muted-foreground);
-  font-size: 13px;
-}
-
-.insights-filters {
+.insights-toolbar-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.insights-toolbar-status {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  margin-left: auto;
 }
 
 .insights-filter {
   width: 176px;
 }
 
+.insights-live,
+.insights-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.insights-live[data-state='attention'],
+.insights-live[data-state='error'],
+.insights-health[data-state='attention'] {
+  color: var(--state-warning-text);
+}
+
+.insights-health {
+  padding: 3px 8px;
+  border-radius: var(--radius-row);
+}
+
+.insights-health:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.insights-health:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.insights-live + [data-slot='button'] {
+  margin-left: -4px;
+}
+
+/* The first line of Now: the counts that need someone, each opening its records. */
+.insights-attention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.insights-attention-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--foreground-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.insights-attention[data-state='attention'] .insights-attention-title {
+  color: var(--state-warning-text);
+}
+
+.insights-attention ul {
+  display: contents;
+  list-style: none;
+}
+
+.insights-attention-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.insights-attention-item strong {
+  color: var(--state-warning-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.insights-attention-item:hover {
+  background: var(--surface-hover);
+}
+
+.insights-attention-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.insights-attention-note {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights-attention-item {
+    transition: none;
+  }
+}
+
+.insights-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.insights-section-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.insights-section-header p {
+  max-width: 72ch;
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+/* Timelines read across the full width; current-state breakdowns sit side by side. */
 .insights-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+}
+
+.insights-grid[data-layout='columns'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .insights-card {
@@ -47,10 +177,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 14px;
-}
-
-.insights-card-wide {
-  grid-column: 1 / -1;
+  container-type: inline-size;
 }
 
 .insights-card-header {
@@ -97,7 +224,51 @@
   gap: 12px;
 }
 
+.insights-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 24px;
+}
+
 .insights-total {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.insights-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  font-size: 12px;
+}
+
+.insights-stats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.insights-stats dt {
+  color: var(--foreground-subtle);
+}
+
+.insights-stats dd {
+  color: var(--foreground);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.insights-stats dd[data-comparable='false'] {
+  color: var(--foreground-subtle);
+  font-weight: 400;
+}
+
+.insights-card-empty {
+  display: grid;
+  min-height: 96px;
+  place-items: center start;
   color: var(--muted-foreground);
   font-size: 13px;
 }
@@ -121,7 +292,7 @@
 
 .insights-card-state {
   display: grid;
-  min-height: 180px;
+  min-height: 120px;
   align-content: center;
   justify-items: start;
   gap: 8px;
@@ -141,30 +312,42 @@
 
 .insights-coverage {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
   color: var(--muted-foreground);
   font-size: 12px;
 }
 
-.insights-coverage dl {
-  display: grid;
-  gap: 6px;
+.insights-coverage-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: var(--foreground-muted);
 }
 
-.insights-coverage dl > div {
+.insights-coverage-line > span + span {
+  color: var(--foreground-subtle);
+}
+
+.insights-limit dl {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.insights-limit dl > div {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 10px;
 }
 
-.insights-coverage dt {
+.insights-limit dt {
   color: var(--foreground-subtle);
 }
 
-.insights-coverage dd {
+.insights-limit dd {
   color: var(--foreground-muted);
 }
 
@@ -196,7 +379,7 @@
 }
 
 .insights-limit p {
-  margin-top: 4px;
+  margin-top: 6px;
   max-width: 70ch;
 }
 
@@ -343,27 +526,56 @@
   color: var(--state-warning-text);
 }
 
-@media (max-width: 1100px) {
-  .insights-grid {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 1280px) {
+  .insights-grid[data-layout='columns'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* With two columns, an odd last chart takes the full row instead of leaving a gap. */
+  .insights-grid[data-layout='columns'] > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  .insights-grid[data-layout='columns'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .insights-toolbar {
+    position: static;
+  }
+
+  .insights-toolbar-status {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* A narrow card puts its coverage and view switch on their own row instead of squeezing the title. */
+@container (max-width: 560px) {
   .insights-card-header {
     grid-template-areas:
       'icon title'
-      'description description'
-      'actions actions';
+      '. description'
+      '. actions';
     grid-template-columns: auto minmax(0, 1fr);
   }
 
   .insights-card-actions {
-    justify-content: flex-start;
+    justify-content: space-between;
+    margin-top: 6px;
   }
+}
 
-  .insights-coverage dl > div {
+@media (max-width: 640px) {
+  .insights-limit dl > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+  }
+
+  .insights-filter {
+    flex: 1 1 160px;
+    width: auto;
   }
 }
