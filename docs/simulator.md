@@ -4,7 +4,7 @@ The simulator plays a merchant's commerce systems: several Shopify stores, one E
 
 ## Start it
 
-`mise exec -- pnpm simulator` starts PostgreSQL, Temporal and the [local diagnostics stack](observability.md#pilot-and-simulator), provisions the `luma_simulator` database and the run `pilot-44`, provisions a Luma workspace with one connection per simulated system, and starts the simulator, Luma API, worker and web app. The control panel is at <http://127.0.0.1:5890>; Luma credentials are in `.luma/simulator-login.json`.
+`mise exec -- pnpm simulator` starts PostgreSQL, Valkey, Temporal and the [local diagnostics stack](observability.md#pilot-and-simulator) if needed and waits for them to be healthy, provisions the `luma_simulator` database and the run `pilot-44`, provisions a Luma workspace with one connection per simulated system, and starts the simulator, Luma API, worker and web app. The control panel is at <http://127.0.0.1:5890>; Luma credentials are in `.luma/simulator-login.json`.
 
 | Flag                  | Default     | Effect                                                                              |
 | --------------------- | ----------- | ----------------------------------------------------------------------------------- |

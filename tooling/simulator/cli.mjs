@@ -85,6 +85,7 @@ try {
     '--wait-timeout',
     '120',
     'postgres',
+    'valkey',
     'temporal',
     'grafana',
   ]);
