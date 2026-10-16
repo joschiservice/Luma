@@ -122,5 +122,6 @@
   "exceptions_board_note": "Issues change state only through checks and decisions, so cards can’t be moved between columns.",
   "exceptions_owner_none": "No owner",
   "exceptions_source_none": "No source reported",
-  "exceptions_waiting_none": "Not waiting"
+  "exceptions_waiting_none": "Not waiting",
+  "exceptions_open_sync": "Open sync"
 }

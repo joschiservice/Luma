@@ -3,8 +3,11 @@ import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type {
   ItemKey,
   LinkRequest,
+  RecordState,
+  StreamCommand,
   StreamCoverage,
   SyncConnection,
+  SyncRecordProblem,
   SyncRun,
   SyncStore,
 } from '../application/ports.js';
@@ -68,6 +71,52 @@ type StreamRow = {
 };
 
 const iso = (value: Date | null) => value?.toISOString() ?? null;
+
+type RunRow = {
+  id: string;
+  stream_id: string;
+  connection_id: string;
+  record_type: RecordType;
+  kind: SyncRun['kind'];
+  trigger: SyncRun['trigger'];
+  since: Date | null;
+  created_since: Date | null;
+  full_scan: boolean;
+  started_at: Date;
+  finished_at: Date | null;
+  outcome: SyncRun['outcome'];
+  pages: number;
+  records: number;
+  changed: number;
+  unchanged: number;
+  pending: number;
+  failed: number;
+  missing: number | null;
+  errors: number;
+};
+
+const run = (row: RunRow): SyncRun => ({
+  id: row.id,
+  streamId: row.stream_id,
+  connectionId: row.connection_id,
+  recordType: row.record_type,
+  kind: row.kind,
+  trigger: row.trigger,
+  since: iso(row.since),
+  createdSince: iso(row.created_since),
+  fullScan: row.full_scan,
+  startedAt: row.started_at.toISOString(),
+  finishedAt: iso(row.finished_at),
+  outcome: row.outcome,
+  pages: row.pages,
+  records: row.records,
+  changed: row.changed,
+  unchanged: row.unchanged,
+  pending: row.pending,
+  failed: row.failed,
+  missing: row.missing,
+  errors: row.errors,
+});
 
 function stream(row: StreamRow): SyncStream {
   return {
@@ -167,6 +216,13 @@ function link(row: LinkRow): LinkRequest {
   };
 }
 
+/** Ledger filters for the record states people can list; missing excludes confirmed deletions. */
+const recordStates: Record<RecordState, string> = {
+  pending: "status='pending'",
+  failed: "status='failed'",
+  missing: "missing_since IS NOT NULL AND status<>'retired'",
+};
+
 const recordTypeCase = `CASE cap ${Object.entries(recordCapabilities)
   .map(([type, capability]) => `WHEN '${capability}' THEN '${type}'`)
   .join(' ')} END`;
@@ -183,6 +239,50 @@ async function lockStream(
       [tenantId, streamId, token],
     )
   ).rows[0];
+}
+
+/** Applies an operator command to a stream the transaction has locked. */
+async function applyCommand(
+  tx: SqlTransaction,
+  current: StreamRow,
+  command: StreamCommand,
+  principalId: string,
+) {
+  const values = [current.tenant_id, current.id, principalId];
+  if (command.kind === 'pause')
+    await tx.query(
+      'UPDATE commerce_sync_streams SET paused=true,version=version+1,updated_at=now() WHERE tenant_id=$1 AND id=$2',
+      values.slice(0, 2),
+    );
+  else if (command.kind === 'reimport') {
+    if (current.scan_id || current.suspended_scan)
+      await tx.query(
+        `UPDATE commerce_sync_runs SET outcome='cancelled',finished_at=now()
+        WHERE tenant_id=$1 AND id=ANY($2::uuid[]) AND outcome='running'`,
+        [
+          current.tenant_id,
+          [current.scan_id, current.suspended_scan?.id].filter(Boolean),
+        ],
+      );
+    await tx.query(
+      `UPDATE commerce_sync_streams SET phase='backfill',scan=NULL,scan_id=NULL,cursor=NULL,scan_started_at=NULL,
+        scan_since=NULL,scan_created_since=NULL,recent_history_from=NULL,recent_history_completed_at=NULL,suspended_scan=NULL,live_due_at=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
+        principal_id=$3,blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
+        lease_token=NULL,lease_until=NULL,due_at=now(),attempts=0,error_code=NULL,error_message=NULL,
+        error_at=NULL,failing_since=NULL,admission_wait_reason=NULL,admission_wait_at=NULL,version=version+1,updated_at=now()
+      WHERE tenant_id=$1 AND id=$2`,
+      values,
+    );
+  } else
+    await tx.query(
+      `UPDATE commerce_sync_streams SET paused=false,principal_id=$3,
+        blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
+        full_requested=full_requested OR $4,due_at=LEAST(COALESCE(due_at,now()),now()),
+        admission_wait_reason=NULL,admission_wait_at=NULL,
+        version=version+1,updated_at=now()
+      WHERE tenant_id=$1 AND id=$2`,
+      [...values, command.kind === 'reconcile'],
+    );
 }
 
 /** PostgreSQL persistence for sync streams, runs, the import ledger and link requests. */
@@ -838,57 +938,98 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             problems: row.problems ?? [],
           }));
           const runs = (
-            await tx.query<{
-              id: string;
-              stream_id: string;
-              connection_id: string;
-              record_type: RecordType;
-              kind: SyncRun['kind'];
-              trigger: SyncRun['trigger'];
-              since: Date | null;
-              created_since: Date | null;
-              full_scan: boolean;
-              started_at: Date;
-              finished_at: Date | null;
-              outcome: SyncRun['outcome'];
-              pages: number;
-              records: number;
-              changed: number;
-              unchanged: number;
-              pending: number;
-              failed: number;
-              missing: number | null;
-              errors: number;
-            }>(
+            await tx.query<RunRow>(
               `SELECT r.*,s.connection_id,s.record_type FROM commerce_sync_runs r
               JOIN commerce_sync_streams s ON s.tenant_id=r.tenant_id AND s.id=r.stream_id
               WHERE r.tenant_id=$1 ORDER BY r.started_at DESC,r.id LIMIT 30`,
               [tenantId],
             )
-          ).rows.map((row): SyncRun => ({
-            id: row.id,
-            streamId: row.stream_id,
-            connectionId: row.connection_id,
-            recordType: row.record_type,
-            kind: row.kind,
-            trigger: row.trigger,
-            since: iso(row.since),
-            createdSince: iso(row.created_since),
-            fullScan: row.full_scan,
-            startedAt: row.started_at.toISOString(),
-            finishedAt: iso(row.finished_at),
-            outcome: row.outcome,
-            pages: row.pages,
-            records: row.records,
-            changed: row.changed,
-            unchanged: row.unchanged,
-            pending: row.pending,
-            failed: row.failed,
-            missing: row.missing,
-            errors: row.errors,
-          }));
+          ).rows.map(run);
 
           return { streams, coverage, runs };
+        },
+        { readOnlySnapshot: true },
+      );
+    },
+    async runs(tenantId, streamId, limit, before) {
+      return db.transaction(
+        tenantId,
+        async (tx) => {
+          const owner = await tx.query<{ connection_id: string }>(
+            'SELECT connection_id FROM commerce_sync_streams WHERE tenant_id=$1 AND id=$2',
+            [tenantId, streamId],
+          );
+          const connectionId = owner.rows[0]?.connection_id;
+          if (!connectionId) return null;
+          // An unknown `before` run compares as NULL, so the page is empty rather than the start.
+          const runs = await tx.query<RunRow>(
+            `SELECT r.*,s.connection_id,s.record_type FROM commerce_sync_runs r
+            JOIN commerce_sync_streams s ON s.tenant_id=r.tenant_id AND s.id=r.stream_id
+            WHERE r.tenant_id=$1 AND r.stream_id=$2
+              AND ($4::uuid IS NULL OR (r.started_at,r.id) < (SELECT b.started_at,b.id FROM commerce_sync_runs b
+                WHERE b.tenant_id=$1 AND b.stream_id=$2 AND b.id=$4))
+            ORDER BY r.started_at DESC,r.id DESC LIMIT $3`,
+            [tenantId, streamId, limit, before ?? null],
+          );
+
+          return { connectionId, runs: runs.rows.map(run) };
+        },
+        { readOnlySnapshot: true },
+      );
+    },
+    async records(tenantId, streamId, state, limit, after) {
+      return db.transaction(
+        tenantId,
+        async (tx) => {
+          const owner = await tx.query<{
+            connection_id: string;
+            record_type: RecordType;
+          }>(
+            'SELECT connection_id,record_type FROM commerce_sync_streams WHERE tenant_id=$1 AND id=$2',
+            [tenantId, streamId],
+          );
+          const stream = owner.rows[0];
+          if (!stream) return null;
+          const rows = await tx.query<{
+            resource: ItemKey['resource'];
+            scope_key: string;
+            external_id: string;
+            problem: string | null;
+            entity_id: string | null;
+            source_created_at: Date | null;
+            last_seen_at: Date;
+            missing_since: Date | null;
+          }>(
+            `SELECT resource,scope_key,external_id,problem,entity_id,source_created_at,last_seen_at,missing_since
+            FROM commerce_sync_items
+            WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND ${recordStates[state]}
+              AND ($5::text IS NULL OR (resource,scope_key,external_id) > ($5,$6,$7))
+            ORDER BY resource,scope_key,external_id LIMIT $4`,
+            [
+              tenantId,
+              stream.connection_id,
+              stream.record_type,
+              limit,
+              after?.resource ?? null,
+              after?.scopeKey ?? null,
+              after?.externalId ?? null,
+            ],
+          );
+
+          return {
+            connectionId: stream.connection_id,
+            records: rows.rows.map((row): SyncRecordProblem => ({
+              resource: row.resource,
+              scopeKey: row.scope_key,
+              externalId: row.external_id,
+              state,
+              problem: row.problem,
+              entityId: row.entity_id,
+              sourceCreatedAt: iso(row.source_created_at),
+              lastSeenAt: row.last_seen_at.toISOString(),
+              missingSince: iso(row.missing_since),
+            })),
+          };
         },
         { readOnlySnapshot: true },
       );
@@ -902,43 +1043,29 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           )
         ).rows[0];
         if (!current) return false;
-        const values = [tenantId, streamId, principalId];
-        if (command.kind === 'pause')
-          await tx.query(
-            'UPDATE commerce_sync_streams SET paused=true,version=version+1,updated_at=now() WHERE tenant_id=$1 AND id=$2',
-            values.slice(0, 2),
-          );
-        else if (command.kind === 'reimport') {
-          if (current.scan_id || current.suspended_scan)
-            await tx.query(
-              `UPDATE commerce_sync_runs SET outcome='cancelled',finished_at=now()
-              WHERE tenant_id=$1 AND id=ANY($2::uuid[]) AND outcome='running'`,
-              [
-                tenantId,
-                [current.scan_id, current.suspended_scan?.id].filter(Boolean),
-              ],
-            );
-          await tx.query(
-            `UPDATE commerce_sync_streams SET phase='backfill',scan=NULL,scan_id=NULL,cursor=NULL,scan_started_at=NULL,
-              scan_since=NULL,scan_created_since=NULL,recent_history_from=NULL,recent_history_completed_at=NULL,suspended_scan=NULL,live_due_at=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
-              principal_id=$3,blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
-              lease_token=NULL,lease_until=NULL,due_at=now(),attempts=0,error_code=NULL,error_message=NULL,
-              error_at=NULL,failing_since=NULL,admission_wait_reason=NULL,admission_wait_at=NULL,version=version+1,updated_at=now()
-            WHERE tenant_id=$1 AND id=$2`,
-            values,
-          );
-        } else
-          await tx.query(
-            `UPDATE commerce_sync_streams SET paused=false,principal_id=$3,
-              blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
-              full_requested=full_requested OR $4,due_at=LEAST(COALESCE(due_at,now()),now()),
-              admission_wait_reason=NULL,admission_wait_at=NULL,
-              version=version+1,updated_at=now()
-            WHERE tenant_id=$1 AND id=$2`,
-            [...values, command.kind === 'reconcile'],
-          );
+        await applyCommand(tx, current, command, principalId);
 
         return true;
+      });
+    },
+    async commandConnection(tenantId, connectionId, command, principalId) {
+      return db.transaction(tenantId, async (tx) => {
+        const streams = (
+          await tx.query<StreamRow>(
+            'SELECT * FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=$2 ORDER BY id FOR UPDATE',
+            [tenantId, connectionId],
+          )
+        ).rows.filter((row) =>
+          command === 'pause'
+            ? !row.paused
+            : command === 'resume'
+              ? row.paused || row.blocked === 'principal_unavailable'
+              : !row.paused && !row.blocked,
+        );
+        for (const row of streams)
+          await applyCommand(tx, row, { kind: command }, principalId);
+
+        return streams.map((row) => row.id);
       });
     },
     async requestLink(tenantId, request) {

@@ -122,5 +122,6 @@
   "exceptions_board_note": "Probleme ändern ihren Status nur durch Prüfungen und Entscheidungen. Karten lassen sich daher nicht zwischen Spalten verschieben.",
   "exceptions_owner_none": "Keine verantwortliche Person",
   "exceptions_source_none": "Keine Quelle gemeldet",
-  "exceptions_waiting_none": "Wartet nicht"
+  "exceptions_waiting_none": "Wartet nicht",
+  "exceptions_open_sync": "Abgleich öffnen"
 }

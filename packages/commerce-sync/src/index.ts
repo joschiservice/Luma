@@ -9,9 +9,15 @@ export type {
   IdentityDetail,
   LinkInput,
   LinkRequestView,
+  SyncConnectionView,
   SyncOverview,
+  SyncRecordView,
+  SyncRunView,
   SyncStreamView,
 } from './application/views.js';
+
+/** @public Declaration emit names these in the inferred type of `createCommerceSyncService` in application-runtime. */
+export type { ConnectionCommand, RecordState } from './application/ports.js';
 
 export {
   createAutoLinkService,

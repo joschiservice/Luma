@@ -8,6 +8,7 @@ const now = Date.parse('2026-10-06T05:00:00.000Z');
 function item(patch: Partial<CoverageItem> = {}): CoverageItem {
   return {
     id: crypto.randomUUID(),
+    streamId: crypto.randomUUID(),
     label: 'Tokyo store',
     state: 'verified',
     text: 'all orders',

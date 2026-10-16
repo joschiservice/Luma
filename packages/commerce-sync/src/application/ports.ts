@@ -120,6 +120,22 @@ export type StreamCommand =
   | { kind: 'reconcile' }
   | { kind: 'reimport' };
 
+/** Commands that apply to every eligible stream of a connection at once. */
+export type ConnectionCommand = 'pause' | 'resume' | 'retry';
+
+/** Ledger states a person can list for one stream. */
+export type RecordState = 'pending' | 'failed' | 'missing';
+
+/** One source record that is waiting, could not be imported or is no longer found. */
+export interface SyncRecordProblem extends ItemKey {
+  state: RecordState;
+  problem: string | null;
+  entityId: string | null;
+  sourceCreatedAt: string | null;
+  lastSeenAt: string;
+  missingSince: string | null;
+}
+
 export interface LinkRequest {
   id: string;
   kind: 'sku' | 'location' | 'order' | 'order_line';
@@ -248,6 +264,29 @@ export interface SyncStore {
     coverage: StreamCoverage[];
     runs: SyncRun[];
   }>;
+  /**
+   * Reads up to `limit` runs of one stream, newest first, with the stream's connection. With
+   * `before`, starts after that run of the same stream; an unknown run returns no runs. Returns
+   * null when the stream does not exist in the tenant.
+   */
+  runs(
+    tenantId: string,
+    streamId: string,
+    limit: number,
+    before?: string,
+  ): Promise<{ connectionId: string; runs: SyncRun[] } | null>;
+  /**
+   * Lists up to `limit` records of one stream in a ledger state, in source key order, starting
+   * after `after`. Missing records exclude confirmed retirements. Returns null when the stream
+   * does not exist in the tenant.
+   */
+  records(
+    tenantId: string,
+    streamId: string,
+    state: RecordState,
+    limit: number,
+    after?: Record<keyof ItemKey, string>,
+  ): Promise<{ connectionId: string; records: SyncRecordProblem[] } | null>;
   /** Counts current source identities linked across connections, excluding withheld sources. */
   linkCoverage(
     tenantId: string,
@@ -263,6 +302,17 @@ export interface SyncStore {
     command: StreamCommand,
     principalId: string,
   ): Promise<boolean>;
+  /**
+   * Applies a command to every stream of a connection it changes, in one transaction: pause to
+   * running streams, resume to paused streams and streams whose person lost access, and retry to
+   * streams that are neither paused nor blocked. Returns the IDs of the streams it changed.
+   */
+  commandConnection(
+    tenantId: string,
+    connectionId: string,
+    command: ConnectionCommand,
+    principalId: string,
+  ): Promise<string[]>;
   requestLink(
     tenantId: string,
     request: Omit<

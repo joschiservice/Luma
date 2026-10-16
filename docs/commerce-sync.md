@@ -231,6 +231,17 @@ tenant-scoped snapshot and clears when capacity is released. A due stream withou
 active page waits for the next sync pass. Waiting never establishes fresh coverage or a
 successful read, and imported progress remains visible.
 
+Runs are retained. The overview lists the workspace's latest 30; a stream's history route
+pages 20 at a time through the `(tenant, stream, started)` index, with the same source
+visibility as the overview. Its cursor is the last run's ID, so an unknown run returns an empty
+page rather than restarting from the newest. The record route lists one stream's pending,
+failed or missing ledger entries in source key order, 25 at a time; missing entries use a
+partial index because they are rare among a stream's records. Data sync only lists "needs
+attention" items that a person must resolve: blocks, repeated failures, inactive connections,
+records that failed validation and older history that became available. A connection-wide
+command locks the connection's streams and applies to those it changes in one transaction, so
+it never leaves a connection partly paused; it reports how many changed.
+
 Full Shopify backfills of orders, products, inventory and permitted customers use Bulk
 Operations; recent windows, incremental reads and full checks stay paged.
 

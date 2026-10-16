@@ -14,6 +14,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 const url = process.env.SHOPIFY_ADMISSION_URL;
+// Child processes start Node and connect to Valkey before they report a state, which can take
+// longer than the default poll limit when suites run in parallel. Bounds under test are set
+// through each budget's own wait limit, not through these waits.
+const childWait = { timeout: 15_000 };
 
 describe.skipIf(!url)('Shopify admission on real Valkey', () => {
   let store: AtomicStore;
@@ -71,7 +75,10 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
   it('admits foreground work across processes while history is holding capacity', async () => {
     const importer = child('history', true);
     await expect
-      .poll(() => importer.states.some((s) => s.state === 'admitted'))
+      .poll(
+        () => importer.states.some((s) => s.state === 'admitted'),
+        childWait,
+      )
       .toBe(true);
     await expect(
       createSharedReadBudget({
@@ -84,18 +91,28 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
     const nextImport = child('history');
     const foreground = child('foreground');
     await expect
-      .poll(() =>
-        nextImport.states.some((s) => s.providerCode === 'ADMISSION_DEFERRED'),
+      .poll(
+        () =>
+          nextImport.states.some(
+            (s) => s.providerCode === 'ADMISSION_DEFERRED',
+          ),
+        childWait,
       )
       .toBe(true);
     await expect
-      .poll(() => foreground.states.some((s) => s.state === 'completed'))
+      .poll(
+        () => foreground.states.some((s) => s.state === 'completed'),
+        childWait,
+      )
       .toBe(true);
     importer.process.send('release');
     await expect
-      .poll(() => importer.states.some((s) => s.state === 'completed'))
+      .poll(
+        () => importer.states.some((s) => s.state === 'completed'),
+        childWait,
+      )
       .toBe(true);
-  });
+  }, 30_000);
 
   it('learns a background shape without requiring a completely full bucket and leaves foreground waiting bounded', async () => {
     await createSharedReadBudget({ store, key }).run(
@@ -104,7 +121,10 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
     );
     const importer = child('history', true);
     await expect
-      .poll(() => importer.states.some((s) => s.state === 'admitted'))
+      .poll(
+        () => importer.states.some((s) => s.state === 'admitted'),
+        childWait,
+      )
       .toBe(true);
     const foreground = createSharedReadBudget({ store, key, maxWaitMs: 1500 });
     await expect(
@@ -117,14 +137,20 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
     ).resolves.toBe('fresh');
     importer.process.send('release');
     await expect
-      .poll(() => importer.states.some((s) => s.state === 'completed'))
+      .poll(
+        () => importer.states.some((s) => s.state === 'completed'),
+        childWait,
+      )
       .toBe(true);
-  });
+  }, 30_000);
 
   it('recovers a dead process concurrency slot without refunding its unknown effect', async () => {
     const importer = child('history', true, 250);
     await expect
-      .poll(() => importer.states.some((s) => s.state === 'admitted'))
+      .poll(
+        () => importer.states.some((s) => s.state === 'admitted'),
+        childWait,
+      )
       .toBe(true);
     importer.process.kill();
     const foreground = createSharedReadBudget({
@@ -145,7 +171,7 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
     await expect(next.run('other', async () => 'read')).rejects.toMatchObject({
       failure: { providerCode: 'ADMISSION_DEFERRED' },
     });
-  });
+  }, 30_000);
 
   it('shares cooldown while other shops and tenants keep progressing', async () => {
     const budget = createSharedReadBudget({ store, key, maxWaitMs: 0 });

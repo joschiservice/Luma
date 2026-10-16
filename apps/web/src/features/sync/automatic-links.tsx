@@ -3,7 +3,7 @@ import type {
   AutoLinkRule,
   SyncConnectionView,
 } from '@luma/api-contract';
-import { formatNumber } from '@luma/i18n/format';
+import { formatNumber, formatPercent } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { Progress } from '@luma/ui/components/primitives/progress';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
@@ -173,21 +174,21 @@ export function AutomaticLinksView({
       </CardHeader>
       <CardContent>
         {coverage ? (
-          <div>
-            <p>
-              {m.sync_link_coverage_sku({
-                linked: formatNumber(coverage.sku.linked),
-                total: formatNumber(coverage.sku.total),
-              })}
+          <>
+            <dl className="auto-link-coverage">
+              <LinkMeter
+                label={m.sync_link_coverage_sku_label()}
+                {...coverage.sku}
+              />
+              <LinkMeter
+                label={m.sync_link_coverage_order_label()}
+                {...coverage.order}
+              />
+            </dl>
+            <p className="auto-link-note">
+              {m.sync_link_coverage_monitoring()}
             </p>
-            <p>
-              {m.sync_link_coverage_order({
-                linked: formatNumber(coverage.order.linked),
-                total: formatNumber(coverage.order.total),
-              })}
-            </p>
-            <p>{m.sync_link_coverage_monitoring()}</p>
-          </div>
+          </>
         ) : null}
         {error ? (
           <Alert tone="danger" role="alert">
@@ -203,7 +204,7 @@ export function AutomaticLinksView({
           <ul className="auto-link-rules">
             {rules.map((rule) => (
               <li key={rule.id}>
-                <div>
+                <div className="auto-link-rule">
                   <strong>
                     {rule.kind === 'sku'
                       ? m.sync_autolink_kind_sku()
@@ -277,15 +278,53 @@ export function AutomaticLinksView({
             ))}
           </ul>
         ) : rules ? (
-          <p>{m.sync_autolink_empty()}</p>
+          <p className="auto-link-note">{m.sync_autolink_empty()}</p>
         ) : null}
-        <p>
+        <p className="auto-link-note">
           <a href="/docs/data-sync#automatic-linking">
             {m.sync_autolink_help_link()}
           </a>
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+/** Records linked across systems out of all source records of one kind, as a meter. */
+function LinkMeter({
+  label,
+  linked,
+  total,
+}: {
+  label: string;
+  linked: number;
+  total: number;
+}) {
+  const text = m.sync_link_coverage_value({
+    linked: formatNumber(linked),
+    total: formatNumber(total),
+  });
+
+  return (
+    <div>
+      <dt>
+        <span>{label}</span>
+        <strong>
+          {/* Rounded down, so the meter never reads 100% while a record is unlinked. */}
+          {total
+            ? formatPercent(Math.floor((linked / total) * 100) / 100)
+            : '–'}
+        </strong>
+      </dt>
+      <dd>
+        <Progress
+          value={total ? (linked / total) * 100 : 0}
+          label={label}
+          valueText={text}
+        />
+        <small className="auto-link-note">{text}</small>
+      </dd>
+    </div>
   );
 }
 

@@ -91,5 +91,7 @@
   "connections_health_importing": "Import läuft",
   "connections_health_disconnected": "Getrennt",
   "connections_last_success": "Letzter erfolgreicher vollständiger Abruf",
-  "connections_open_issue": "Offenes Verbindungsproblem"
+  "connections_open_issue": "Offenes Verbindungsproblem",
+  "connections_open_sync": "Abgleich öffnen",
+  "connections_open_sync_label": "Abgleich für {type} öffnen"
 }

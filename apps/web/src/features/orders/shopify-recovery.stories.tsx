@@ -1,7 +1,7 @@
 import type { AppUiProps } from '@luma/app-host/web';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { type ComponentType, lazy, Suspense, useMemo, useRef } from 'react';
+import { type ComponentType, useMemo, useRef } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 const modules = import.meta.glob<{
@@ -13,9 +13,9 @@ const modules = import.meta.glob<{
   }>;
 }>('../../../../../packages/apps/*/src/web/fulfillment-recovery.tsx');
 const load = Object.values(modules)[0];
-const Recovery = load
-  ? lazy(async () => ({ default: (await load()).ShopifyFulfillmentRecovery }))
-  : null;
+// Import the app while the story file loads: its first Vite compile can outlast a story's
+// test time limit in parallel runs, and story loaders count toward that limit.
+const Recovery = load ? (await load()).ShopifyFulfillmentRecovery : null;
 const connectionId = '11111111-1111-4111-8111-111111111111';
 const orderId = 'gid://shopify/Order/2001';
 const fulfillmentOrderId = 'gid://shopify/FulfillmentOrder/81';
@@ -133,16 +133,14 @@ function Preview({
   return (
     <main className="shopify-recovery-story">
       <PageHeader title="Order #2001" description="Shopify · Tokyo warehouse" />
-      <Suspense fallback={<p>Loading recovery…</p>}>
-        {Recovery ? (
-          <Recovery
-            connectionId={connectionId}
-            orderId={orderId}
-            fulfillmentOrderId={fulfillmentOrderId}
-            services={services}
-          />
-        ) : null}
-      </Suspense>
+      {Recovery ? (
+        <Recovery
+          connectionId={connectionId}
+          orderId={orderId}
+          fulfillmentOrderId={fulfillmentOrderId}
+          services={services}
+        />
+      ) : null}
     </main>
   );
 }
@@ -151,12 +149,6 @@ const meta = {
   title: 'Orders/Shopify fulfillment recovery',
   component: Preview,
   parameters: { layout: 'padded' },
-  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
-  loaders: [
-    async () => {
-      await load?.();
-    },
-  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;

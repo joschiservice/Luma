@@ -7,7 +7,10 @@ import {
   autoLinkRulesSchema,
   identityDetailSchema,
   linkRequestSchema,
+  syncConnectionCommandResultSchema,
   syncOverviewSchema,
+  syncRecordListSchema,
+  syncRunHistorySchema,
   syncStreamSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
@@ -67,6 +70,42 @@ export function syncRoutes(service?: SyncService) {
 
       return syncOverviewSchema.parse(await s.service.overview(s.context));
     }),
+    runs: os.runs.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request);
+
+        return syncRunHistorySchema.parse(
+          await s.service.runs(s.context, params.streamId, query.before),
+        );
+      },
+    ),
+    records: os.records.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request);
+
+        return syncRecordListSchema.parse(
+          await s.service.records(
+            s.context,
+            params.streamId,
+            query.state,
+            query.cursor,
+          ),
+        );
+      },
+    ),
+    connectionCommand: os.connectionCommand.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return syncConnectionCommandResultSchema.parse(
+          await s.service.commandConnection(
+            s.context,
+            params.connectionId,
+            body.command,
+          ),
+        );
+      },
+    ),
     command: os.command.handler(
       async ({ context: { request }, input: { params, body } }) => {
         const s = use(request);

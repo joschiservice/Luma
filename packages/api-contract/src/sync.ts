@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const timestamp = z.string().datetime({ offset: true });
 
-const syncRecordTypeSchema = z.enum([
+export const syncRecordTypeSchema = z.enum([
   'orders',
   'fulfillments',
   'products',
@@ -160,6 +160,45 @@ export const syncOverviewSchema = z.object({
   asOf: timestamp,
 });
 
+export const syncRunHistorySchema = z.object({
+  runs: z.array(syncRunSchema),
+  nextCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Pass as `before` for older runs; null on the last page.'),
+});
+
+export const syncRecordStateSchema = z.enum(['pending', 'failed', 'missing']);
+
+export const syncRecordListSchema = z.object({
+  records: z.array(
+    z.object({
+      externalId: z.string(),
+      resource: z.string(),
+      state: syncRecordStateSchema,
+      problem: z.string().nullable(),
+      entityId: z.string().uuid().nullable(),
+      sourceCreatedAt: timestamp.nullable(),
+      lastSeenAt: timestamp,
+      missingSince: timestamp.nullable(),
+    }),
+  ),
+  nextCursor: z
+    .string()
+    .nullable()
+    .describe('Pass as `cursor` for the next page; null on the last page.'),
+});
+
+export const syncConnectionCommandSchema = z
+  .object({ command: z.enum(['pause', 'resume', 'retry']) })
+  .strict();
+
+export const syncConnectionCommandResultSchema = z.object({
+  updated: z.number().int().nonnegative(),
+  connection: syncConnectionSchema,
+});
+
 export const syncCommandSchema = z
   .object({
     command: z.enum(['pause', 'resume', 'retry', 'reconcile', 'reimport']),
@@ -257,6 +296,16 @@ export type SyncStreamView = z.infer<typeof syncStreamSchema>;
 export type SyncConnectionView = z.infer<typeof syncConnectionSchema>;
 
 export type SyncRunView = z.infer<typeof syncRunSchema>;
+
+export type SyncRecordState = z.infer<typeof syncRecordStateSchema>;
+
+export type SyncRecordView = z.infer<
+  typeof syncRecordListSchema
+>['records'][number];
+
+export type SyncConnectionCommand = z.infer<
+  typeof syncConnectionCommandSchema
+>['command'];
 
 export type SyncOverview = z.infer<typeof syncOverviewSchema>;
 
