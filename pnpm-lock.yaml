@@ -1670,8 +1670,8 @@ importers:
         specifier: 1.1.1
         version: 1.1.1
       '@inlang/sdk':
-        specifier: 3.1.0
-        version: 3.1.0
+        specifier: 4.0.2
+        version: 4.0.2
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*
@@ -3746,6 +3746,10 @@ packages:
 
   '@inlang/sdk@3.1.0':
     resolution: {integrity: sha512-l8LqeyqLfe00cmDvKY7J6YuCkfWVfgzaNWlB8IAHxWOWqkUAwyG4AhuMYUiBbeA0wM6zdVphPCG2lay/OzTdFg==}
+    engines: {node: '>=20.0.0'}
+
+  '@inlang/sdk@4.0.2':
+    resolution: {integrity: sha512-IiOiQpybiV2HrguH+2eG+9Pqsm8AuUBtjHpgl3rnwXkE9x1p+mAC5YqVVRlquGLELXxFiu90zvgFXdYnt4X3LA==}
     engines: {node: '>=20.0.0'}
 
   '@isaacs/cliui@8.0.2':
@@ -10446,6 +10450,13 @@ snapshots:
       comment-json: 4.6.2
 
   '@inlang/sdk@3.1.0':
+    dependencies:
+      '@lix-js/sdk': 0.19.0
+      '@sinclair/typebox': 0.31.30
+      kysely: 0.28.17
+      uuid: 14.0.2
+
+  '@inlang/sdk@4.0.2':
     dependencies:
       '@lix-js/sdk': 0.19.0
       '@sinclair/typebox': 0.31.30
