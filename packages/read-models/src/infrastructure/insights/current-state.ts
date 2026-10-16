@@ -87,6 +87,7 @@ export function stockChart(
     // Every compared position was read at or after its oldest read.
     dataThrough:
       positions.length && !unknown.length ? observed.sort()[0]! : null,
+    previous: null,
     asOf,
   };
 }
@@ -163,6 +164,7 @@ export function procurementChart(
     sourceFilter: 'not_applicable',
     coverage: { state: 'complete', sources: [], excluded: [] },
     dataThrough: asOf,
+    previous: null,
     asOf,
   };
 }

@@ -5,6 +5,7 @@ import {
   countPoints,
   coverageState,
   dataThrough,
+  detectionCoverage,
   pointCoverage,
   sourceState,
   stockPoint,
@@ -104,6 +105,24 @@ describe('source coverage', () => {
     ).toBe('2026-10-01T09:00:00.000Z');
     expect(dataThrough([source({}), source({ dataThrough: null })])).toBe(null);
     expect(dataThrough([])).toBe(null);
+  });
+});
+
+describe('detection coverage', () => {
+  const span = {
+    from: '2026-09-01T00:00:00.000Z',
+    before: '2026-09-08T00:00:00.000Z',
+  };
+
+  it('treats a stretch before the first detection as unknown, not empty', () => {
+    expect(detectionCoverage(span, '2026-08-01T00:00:00.000Z')).toBe(
+      'complete',
+    );
+    expect(detectionCoverage(span, '2026-09-03T00:00:00.000Z')).toBe('partial');
+    expect(detectionCoverage(span, '2026-09-08T00:00:00.000Z')).toBe(
+      'not_imported',
+    );
+    expect(detectionCoverage(span, null)).toBe('not_imported');
   });
 });
 

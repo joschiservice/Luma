@@ -204,6 +204,21 @@ export function pointCoverage(
   return 'complete';
 }
 
+/**
+ * Whether Luma's issue records cover a stretch. Issues exist only from Luma's first recorded
+ * detection, `since`; before it Luma has no evidence that it was watching, so an earlier stretch
+ * is unknown rather than empty. Without any detection nothing establishes when watching began.
+ */
+export function detectionCoverage(
+  span: { from: string; before: string },
+  since: string | null,
+): InsightPointCoverage {
+  if (!since || Date.parse(span.before) <= Date.parse(since))
+    return 'not_imported';
+
+  return Date.parse(span.from) < Date.parse(since) ? 'partial' : 'complete';
+}
+
 /** Builds points in the given order with every series present, counting `rows`. */
 export function countPoints(
   points: {

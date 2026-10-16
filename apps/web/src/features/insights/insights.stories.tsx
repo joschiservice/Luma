@@ -84,7 +84,32 @@ const orders: InsightChartResponse = {
     excluded: [{ reason: 'no_placed_time', count: 3 }],
   },
   dataThrough: '2026-10-01T08:40:00.000Z',
+  previous: {
+    from: '2026-09-03T22:00:00.000Z',
+    before: '2026-09-17T09:00:00.000Z',
+    total: 0,
+    coverage: 'not_imported',
+  },
   asOf,
+};
+
+// Both sources current and the previous stretch imported, so the totals compare.
+const compared: InsightChartResponse = {
+  ...orders,
+  points: days.map((day, index) => ({
+    ...day,
+    coverage: index === 13 ? ('partial' as const) : ('complete' as const),
+  })),
+  coverage: {
+    ...orders.coverage,
+    state: 'complete',
+    sources: orders.coverage.sources.map((source) => ({
+      ...source,
+      state: 'complete' as const,
+      historyFrom: null,
+    })),
+  },
+  previous: { ...orders.previous!, total: 160, coverage: 'complete' },
 };
 
 const procurement: InsightChartResponse = {
@@ -117,6 +142,7 @@ const procurement: InsightChartResponse = {
   sourceFilter: 'not_applicable',
   coverage: { state: 'complete', sources: [], excluded: [] },
   dataThrough: asOf,
+  previous: null,
   asOf,
 };
 
@@ -132,7 +158,8 @@ const stock: InsightChartResponse = {
   dataThrough: null,
 };
 
-type State = 'orders' | 'procurement' | 'loading' | 'unavailable' | 'error';
+type State =
+  'orders' | 'compared' | 'procurement' | 'loading' | 'unavailable' | 'error';
 
 function Content({
   state,
@@ -145,11 +172,13 @@ function Content({
   const data =
     state === 'orders'
       ? orders
-      : state === 'procurement'
-        ? procurement
-        : state === 'unavailable'
-          ? stock
-          : undefined;
+      : state === 'compared'
+        ? compared
+        : state === 'procurement'
+          ? procurement
+          : state === 'unavailable'
+            ? stock
+            : undefined;
   const error: InsightsError | undefined =
     state === 'error' ? 'unavailable' : undefined;
 
@@ -222,6 +251,8 @@ export const OrdersWithImportedHistory: Story = {
       'Fri 18 Sept: Not imported: this period is before the imported history, so its count is unknown.',
     );
     await expect(canvas.getByText(/without a placed time/)).toBeVisible();
+    // The previous period lies before the imported history.
+    await expect(canvas.getByText('Not comparable')).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: /^Open\s*39$/ }));
     await expect(args.onSelect).toHaveBeenLastCalledWith({ series: 'open' });
     await userEvent.click(canvas.getByRole('tab', { name: 'Table' }));
@@ -229,6 +260,27 @@ export const OrdersWithImportedHistory: Story = {
       name: 'Orders placed, last 7 days',
     });
     await expect(within(table).getAllByText('Not imported')).toHaveLength(3);
+  },
+};
+
+export const OrdersComparedWithPreviousPeriod: Story = {
+  args: { state: 'compared' },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const previous = await canvas.findByText('Previous period');
+    // 152 orders against 160 in the same stretch of the previous period.
+    await expect(previous.nextElementSibling).toHaveTextContent(
+      /^[-−]5% vs 160$/,
+    );
+    // Like every number, the comparison opens the records it counts.
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: '160 orders, Previous period. Show the records.',
+      }),
+    );
+    await expect(args.onSelect).toHaveBeenLastCalledWith({
+      point: 'previous',
+    });
   },
 };
 

@@ -34,6 +34,21 @@ reconciles with the Orders list: a point's `start`/`end` days are the list's
 
 Without a source filter, fulfillment uses one source view per linked order and work kind: Starshipit shipments, otherwise Shopify, then another source. Split shipments from that view remain separate. Source-filtered reads retain that source’s own records. Shipping-only order views do not contribute to commercial order totals.
 
+## Views and links
+
+The page shows timelines under Trends, breakdowns under Now beside the
+[operational metrics](operational-metrics.md), and resolution measurement under Outcomes.
+`view` is optional in the address: without it, an open chart selects the view that contains
+it, a range selects Trends, and report or outcome filters select Outcomes, so links created
+before views existed still open their records. Navigation writes `view` only when the rest of
+the address wouldn't select it; otherwise closing an inferred view's records would switch views.
+
+Each view puts only the metrics it shows into the page's live summary; connection health reads
+the operational part on every view. The toolbar's live status and Refresh describe the view on
+screen, so Outcomes reports the resolution read, including a denied resolution part. The
+resolution report's rolling period ends when Outcomes is opened or refreshed, not on every live
+refresh, so live updates recount one fixed cohort.
+
 ## Coverage and data-through time
 
 Commerce charts list each in-scope connection with its sync stream state: `complete`,
@@ -47,6 +62,23 @@ history or ends after `dataThrough` is `partial`.
 Issue and purchase-order charts read Luma's own records: their coverage is complete and their
 data-through time is the evaluation time. Stock coverage is unavailable without active rules
 and partial while any monitored position has unusable stock.
+
+## Previous period
+
+Timelines return `previous`: the same rules and filters counted from one range length before
+the window's start until one range length before `asOf`, in local time. Comparing up to `asOf`
+rather than the whole previous period keeps a partly elapsed day or week fair. Order coverage
+uses the same point rules as the timeline. Issues exist only from Luma's first recorded
+detection, so a previous stretch before it is `not_imported` or `partial`: before that, an empty
+period can't be told from one Luma wasn't watching. The organization's creation time isn't
+used; runtime roles can't read it and seeded or imported history may predate it. The web app
+shows a change only when the previous stretch, the overall coverage and every finished bucket
+are complete.
+
+Records accept `point=previous`, which matches the stretch the chart's `asOf` defines, so the
+list totals `previous.total` with the same rules and filters. The Orders list filters whole
+days and can't express a stretch that ends at a time of day, so the record panel offers no
+Orders link for it.
 
 The orders chart returns 503 while an existing tenant's order-list projection awaits
 [backfill](orders-workspace.md#backfill-and-rollout). Only the rebuild command clears this;

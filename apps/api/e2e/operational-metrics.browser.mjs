@@ -74,7 +74,11 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await count('cases.active', 200);
   await count('inventory.below_minimum', 200);
   await count('procurement.purchase_orders.draft', 40);
-  await section.getByText('Live updates', { exact: true }).waitFor();
+  // Insights shows the live status once for the page.
+  await page
+    .locator('.insights-live')
+    .getByText('Live updates', { exact: true })
+    .waitFor();
   await section.locator('[data-metric="cases.attention"]').click();
   const dialog = page.getByRole('dialog');
   await dialog.getByText('Outcome unclear · 200').waitFor();
@@ -108,7 +112,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     },
     { times: 1 },
   );
-  await section.getByRole('button', { name: 'Refresh summary' }).click();
+  await page.getByRole('button', { name: 'Refresh insights' }).click();
   await expect.poll(() => held).toBe(true);
   await f.db.owner.query(
     "UPDATE exceptions SET state='detected',document=jsonb_set(document,'{state}','\"detected\"') WHERE id=$1",
@@ -177,7 +181,10 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   );
   await count('inventory.replenishment_unknown', 2);
   await context.setOffline(true);
-  await section.getByText('Offline', { exact: true }).waitFor();
+  await page
+    .locator('.insights-live')
+    .getByText('Offline', { exact: true })
+    .waitFor();
   await context.setOffline(false);
   await count('inventory.replenishment_unknown', 2);
   await mkdir('/tmp/luma87-ui', { recursive: true });

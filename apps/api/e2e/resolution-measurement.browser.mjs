@@ -46,7 +46,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15000);
-  await page.goto(`/app/${f.org.id}/insights`);
+  await page.goto(`/app/${f.org.id}/insights?view=outcomes`);
   const section = page.getByRole('region', {
     name: 'Verified outcomes and human help',
   });
@@ -162,14 +162,14 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
       },
     });
   });
-  await section
-    .getByRole('button', { name: 'Refresh summary', exact: true })
+  await page
+    .getByRole('button', { name: 'Refresh insights', exact: true })
     .click();
   await section.getByText('Summary unavailable', { exact: true }).waitFor();
   expect(await section.locator('[data-metric]').count()).toBe(0);
   await page.unroute('**/v2/organizations/*/metrics/summary');
-  await section
-    .getByRole('button', { name: 'Refresh summary', exact: true })
+  await page
+    .getByRole('button', { name: 'Refresh insights', exact: true })
     .click();
   await expect(value('verified')).toHaveText('2');
   await context.setOffline(true);

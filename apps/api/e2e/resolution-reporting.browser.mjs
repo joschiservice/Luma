@@ -55,7 +55,7 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
   const page = await context.newPage(),
     errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`/app/${f.org.id}/insights`);
+  await page.goto(`/app/${f.org.id}/insights?view=outcomes`);
   const report = page.getByRole('region', {
     name: 'Resolution reporting',
     exact: true,
@@ -64,7 +64,7 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
     report.locator(`[data-metric="resolution.${id}"] .operational-value`);
   await expect(value('detected')).toHaveText('3');
   await expect(value('completed')).toHaveText('2');
-  await report
+  await page
     .getByRole('combobox', { name: 'Reporting period', exact: true })
     .click();
   await page.getByRole('option', { name: '7 days', exact: true }).click();
@@ -85,7 +85,7 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
   await expect
     .poll(() => trigger.evaluate((el) => el === document.activeElement))
     .toBe(true);
-  await report
+  await page
     .getByRole('combobox', { name: 'Reporting period', exact: true })
     .click();
   await page
@@ -119,7 +119,9 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
     path: '/tmp/luma65-report-dark-narrow.png',
     fullPage: true,
   });
+  await report.getByRole('tab', { name: 'Table', exact: true }).click();
   const cohortDay = report
+    .getByRole('table', { name: 'Daily counts (UTC)' })
     .getByRole('button', { name: /^Inspect records:/ })
     .last();
   await cohortDay.scrollIntoViewIfNeeded();

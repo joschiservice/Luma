@@ -1,5 +1,11 @@
 import type { InsightChart, InsightChartResponse } from '@luma/api-contract';
-import { formatNumber, formatTime } from '@luma/i18n/format';
+import {
+  formatDateTime,
+  formatList,
+  formatNumber,
+  formatPercent,
+  formatTime,
+} from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -37,10 +43,13 @@ import {
   dataThroughText,
   definitions,
   excludedText,
+  periodComparison,
+  previousPoint,
   rangeLabels,
   seriesTotals,
   sourceDetail,
   sourceStates,
+  timelineStats,
   windowLabel,
 } from './presentation';
 
@@ -171,7 +180,9 @@ export function ChartCard({
           />
         )}
       </div>
-      {data && !error && <Coverage data={data} timeZone={timeZone} />}
+      {data && !error && !loading && data.coverage.state !== 'unavailable' && (
+        <Coverage data={data} timeZone={timeZone} />
+      )}
     </Card>
   );
 }
@@ -230,13 +241,81 @@ function Content({
   const categories = chartCategories(data, timeZone);
   const multiple = series.length > 1;
   const label = chartLabel(data);
+  // A breakdown of nothing says so instead of drawing a row of zeros for every group.
+  const empty = data.total === 0 && !data.window;
+
+  return (
+    <>
+      <Headline data={data} timeZone={timeZone} onSelect={onSelect} />
+      {view === 'table' ? (
+        <ChartTable
+          data={data}
+          categories={categories}
+          caption={label}
+          onSelect={onSelect}
+        />
+      ) : empty ? (
+        <p className="insights-card-empty">{definition.empty()}</p>
+      ) : (
+        <>
+          {multiple && (
+            <ChartLegend
+              series={series}
+              totals={seriesTotals(data)}
+              selected={selected?.point ? undefined : selected?.series}
+              onSelect={(id) => onSelect({ series: id })}
+            />
+          )}
+          <BarChart
+            label={label}
+            orientation={definition.orientation}
+            series={series}
+            categories={categories}
+            unit={(value) => amount(data.chart, value)}
+            integerTicks
+            selected={
+              selected?.point
+                ? { category: selected.point, series: selected.series }
+                : null
+            }
+            busy={refreshing}
+            onSelect={({ category, series: id }) =>
+              onSelect({ point: category, ...(id ? { series: id } : {}) })
+            }
+          />
+          {data.total === 0 && (
+            <p className="insights-empty-note">{definition.empty()}</p>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * The chart's total for its period or moment and, for timelines, the average of complete
+ * periods and the busiest period, which opens its records.
+ */
+function Headline({
+  data,
+  timeZone,
+  onSelect,
+}: {
+  data: InsightChartResponse;
+  timeZone: string;
+  onSelect: (selection: Selection) => void;
+}) {
+  const definition = definitions[data.chart];
+  const stats = timelineStats(data);
+  const comparison = periodComparison(data);
   const total = rich(definition.amount, {
     count: data.total,
     value: <strong>{formatNumber(data.total)}</strong>,
   });
+  const week = data.window?.bucket === 'week';
 
   return (
-    <>
+    <div className="insights-headline">
       <p className="insights-total" aria-live="polite">
         {data.window
           ? rich(m.insights_total_window, {
@@ -253,45 +332,104 @@ function Content({
               }),
             })}
       </p>
-      {view === 'chart' ? (
-        <>
-          {multiple && (
-            <ChartLegend
-              series={series}
-              totals={seriesTotals(data)}
-              selected={selected?.point ? undefined : selected?.series}
-              onSelect={(id) => onSelect({ series: id })}
-            />
+      {stats && (data.total > 0 || comparison?.comparable) && (
+        <dl className="insights-stats">
+          <div>
+            <dt>
+              {week
+                ? m.insights_stat_average_week()
+                : m.insights_stat_average_day()}
+            </dt>
+            <dd
+              title={
+                stats.average === null
+                  ? undefined
+                  : m.insights_stat_average_note({
+                      count: stats.averagedPeriods,
+                    })
+              }
+            >
+              {stats.average === null
+                ? m.common_empty_value()
+                : formatNumber(stats.average, { maximumFractionDigits: 1 })}
+            </dd>
+          </div>
+          {stats.peak && (
+            <div>
+              <dt>
+                {week
+                  ? m.insights_stat_peak_week()
+                  : m.insights_stat_peak_day()}
+              </dt>
+              <dd>
+                <button
+                  type="button"
+                  className="insights-cell-link"
+                  aria-label={m.insights_table_cell({
+                    amount: amount(data.chart, stats.peak.total),
+                    category: stats.peak.label,
+                  })}
+                  onClick={() => onSelect({ point: stats.peak!.key })}
+                >
+                  {stats.peak.label} · {formatNumber(stats.peak.total)}
+                </button>
+              </dd>
+            </div>
           )}
-          <BarChart
-            label={label}
-            orientation={definition.orientation}
-            series={series}
-            categories={categories}
-            unit={(value) => amount(data.chart, value)}
-            selected={
-              selected?.point
-                ? { category: selected.point, series: selected.series }
-                : null
-            }
-            busy={refreshing}
-            onSelect={({ category, series: id }) =>
-              onSelect({ point: category, ...(id ? { series: id } : {}) })
-            }
-          />
-          {data.total === 0 && (
-            <p className="insights-empty-note">{definition.empty()}</p>
+          {comparison && data.previous && (
+            <div>
+              <dt>{m.insights_stat_previous()}</dt>
+              <dd
+                data-comparable={comparison.comparable}
+                title={
+                  comparison.comparable
+                    ? m.insights_stat_previous_note({
+                        from: formatDateTime(data.previous.from, {
+                          dateStyle: 'medium',
+                          timeZone,
+                        }),
+                        before: formatDateTime(data.previous.before, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          timeZone,
+                        }),
+                      })
+                    : data.chart === 'cases'
+                      ? m.insights_stat_previous_incomplete_cases_note()
+                      : m.insights_stat_previous_incomplete_note()
+                }
+              >
+                {comparison.comparable ? (
+                  <button
+                    type="button"
+                    className="insights-cell-link"
+                    aria-label={m.insights_table_cell({
+                      amount: amount(data.chart, comparison.previous),
+                      category: m.insights_stat_previous(),
+                    })}
+                    onClick={() => onSelect({ point: previousPoint })}
+                  >
+                    {m.insights_stat_previous_value({
+                      change:
+                        comparison.ratio === null
+                          ? formatNumber(comparison.difference, {
+                              signDisplay: 'exceptZero',
+                            })
+                          : formatPercent(comparison.ratio, {
+                              signDisplay: 'exceptZero',
+                            }),
+                      previous: formatNumber(comparison.previous),
+                    })}
+                  </button>
+                ) : (
+                  m.insights_stat_previous_incomplete()
+                )}
+              </dd>
+            </div>
           )}
-        </>
-      ) : (
-        <ChartTable
-          data={data}
-          categories={categories}
-          caption={label}
-          onSelect={onSelect}
-        />
+        </dl>
       )}
-    </>
+    </div>
   );
 }
 
@@ -394,6 +532,10 @@ function ChartTable({
   );
 }
 
+/**
+ * States what the chart is based on in one line, lists sources individually while any of them
+ * limits the counts, and keeps the period, every source and the chart's limits one click away.
+ */
 function Coverage({
   data,
   timeZone,
@@ -403,56 +545,66 @@ function Coverage({
 }) {
   const definition = definitions[data.chart];
   const excluded = excludedText(data);
+  const own = data.sourceFilter === 'not_applicable';
+  const sources = data.coverage.sources;
+  const limited = sources.some((source) => source.state !== 'complete');
+  const list = (
+    <ul className="insights-sources">
+      {sources.map((source) => (
+        <li key={source.connectionId}>
+          <StateDot state={sourceStates[source.state].state} />
+          <span>
+            <strong>{source.label}</strong> {sourceDetail(source, timeZone)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <footer className="insights-coverage">
-      <dl>
-        <div>
-          <dt>{m.insights_coverage_period()}</dt>
-          <dd>
-            {data.window
-              ? `${rangeLabels[data.window.range]()} · ${windowLabel(data.window)} · ${data.window.timeZone}`
-              : m.insights_coverage_current()}
-          </dd>
-        </div>
-        <div>
-          <dt>{m.insights_coverage_data_through()}</dt>
-          <dd>{dataThroughText(data, timeZone)}</dd>
-        </div>
-        <div>
-          <dt>{m.common_sources()}</dt>
-          <dd>
-            {data.sourceFilter === 'not_applicable' ? (
-              m.insights_coverage_own_records()
-            ) : data.coverage.sources.length ? (
-              <ul className="insights-sources">
-                {data.coverage.sources.map((source) => (
-                  <li key={source.connectionId}>
-                    <StateDot state={sourceStates[source.state].state} />
-                    <span>
-                      <strong>{source.label}</strong>{' '}
-                      {sourceDetail(source, timeZone)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              m.insights_coverage_no_sources()
-            )}
-          </dd>
-        </div>
-      </dl>
+      <p className="insights-coverage-line">
+        <span>{dataThroughText(data, timeZone)}</span>
+        <span>
+          {own
+            ? m.insights_coverage_own_records_short()
+            : sources.length
+              ? formatList(sources.map((source) => source.label))
+              : m.insights_coverage_no_sources()}
+        </span>
+      </p>
+      {limited && list}
       {excluded.map((text) => (
         <p key={text} className="insights-excluded">
           {text}
         </p>
       ))}
-      {definition.limit && (
-        <Disclosure variant="plain" className="insights-limit">
-          <summary>{m.insights_coverage_limit_summary()}</summary>
-          <p>{definition.limit()}</p>
-        </Disclosure>
-      )}
+      <Disclosure variant="plain" className="insights-limit">
+        <summary>{m.insights_coverage_limit_summary()}</summary>
+        <dl>
+          <div>
+            <dt>{m.insights_coverage_period()}</dt>
+            <dd>
+              {data.window
+                ? `${rangeLabels[data.window.range]()} · ${windowLabel(data.window)} · ${data.window.timeZone}`
+                : m.insights_coverage_current()}
+            </dd>
+          </div>
+          <div>
+            <dt>{m.common_sources()}</dt>
+            <dd>
+              {own
+                ? m.insights_coverage_own_records()
+                : sources.length && !limited
+                  ? list
+                  : sources.length
+                    ? m.insights_coverage_sources_above()
+                    : m.insights_coverage_no_sources()}
+            </dd>
+          </div>
+        </dl>
+        {definition.limit && <p>{definition.limit()}</p>}
+      </Disclosure>
     </footer>
   );
 }

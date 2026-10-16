@@ -252,12 +252,27 @@ export function WorkspaceSearch({
         })),
       ]
     : [];
-  const pages = workspaceDestinations.filter(
+  const permitted = workspaceDestinations.filter(
     (item) =>
       (item.path !== 'views' || adaptive.data?.views === true) &&
-      (!item.permission || can(item.permission)) &&
-      matches(query, `${item.label} ${item.description}`),
+      (!item.permission || can(item.permission)),
   );
+  const pages = permitted.filter((item) =>
+    matches(query, `${item.label} ${item.description}`),
+  );
+  // A page's views are listed once someone searches, so the empty menu stays a list of pages.
+  const sections = query.trim()
+    ? permitted.flatMap((page) =>
+        (page.sections ?? [])
+          .filter((section) =>
+            matches(
+              query,
+              `${page.label} ${section.label()} ${section.description()}`,
+            ),
+          )
+          .map((section) => ({ page, section })),
+      )
+    : [];
   // Any longer query can become a question for Luma.
   const question =
     query.trim().length >= 3 && can('assistant.use') ? query.trim() : '';
@@ -371,7 +386,7 @@ export function WorkspaceSearch({
               </span>
             </Link>
           ))}
-          {pages.length ? (
+          {pages.length || sections.length ? (
             <p className="command-section-label">
               {m.identity_search_section_pages()}
             </p>
@@ -404,6 +419,29 @@ export function WorkspaceSearch({
               </Link>
             ),
           )}
+          {sections.map(({ page, section }) => (
+            <Link
+              key={`${page.path}:${section.search.view}`}
+              className="command-item"
+              to={`/app/$organizationId/${page.path}`}
+              params={{ organizationId }}
+              search={section.search}
+              onClick={() => changeOpen(false)}
+            >
+              <span className="command-item-icon">
+                <page.Icon size={16} aria-hidden="true" />
+              </span>
+              <span className="command-item-copy">
+                <strong>
+                  {m.identity_search_page_section({
+                    page: page.label,
+                    section: section.label(),
+                  })}
+                </strong>
+                <span>{section.description()}</span>
+              </span>
+            </Link>
+          ))}
           {recordQuery.length >= 2 ? (
             <p className="command-section-label">
               {m.identity_search_section_records()}
@@ -580,6 +618,7 @@ export function WorkspaceSearch({
           })}
           {!matchedViews.length &&
           !pages.length &&
+          !sections.length &&
           !actions.length &&
           !records.data?.items.length &&
           !purchaseResults.length ? (
