@@ -1,4 +1,4 @@
-import { htmlToText } from './html.js';
+import { convertHtml } from './html.js';
 import type { GmailMessage, MessagePart } from './schemas.js';
 
 /** Longest message text returned; longer bodies are cut and marked truncated. */
@@ -32,6 +32,8 @@ export interface ParsedMessage {
   inReplyTo: string | null;
   references: string[];
   direction: 'inbound' | 'outbound';
+  /** True only when provider-owned metadata confirms a sent message. */
+  providerSent?: boolean;
   from: ParsedAddress;
   to: ParsedAddress[];
   cc: ParsedAddress[];
@@ -197,12 +199,17 @@ function isAttachment(part: MessagePart) {
 }
 
 /** Extracts the readable body: plain text preferred, HTML converted when no plain text exists. */
-function bodyOf(part: MessagePart): { text: string; plain: boolean } | null {
+function bodyOf(
+  part: MessagePart,
+): { text: string; plain: boolean; truncated: boolean } | null {
   const { mimeType, charset } = contentType(part);
   if (mimeType.startsWith('multipart/')) {
     const children = (part.parts ?? [])
       .map(bodyOf)
-      .filter((body): body is { text: string; plain: boolean } => !!body);
+      .filter(
+        (body): body is { text: string; plain: boolean; truncated: boolean } =>
+          !!body,
+      );
     if (!children.length) return null;
     if (mimeType === 'multipart/alternative')
       return children.find((body) => body.plain) ?? children[0]!;
@@ -213,6 +220,7 @@ function bodyOf(part: MessagePart): { text: string; plain: boolean } | null {
         .filter(Boolean)
         .join('\n\n'),
       plain: children.every((body) => body.plain),
+      truncated: children.some((body) => body.truncated),
     };
   }
   if (isAttachment(part) || !part.body?.data) return null;
@@ -223,10 +231,11 @@ function bodyOf(part: MessagePart): { text: string; plain: boolean } | null {
         '\n',
       ),
       plain: true,
+      truncated: false,
     };
   if (mimeType === 'text/html')
     return {
-      text: htmlToText(decodeCharset(decodeBase64(part.body.data), charset)),
+      ...convertHtml(decodeCharset(decodeBase64(part.body.data), charset)),
       plain: false,
     };
 
@@ -360,6 +369,7 @@ export function parseMessage(
       labelIds.includes('SENT') || from.address === mailbox.toLowerCase()
         ? 'outbound'
         : 'inbound',
+    providerSent: labelIds.includes('SENT'),
     from,
     to: parseAddressList(headersOf(payload, 'To').join(', ')),
     cc: parseAddressList(headersOf(payload, 'Cc').join(', ')),
@@ -372,7 +382,7 @@ export function parseMessage(
       .trim()
       .slice(0, 998),
     text: text.slice(0, maxTextLength),
-    truncated: text.length > maxTextLength,
+    truncated: !!body?.truncated || text.length > maxTextLength,
     sentAt: validTime(date) ? new Date(date).toISOString() : receivedAt,
     receivedAt,
     labels: labelIds.map((id) => labelNames.get(id) ?? id),

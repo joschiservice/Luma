@@ -80,6 +80,7 @@ export async function fulfillmentChart(
     sourceFilter: 'applied',
     coverage: { state: coverageState(sources), sources, excluded: [] },
     dataThrough: dataThrough(sources),
+    previous: null,
     asOf,
   };
 }

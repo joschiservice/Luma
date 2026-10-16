@@ -200,6 +200,7 @@
   "identity_search_placeholder": "Search records, pages, and actions…",
   "identity_search_results_label": "Search results",
   "identity_search_section_pages": "Go to",
+  "identity_search_page_section": "{page}: {section}",
   "identity_search_section_records": "Records",
   "identity_search_section_actions": "Actions",
   "identity_search_records_searching": "Searching records…",

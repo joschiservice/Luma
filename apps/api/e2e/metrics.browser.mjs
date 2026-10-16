@@ -44,15 +44,15 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`/app/${f.org.id}/insights`);
-  const section = page.getByRole('region', {
-    name: 'Orders that need work',
+  // Insights shows orders as one group of the Now view.
+  const section = page.getByRole('region', { name: 'Orders', exact: true });
+  const refresh = page.getByRole('button', {
+    name: 'Refresh insights',
+    exact: true,
   });
   await section.getByText('No order data yet').first().waitFor();
   expect(await section.getByText('No order data yet').count()).toBe(3);
-  await section
-    .getByRole('button', { name: 'Show matching orders' })
-    .first()
-    .click();
+  await section.locator('[data-metric="orders.open"]').click();
   const dialog = page.getByRole('dialog');
   await dialog
     .getByRole('heading', { name: 'Open orders', exact: true })
@@ -72,8 +72,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await expect
     .poll(() =>
       section
-        .getByRole('button', { name: 'Show matching orders' })
-        .first()
+        .locator('[data-metric="orders.open"]')
         .evaluate((el) => el === document.activeElement),
     )
     .toBe(true);
@@ -113,27 +112,20 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     },
     { times: 1 },
   );
-  await section
-    .getByRole('button', { name: 'Refresh orders', exact: true })
-    .click();
+  await refresh.click();
   await section
     .getByText('Order counts unavailable', { exact: true })
     .waitFor();
   expect(await section.getByText('No order data yet').count()).toBe(0);
-  await section
-    .getByRole('button', { name: 'Refresh orders', exact: true })
-    .click();
+  await refresh.click();
   await section.getByText('No order data yet').first().waitFor();
   const seed = await seedMetricOrders(t, f);
   for (let i = 0; i < 25; i++) await seed(i);
-  await section
-    .getByRole('button', { name: 'Refresh orders', exact: true })
-    .click();
-  await section.getByText('orders found', { exact: true }).first().waitFor();
-  await section
-    .getByRole('button', { name: 'Show matching orders' })
-    .first()
-    .click();
+  await refresh.click();
+  await expect(
+    section.locator('[data-metric="orders.open"] .operational-value'),
+  ).toHaveText('25');
+  await section.locator('[data-metric="orders.open"]').click();
   await dialog.getByText('1–20 of 25 matching orders').waitFor();
   expect(
     await dialog

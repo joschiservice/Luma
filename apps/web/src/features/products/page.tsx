@@ -15,7 +15,7 @@ import { CollectionPreview } from '@luma/ui/components/primitives/collection-pre
 import {
   type CollectionSort,
   CollectionToolbar,
-  CollectionViews,
+  type CollectionView,
 } from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
@@ -609,6 +609,7 @@ export function ProductsPage() {
                 view={view}
                 path="products"
                 segmentLabel={productSegmentLabel}
+                segments={productViews(data?.counts)}
                 exportColumns={controls.columns
                   .filter((id) => !listingColumnSource(id))
                   .map((id) => ({
@@ -619,11 +620,6 @@ export function ProductsPage() {
                         ?.label ??
                       id,
                   }))}
-              />
-              <ProductTabs
-                value={view.ref.kind === 'builtin' ? view.ref.segment : null}
-                counts={data?.counts}
-                onChange={(next) => view.open(`builtin:${next}`)}
               />
             </>
           }
@@ -778,33 +774,17 @@ export function ProductsPage() {
   );
 }
 
-/**
- * The built-in comparison views as tabs with their counts under the current search and
- * conditions. A saved view selects no tab.
- */
-export function ProductTabs({
-  value,
-  counts,
-  onChange,
-}: {
-  value: string | null;
-  counts?: ProductList['counts'] | undefined;
-  onChange: (segment: string) => void;
-}) {
-  return (
-    <CollectionViews
-      label={m.products_list_views_label()}
-      value={value}
-      views={productsCatalog.segments.map((segment) => ({
-        value: segment,
-        label: productSegmentLabel(segment),
-        description: (viewDescriptions as Record<string, string>)[segment],
-        count: counts?.[segment as keyof ProductList['counts']],
-        attention: segment !== 'all',
-      }))}
-      onChange={onChange}
-    />
-  );
+/** The built-in comparison views with their counts under the current search and conditions. */
+export function productViews(
+  counts?: ProductList['counts'] | undefined,
+): CollectionView<string>[] {
+  return productsCatalog.segments.map((segment) => ({
+    value: segment,
+    label: productSegmentLabel(segment),
+    description: (viewDescriptions as Record<string, string>)[segment],
+    count: counts?.[segment as keyof ProductList['counts']],
+    attention: segment !== 'all',
+  }));
 }
 
 /**

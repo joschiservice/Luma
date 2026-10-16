@@ -48,6 +48,14 @@ type DestinationPath =
   | 'settings'
   | 'records';
 
+/** A view inside a page that the command menu offers on its own, such as Insights → Trends. */
+type DestinationSection = {
+  /** The localized view name, read in the active language. */
+  label: () => string;
+  description: () => string;
+  search: { view: 'now' | 'trends' | 'outcomes' };
+};
+
 export type WorkspaceDestination = {
   path: DestinationPath;
   /** The localized page name, read in the active language each time. */
@@ -66,6 +74,8 @@ export type WorkspaceDestination = {
   permission?: string;
   /** What the page shows, for the no-access explanation, in the active language. */
   readonly area?: string | undefined;
+  /** Views the command menu lists when a search matches them. */
+  sections?: readonly DestinationSection[];
 };
 
 type DestinationInput = Omit<
@@ -166,6 +176,23 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     shortcut: 'm',
     permission: 'insights.read',
     area: m.identity_nav_insights_area,
+    sections: [
+      {
+        label: m.insights_view_now,
+        description: m.insights_view_now_description,
+        search: { view: 'now' },
+      },
+      {
+        label: m.insights_view_trends,
+        description: m.insights_view_trends_description,
+        search: { view: 'trends' },
+      },
+      {
+        label: m.insights_view_outcomes,
+        description: m.insights_view_outcomes_description,
+        search: { view: 'outcomes' },
+      },
+    ],
   }),
   destination({
     path: 'inbox',

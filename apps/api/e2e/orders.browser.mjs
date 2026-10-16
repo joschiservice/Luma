@@ -192,13 +192,11 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   await page.getByRole('button', { name: 'Previous' }).click();
   await expect(orderRange).toHaveText('1–50');
 
-  // Built-in views live in the view menu.
-  await page.getByRole('button', { name: 'All orders', exact: true }).click();
-  await page.getByRole('menuitemradio', { name: 'Overdue' }).click();
+  // Built-in views are tabs.
+  await page.getByRole('tab', { name: 'Overdue', exact: true }).click();
   await expect(orderRange).toHaveText('1–1');
   await page.getByRole('link', { name: '#2003' }).waitFor();
-  await page.getByRole('button', { name: 'Overdue', exact: true }).click();
-  await page.getByRole('menuitemradio', { name: 'All orders' }).click();
+  await page.getByRole('tab', { name: 'All orders', exact: true }).click();
   await page.waitForURL((url) => url.searchParams.get('view') === 'all');
 
   await page.getByRole('searchbox', { name: 'Search orders' }).fill('TOTE-red');
@@ -345,7 +343,7 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   await save.getByLabel('Name').fill('Placed orders');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Placed orders', exact: true })
+    .getByRole('tab', { name: 'Placed orders', exact: true, selected: true })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
@@ -393,16 +391,26 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     .getByRole('button', { name: 'Discard mine and load theirs' })
     .click();
   await page
-    .getByRole('button', { name: 'Placed orders (renamed)', exact: true })
+    .getByRole('tab', {
+      name: 'Placed orders (renamed)',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
 
   // Resetting the page opens the default view and can be undone.
   await page.getByRole('button', { name: 'View options' }).click();
   await page.getByRole('menuitem', { name: 'Reset page to default' }).click();
-  await page.getByRole('button', { name: 'All orders', exact: true }).waitFor();
+  await page
+    .getByRole('tab', { name: 'All orders', exact: true, selected: true })
+    .waitFor();
   await page.getByRole('button', { name: 'Undo' }).click();
   await page
-    .getByRole('button', { name: 'Placed orders (renamed)', exact: true })
+    .getByRole('tab', {
+      name: 'Placed orders (renamed)',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
 
   // List keys move through rows, and ? lists them.

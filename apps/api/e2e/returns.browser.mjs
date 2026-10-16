@@ -260,7 +260,11 @@ test('opens a return from its order, tells pending work from money returned and 
   await save.getByLabel('Name').fill('Defective by stage');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Defective by stage', exact: true })
+    .getByRole('tab', {
+      name: 'Defective by stage',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),

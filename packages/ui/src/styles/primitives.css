@@ -1071,6 +1071,54 @@
   height: 14px;
 }
 
+.collection-views [data-slot='tabs-trigger'] {
+  text-decoration: none;
+}
+
+/* Overflowing views fill the row, so they know how much room they have; whatever doesn't fit
+   moves into the More menu. The ruler keeps every tab at its natural width out of sight. */
+.collection-views-overflow {
+  position: relative;
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.collection-views-overflow [data-slot='tabs'] {
+  min-width: 0;
+}
+
+.collection-views-ruler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.collection-views-ruler [data-slot='tabs-list'] {
+  max-width: none;
+  overflow: visible;
+}
+
+.collection-views-more[data-slot='button'] {
+  flex: none;
+  color: var(--foreground-muted);
+}
+
+.collection-views-more[data-slot='button'] svg {
+  width: 14px;
+  height: 14px;
+}
+
+.collection-views-menu [data-slot='badge'] {
+  margin-inline-start: auto;
+}
+
 .collection-toolbar-refresh[data-slot='button'] {
   margin-left: auto;
 }

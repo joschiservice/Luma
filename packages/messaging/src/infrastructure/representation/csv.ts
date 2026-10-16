@@ -62,7 +62,7 @@ export function parseCsv(input: string): {
   const pushCell = () => {
     if (row.length < representationLimits.columns)
       row.push(cell.slice(0, representationLimits.cell));
-    else if (cell.trim()) truncated = true;
+    else truncated = true;
     if (cell.length > representationLimits.cell) truncated = true;
     cell = '';
   };
@@ -85,7 +85,7 @@ export function parseCsv(input: string): {
       rows.push(row);
       row = [];
       if (rows.length >= representationLimits.rows) {
-        truncated = index < text.length - 1;
+        truncated ||= index < text.length - 1;
         break;
       }
     } else cell += char;

@@ -113,7 +113,12 @@ export function ModuleLink({
       );
     case 'outcomes':
       return (
-        <Link {...props} to="/app/$organizationId/insights" params={params} />
+        <Link
+          {...props}
+          to="/app/$organizationId/insights"
+          params={params}
+          search={{ view: 'outcomes' }}
+        />
       );
     case 'catalog':
       return (

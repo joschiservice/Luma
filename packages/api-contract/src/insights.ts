@@ -70,7 +70,9 @@ export const insightRecordQuerySchema = z
       .min(1)
       .max(40)
       .optional()
-      .describe('A point key from the chart. Omit to list every point.'),
+      .describe(
+        'A point key from the chart, or `previous` for a timeline’s previous stretch. Omit to list every point.',
+      ),
     series: z
       .string()
       .min(1)
@@ -182,6 +184,22 @@ export const insightChartResponseSchema = z.object({
   coverage: insightCoverageSchema,
   /** Every counted record reflects source changes up to this time; null when unknown. */
   dataThrough: timestamp.nullable(),
+  /**
+   * For timelines, the same stretch of the preceding period, counted with the same rules and
+   * filters: from one range length before `window.from` until one range length before `asOf`,
+   * so a partly elapsed day or week compares with the same part of its counterpart. Compare
+   * only when `coverage` is `complete`. Issues count from Luma's first recorded detection, so
+   * an earlier stretch is `not_imported` or `partial`. List its records with the point
+   * `previous`. Null for breakdowns.
+   */
+  previous: z
+    .object({
+      from: timestamp,
+      before: timestamp,
+      total: z.number().int().nonnegative(),
+      coverage: insightPointCoverageSchema,
+    })
+    .nullable(),
   asOf: timestamp,
 });
 

@@ -772,6 +772,8 @@ export interface MessageSnapshot {
   references: string[];
   /** Relative to the connected mailbox. */
   direction: 'inbound' | 'outbound';
+  /** True only when provider-owned metadata confirms a sent message. */
+  providerSent?: boolean;
   from: MessageAddress;
   to: MessageAddress[];
   cc: MessageAddress[];

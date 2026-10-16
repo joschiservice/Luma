@@ -205178,6 +205178,36 @@
                         }
                       ]
                     },
+                    "previous": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "before": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "coverage": {
+                              "enum": ["complete", "partial", "not_imported"],
+                              "type": "string"
+                            }
+                          },
+                          "required": ["from", "before", "total", "coverage"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "asOf": {
                       "type": "string",
                       "format": "date-time"
@@ -205194,6 +205224,7 @@
                     "sourceFilter",
                     "coverage",
                     "dataThrough",
+                    "previous",
                     "asOf"
                   ]
                 }
@@ -205356,7 +205387,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 40,
-              "description": "A point key from the chart. Omit to list every point."
+              "description": "A point key from the chart, or `previous` for a timeline’s previous stretch. Omit to list every point."
             },
             "allowEmptyValue": true,
             "allowReserved": true
@@ -206338,7 +206369,7 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 40,
-                                "description": "A point key from the chart. Omit to list every point."
+                                "description": "A point key from the chart, or `previous` for a timeline’s previous stretch. Omit to list every point."
                               },
                               "series": {
                                 "type": "string",

@@ -302,7 +302,11 @@ test('opens an imported customer from an order, lists their imported orders and 
   await save.getByLabel('Name').fill('Spenders by account');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Spenders by account', exact: true })
+    .getByRole('tab', {
+      name: 'Spenders by account',
+      exact: true,
+      selected: true,
+    })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),

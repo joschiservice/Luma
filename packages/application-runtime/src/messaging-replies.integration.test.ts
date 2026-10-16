@@ -73,6 +73,11 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
   const mailbox: { providerMessageId: string; data: MessageData }[] = [];
   const sends: string[] = [];
   let loseResponse = false;
+  let hideThread = false;
+  let partialThread = false;
+  let endlessThread = false;
+  let corruptAttachment = false;
+  let staleObservation = false;
   const ops = { address: 'ops@shop.example', name: null };
   const anna = { address: 'anna@acme.example', name: 'Anna' };
   mailbox.push({
@@ -107,14 +112,24 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     async thread(_context, _connection, input) {
       return {
         ok: true,
-        items: mailbox.filter(
-          (m) =>
-            m.data.thread.externalId === input.thread.externalId ||
-            (input.thread.externalId.startsWith('outbound:') &&
-              m.data.rfcMessageId ===
-                `luma.${input.thread.externalId.slice(9)}@shop.example`),
-        ),
-        nextCursor: null,
+        complete: !partialThread,
+        items: mailbox
+          .filter(
+            (m) =>
+              !hideThread &&
+              (m.data.thread.externalId === input.thread.externalId ||
+                (input.thread.externalId.startsWith('outbound:') &&
+                  m.data.rfcMessageId ===
+                    `luma.${input.thread.externalId.slice(9)}@shop.example`)),
+          )
+          .map((item) => ({
+            ...item,
+            observationId: `provider:${item.providerMessageId}`,
+            observedAt: staleObservation
+              ? '2000-01-01T00:00:00.000Z'
+              : new Date().toISOString(),
+          })),
+        nextCursor: endlessThread ? 'more' : null,
       };
     },
   };
@@ -153,6 +168,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
                   inReplyTo: input.inReplyTo,
                   references: input.references,
                   direction: 'outbound',
+                  providerSent: true,
                   from: ops,
                   to: input.to,
                   cc: input.cc,
@@ -311,6 +327,39 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
         members: { canReadMessages: async () => true },
         reader,
         records,
+        documents: {
+          directory: { skus: async () => new Set(), suppliers: async () => [] },
+          attachments: {
+            read: async (_context, _connection, input) => {
+              const index = Number(input.attachment.externalId);
+              const outboundId = mailbox
+                .find(
+                  (item) => item.providerMessageId === input.message.externalId,
+                )
+                ?.data.rfcMessageId?.split('@')[0]
+                ?.slice(5);
+              const result = await owner.query<{
+                document: { attachments?: { base64: string }[] };
+              }>(
+                'SELECT document FROM messaging_outbound WHERE tenant_id=$1 AND id=$2',
+                [tenant, outboundId],
+              );
+              const file = result.rows[0]?.document.attachments?.[index];
+
+              return file
+                ? {
+                    ok: true,
+                    bytes: corruptAttachment
+                      ? new Uint8Array(
+                          Buffer.from(file.base64, 'base64').length,
+                        ).fill(1)
+                      : Buffer.from(file.base64, 'base64'),
+                    sha256: null,
+                  }
+                : { ok: false, code: 'not_found' };
+            },
+          },
+        },
         replyAdmission: createReplyAdmission(safety, effects),
         settled: async (_context, outbound) => {
           supplierEvents.push({ id: outbound.id, state: outbound.state });
@@ -337,6 +386,11 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
 
   beforeEach(() => {
     loseResponse = false;
+    hideThread = false;
+    partialThread = false;
+    endlessThread = false;
+    corruptAttachment = false;
+    staleObservation = false;
   });
 
   afterAll(async () => {
@@ -591,6 +645,29 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  it('requires independently read attachment bytes to match the approved PDF', async () => {
+    const { reply } = await supplierDraft();
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    loseResponse = true;
+    expect(
+      await messaging.replies.decide(bob(), reply.id, {
+        decisionId: requested.decisionId!,
+        outcome: 'approved',
+      }),
+    ).toMatchObject({ state: 'uncertain' });
+    corruptAttachment = true;
+    expect(await messaging.replies.check(alice(), reply.id)).toMatchObject({
+      state: 'uncertain',
+    });
+    corruptAttachment = false;
+    expect(await messaging.replies.check(alice(), reply.id)).toMatchObject({
+      state: 'sent',
+    });
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
   it('reconciles an uncertain supplier send after restart and records a permanent bounce independently', async () => {
     const { reply, purchaseOrderId } = await supplierDraft();
     const requested = await messaging.replies.request(alice(), reply.id, {
@@ -744,6 +821,75 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     expect(
       (await safety.execution.get(alice(), (await action(reply.id))!))?.state,
     ).toBe('succeeded');
+  });
+
+  it('ignores cached matches when a fresh read is empty or incomplete', async () => {
+    const reply = await draft('Thanks, we are checking.');
+    const sent = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    expect(sent.state).toBe('sent');
+    hideThread = true;
+    expect((await messaging.replies.verify(alice(), reply.id)).outcome).toBe(
+      'inconclusive',
+    );
+    hideThread = false;
+    partialThread = true;
+    expect((await messaging.replies.verify(alice(), reply.id)).outcome).toBe(
+      'inconclusive',
+    );
+    partialThread = false;
+    endlessThread = true;
+    expect((await messaging.replies.verify(alice(), reply.id)).outcome).toBe(
+      'inconclusive',
+    );
+    endlessThread = false;
+    staleObservation = true;
+    expect((await messaging.replies.verify(alice(), reply.id)).outcome).toBe(
+      'inconclusive',
+    );
+    expect(sends.filter((id) => id === reply.id)).toHaveLength(1);
+  });
+
+  it.each([
+    'inbound',
+    'wrong-domain',
+    'recipients',
+    'body',
+    'subject',
+    'attachments',
+    'provider-sent',
+  ] as const)('rejects conflicting fresh send evidence: %s', async (change) => {
+    const reply = await draft('Thanks, we are checking.');
+    await messaging.replies.request(alice(), reply.id, { id: randomUUID() });
+    const item = mailbox.find(
+      (item) => item.data.rfcMessageId === `luma.${reply.id}@shop.example`,
+    )!;
+    const original = structuredClone(item.data);
+    try {
+      if (change === 'inbound') item.data.direction = 'inbound';
+      if (change === 'wrong-domain')
+        item.data.rfcMessageId = `luma.${reply.id}@wrong.example`;
+      if (change === 'recipients') item.data.to = [ops];
+      if (change === 'body') item.data.text = 'Different body';
+      if (change === 'subject') item.data.subject = 'Different subject';
+      if (change === 'attachments')
+        item.data.attachments = [
+          {
+            attachment: { externalId: 'extra', scopeKey: '' },
+            filename: 'extra.txt',
+            mimeType: 'text/plain',
+            size: 1,
+          },
+        ];
+      if (change === 'provider-sent') item.data.providerSent = false;
+      expect((await messaging.replies.verify(alice(), reply.id)).outcome).toBe(
+        'inconclusive',
+      );
+      expect(sends.filter((id) => id === reply.id)).toHaveLength(1);
+    } finally {
+      item.data = original;
+    }
   });
 
   it('needs someone else to approve a consequential reply before sending it', async () => {
@@ -911,6 +1057,27 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
         [tenant],
       );
     }
+  });
+
+  it('expires draft and sent body copies without attachment deadlines and withholds unsent work', async () => {
+    const sent = await draft('A retained sent reply.');
+    await messaging.replies.request(alice(), sent.id, { id: randomUUID() });
+    const unsent = await draft('A retained draft reply.');
+    await owner.query(
+      `UPDATE messaging_outbound SET document=(document-'attachmentsExpireAt') || jsonb_build_object('contentRetainUntil',now()-interval '1 day') WHERE tenant_id=$1 AND id=ANY($2::uuid[])`,
+      [tenant, [sent.id, unsent.id]],
+    );
+    await runtime.query('SELECT purge_expired_messaging(200)');
+    const detail = await messaging.service.thread(alice(), threadId);
+    expect(detail.outbound.find((reply) => reply.id === sent.id)).toMatchObject(
+      { text: '', state: 'sent' },
+    );
+    expect(
+      detail.outbound.find((reply) => reply.id === unsent.id),
+    ).toMatchObject({ text: '', state: 'withheld', canRequest: false });
+    await expect(
+      messaging.replies.request(alice(), unsent.id, { id: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it('discards drafts and keeps replies inside their workspace and roles', async () => {

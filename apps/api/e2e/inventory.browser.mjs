@@ -65,9 +65,8 @@ test('investigates stock differences, follows affected orders and preserves filt
   await page.goto(`/app/${f.org.id}/exceptions/${issueId}/detail`);
   await page.getByRole('link', { name: 'Inspect inventory' }).click();
   await page.getByRole('heading', { name: 'Inventory', exact: true }).waitFor();
-  // Built-in views live in the view menu.
-  await page.getByRole('button', { name: 'All stock', exact: true }).click();
-  await page.getByRole('menuitemradio', { name: 'Source differences' }).click();
+  // Built-in views are tabs.
+  await page.getByRole('tab', { name: 'Source differences' }).click();
   await page.waitForURL((url) => url.searchParams.get('view') === 'differs');
   const search = page.getByRole('searchbox', { name: 'Search inventory' });
   await search.fill('77');
@@ -186,7 +185,7 @@ test('investigates stock differences, follows affected orders and preserves filt
   await save.getByLabel('Name').fill('Oversold by SKU');
   await save.getByRole('button', { name: 'Save', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Oversold by SKU', exact: true })
+    .getByRole('tab', { name: 'Oversold by SKU', exact: true, selected: true })
     .waitFor();
   await page.waitForURL((url) =>
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),

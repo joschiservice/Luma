@@ -484,7 +484,7 @@ export function InboxView({
   segment?: ThreadView | undefined;
   /** A saved view is open, so no built-in view tab is current. */
   savedView?: boolean | undefined;
-  /** The view menu with saved views. */
+  /** The view bar with built-in and saved views; without it the built-in views are plain tabs. */
   viewBar?: ReactNode;
   /** The Display menu. */
   display?: ReactNode;
@@ -498,7 +498,7 @@ export function InboxView({
   /** Row properties in display order. */
   properties?: readonly string[] | undefined;
   density?: CollectionListDensity | undefined;
-  /** Opens a built-in view; without it the view tabs are plain links. */
+  /** Opens a built-in view from the tabs shown without a view bar; without it they are plain links. */
   onOpenView?: ((view: ThreadView) => void) | undefined;
   threads: readonly ThreadSummary[] | undefined;
   counts?: Counts | undefined;
@@ -592,48 +592,49 @@ export function InboxView({
           onRefresh={onRefresh}
           views={
             <>
-              {viewBar}
-              <Tabs
-                value={savedView ? null : segment}
-                className="messaging-views"
-              >
-                <TabsList
-                  aria-label={m.messaging_views_label()}
-                  activateOnFocus={false}
+              {viewBar ?? (
+                <Tabs
+                  value={savedView ? null : segment}
+                  className="messaging-views"
                 >
-                  {threadViews.map((option) => (
-                    <TabsTrigger
-                      key={option}
-                      value={option}
-                      nativeButton={false}
-                      title={viewDescriptions[option]()}
-                      render={
-                        <Link
-                          to="/app/$organizationId/inbox"
-                          params={{ organizationId }}
-                          search={{
-                            q: search.q,
-                            thread: search.thread,
-                            view: option,
-                          }}
-                          resetScroll={false}
-                          onClick={(event) => {
-                            if (!onOpenView || event.metaKey || event.ctrlKey)
-                              return;
-                            event.preventDefault();
-                            onOpenView(option);
-                          }}
-                        />
-                      }
-                    >
-                      {viewLabels[option]()}
-                      {counts?.[option] !== undefined ? (
-                        <Badge>{formatNumber(counts[option] ?? 0)}</Badge>
-                      ) : null}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+                  <TabsList
+                    aria-label={m.messaging_views_label()}
+                    activateOnFocus={false}
+                  >
+                    {threadViews.map((option) => (
+                      <TabsTrigger
+                        key={option}
+                        value={option}
+                        nativeButton={false}
+                        title={viewDescriptions[option]()}
+                        render={
+                          <Link
+                            to="/app/$organizationId/inbox"
+                            params={{ organizationId }}
+                            search={{
+                              q: search.q,
+                              thread: search.thread,
+                              view: option,
+                            }}
+                            resetScroll={false}
+                            onClick={(event) => {
+                              if (!onOpenView || event.metaKey || event.ctrlKey)
+                                return;
+                              event.preventDefault();
+                              onOpenView(option);
+                            }}
+                          />
+                        }
+                      >
+                        {viewLabels[option]()}
+                        {counts?.[option] !== undefined ? (
+                          <Badge>{formatNumber(counts[option] ?? 0)}</Badge>
+                        ) : null}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
             </>
           }
           search={{
@@ -909,7 +910,13 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       ? undefined
       : list.data?.pages.flatMap((page) => page.items);
   const first = list.data?.pages[0];
-  const counts = first?.counts;
+  const counts: Counts | undefined = first?.counts && {
+    open: first.counts.open,
+    mine: first.counts.mine,
+    unassigned: first.counts.unassigned,
+    overdue: first.counts.overdue,
+    review: first.counts.review,
+  };
 
   const grouping = state.group;
   const groupPrefix = `${groupOf(state) ?? ''}=`;
@@ -985,13 +992,18 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       organizationId={organizationId}
       search={search}
       segment={segment}
-      savedView={view.ref.kind === 'saved'}
       viewBar={
         <CollectionViewBar
           organizationId={organizationId}
           view={view}
           path="inbox"
           segmentLabel={(value) => viewLabels[threadView(value)]()}
+          segments={threadViews.map((option) => ({
+            value: option,
+            label: viewLabels[option](),
+            description: viewDescriptions[option](),
+            count: counts?.[option],
+          }))}
         />
       }
       display={controls.display}
@@ -1038,19 +1050,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       }
       properties={controls.properties}
       density={state.density}
-      onOpenView={(option) => view.open(`builtin:${option}`)}
       threads={threads}
-      counts={
-        counts
-          ? {
-              open: counts.open,
-              mine: counts.mine,
-              unassigned: counts.unassigned,
-              overdue: counts.overdue,
-              review: counts.review,
-            }
-          : undefined
-      }
       mailboxes={mailboxes.data?.items}
       loading={list.isPending && !invalid}
       refreshing={list.isFetching && !list.isFetchingNextPage}

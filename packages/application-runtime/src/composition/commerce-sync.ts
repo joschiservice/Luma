@@ -249,6 +249,7 @@ export async function createDefaultCommerceSyncWorker(
     });
     resources.add(worker.close);
     const followUp = createSupplierFollowUpWorker({
+      ...(observability ? { observability } : {}),
       database: createTenantDatabase(pool),
       pool,
       identity: identity.service,
@@ -258,6 +259,7 @@ export async function createDefaultCommerceSyncWorker(
     });
 
     const mailboxes = createMailboxSyncWorker({
+      ...(observability ? { observability } : {}),
       database: createTenantDatabase(pool),
       identity: identity.service,
       connections: settings.connections,

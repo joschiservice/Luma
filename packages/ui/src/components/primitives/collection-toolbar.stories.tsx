@@ -424,3 +424,72 @@ export const ConditionsDark: Story = {
   args: { ...ConditionsAndDisplay.args },
   globals: { theme: 'dark' },
 };
+
+function OverflowingViews() {
+  const [view, setView] = useState('all');
+
+  return (
+    <div style={{ width: 380 }}>
+      <CollectionToolbar
+        views={
+          <CollectionViews
+            label="Order views"
+            value={view}
+            overflow
+            views={[
+              { value: 'all', label: 'All orders', group: 'Built-in views' },
+              {
+                value: 'late',
+                label: 'Overdue',
+                count: 3,
+                attention: true,
+                group: 'Built-in views',
+              },
+              {
+                value: 'differs',
+                label: 'Differs by source',
+                group: 'Built-in views',
+              },
+              { value: 'wholesale', label: 'Wholesale', group: 'My views' },
+              {
+                value: 'returns',
+                label: 'Returns this week',
+                group: 'Shared views',
+              },
+            ]}
+            onChange={setView}
+          />
+        }
+        onRefresh={() => {}}
+      />
+    </div>
+  );
+}
+
+/** Views that don't fit move into a More menu; the open view always stays a tab. */
+export const OverflowingIntoMore: Story = {
+  render: () => <OverflowingViews />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    const more = await canvas.findByRole('button', { name: /more views?$/ });
+    await expect(
+      canvas.getByRole('tab', { name: 'All orders' }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      canvas.queryByRole('tab', { name: 'Returns this week' }),
+    ).toBeNull();
+
+    await userEvent.click(more);
+    const item = await body.findByRole('menuitemradio', {
+      name: 'Returns this week',
+    });
+    await expect(body.getByText('Shared views')).toBeInTheDocument();
+    await userEvent.click(item);
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('tab', { name: 'Returns this week' }),
+      ).toHaveAttribute('aria-selected', 'true'),
+    );
+  },
+};

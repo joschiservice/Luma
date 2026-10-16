@@ -66,3 +66,7 @@ catalogs:
     'typescript': '~5.9.3'
   typescript-5-9-3:
     'typescript': '5.9.3'
+
+# Keep auto-installed optional framework peers on the reviewed patch release.
+overrides:
+  next: 16.3.8

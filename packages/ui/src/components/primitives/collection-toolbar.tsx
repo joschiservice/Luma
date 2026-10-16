@@ -1,9 +1,24 @@
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { ArrowDownUp, ListFilter, Plus, Search, X } from 'lucide-react';
-import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react';
+import {
+  ArrowDownUp,
+  ChevronDown,
+  ListFilter,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react';
+import {
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { cn } from '../../lib/utils';
+import { fitViews } from '../../lib/view-overflow';
 import { Badge } from './badge';
 import { Button } from './button';
 import {
@@ -73,53 +88,212 @@ export interface CollectionView<Value extends string> {
   count?: number | undefined;
   /** Highlights the count when the view holds work that needs attention. */
   attention?: boolean | undefined;
+  /**
+   * Makes the tab a link, so it can open in a new browser tab; a plain click still calls
+   * `onChange`.
+   */
+  href?: string | undefined;
+  /** Names the section of the More menu the view appears in. */
+  group?: string | undefined;
 }
 
 /**
- * Switches between a collection's saved views as segmented tabs with optional counts. Arrow keys
+ * Switches between a collection's views as segmented tabs with optional counts. Arrow keys
  * move focus; Enter or Space selects, so moving through views does not refetch each one. A null
- * value marks no tab as current, as while a saved view is open.
+ * value marks no tab as current, as while a saved view is open. Without `overflow`, views that
+ * don't fit scroll sideways. With it, the views that fit the row stay tabs and the rest move into
+ * a More menu, grouped by `group`; the current view always stays a tab.
  */
 export function CollectionViews<Value extends string>({
   label,
   value,
   views,
   onChange,
+  overflow = false,
 }: {
   label: string;
   value: Value | null;
   views: readonly CollectionView<Value>[];
   onChange: (value: Value) => void;
+  overflow?: boolean | undefined;
 }) {
-  return (
+  const root = useRef<HTMLDivElement>(null);
+  const ruler = useRef<HTMLDivElement>(null);
+  const [fitted, setFitted] = useState<readonly number[] | null>(null);
+  const current = views.findIndex((view) => view.value === value);
+  const widthKey = views
+    .map((view) => `${view.value}:${view.label}:${view.count ?? ''}`)
+    .join('|');
+
+  useLayoutEffect(() => {
+    const container = root.current;
+    const measured = ruler.current;
+    if (!overflow || !container || !measured) return;
+    const fit = () => {
+      const widths = [
+        ...measured.querySelectorAll<HTMLElement>('[data-slot="tabs-trigger"]'),
+      ].map((tab) => tab.getBoundingClientRect().width);
+      const list =
+        measured
+          .querySelector('[data-slot="tabs-list"]')
+          ?.getBoundingClientRect().width ?? 0;
+      const more =
+        measured
+          .querySelector('.collection-views-more')
+          ?.getBoundingClientRect().width ?? 0;
+      const gap = Number.parseFloat(getComputedStyle(container).columnGap) || 0;
+      const next = fitViews({
+        widths,
+        // The list's padding and border surround the tabs wherever they are.
+        available:
+          container.clientWidth - (list - widths.reduce((a, b) => a + b, 0)),
+        more: more + gap,
+        current: current < 0 ? undefined : current,
+      });
+      setFitted((previous) =>
+        previous?.join() === next.join() ? previous : next,
+      );
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    observer.observe(measured);
+
+    return () => observer.disconnect();
+  }, [overflow, current, widthKey]);
+
+  const content = (view: CollectionView<Value>) => (
+    <>
+      {view.icon}
+      {view.label}
+      {view.count !== undefined ? (
+        <Badge tone={view.attention && view.count ? 'warning' : 'neutral'}>
+          {formatNumber(view.count)}
+        </Badge>
+      ) : null}
+    </>
+  );
+  const trigger = (view: CollectionView<Value>) => (
+    <TabsTrigger
+      key={view.value}
+      value={view.value}
+      title={view.description}
+      data-view={view.value}
+      {...(view.href
+        ? {
+            nativeButton: false,
+            render: (
+              <a
+                href={view.href}
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  onChange(view.value);
+                }}
+              />
+            ),
+          }
+        : {})}
+    >
+      {content(view)}
+    </TabsTrigger>
+  );
+  const tabs = (shown: readonly CollectionView<Value>[]) => (
     <Tabs
       value={value}
-      className="collection-views"
+      className={overflow ? undefined : 'collection-views'}
       onValueChange={(next) => {
+        // Link tabs select in their own click handler, which leaves modified clicks alone.
         const view = views.find((item) => item.value === next);
-        if (view) onChange(view.value);
+        if (view && !view.href) onChange(view.value);
       }}
     >
       <TabsList aria-label={label} activateOnFocus={false}>
-        {views.map((view) => (
-          <TabsTrigger
-            key={view.value}
-            value={view.value}
-            title={view.description}
-          >
-            {view.icon}
-            {view.label}
-            {view.count !== undefined ? (
-              <Badge
-                tone={view.attention && view.count ? 'warning' : 'neutral'}
-              >
-                {formatNumber(view.count)}
-              </Badge>
-            ) : null}
-          </TabsTrigger>
-        ))}
+        {shown.map(trigger)}
       </TabsList>
     </Tabs>
+  );
+
+  if (!overflow) return tabs(views);
+
+  const shown = fitted
+    ? fitted.flatMap((index) => views[index] ?? [])
+    : [...views];
+  const hidden = views.filter((view) => !shown.includes(view));
+  const groups = [...new Set(hidden.map((view) => view.group))].map(
+    (group) => [group, hidden.filter((view) => view.group === group)] as const,
+  );
+
+  return (
+    <div ref={root} className="collection-views collection-views-overflow">
+      {tabs(shown)}
+      {hidden.length ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                className="collection-views-more"
+                aria-label={m.ui_views_more({ count: hidden.length })}
+              >
+                {m.common_count_more({ count: hidden.length })}
+                <ChevronDown aria-hidden="true" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="start" className="collection-views-menu">
+            <DropdownMenuRadioGroup
+              value={value}
+              onValueChange={(next: string) => {
+                const view = hidden.find((item) => item.value === next);
+                if (view) onChange(view.value);
+              }}
+            >
+              {groups.map(([group, items], index) => (
+                <DropdownMenuGroup key={group ?? index}>
+                  {group ? (
+                    <DropdownMenuLabel>{group}</DropdownMenuLabel>
+                  ) : null}
+                  {items.map((view) => (
+                    <DropdownMenuRadioItem
+                      key={view.value}
+                      value={view.value}
+                      title={view.description}
+                      // Opening a view is navigation, so the menu closes.
+                      closeOnClick
+                    >
+                      {content(view)}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuGroup>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+      {/* Every tab at its natural width, so the row knows what fits as it resizes. */}
+      <div ref={ruler} className="collection-views-ruler" aria-hidden inert>
+        <Tabs value={value}>
+          <TabsList>
+            {views.map((view) => (
+              <TabsTrigger key={view.value} value={view.value}>
+                {content(view)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Button variant="ghost" className="collection-views-more">
+          {m.common_count_more({ count: views.length })}
+          <ChevronDown aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
   );
 }
 

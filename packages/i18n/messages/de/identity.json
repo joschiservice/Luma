@@ -200,6 +200,7 @@
   "identity_search_placeholder": "Datensätze, Seiten und Aktionen suchen…",
   "identity_search_results_label": "Suchergebnisse",
   "identity_search_section_pages": "Gehe zu",
+  "identity_search_page_section": "{page}: {section}",
   "identity_search_section_records": "Datensätze",
   "identity_search_section_actions": "Aktionen",
   "identity_search_records_searching": "Datensätze werden durchsucht…",

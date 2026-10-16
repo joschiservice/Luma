@@ -6,9 +6,17 @@ import type {
   InsightRecord,
   InsightRecordQuery,
 } from '../../application/insights.js';
-import { caseSeries, countPoints } from '../../domain/insights.js';
+import {
+  caseSeries,
+  countPoints,
+  detectionCoverage,
+} from '../../domain/insights.js';
 import { iso, text } from '../orders/values.js';
-import { bucketRelation, readWindow } from './window.js';
+import {
+  bucketRelation,
+  readPreviousWindow,
+  readRecordWindow,
+} from './window.js';
 
 /*
  * Issues by the day or week Luma first detected them, by class. A reopened issue keeps its
@@ -26,15 +34,10 @@ const rows = (
 async function prepare(
   tx: SqlTransaction,
   tenantId: string,
-  query: InsightQuery,
+  query: InsightQuery & { point?: string | undefined },
   asOf: string,
 ) {
-  const { window, buckets } = await readWindow(
-    tx,
-    query.range,
-    query.timeZone,
-    asOf,
-  );
+  const { window, buckets } = await readRecordWindow(tx, query, asOf);
 
   return {
     window,
@@ -74,6 +77,13 @@ export async function caseChart(
     [tenantId, asOf, window.from, window.before],
   );
   const { undated, other } = excluded.rows[0]!;
+  const span = await readPreviousWindow(tx, window, asOf);
+  const previous = await tx.query<{ count: number; since: Date | null }>(
+    `WITH ${rows(timeline)} SELECT (SELECT count(*)::int FROM rows) AS count,
+      (SELECT min(detected_at) FROM timeline) AS since`,
+    [tenantId, asOf, ['previous'], [span.from], [span.before]],
+  );
+  const { count, since } = previous.rows[0]!;
   const points = countPoints(buckets, caseSeries, counts.rows);
 
   return {
@@ -94,6 +104,12 @@ export async function caseChart(
       ],
     },
     dataThrough: asOf,
+    previous: {
+      from: span.from,
+      before: span.before,
+      total: count,
+      coverage: detectionCoverage(span, iso(since)),
+    },
     asOf,
   };
 }

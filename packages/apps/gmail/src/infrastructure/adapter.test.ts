@@ -406,15 +406,13 @@ describe('messages.send', () => {
     });
   });
 
-  it('returns the existing message instead of sending twice', async () => {
+  it('treats an existing ID as a conflict without accepting or sending it', async () => {
     const gmail = fakeGmail({
       messages: () => ({ messages: [{ id: 'earlier', threadId: 't1' }] }),
     });
     await expect(
       run(connector(gmail.fetch), 'messages.send', outbound, 'v0:action'),
-    ).resolves.toMatchObject({
-      evidenceRefs: [sentEvidenceId(tenantId, connectionId, 'earlier')],
-    });
+    ).rejects.toMatchObject({ failure: { code: 'conflict' } });
     expect(gmail.calls.map((c) => c.url.pathname)).not.toContain(
       '/gmail/v1/users/me/messages/send',
     );

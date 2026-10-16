@@ -75,6 +75,12 @@ export const Open: Story = {
     await expect(
       body.queryByRole('link', { name: /^Home/ }),
     ).not.toBeInTheDocument();
+    // A page's views are offered by name.
+    await userEvent.clear(input);
+    await userEvent.type(input, 'trends');
+    await expect(
+      body.getByRole('link', { name: /^Insights: Trends/ }),
+    ).toBeVisible();
     await userEvent.clear(input);
     await userEvent.type(input, 'zz');
     await expect(body.getByRole('status')).toHaveTextContent('No matches');

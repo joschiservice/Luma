@@ -112,7 +112,10 @@ function page(result: MessagePage): ReadResult {
       .map((item) => ({
         providerMessageId: item.source.externalId,
         data: item.data,
+        observationId: item.id,
+        observedAt: item.observedAt,
       })),
+    complete: result.value.completeness === 'complete',
     nextCursor: result.value.nextCursor,
     retryAfterMs: result.value.retryAfterMs,
   };

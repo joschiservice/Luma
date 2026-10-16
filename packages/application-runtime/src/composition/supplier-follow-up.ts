@@ -5,11 +5,12 @@ import type { ConnectionsConfig } from '@luma/config';
 import { createInstalledPurchaseOrderRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import type { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 
 /**
  * Follows placed purchase orders in the background: dispatches approved submissions as their
@@ -22,6 +23,7 @@ export function createSupplierFollowUpWorker(options: {
   pool: Pool;
   identity: IdentityService;
   connections: ConnectionsConfig;
+  observability?: Observability;
   env?: Readonly<Record<string, string | undefined>>;
   intervalMs?: number;
   log?: (message: string, error?: unknown) => void;
@@ -29,11 +31,15 @@ export function createSupplierFollowUpWorker(options: {
   const host = createAppHost(options.database, {
     ...options.connections,
     refreshContext: options.identity.refreshContext,
+    featureEnabled: createTenantFeatureRelease(options.observability),
     ...(options.env ? { env: options.env } : {}),
   });
   const { commitments } = createApplicationServices({
     database: options.database,
     identity: options.identity,
+    ...(options.observability ? { observability: options.observability } : {}),
+    providerCatalog: host.providerCatalog,
+    connectionEnvironment: host.connectionEnvironment,
     execution: { kind: 'enabled', effects: { resolve: async () => null } },
     purchasing: {
       runtime: createInstalledPurchaseOrderRuntime({

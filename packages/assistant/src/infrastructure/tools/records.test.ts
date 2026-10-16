@@ -175,6 +175,7 @@ describe('contextual record evidence', () => {
       sourceFilter: 'applied' as const,
       coverage: { state: 'partial' as const, sources: [], excluded: [] },
       dataThrough: null,
+      previous: null,
       asOf: observedAt,
     }));
     const tools = createToolRegistry(insightTools({ records, chart }));

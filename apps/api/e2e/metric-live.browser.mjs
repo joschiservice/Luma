@@ -62,23 +62,19 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
       });
   });
   await page.goto(`/app/${f.org.id}/insights`);
-  const section = page.getByRole('region', {
-    name: 'Orders that need work',
-  });
-  const values = section.locator('.order-metric-value');
+  // Insights shows orders as one group of the Now view and the live status once for the page.
+  const section = page.getByRole('region', { name: 'Orders', exact: true });
+  const live = page.locator('.insights-live');
+  const values = section.locator('.operational-value');
   const hasCount = async (index, count) =>
     expect
       .poll(() => values.nth(index).textContent(), {
         interval: 20,
         timeout: 10000,
       })
-      .toMatch(new RegExp(`^${count}orders? found`));
+      .toBe(String(count));
   await hasCount(0, 200);
-  await section.getByText('Live updates', { exact: true }).waitFor();
-  await page
-    .getByRole('region', { name: 'Where work is waiting' })
-    .getByText('Live updates', { exact: true })
-    .waitFor();
+  await live.getByText('Live updates', { exact: true }).waitFor();
   expect(streamResponses.map(({ status }) => status)).toEqual([200]);
   // Every metric section on the page shares one summary read.
   expect(metricReads.length).toBeGreaterThan(0);
@@ -88,7 +84,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   const extraPages = await Promise.all([context.newPage(), context.newPage()]);
   for (const extra of extraPages) {
     await extra.goto(`/app/${f.org.id}/insights`);
-    await extra.getByText('Live updates', { exact: true }).nth(1).waitFor();
+    await extra.getByText('Live updates', { exact: true }).waitFor();
   }
   expect(streamResponses.map(({ status }) => status)).toEqual([200, 200, 200]);
   for (const extra of extraPages) {
@@ -129,8 +125,8 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     },
     { times: 1 },
   );
-  await section
-    .getByRole('button', { name: 'Refresh orders', exact: true })
+  await page
+    .getByRole('button', { name: 'Refresh insights', exact: true })
     .click();
   await expect.poll(() => held).toBe(true);
   await setStatus('cancelled');
@@ -160,10 +156,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     [f.org.id],
   );
   await hasCount(0, 200);
-  await section
-    .getByRole('button', { name: 'Show matching orders' })
-    .first()
-    .click();
+  await section.locator('[data-metric="orders.open"]').click();
   const dialog = page.getByRole('dialog');
   const orderNumber = await dialog
     .locator('.order-cohort-list strong')
@@ -196,12 +189,12 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   await hasCount(1, 0);
   await hasCount(1, 200);
   await context.setOffline(true);
-  await section.getByText('Offline', { exact: true }).waitFor();
+  await live.getByText('Offline', { exact: true }).waitFor();
   await setStatus('cancelled');
   const recoveryStart = performance.now();
   await context.setOffline(false);
   await hasCount(0, 199);
-  await section.getByText('Live updates', { exact: true }).waitFor();
+  await live.getByText('Live updates', { exact: true }).waitFor();
   const browserRecoveryMs = performance.now() - recoveryStart;
   // Degraded connector observation state remains separate from live internal delivery.
   await f.db.owner.query(
@@ -209,7 +202,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     [f.org.id],
   );
   await section.getByText('Data out of date', { exact: true }).waitFor();
-  await section.getByText('Live updates', { exact: true }).waitFor();
+  await live.getByText('Live updates', { exact: true }).waitFor();
   await mkdir('/tmp/luma85-ui', { recursive: true });
   await section.screenshot({ path: '/tmp/luma85-ui/desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });

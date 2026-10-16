@@ -237,5 +237,6 @@
   "ui_board_move": "Move to…",
   "ui_board_move_to": "Move to",
   "ui_board_empty": "No records",
-  "ui_condition_resolved": "{value} ({resolved})"
+  "ui_condition_resolved": "{value} ({resolved})",
+  "ui_views_more": "{count, plural, one {{count, number} more view} other {{count, number} more views}}"
 }

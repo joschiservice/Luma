@@ -90,58 +90,71 @@ const environmentOrder: OutcomeEnvironment[] = [
 const windowOrder: OutcomeWindow[] = ['24h', '7d'];
 
 /**
- * Shows verified outcomes and human help with explicit environment/window controls and authorized
- * evidence drilldowns. The page owns the cohort so its metric summary reads the matching request.
+ * Chooses the verified-outcome cohort: the environment its incidents ran in and how recently
+ * they were first detected. Anything but live operations is marked as excluded from live results.
+ */
+export function OutcomeFilters({
+  environment,
+  window,
+  onEnvironmentChange,
+  onWindowChange,
+}: {
+  environment: OutcomeEnvironment;
+  window: OutcomeWindow;
+  onEnvironmentChange: (environment: OutcomeEnvironment) => void;
+  onWindowChange: (window: OutcomeWindow) => void;
+}) {
+  return (
+    <>
+      <Select
+        className="outcome-environment-select"
+        aria-label={m.overview_outcomes_env_label()}
+        options={environmentOrder.map((value) => ({
+          value,
+          label: environments[value](),
+        }))}
+        value={environment}
+        onValueChange={(value) => {
+          if (value) onEnvironmentChange(value);
+        }}
+      />
+      <Select
+        className="outcome-window-select"
+        aria-label={m.overview_outcomes_window_label()}
+        options={windowOrder.map((value) => ({
+          value,
+          label: windows[value](),
+        }))}
+        value={window}
+        onValueChange={(value) => {
+          if (value) onWindowChange(value);
+        }}
+      />
+      {environment !== 'live' ? (
+        <Badge tone="warning">{m.overview_outcomes_excluded()}</Badge>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Shows verified outcomes and human help for the cohort the page's filters choose, with
+ * authorized evidence drilldowns. The page owns the cohort so its metric summary reads the
+ * matching request, and it shows the live status and refresh.
  */
 export function ResolutionOutcomes({
   organizationId,
   live,
   environment,
   window,
-  onEnvironmentChange,
-  onWindowChange,
 }: {
   organizationId: string;
   live: LiveMetricView<OperationalMetricResponse>;
   environment: OutcomeEnvironment;
   window: OutcomeWindow;
-  onEnvironmentChange: (environment: OutcomeEnvironment) => void;
-  onWindowChange: (window: OutcomeWindow) => void;
 }) {
-  const environmentOptions = environmentOrder.map((value) => ({
-    value,
-    label: environments[value](),
-  }));
-  const windowOptions = windowOrder.map((value) => ({
-    value,
-    label: windows[value](),
-  }));
-
   return (
     <div className="outcome-measurement">
-      <div className="outcome-measurement-controls">
-        <Select
-          className="outcome-environment-select"
-          aria-label={m.overview_outcomes_env_label()}
-          options={environmentOptions}
-          value={environment}
-          onValueChange={(value) => {
-            if (value) onEnvironmentChange(value);
-          }}
-        />
-        <Select
-          className="outcome-window-select"
-          aria-label={m.overview_outcomes_window_label()}
-          options={windowOptions}
-          value={window}
-          onValueChange={(value) => {
-            if (value) onWindowChange(value);
-          }}
-        />
-        {environment !== 'live' ? (
-          <Badge tone="warning">{m.overview_outcomes_excluded()}</Badge>
-        ) : null}
-      </div>
       <OperationalMetrics
         key={`${organizationId}:${environment}:${window}`}
         organizationId={organizationId}
@@ -150,6 +163,7 @@ export function ResolutionOutcomes({
         metricGroups={groups}
         heading={m.overview_outcomes_title()}
         description={m.overview_outcomes_description()}
+        embedded
       />
     </div>
   );
