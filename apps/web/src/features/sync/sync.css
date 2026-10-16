@@ -355,6 +355,15 @@
   color: var(--state-warning-text);
 }
 
+.sync-stream-wait {
+  flex-basis: 100%;
+  white-space: normal;
+}
+
+.sync-stream-wait[data-delayed] {
+  color: var(--state-warning-text);
+}
+
 .sync-stream-progress {
   display: grid;
   gap: 4px;

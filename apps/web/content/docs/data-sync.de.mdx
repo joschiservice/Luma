@@ -26,7 +26,7 @@ Lieferanten und Lieferantenbestellungen aus JTL erscheinen hier nicht. Die [Besc
 
 Oben fasst die Seite alle Abgleiche zusammen, etwa **Verlauf wird importiert**, **Aktuell** oder **2 Abgleiche müssen geprüft werden**. Ein Balken zählt die Abgleiche nach Status, und vier Kennzahlen zeigen, wie viele und wie aktuelle Daten vorliegen: **Datensätze in Luma**, **Verlauf importiert**, der **Älteste Abgleich** und die **Älteste vollständige Prüfung**.
 
-**Muss geprüft werden** erscheint, wenn ein Abgleich oder eine Verbindung eine Person braucht: ein Abgleich, der wiederholt fehlschlägt oder darauf wartet, dass ihn jemand fortsetzt, eine Verbindung, die nicht aktiv ist, Datensätze, die Luma nicht importieren konnte, oder älterer Verlauf, der verfügbar geworden ist. Jeder Eintrag bietet den Schritt, der ihn löst, etwa **Jetzt erneut versuchen**, **Mit meinem Zugriff fortsetzen**, **Verbindung verwalten** oder **Ältere Bestellungen importieren**. Automatische Wiederholungen und Wartezeiten stehen dort nicht; Luma löst sie selbst.
+**Muss geprüft werden** erscheint, wenn ein Abgleich oder eine Verbindung eine Person braucht: ein Abgleich, der wiederholt fehlschlägt oder darauf wartet, dass ihn jemand fortsetzt, eine Verbindung, die nicht aktiv ist, Datensätze, die Luma nicht importieren konnte, oder älterer Verlauf, der verfügbar geworden ist. Jeder Eintrag bietet den Schritt, der ihn löst, etwa **Jetzt erneut versuchen**, **Mit meinem Zugriff fortsetzen**, **Verbindung verwalten** oder **Ältere Bestellungen importieren**. Automatische Wiederholungen und Wartezeiten stehen dort nicht. Ihr Status erklärt, worauf sie warten.
 
 Darunter listet jede Verbindung ihre Datensatztypen mit ihrem Status, etwa **Verlauf wird importiert**, **Änderungen werden gelesen** oder **Aktuell**, mit dem, was Luma hat, dem Fortschritt eines laufenden Lesevorgangs und dem letzten Abgleich. Datensatztypen, die die Verbindung nicht abgleicht, stehen zusammengefasst in einer Zeile unter der Verbindung.
 
@@ -91,6 +91,7 @@ Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig 
 ## Wenn ein Abgleich dich braucht [#when-a-sync-needs-you]
 
 - **Wartet wegen Anfragelimit** oder **Erneuter Versuch nach Anfragelimit**: Luma hält das Anfragelimit der Quelle ein. Luma versucht es automatisch erneut und zeigt den nächsten Versuch an, wenn der Zeitpunkt bekannt ist. Du kannst die Seite verlassen; bereits importierte Datensätze bleiben verfügbar.
+- **Synchronisierung verzögert**: Ein fälliger Abgleich wurde länger als erwartet nicht aufgenommen. Prüfe den letzten erfolgreichen Lesevorgang und aktualisiere den Status, um den Fortschritt zu verfolgen. Bereits importierte Datensätze bleiben verfügbar.
 - **Wartet auf Sync-Kapazität**: Andere Lesezugriffe laufen. Luma fährt automatisch fort, sobald Kapazität verfügbar ist.
 - **Neuer Versuch läuft**: Ein Lesevorgang ist fehlgeschlagen, und Luma versucht es automatisch erneut, mit jeweils etwas längerer Pause.
 - **Fehlgeschlagen**: Der Abgleich ist mehrmals hintereinander fehlgeschlagen. Die Meldung nennt den Grund. Behebe die Ursache, etwa indem du die Verbindung neu verbindest, und wähle dann **Jetzt erneut versuchen**.

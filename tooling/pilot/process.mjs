@@ -1,46 +1,9 @@
 import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 
 import { startTelemetry } from '../observability/runtime.mjs';
+import { startPilotBackgroundWork } from './background.mjs';
 import { readJson } from './fixtures.mjs';
 import { startJourney } from './journey.mjs';
-
-/**
- * Runs commerce sync in the background like the sync worker, one pass at a time and briefly
- * idle between passes. Once a minute it links the next SKUs a merchant reviewed, completes the
- * demo workflow setup, carries customers' quantity requests into Luma's records, and runs the
- * inventory scenario check and scheduled detection. Failures go to `log`. Returns a function
- * that stops after the current pass.
- */
-function startSync(pilot, log) {
-  let stopped = false;
-  let checkedAt = 0;
-  const loop = (async () => {
-    while (!stopped) {
-      const check = Date.now() - checkedAt >= 60_000;
-      if (check) checkedAt = Date.now();
-      await pilot
-        .observe({ passes: 1, refresh: false, check })
-        .catch((error) => log('Pilot sync pass failed', error));
-      if (check)
-        for (const step of [
-          pilot.link,
-          pilot.demo,
-          pilot.quantityChanges,
-          pilot.detect,
-        ]) {
-          if (stopped) break;
-          await step().catch((error) => log('Pilot sync step failed', error));
-        }
-      await delay(2_000);
-    }
-  })();
-
-  return async () => {
-    stopped = true;
-    await loop;
-  };
-}
 
 const directory = process.env.LUMA_PILOT_DIRECTORY;
 if (!directory || process.env.NODE_ENV === 'production')
@@ -113,7 +76,10 @@ try {
     console.log(`Synthetic pilot API: ${address}`);
     if (manifest.simulator) {
       const { createFailureLog } = await import('@luma/platform');
-      stopObservations = startSync(pilot, createFailureLog(observability));
+      stopObservations = startPilotBackgroundWork(
+        pilot,
+        createFailureLog(observability),
+      );
     }
   }
 } catch (error) {

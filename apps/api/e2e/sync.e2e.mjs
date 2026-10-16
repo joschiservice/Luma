@@ -4,6 +4,31 @@ import { expect, it } from 'vitest';
 
 import { syncFixture } from './sync-fixture.mjs';
 
+it('reports overdue unclaimed syncs and clears the delay when a page is claimed', async (t) => {
+  const f = await syncFixture(t);
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET lease_token=NULL,lease_until=NULL,due_at=now()-interval '4 minutes'
+      WHERE tenant_id=$1 AND id=$2`,
+    [f.org.id, f.stream],
+  );
+  const read = async () =>
+    (await f.request(f.member, `${f.base}/sync`)).connections.find(
+      (connection) => connection.connectionId === f.store,
+    ).recordTypes[0].stream;
+  expect(await read()).toMatchObject({
+    status: 'waiting',
+    waiting: { reason: 'delayed', connections: [], until: null },
+    scan: { records: 50, total: 120 },
+    records: { total: 50 },
+  });
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET lease_token=$2,lease_until=now()+interval '5 minutes'
+      WHERE tenant_id=$1 AND id=$2`,
+    [f.org.id, f.stream],
+  );
+  expect(await read()).toMatchObject({ status: 'importing', waiting: null });
+});
+
 it('reports import progress and coverage, and lets only managers control syncs', async (t) => {
   const f = await syncFixture(t);
   const overview = await f.request(f.member, `${f.base}/sync`);

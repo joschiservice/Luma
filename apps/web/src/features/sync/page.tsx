@@ -96,6 +96,7 @@ import {
   type SyncItem,
   syncItems,
   unavailableReason,
+  waitingStatement,
 } from './presentation';
 import {
   closedRecords,
@@ -948,11 +949,20 @@ function ConnectionSync({
 
 function StreamBrief({ item }: { item: SyncItem }) {
   const note = recordNote(item.type, item.stream);
+  const waiting = waitingStatement(item.stream);
 
   return (
     <span className="sync-stream-brief">
       <span>{coverageBrief(item.type, item.stream)}</span>
       {note ? <span className="sync-stream-flag">{note}</span> : null}
+      {waiting ? (
+        <span
+          className="sync-stream-wait"
+          data-delayed={item.stream.waiting?.reason === 'delayed' || undefined}
+        >
+          {waiting}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -1017,6 +1027,12 @@ function StreamFreshness({
       {retry ? (
         <small title={retry}>
           {m.sync_stream_next_retry({ time: soon(retry, now) })}
+        </small>
+      ) : stream.status === 'up_to_date' &&
+        stream.nextRunAt &&
+        Date.parse(stream.nextRunAt) > now ? (
+        <small title={stream.nextRunAt}>
+          {m.sync_stream_next_check({ time: soon(stream.nextRunAt, now) })}
         </small>
       ) : null}
       <ChevronRight

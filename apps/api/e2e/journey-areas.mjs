@@ -1070,7 +1070,7 @@ export const journeyAreas = {
   'pilot.e2e.mjs': [
     ...pilot,
     ...replenishmentRuntime,
-    'tooling/pilot/process.mjs',
+    'tooling/pilot/{process,background}.mjs',
     'tooling/observability/**',
   ],
   'playbooks.browser.mjs': [

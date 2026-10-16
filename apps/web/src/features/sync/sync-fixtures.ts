@@ -95,6 +95,12 @@ export const shopify: SyncConnectionView = {
       availability: 'granted',
       stream: stream({
         status: 'waiting',
+        waiting: {
+          reason: 'orders',
+          observedAt: asOf,
+          until: null,
+          connections: [],
+        },
         phase: 'backfill',
         backfillCompletedAt: null,
         lastSuccessAt: null,
@@ -433,6 +439,32 @@ export const waiting: SyncOverview = {
         },
       };
     }),
+  })),
+};
+
+/** Overdue unclaimed work, with imported progress preserved and no inferred worker outage. */
+export const delayed: SyncOverview = {
+  ...waiting,
+  connections: waiting.connections.map((connection, index) => ({
+    ...connection,
+    recordTypes: connection.recordTypes.map((item) =>
+      index === 0 && item.recordType === 'orders' && item.stream
+        ? {
+            ...item,
+            stream: {
+              ...item.stream,
+              waiting: {
+                reason: 'delayed',
+                observedAt: asOf,
+                until: null,
+                connections: [],
+              },
+              lastSuccessAt: '2026-09-29T08:56:00.000Z',
+              nextRunAt: '2026-09-29T08:56:00.000Z',
+            },
+          }
+        : item,
+    ),
   })),
 };
 

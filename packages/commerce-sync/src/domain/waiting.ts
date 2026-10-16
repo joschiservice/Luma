@@ -1,4 +1,4 @@
-import { orderChildren, type SyncStream } from './streams.js';
+import { orderChildren, syncPolicy, type SyncStream } from './streams.js';
 
 /** Scheduling evidence for a wait, evaluated against one tenant's current stream snapshot. */
 export interface SyncWait {
@@ -10,7 +10,8 @@ export interface SyncWait {
     | 'worker_capacity'
     | 'connection_capacity'
     | 'recent_changes'
-    | 'queued';
+    | 'queued'
+    | 'delayed';
   connectionIds: string[];
   observedAt: string;
   until: string | null;
@@ -91,5 +92,14 @@ export function syncWait(
   if (workspaceLimit && active.length >= workspaceLimit)
     return capacityWait('worker_capacity', active);
 
-  return wait('queued');
+  // Expired provider advice or a page lease may have made old due work eligible only recently.
+  const eligibleSince = Math.max(
+    Date.parse(due),
+    stream.providerDueAt ? Date.parse(stream.providerDueAt) : 0,
+    stream.leaseUntil ? Date.parse(stream.leaseUntil) : 0,
+  );
+
+  return wait(
+    +now - eligibleSince >= syncPolicy.queueDelayMs ? 'delayed' : 'queued',
+  );
 }

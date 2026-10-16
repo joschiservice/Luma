@@ -122,6 +122,8 @@ export function StreamDetail({
   const { stream, type, connection } = item;
   const now = Date.parse(asOf);
   const state = streamState(stream);
+  const delayed =
+    stream.status === 'waiting' && stream.waiting?.reason === 'delayed';
 
   return (
     <div
@@ -235,13 +237,17 @@ export function StreamDetail({
           </PreviewFact>
           <PreviewFact
             label={
-              stream.error
-                ? m.sync_detail_next_retry()
-                : m.sync_detail_next_check()
+              delayed
+                ? m.sync_detail_due()
+                : stream.error
+                  ? m.sync_detail_next_retry()
+                  : m.sync_detail_next_check()
             }
           >
             {stream.paused || stream.blocked || !stream.nextRunAt ? (
               m.sync_detail_not_scheduled()
+            ) : delayed ? (
+              <Moment value={stream.nextRunAt} now={now} />
             ) : (
               <span title={stream.nextRunAt}>
                 {soon(stream.nextRunAt, now)}
@@ -386,15 +392,17 @@ function ImportProgress({ item, now }: { item: SyncItem; now: number }) {
         <small>
           {progress.text}
           {stream.scan
-            ? ` · ${m.sync_detail_running_for({
-                time: runDuration(
-                  {
-                    startedAt: stream.scan.startedAt,
-                    finishedAt: null,
-                  },
-                  now,
-                ),
-              })}`
+            ? stream.status === 'waiting'
+              ? ` · ${m.sync_detail_read_started({ time: ago(stream.scan.startedAt, now) })}`
+              : ` · ${m.sync_detail_running_for({
+                  time: runDuration(
+                    {
+                      startedAt: stream.scan.startedAt,
+                      finishedAt: null,
+                    },
+                    now,
+                  ),
+                })}`
             : null}
         </small>
       </div>
@@ -481,7 +489,9 @@ function ImportProgress({ item, now }: { item: SyncItem; now: number }) {
           </li>
         ))}
       </ol>
-      <p className="collection-preview-note">{m.sync_detail_import_note()}</p>
+      {['importing', 'syncing'].includes(stream.status) ? (
+        <p className="collection-preview-note">{m.sync_detail_import_note()}</p>
+      ) : null}
     </section>
   );
 }

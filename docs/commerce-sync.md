@@ -231,6 +231,11 @@ tenant-scoped snapshot and clears when capacity is released. A due stream withou
 active page waits for the next sync pass. Waiting never establishes fresh coverage or a
 successful read, and imported progress remains visible.
 
+Due work with no active lease or evidenced capacity wait is reported as delayed after two
+minutes. An expired page lease or provider cooldown starts that grace period again. This
+reports unclaimed work, not a worker outage: the overview has no worker-health evidence.
+Future scheduled checks remain up to date, and a new page claim clears the delay.
+
 Runs are retained. The overview lists the workspace's latest 30; a stream's history route
 pages 20 at a time through the `(tenant, stream, started)` index, with the same source
 visibility as the overview. Its cursor is the last run's ID, so an unknown run returns an empty

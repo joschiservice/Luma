@@ -214,7 +214,7 @@ export function streamState(stream: SyncStreamView): {
       };
     case 'waiting':
       return {
-        state: 'waiting',
+        state: stream.waiting?.reason === 'delayed' ? 'attention' : 'waiting',
         label: waitingLabel(stream.waiting?.reason),
       };
     case 'importing':
@@ -246,6 +246,7 @@ function waitingLabel(
 ): string {
   switch (reason) {
     case undefined:
+      return m.sync_state_waiting();
     case 'orders':
       return m.sync_state_waiting_for_orders();
     case 'request_capacity':
@@ -254,6 +255,12 @@ function waitingLabel(
     case 'worker_capacity':
     case 'connection_capacity':
       return m.sync_state_waiting_capacity();
+    case 'admission_unavailable':
+      return m.sync_state_scheduling_unavailable();
+    case 'recent_changes':
+      return m.sync_state_waiting_recent_changes();
+    case 'delayed':
+      return m.sync_state_delayed();
     default:
       return m.sync_state_waiting();
   }
@@ -263,7 +270,7 @@ function waitingLabel(
 export function waitingStatement(stream: SyncStreamView): string | null {
   if (stream.status !== 'waiting') return null;
   const waiting = stream.waiting;
-  if (!waiting) return m.sync_stream_starts_after_orders();
+  if (!waiting) return m.sync_wait_queued();
   switch (waiting.reason) {
     case 'orders':
       return m.sync_stream_starts_after_orders();
@@ -287,7 +294,49 @@ export function waitingStatement(stream: SyncStreamView): string | null {
         : m.sync_wait_worker_capacity();
     case 'queued':
       return m.sync_wait_queued();
+    case 'delayed':
+      return m.sync_wait_delayed();
   }
+}
+
+/** Summarizes known wait reasons without attributing a queue delay to an unavailable worker. */
+function waitingSummary(streams: SyncStreamView[]) {
+  const groups = {
+    rate: { count: 0, label: m.sync_wait_summary_rate },
+    capacity: { count: 0, label: m.sync_wait_summary_capacity },
+    orders: { count: 0, label: m.sync_wait_summary_orders },
+    scheduling: { count: 0, label: m.sync_wait_summary_scheduling },
+    queued: { count: 0, label: m.sync_wait_summary_queued },
+  };
+  for (const stream of streams) {
+    if (stream.status !== 'waiting') continue;
+    switch (stream.waiting?.reason) {
+      case 'delayed':
+        break;
+      case 'request_capacity':
+      case 'provider_cooldown':
+        groups.rate.count++;
+        break;
+      case 'worker_capacity':
+      case 'connection_capacity':
+      case 'recent_changes':
+        groups.capacity.count++;
+        break;
+      case 'orders':
+        groups.orders.count++;
+        break;
+      case 'admission_unavailable':
+        groups.scheduling.count++;
+        break;
+      default:
+        groups.queued.count++;
+    }
+  }
+
+  return Object.values(groups)
+    .filter((group) => group.count)
+    .map((group) => group.label({ count: group.count }))
+    .join(' ');
 }
 
 /**
@@ -462,6 +511,19 @@ export function overallState(overview: SyncOverview): {
       title: m.sync_overall_attention_title({ count: needs }),
       detail: m.sync_overall_attention_detail(),
     };
+  const waits = waitingSummary(streams);
+  const delayed = streams.filter(
+    (stream) =>
+      stream.status === 'waiting' && stream.waiting?.reason === 'delayed',
+  ).length;
+  if (delayed)
+    return {
+      state: 'attention',
+      title: m.sync_overall_delayed_title({ count: delayed }),
+      detail: [m.sync_overall_attention_detail(), waits]
+        .filter(Boolean)
+        .join(' '),
+    };
   const importing = streams.filter((stream) => stream.phase === 'backfill');
   if (importing.length && importing.every((stream) => stream.paused))
     return {
@@ -476,21 +538,26 @@ export function overallState(overview: SyncOverview): {
     return {
       state: 'waiting',
       title: m.sync_overall_waiting_title(),
-      detail: m.sync_overall_waiting_detail(),
+      detail: waits || m.sync_overall_waiting_detail(),
     };
   if (importing.length)
     return {
       state: 'running',
       title: m.sync_overall_importing_title(),
-      detail: importing.some(
-        (stream) =>
-          stream.coverage.recentCompletedAt && stream.coverage.recentFrom,
-      )
-        ? m.sync_overall_importing_recent_detail()
-        : m.sync_overall_importing_detail({
-            done: streams.length - importing.length,
-            total: streams.length,
-          }),
+      detail: [
+        importing.some(
+          (stream) =>
+            stream.coverage.recentCompletedAt && stream.coverage.recentFrom,
+        )
+          ? m.sync_overall_importing_recent_detail()
+          : m.sync_overall_importing_detail({
+              done: streams.length - importing.length,
+              total: streams.length,
+            }),
+        waits,
+      ]
+        .filter(Boolean)
+        .join(' '),
     };
   const retrying = streams.filter((s) => s.status === 'retrying').length;
   if (retrying)
@@ -503,7 +570,7 @@ export function overallState(overview: SyncOverview): {
     return {
       state: 'waiting',
       title: m.sync_overall_waiting_title(),
-      detail: m.sync_overall_waiting_detail(),
+      detail: waits || m.sync_overall_waiting_detail(),
     };
   const latest = streams
     .map((stream) => stream.lastSuccessAt)
@@ -595,7 +662,13 @@ export function syncItems(overview: SyncOverview): SyncItem[] {
 
 /** Groups of the workspace health bar, from most to least urgent. */
 export type HealthGroup =
-  'attention' | 'retrying' | 'importing' | 'waiting' | 'paused' | 'current';
+  | 'attention'
+  | 'retrying'
+  | 'delayed'
+  | 'importing'
+  | 'waiting'
+  | 'paused'
+  | 'current';
 
 const healthGroups: Record<
   HealthGroup,
@@ -603,6 +676,7 @@ const healthGroups: Record<
 > = {
   attention: { state: 'error', label: m.sync_health_attention },
   retrying: { state: 'attention', label: m.sync_health_retrying },
+  delayed: { state: 'attention', label: m.sync_health_delayed },
   importing: { state: 'running', label: m.sync_health_importing },
   waiting: { state: 'waiting', label: m.sync_health_waiting },
   paused: { state: 'idle', label: m.sync_health_paused },
@@ -618,6 +692,8 @@ function healthGroup(stream: SyncStreamView): HealthGroup {
     return 'attention';
   if (stream.status === 'retrying') return 'retrying';
   if (stream.status === 'paused') return 'paused';
+  if (stream.status === 'waiting' && stream.waiting?.reason === 'delayed')
+    return 'delayed';
   if (stream.status === 'waiting') return 'waiting';
   if (stream.phase === 'backfill') return 'importing';
 

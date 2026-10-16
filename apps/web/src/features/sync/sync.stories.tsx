@@ -15,6 +15,7 @@ import { SyncView } from './page';
 import {
   attention,
   current,
+  delayed,
   disconnected,
   importing,
   opportunities,
@@ -32,6 +33,7 @@ const overviews: Record<string, SyncOverview | undefined> = {
   recentHistory,
   waiting,
   current,
+  delayed,
   rateLimited,
   attention,
   opportunities,
@@ -424,6 +426,39 @@ export const WaitingDetail: Story = {
 
 export const WaitingDark: Story = {
   args: { state: 'waiting' },
+  globals: { theme: 'dark' },
+};
+
+export const Delayed: Story = {
+  args: { state: 'delayed' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: '1 sync is delayed' }),
+    ).toBeVisible();
+    const row = canvas.getByRole('link', {
+      name: 'Orders: Sync delayed',
+    });
+    await expect(
+      within(row).getByText(
+        'This sync is overdue and has not been picked up yet. Imported records remain available.',
+      ),
+    ).toBeVisible();
+    await expect(canvas.getByText('1,240 of 3,100 orders')).toBeVisible();
+    await userEvent.click(row);
+    const pane = within(
+      await canvas.findByRole('region', { name: 'Sync details' }),
+    );
+    await expect(
+      pane.getByText(
+        'This sync is overdue and has not been picked up yet. Imported records remain available.',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const DelayedDark: Story = {
+  args: { state: 'delayed' },
   globals: { theme: 'dark' },
 };
 

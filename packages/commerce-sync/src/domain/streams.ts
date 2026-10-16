@@ -112,6 +112,8 @@ export const syncPolicy = {
   pageSize: 100,
   recentHistoryMs: 30 * 24 * 60 * 60_000,
   leaseMs: 5 * 60_000,
+  /** Due, unclaimed work is delayed after this grace period; this is not worker-health evidence. */
+  queueDelayMs: 2 * 60_000,
   /** Interval between change reads when the source filters by update time. */
   incrementalIntervalMs: 5 * 60_000,
   /** Interval between full rereads when the source cannot filter by update time. */

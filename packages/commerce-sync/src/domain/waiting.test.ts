@@ -39,6 +39,51 @@ function stream(patch: Partial<SyncStream> = {}): SyncStream {
 }
 
 describe('sync waiting evidence', () => {
+  it('flags prolonged unclaimed work without claiming a worker outage', () => {
+    const queued = stream({ dueAt: '2026-10-14T12:58:01Z' });
+    expect(syncWait(queued, [], now)?.reason).toBe('queued');
+    const delayed = { ...queued, dueAt: '2026-10-14T12:58:00Z' };
+    expect(syncWait(delayed, [], now)).toMatchObject({
+      reason: 'delayed',
+      observedAt: now.toISOString(),
+      connectionIds: [],
+      until: null,
+    });
+    expect(syncWait({ ...delayed, leaseUntil: after }, [], now)).toBeNull();
+    expect(syncWait({ ...delayed, paused: true }, [], now)).toBeNull();
+    expect(syncWait({ ...delayed, dueAt: after }, [], now)).toBeNull();
+    expect(
+      syncWait({ ...delayed, providerDueAt: before }, [], now)?.reason,
+    ).toBe('queued');
+    expect(syncWait({ ...delayed, leaseUntil: before }, [], now)?.reason).toBe(
+      'queued',
+    );
+  });
+
+  it('preserves an evidenced wait while old work is blocked on orders or capacity', () => {
+    const old = stream({ dueAt: '2026-10-14T12:00:00Z' });
+    expect(
+      syncWait({ ...old, recordType: 'fulfillments' }, [stream()], now)?.reason,
+    ).toBe('orders');
+    expect(
+      syncWait(
+        old,
+        [
+          stream({
+            id: 'holder',
+            connectionId: 'erp',
+            leaseUntil: after,
+            leaseWorkspaceConcurrency: 1,
+          }),
+        ],
+        now,
+      )?.reason,
+    ).toBe('worker_capacity');
+    expect(syncWait({ ...old, providerDueAt: after }, [], now)?.reason).toBe(
+      'provider_cooldown',
+    );
+  });
+
   it('shows admission advice only until due, and clears it while a page is leased', () => {
     const deferred = stream({
       admissionWait: { reason: 'request_capacity', observedAt: before },

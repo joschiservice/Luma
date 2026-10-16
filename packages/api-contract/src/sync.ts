@@ -42,6 +42,7 @@ export const syncStreamSchema = z.object({
         'connection_capacity',
         'recent_changes',
         'queued',
+        'delayed',
       ]),
       connections: z.array(
         z.object({ connectionId: z.string().uuid(), label: z.string() }),

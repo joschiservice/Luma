@@ -1010,6 +1010,10 @@ export async function createPilot(
       demo: async () => demo?.pass(),
       /** Carries simulated customers' quantity requests into Luma's order records. */
       quantityChanges: async () => quantityChanges?.pass(),
+      /** Runs the explicit stock scenario independently of commerce import passes. */
+      checkInventory: async () => {
+        if (inventory) await inventory.check(await operator(), detection);
+      },
       /** Runs one scheduled detection and verification pass, as the sync worker does. */
       detect: async () => {
         if (scheduled) await scheduled.tick(await operator());

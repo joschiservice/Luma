@@ -199911,7 +199911,8 @@
                                                     "worker_capacity",
                                                     "connection_capacity",
                                                     "recent_changes",
-                                                    "queued"
+                                                    "queued",
+                                                    "delayed"
                                                   ],
                                                   "type": "string"
                                                 },
@@ -201213,7 +201214,8 @@
                                 "worker_capacity",
                                 "connection_capacity",
                                 "recent_changes",
-                                "queued"
+                                "queued",
+                                "delayed"
                               ],
                               "type": "string"
                             },
@@ -201840,7 +201842,8 @@
                                                   "worker_capacity",
                                                   "connection_capacity",
                                                   "recent_changes",
-                                                  "queued"
+                                                  "queued",
+                                                  "delayed"
                                                 ],
                                                 "type": "string"
                                               },

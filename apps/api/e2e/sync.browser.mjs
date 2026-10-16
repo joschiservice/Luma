@@ -78,6 +78,11 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     exact: true,
   });
   await waitingRow.waitFor();
+  await expect(
+    waitingRow.getByText(
+      'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
+    ),
+  ).toBeVisible();
   // The row opens the sync's detail beside the list, which explains the wait.
   await waitingRow.click();
   await page.waitForURL(/[?&]stream=/);
@@ -111,12 +116,55 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   );
   await page.getByRole('button', { name: 'Refresh sync status' }).click();
   await expect(
-    page.getByText('Waiting for sync capacity. Currently syncing: JTL-Wawi.'),
+    detail.getByText('Waiting for sync capacity. Currently syncing: JTL-Wawi.'),
   ).toBeVisible();
   await f.db.owner.query(
     'DELETE FROM commerce_sync_streams WHERE tenant_id=$1 AND id=$2',
     [f.org.id, busy],
   );
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET due_at=now()-interval '4 minutes'
+      WHERE tenant_id=$1 AND id=$2`,
+    [f.org.id, f.stream],
+  );
+  await page.getByRole('button', { name: 'Refresh sync status' }).click();
+  await expect(
+    page.getByRole('heading', { name: '1 sync is delayed' }),
+  ).toBeVisible();
+  const delayedRow = page.getByRole('link', {
+    name: 'Orders: Sync delayed',
+    exact: true,
+  });
+  const delayedText =
+    'This sync is overdue and has not been picked up yet. Imported records remain available.';
+  await expect(delayedRow.getByText(delayedText)).toBeVisible();
+  await expect(detail.getByText(delayedText)).toBeVisible();
+  await expect(
+    page.getByText('50 of 120 orders', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: '/tmp/luma-sync-delayed-light.png',
+    fullPage: true,
+  });
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  await page.screenshot({
+    path: '/tmp/luma-sync-delayed-dark.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: '/tmp/luma-sync-delayed-mobile.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await f.db.owner.query(
     `UPDATE commerce_sync_streams SET lease_token=$2,lease_until=now()+interval '5 minutes'
       WHERE tenant_id=$1 AND id=$2`,
@@ -130,6 +178,7 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     page.getByText('Waiting for sync capacity. Currently syncing: JTL-Wawi.'),
   ).toHaveCount(0);
   await expect(progress).toHaveAttribute('aria-valuetext', '50 of 120 orders');
+  await expect(page.getByText(delayedText)).toHaveCount(0);
 
   await f.db.owner.query(
     `UPDATE commerce_sync_streams SET recent_history_from=now()-interval '30 days',

@@ -22,6 +22,7 @@ import {
 import {
   attention,
   current,
+  delayed,
   disconnected,
   importing,
   jtl,
@@ -208,7 +209,8 @@ describe('waiting explanations', () => {
     ['provider_cooldown', 'Waiting for rate limit'],
     ['connection_capacity', 'Waiting for sync capacity'],
     ['orders', 'Waiting for orders'],
-    ['admission_unavailable', 'Waiting'],
+    ['admission_unavailable', 'Read scheduling unavailable'],
+    ['recent_changes', 'Waiting for recent changes'],
     ['queued', 'Waiting'],
   ] as const)('labels %s accurately', (reason, label) => {
     const waiting = stream({
@@ -307,6 +309,40 @@ describe('waiting explanations', () => {
     expect(waitingStatement(waiting)).toBe(
       'Luma is waiting for request capacity to stay within the source’s rate limit. It will retry automatically.',
     );
+  });
+
+  it('surfaces delayed work separately, preserving progress without promising continuation', () => {
+    const target = delayed.connections[0]!.recordTypes[0]!.stream!;
+    expect(streamState(target)).toEqual({
+      state: 'attention',
+      label: 'Sync delayed',
+    });
+    expect(waitingStatement(target)).toBe(
+      'This sync is overdue and has not been picked up yet. Imported records remain available.',
+    );
+    expect(scanProgress('orders', target)?.text).toBe('1,240 of 3,100 orders');
+    expect(overallState(delayed)).toMatchObject({
+      state: 'attention',
+      title: '1 sync is delayed',
+    });
+    expect(
+      syncHealth(delayed).find((group) => group.group === 'delayed'),
+    ).toMatchObject({ count: 1, label: '1 delayed', state: 'attention' });
+  });
+
+  it('summarizes evidenced wait reasons while other imports progress', () => {
+    expect(overallState(delayed).detail).toContain(
+      '1 sync is waiting for provider limits.',
+    );
+    expect(overallState(delayed).detail).toContain(
+      '1 sync is waiting for orders to import.',
+    );
+    expect(waitingStatement(stream({ status: 'waiting', waiting: null }))).toBe(
+      'Waiting for the next sync pass.',
+    );
+    expect(
+      streamState(stream({ status: 'waiting', waiting: null })).label,
+    ).toBe('Waiting');
   });
 });
 
