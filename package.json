@@ -72,23 +72,23 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@testcontainers/postgresql": "12.1.0",
-    "testcontainers": "12.1.0",
+    "@testcontainers/postgresql": "12.2.1",
+    "testcontainers": "12.2.1",
     "@types/node": "catalog:",
-    "eslint": "^10.10.0",
+    "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "64.5.4",
     "eslint-plugin-react-hooks": "^7.0.0",
     "eslint-plugin-simple-import-sort": "14.0.0",
     "globals": "^16.5.0",
-    "knip": "6.34.0",
+    "knip": "6.41.0",
     "pg": "catalog:pg-8-23-0",
-    "postcss": "8.5.28",
-    "prettier": "^3.6.2",
-    "turbo": "2.11.7",
+    "postcss": "8.5.30",
+    "prettier": "^3.9.10",
+    "turbo": "2.11.8",
     "typescript": "catalog:typescript-compatible-5-9-3",
-    "typescript-eslint": "^8.46.0",
+    "typescript-eslint": "^8.71.2",
     "vitest": "catalog:",
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   }
 }

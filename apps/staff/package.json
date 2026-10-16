@@ -14,7 +14,7 @@
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
-    "@tanstack/react-router": "^1.168.0",
+    "@tanstack/react-router": "^1.170.44",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:",
@@ -25,7 +25,7 @@
     "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.0.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "vite": "catalog:"
   }
 }
