@@ -34,7 +34,7 @@
     "@luma/typescript-config": "workspace:*",
     "@luma/workflow-temporal": "workspace:*",
     "@luma/workflows": "workspace:*",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.0",
     "@temporalio/testing": "catalog:",
     "@types/pg": "catalog:",
     "drizzle-kit": "0.31.11",
