@@ -17,8 +17,8 @@ import {
   createReadBudget,
   type ReadBudget,
 } from '@luma/connector-shopify';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { invalid, ServiceError, unavailable } from '@luma/platform';
 import { z } from 'zod';
 
 import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
@@ -94,7 +94,7 @@ export function createShopifyProvider(
     ...(options.oauth ? { refreshCredential: options.oauth.credential } : {}),
     manage() {
       if (options.oauth)
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'Use Connect Shopify to authorize this store',
@@ -115,11 +115,7 @@ export function createShopifyProvider(
 
       if (runtime.readBounds) {
         if (!capability.endsWith('.read'))
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Read bounds cannot authorize writes',
-          );
+          throw invalid('Read bounds cannot authorize writes');
         fetch = boundedReadTransport(
           fetch ?? globalThis.fetch,
           runtime.readBounds,
@@ -455,7 +451,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)
-            throw new IdentityError(
+            throw new ServiceError(
               401,
               'UNAUTHENTICATED',
               'Sign in to continue.',
@@ -497,7 +493,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)
-            throw new IdentityError(
+            throw new ServiceError(
               401,
               'UNAUTHENTICATED',
               'Sign in to continue',
@@ -525,18 +521,14 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)
-            throw new IdentityError(
+            throw new ServiceError(
               401,
               'UNAUTHENTICATED',
               'Sign in to continue',
             );
           await context.requireInstalled(request.tenantContext, 'shopify');
           if (!oauth)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Shopify authorization is not configured',
-            );
+            throw unavailable('Shopify authorization is not configured');
           const input = z
             .object({ connectionId: z.string().uuid().optional() })
             .strict()
@@ -550,18 +542,14 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         { config: { access: { permission: 'connections.manage' } } },
         async (request) => {
           if (!request.tenantContext)
-            throw new IdentityError(
+            throw new ServiceError(
               401,
               'UNAUTHENTICATED',
               'Sign in to continue',
             );
           await context.requireInstalled(request.tenantContext, 'shopify');
           if (!oauth)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Shopify authorization is not configured',
-            );
+            throw unavailable('Shopify authorization is not configured');
 
           return oauth.start(request.tenantContext, request.body);
         },

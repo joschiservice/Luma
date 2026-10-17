@@ -4,11 +4,10 @@ import type { ExecutionRecord } from '@luma/execution';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict } from '@luma/platform';
+import { conflict, forbidden, notFound } from '@luma/platform';
 import type { Approval, PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 import type { ProcessStepOutput } from '@luma/workflows';
@@ -218,8 +217,7 @@ export function createDeskService(deps: DeskDependencies) {
   async function fresh(context: TenantContext) {
     const next = await deps.refreshContext(context);
     requireTenant(next, context.tenantId);
-    if (next.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (next.actor.id !== context.actor.id) throw forbidden('Actor changed');
 
     return next;
   }
@@ -285,9 +283,7 @@ export function createDeskService(deps: DeskDependencies) {
       context = await fresh(context);
       requirePermission(context, 'actions.propose');
       if (!deps.refreshProposal)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This case requires a new investigation before approval.',
         );
       const key = `${context.tenantId}:${id}`;
@@ -564,7 +560,7 @@ export function createDeskService(deps: DeskDependencies) {
           value.receipt.exceptionId !== id ||
           value.receipt.actorId !== context.actor.id
         )
-          throw new IdentityError(404, 'NOT_FOUND', 'Decision not found');
+          throw notFound('Decision not found');
 
         return value.receipt;
       });

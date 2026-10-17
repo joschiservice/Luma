@@ -1,5 +1,6 @@
+import { forbidden } from '@luma/platform';
+
 import type { Membership } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
 import type { RoleReference } from '../domain/roles.js';
 import {
   builtInReference,
@@ -48,7 +49,7 @@ export function roleFromRow(row: {
       builtIn: false,
       revision: row.roleRevision ?? 1,
     };
-  throw new IdentityError(403, 'FORBIDDEN', 'Unknown organization role');
+  throw forbidden('Unknown organization role');
 }
 
 /** Maps a membership row with its role grants to a membership. */

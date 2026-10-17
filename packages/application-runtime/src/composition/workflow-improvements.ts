@@ -1,5 +1,6 @@
-import { IdentityError, type TenantContext } from '@luma/identity';
+import { type TenantContext } from '@luma/identity';
 import type { FeatureFlag } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 import type { LearningService } from '@luma/resolution';
 import type {
   ImprovementDiscoveryGroup,
@@ -50,11 +51,7 @@ export function createWorkflowImprovementSource(
         incident.tenantId !== context.tenantId ||
         run.incidentId !== source.incidentId
       )
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Resolution evidence not found.',
-        );
+        throw notFound('Resolution evidence not found.');
       if (
         incident.state !== 'resolved' ||
         resolution?.kind !== 'verification' ||
@@ -63,18 +60,14 @@ export function createWorkflowImprovementSource(
         !resolution.complete ||
         !resolution.evidenceRefs.length
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This operation needs an independently verified resolution before it can inform an improvement.',
         );
       if (
         incident.exceptionClass !== 'inventory_mismatch' &&
         incident.exceptionClass !== 'sync_failure'
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This recurring pattern is not supported for workflow improvements.',
         );
       const confirmed = history.events.some(
@@ -91,9 +84,7 @@ export function createWorkflowImprovementSource(
           ),
       );
       if (!confirmed)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This resolution run has no recorded outcome matching the independent verification.',
         );
       const repairs = history.events.flatMap((event) =>
@@ -103,9 +94,7 @@ export function createWorkflowImprovementSource(
       );
       // Codes are structured identifiers. Reject legacy free text before building a model input.
       if (repairs.some((code) => !/^[a-zA-Z0-9_.:-]{1,100}$/.test(code)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The retained repair facts need structured action codes.',
         );
 

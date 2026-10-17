@@ -2,10 +2,10 @@ import type { ActionDiff } from '@luma/connections';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, notFound, unavailable } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
 import type { EvaluateCode } from '../domain/code-evaluation.js';
@@ -141,7 +141,7 @@ export function createWorkflowCatalog(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -389,11 +389,7 @@ export function createWorkflowCatalog(deps: {
 
   function replenishment(id: string) {
     if (!deps.replenishment || id !== deps.replenishment.definitionId)
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Replenishment workflow not found.',
-      );
+      throw notFound('Replenishment workflow not found.');
 
     return deps.replenishment;
   }
@@ -478,7 +474,7 @@ export function createWorkflowCatalog(deps: {
     )
       return triggered;
     if (!(await deps.store.resolutionVersions(context, id)).length)
-      throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
+      throw notFound('Workflow not found');
     const records = await deps.store.runs(context, id);
 
     const resolution = records.map(({ run, version, outcomes }) => {
@@ -522,9 +518,7 @@ export function createWorkflowCatalog(deps: {
       request: EvaluateCode,
     ) {
       if (!deps.codeEvaluations)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'Code evaluation is unavailable on this Luma server. Whoever runs the server needs to install the Code Step runtime.',
         );
 
@@ -537,11 +531,7 @@ export function createWorkflowCatalog(deps: {
       evaluationId: string,
     ) {
       if (!deps.codeEvaluations)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Code evaluation is unavailable.',
-        );
+        throw unavailable('Code evaluation is unavailable.');
 
       return deps.codeEvaluations.get(context, id, evaluationId);
     },
@@ -552,11 +542,7 @@ export function createWorkflowCatalog(deps: {
       evaluationId: string,
     ) {
       if (!deps.codeEvaluations)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Code evaluation is unavailable.',
-        );
+        throw unavailable('Code evaluation is unavailable.');
 
       return deps.codeEvaluations.cancel(context, id, evaluationId);
     },
@@ -569,11 +555,7 @@ export function createWorkflowCatalog(deps: {
     ) {
       context = await authorize(context, 'workflows.triggers.manage');
       if (!deps.store.cancelCode)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Code execution is unavailable.',
-        );
+        throw unavailable('Code execution is unavailable.');
       await deps.store.cancelCode(context, id, runId, stepId);
 
       return { cancelled: true as const };
@@ -639,15 +621,11 @@ export function createWorkflowCatalog(deps: {
       request: WorkflowTriggerRequest,
     ) {
       if (id === deps.replenishment?.definitionId)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Use the replenishment stock check to start this workflow.',
         );
       if (deps.caseWorkflows?.owns(id))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This workflow starts from detected cases. Turn it on instead of starting it by hand.',
         );
 
@@ -740,13 +718,11 @@ export function createWorkflowCatalog(deps: {
       const [context, id, request] = args;
       const fresh = await authorize(context, 'playbooks.activate');
       if (deps.caseWorkflows?.owns(id))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Turn this workflow on for the workspace instead of choosing orders.',
         );
       if ((await deps.store.versions(fresh, id)).length)
-        throw new IdentityError(409, 'CONFLICT', nativeBlocker);
+        throw conflict(nativeBlocker);
 
       return deps.legacy.activate(fresh, id, request);
     },
@@ -756,8 +732,7 @@ export function createWorkflowCatalog(deps: {
       id: string,
       input: Parameters<CaseWorkflows['activate']>[2],
     ) {
-      if (!deps.caseWorkflows?.owns(id))
-        throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found.');
+      if (!deps.caseWorkflows?.owns(id)) throw notFound('Workflow not found.');
 
       return deps.caseWorkflows.activate(context, id, input);
     },

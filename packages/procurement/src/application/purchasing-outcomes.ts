@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden } from '@luma/platform';
 
 import type { PurchasingOverview } from '../domain/purchasing.js';
 import type {
@@ -29,7 +26,7 @@ export function createPurchasingOutcomes(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     requirePermission(fresh, 'inventory.read');
 
@@ -56,11 +53,7 @@ export function createPurchasingOutcomes(deps: {
     async ignore(context: TenantContext, input: unknown) {
       context = await authorize(context, true);
       if (!(await deps.enabled(context)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Purchasing outcomes are not enabled.',
-        );
+        throw conflict('Purchasing outcomes are not enabled.');
       const request = deps.parse(input);
       if (await deps.existing(context, request))
         return { recorded: true as const };
@@ -74,11 +67,7 @@ export function createPurchasingOutcomes(deps: {
         rec.quantity <= 0 ||
         rec.missing.length
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Refresh and review an available recommendation.',
-        );
+        throw conflict('Refresh and review an available recommendation.');
       await deps.ignore(context, request, rec);
 
       return { recorded: true as const };

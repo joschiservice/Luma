@@ -1,10 +1,12 @@
 import type { Permission, TenantContext } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
-import { conflict } from '@luma/platform';
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import {
   type CodeActivityResult,
@@ -380,7 +382,7 @@ export function createDraftTests(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -388,7 +390,7 @@ export function createDraftTests(deps: {
   async function open(context: TenantContext, id: string) {
     const draft = await deps.drafts.get(context, id);
     if (!draft || draft.state === 'discarded')
-      throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+      throw notFound('Draft not found.');
 
     return draft;
   }
@@ -585,11 +587,7 @@ export function createDraftTests(deps: {
 
   function claimSlot() {
     if (active >= maxActive)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'The test runner is busy. Try again shortly.',
-      );
+      throw unavailable('The test runner is busy. Try again shortly.');
     active++;
   }
 
@@ -675,7 +673,7 @@ export function createDraftTests(deps: {
 
   async function get(context: TenantContext, draftId: string, id: string) {
     const item = await deps.store.get(context, draftId, id);
-    if (!item) throw new IdentityError(404, 'NOT_FOUND', 'Test run not found.');
+    if (!item) throw notFound('Test run not found.');
 
     return view(item);
   }
@@ -787,7 +785,7 @@ export function createDraftTests(deps: {
             if (reserved.created) jobs.push({ item, testCase: entry.testCase });
           } catch (error) {
             // Another person started the same saved case first; their run is in the summary.
-            if (!(error instanceof IdentityError && error.statusCode === 409))
+            if (!(error instanceof ServiceError && error.statusCode === 409))
               throw error;
           }
         }
@@ -878,8 +876,7 @@ export function createDraftTests(deps: {
         testCase = (await deps.store.cases(context, draftId)).cases.find(
           (item) => item.id === input.caseId,
         );
-        if (!testCase)
-          throw new IdentityError(404, 'NOT_FOUND', 'Test case not found.');
+        if (!testCase) throw notFound('Test case not found.');
       }
       const { version, problem } = compile(context, draft);
       if (!version) throw conflict(problem!);

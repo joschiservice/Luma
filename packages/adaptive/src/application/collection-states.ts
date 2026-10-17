@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requireChangesAllowed,
-  requireTenant,
-} from '@luma/identity';
+import { requireChangesAllowed, requireTenant } from '@luma/identity';
+import { forbidden, invalid } from '@luma/platform';
 
 import type {
   CollectionMemberStateDocument,
@@ -77,15 +74,11 @@ export function createCollectionStatesService(
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     if (write) requireChangesAllowed(fresh);
     const permission = domain ? deps.validation.permission(domain) : null;
     if (permission && !fresh.permissions.has(permission))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role cannot open this list.',
-      );
+      throw forbidden('Your role cannot open this list.');
 
     return fresh;
   }
@@ -108,11 +101,7 @@ export function createCollectionStatesService(
       const domain = deps.validation.domain(raw);
       const fresh = await authorize(context, domain, true);
       if (!Number.isSafeInteger(input.sequence) || input.sequence < 1)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'The save sequence must be a positive whole number.',
-        );
+        throw invalid('The save sequence must be a positive whole number.');
       const stored = await deps.store.save(
         fresh.tenantId,
         fresh.actor.id,

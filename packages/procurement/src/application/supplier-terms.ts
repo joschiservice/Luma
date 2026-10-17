@@ -2,11 +2,10 @@ import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict } from '@luma/platform';
+import { conflict, forbidden, notFound } from '@luma/platform';
 
 import type {
   SupplierProductTerms,
@@ -70,7 +69,7 @@ export function createSupplierTermsService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
 
     return fresh;
@@ -93,11 +92,7 @@ export function createSupplierTermsService(deps: {
   ) {
     context = await authorize(context, true);
     if (!(await deps.released(context)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Purchasing terms are not enabled for this workspace.',
-      );
+      throw forbidden('Purchasing terms are not enabled for this workspace.');
     const digest = deps.digest({
       actorId: context.actor.id,
       request,
@@ -115,11 +110,7 @@ export function createSupplierTermsService(deps: {
         return prior.result;
       }
       if (!(await tx.exists(request.supplierId, request.skuId)))
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Supplier or product not found.',
-        );
+        throw notFound('Supplier or product not found.');
       const current = (
         await tx.list({ supplierId: request.supplierId, skuId: request.skuId })
       )[0];

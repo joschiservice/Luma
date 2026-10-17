@@ -2,12 +2,11 @@ import type { AppPermissionGroup, TenantContext } from '@luma/identity';
 import {
   appPermissionOwner,
   hasPermission,
-  IdentityError,
   isPermission,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { forbidden } from '@luma/platform';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 
 import type {
   AppFactoryContext,
@@ -101,15 +100,9 @@ export function createAppService(
 
   async function installation(context: TenantContext, appId: string) {
     requireTenant(context, context.tenantId);
-    if (!registry.get(appId))
-      throw new IdentityError(404, 'NOT_FOUND', 'App is unavailable');
+    if (!registry.get(appId)) throw notFound('App is unavailable');
     const current = await repository.installed(context.tenantId, appId);
-    if (!current)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Install this app in the workspace first',
-      );
+    if (!current) throw conflict('Install this app in the workspace first');
 
     return current;
   }
@@ -159,17 +152,14 @@ export function createAppService(
   ) {
     const fresh = await authorize(context, true);
     const app = registry.get(appId);
-    if (installed && !app)
-      throw new IdentityError(404, 'NOT_FOUND', 'App is unavailable');
+    if (installed && !app) throw notFound('App is unavailable');
     if (installed) {
       const requested = new Set(app!.manifest.scopes);
       if (
         scopes.length !== requested.size ||
         !scopes.every((scope) => requested.has(scope))
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The access this app requests changed. Review it again before installing.',
         );
       requireScopes(fresh, scopes);
@@ -247,14 +237,12 @@ export function createAppService(
     ) {
       const fresh = await authorize(context, true);
       const app = registry.get(appId);
-      if (!app) throw new IdentityError(404, 'NOT_FOUND', 'App is unavailable');
+      if (!app) throw notFound('App is unavailable');
       const unknown = scopes.filter(
         (scope) => !app.manifest.scopes.includes(scope),
       );
       if (unknown.length || !scopes.length)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The access this app requests changed. Review it again.',
         );
       requireScopes(fresh, scopes);
@@ -278,7 +266,7 @@ export function createAppService(
 
         return true;
       } catch (error) {
-        if (error instanceof IdentityError) return false;
+        if (error instanceof ServiceError) return false;
         throw error;
       }
     },

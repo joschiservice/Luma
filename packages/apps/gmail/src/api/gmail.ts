@@ -1,7 +1,7 @@
 import '@luma/identity/http';
 
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { unavailable } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 
 /** Completes Google authorization for the workspace named in the callback state. */
@@ -33,12 +33,7 @@ export function registerGmailRoutes(
     '/v1/gmail/callback',
     { config: { authentication: 'app' } },
     async (request, reply) => {
-      if (!oauth || !identity)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Gmail is not configured',
-        );
+      if (!oauth || !identity) throw unavailable('Gmail is not configured');
       const query = request.url.split('?')[1] ?? '';
       const tenant = oauth.callbackTenant(query);
       let result: string;

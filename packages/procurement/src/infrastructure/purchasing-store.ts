@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict } from '@luma/platform';
 
 import type { PurchasingStore } from '../application/purchasing.js';
 import type { PurchasingSettings } from '../domain/purchasing.js';
@@ -52,9 +51,7 @@ export function createPurchasingStore(
           )
         ).rows[0];
         if ((row?.document.revision ?? 0) !== input.revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Purchasing settings changed. Refresh and review them.',
           );
         if (input.locationIds.length) {
@@ -63,11 +60,7 @@ export function createPurchasingStore(
             [context.tenantId, input.locationIds],
           );
           if (found.rowCount !== new Set(input.locationIds).size)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Choose locations in this workspace.',
-            );
+            throw conflict('Choose locations in this workspace.');
         }
         const updated = { ...input, revision: input.revision + 1 };
         await tx.query(
@@ -130,9 +123,7 @@ export function createPurchasingStore(
         ).rows[0];
         if (prior) {
           if (prior.digest !== hash)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This plan ID already belongs to a different request.',
             );
 
@@ -143,9 +134,7 @@ export function createPurchasingStore(
           [context.tenantId, plan.request.lines.map((l) => l.skuId)],
         );
         if (other.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another purchasing plan already reserves one of these products.',
           );
         await tx.query(

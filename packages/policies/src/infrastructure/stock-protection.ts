@@ -1,10 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requireChangesAllowed,
-  requirePermission,
-} from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { requireChangesAllowed, requirePermission } from '@luma/identity';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import {
   admitsStockProtection,
@@ -61,9 +57,7 @@ export function createStockProtectionConsent(
           )
         ).rows[0];
         if ((previous?.revision ?? 0) !== parsed.revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Stock protection settings changed. Refresh before saving.',
           );
         const document = { ...parsed, revision: parsed.revision + 1 };

@@ -1,5 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 
 export interface DecisionAssignment {
   assigneeId: string | null;
@@ -49,25 +50,15 @@ export function createDecisionAssignmentService(deps: {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+        throw forbidden('Sign in again to continue.');
       const assignsAnyone = hasPermission(fresh, 'decisions.assign');
       if (!assignsAnyone && !hasPermission(fresh, 'decisions.self_assign'))
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Your role cannot take or assign decisions.',
-        );
+        throw forbidden('Your role cannot take or assign decisions.');
       if (!(await deps.pending(fresh, input.decisionId)))
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'This decision no longer needs a person.',
-        );
+        throw notFound('This decision no longer needs a person.');
       const current = await deps.store.get(fresh.tenantId, input.decisionId);
       if ((current?.revision ?? 0) !== input.revision)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Someone changed this assignment. Refresh to see who has it.',
         );
       const holder = current?.assigneeId ?? null;
@@ -78,9 +69,7 @@ export function createDecisionAssignmentService(deps: {
         const releasing =
           input.assigneeId === null && holder === fresh.actor.id;
         if (!taking && !releasing)
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
+          throw forbidden(
             'You can take unassigned decisions or release your own. Ask someone who assigns decisions to reassign it.',
           );
       }
@@ -88,11 +77,7 @@ export function createDecisionAssignmentService(deps: {
         input.assigneeId !== null &&
         !(await deps.members(fresh)).includes(input.assigneeId)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Choose a current member of this workspace.',
-        );
+        throw conflict('Choose a current member of this workspace.');
       const saved = await deps.store.save(
         fresh.tenantId,
         input.decisionId,
@@ -104,9 +89,7 @@ export function createDecisionAssignmentService(deps: {
         },
       );
       if (!saved)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Someone changed this assignment. Refresh to see who has it.',
         );
 

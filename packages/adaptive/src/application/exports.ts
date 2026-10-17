@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import { exportCsv, exportRowLimit } from '../domain/exports.js';
 import type {
@@ -55,7 +55,7 @@ export function createViewExports(deps: ViewExportsDependencies) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+        throw forbidden('Sign in again to continue.');
       requireChangesAllowed(fresh);
       requirePermission(fresh, 'lists.export');
       const rows: Record<string, unknown>[] = [];

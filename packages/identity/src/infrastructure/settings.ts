@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { notFound } from '@luma/platform';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
@@ -7,7 +8,6 @@ import type {
   SettingsRepository,
   SettingsTransaction,
 } from '../application/settings.js';
-import { IdentityError } from '../domain/context.js';
 import {
   builtInReference,
   isBuiltInRole,
@@ -52,8 +52,7 @@ export async function workspaceTransaction<T>(
       `SELECT id FROM organizations WHERE id=$1 AND status='active' AND data_region=(SELECT region FROM luma_cell_region)${readOnly ? '' : ' FOR UPDATE'}`,
       [tenantId],
     );
-    if (!org.rowCount)
-      throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+    if (!org.rowCount) throw notFound('Workspace not found');
     const result = await operation(tx, readOnly);
     await tx.query('COMMIT');
 

@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import {
   identityRoutes,
@@ -14,6 +13,7 @@ import {
   runInRequestScope,
   settingsRoutes,
 } from '@luma/identity/http';
+import { ServiceError } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createStaff,
@@ -167,7 +167,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
     registerIdentityGuards(customerApp, identity.service, [customerOrigin]);
     customerApp.setErrorHandler(
       (error: unknown, request: FastifyRequest, reply: FastifyReply) => {
-        if (error instanceof IdentityError)
+        if (error instanceof ServiceError)
           return reply
             .status(error.statusCode)
             .send({ code: error.code, message: error.message });

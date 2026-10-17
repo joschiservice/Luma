@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type {
   GenerationRecord,
@@ -76,11 +76,7 @@ export function createGenerationStore(db: TenantDatabase): GenerationStore {
           (row.proposal_state === 'accepted' &&
             row.accept_save_id !== decision.saveId)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Someone else decided on this change first.',
-          );
+          throw conflict('Someone else decided on this change first.');
         if (row.proposal_state === 'accepted') return present(row);
         const revision = await save();
         const updated = (
@@ -96,12 +92,7 @@ export function createGenerationStore(db: TenantDatabase): GenerationStore {
             ],
           )
         ).rows[0];
-        if (!updated)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The proposal was removed during review.',
-          );
+        if (!updated) throw conflict('The proposal was removed during review.');
 
         return present(updated);
       }),

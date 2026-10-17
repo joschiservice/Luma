@@ -1,26 +1,21 @@
 import { apiContract } from '@luma/api-contract';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { RolesService } from '../application/roles.js';
-import { IdentityError } from '../domain/context.js';
 import type { HttpContext } from './contract-routes.js';
 
 /** Routes role reads and command-identified role changes through the roles service. */
 export function rolesRoutes(service?: RolesService) {
   const use = () => {
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Roles are unavailable',
-      );
+    if (!service) throw unavailable('Roles are unavailable');
 
     return service;
   };
   const context = (request: FastifyRequest) => {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
     return request.tenantContext;
   };

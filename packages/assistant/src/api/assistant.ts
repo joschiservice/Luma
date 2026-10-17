@@ -1,9 +1,9 @@
 import '@luma/identity/http';
 
 import { apiContract, assistantAnswerSchema } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import type { TraceContext } from '@luma/platform';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -29,13 +29,9 @@ function requestOptions(
 export function assistantRoutes(service?: Assistant) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Asking Luma is unavailable. Try again later.',
-      );
+      throw unavailable('Asking Luma is unavailable. Try again later.');
 
     return { context: request.tenantContext, service };
   }

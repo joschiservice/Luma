@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import type { InstalledConnection } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import type {
   CaseEvidence,
   CaseRun,
@@ -276,7 +276,7 @@ export function createShopifyCaseWorkflows(deps: {
         async (requestId) => {
           const sources = await stockSources(context, run);
           if ('problem' in sources)
-            throw new IdentityError(409, 'CONFLICT', sources.problem);
+            throw new ServiceError(409, 'CONFLICT', sources.problem);
 
           return { ...sources.target, requestId };
         },
@@ -491,7 +491,7 @@ export function createShopifyCaseWorkflows(deps: {
         async (requestId) => {
           const target = await holdTarget(run);
           if (!target)
-            throw new IdentityError(
+            throw new ServiceError(
               409,
               'CONFLICT',
               'Luma can’t identify this order’s Shopify fulfillment order.',
@@ -502,7 +502,7 @@ export function createShopifyCaseWorkflows(deps: {
             snapshot.holds.length !== 1 ||
             !releasableHoldReasons.includes(only!.reason)
           )
-            throw new IdentityError(
+            throw new ServiceError(
               409,
               'CONFLICT',
               'The order’s holds changed. Review them in Shopify.',

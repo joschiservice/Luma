@@ -3,12 +3,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { EffectRegistry } from '@luma/connections';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   PermissionSet,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import {
+  canonicalJson,
+  forbidden,
+  ServiceError,
+  type TenantDatabase,
+} from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 import {
   createProcessClient,
@@ -116,7 +120,7 @@ export function createWorkflowImprovementControlHarness(options: {
       requireTenant(fresh, context.tenantId);
       requirePermission(fresh, 'workflows.author');
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Your access changed.');
+        throw forbidden('Your access changed.');
       const versions: WorkflowControlComparison['versions'] = [];
       for (const [label, version] of [
         ['baseline', baseline],
@@ -157,7 +161,7 @@ export function createWorkflowImprovementControlHarness(options: {
       requireTenant(refreshed, fresh.tenantId);
       requirePermission(refreshed, 'workflows.author');
       if (refreshed.actor.id !== fresh.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Your access changed.');
+        throw forbidden('Your access changed.');
 
       return {
         suiteVersion: 'workflow-control-simulator/1',
@@ -212,7 +216,7 @@ async function exercise(
       current.actor.id !== context.actor.id &&
       current.actor.id !== reviewer.actor.id
     )
-      throw new IdentityError(403, 'FORBIDDEN', 'Unknown fixture principal.');
+      throw forbidden('Unknown fixture principal.');
 
     return revoked && current.actor.id === context.actor.id
       ? { ...current, permissions: new PermissionSet([]) }
@@ -528,7 +532,7 @@ async function exercise(
           ].includes(scenario) ||
           dispatches !== before ||
           !(
-            error instanceof IdentityError ||
+            error instanceof ServiceError ||
             (error instanceof Error &&
               [
                 'Action step not found',

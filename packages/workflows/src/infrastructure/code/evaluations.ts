@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, unavailable } from '@luma/platform';
 
 import type { CodeEvaluationStore } from '../../application/code-evaluations.js';
 import type { CodeEvaluation } from '../../domain/code-evaluation.js';
@@ -51,9 +51,7 @@ export function createCodeEvaluationStore(
             previous.principal_id !== context.actor.id ||
             previous.definition_id !== definitionId
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This evaluation ID has different inputs. Reuse the original request.',
             );
 
@@ -69,9 +67,7 @@ export function createCodeEvaluationStore(
           )
         ).rows[0];
         if (Number(count?.count) >= 2)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
+          throw unavailable(
             'Two evaluations are already running. Wait or cancel one.',
           );
         await tx.query(

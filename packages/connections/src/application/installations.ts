@@ -1,12 +1,11 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   isOwner,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict, notFound } from '@luma/platform';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 
 import { ConnectorError } from '../domain/capabilities.js';
 import type {
@@ -197,11 +196,7 @@ export function createInstallationService(
       throw unavailable();
 
     if (record.connection.provider === 'luma-erp')
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Built-in sources are managed by Luma',
-      );
+      throw conflict('Built-in sources are managed by Luma');
 
     return record;
   }
@@ -223,13 +218,9 @@ export function createInstallationService(
       requireChangesAllowed(context);
       const fresh = await authorize(context);
       if (!isOwner(fresh))
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only workspace owners can change write mode.',
-        );
+        throw forbidden('Only workspace owners can change write mode.');
       if (writeMode !== null && writeMode !== 'observe_only')
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'Invalid connection write mode',
@@ -266,7 +257,7 @@ export function createInstallationService(
         parsed = deps.boundary.input(input);
         if (deps.validate) parsed = deps.validate(parsed);
       } catch {
-        throw new IdentityError(422, 'CONFLICT', 'Invalid connection settings');
+        throw new ServiceError(422, 'CONFLICT', 'Invalid connection settings');
       }
       const ownership = await deps.provider?.(fresh, parsed.target);
       const { credentials, ...settings } = parsed;
@@ -319,7 +310,7 @@ export function createInstallationService(
             input,
           );
       } catch {
-        throw new IdentityError(422, 'CONFLICT', 'Invalid credentials');
+        throw new ServiceError(422, 'CONFLICT', 'Invalid credentials');
       }
       const connection: InstalledConnection = {
         ...record.connection,

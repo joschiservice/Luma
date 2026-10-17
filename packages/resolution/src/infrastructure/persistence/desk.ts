@@ -1,11 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, forbidden, notFound } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { workspacePolicyVersion } from '@luma/policies';
 import { z } from 'zod';
@@ -47,7 +44,7 @@ async function load(tx: SqlTransaction, tenantId: string, id: string) {
       id,
     ])
   ).rows[0];
-  if (!row) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
+  if (!row) throw notFound('Case not found');
   if (!row.proposal?.action) row.proposal = null;
   Object.assign(row, await readCaseWorkflowHistory(tx, tenantId, id));
   const policy = (
@@ -139,11 +136,7 @@ export function createDeskStore(
           [context.tenantId, id, source.kind, source.id],
         );
         if (!match.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Workflow source already belongs to a different case',
-          );
+          throw conflict('Workflow source already belongs to a different case');
       }),
     workflowSource: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
@@ -222,11 +215,7 @@ export function createDeskStore(
                 evidenceRefs,
               ))
             )
-              throw new IdentityError(
-                409,
-                'CONFLICT',
-                'Case could not be closed',
-              );
+              throw conflict('Case could not be closed');
 
             return snapshot.revision + 1;
           },
@@ -242,9 +231,7 @@ export function createDeskStore(
           action.proposedBy.kind !== 'user' ||
           action.proposedBy.id !== context.actor.id
         )
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
+          throw forbidden(
             'Proposal requester must match the authenticated actor',
           );
         await lock(tx, context.tenantId);
@@ -266,11 +253,7 @@ export function createDeskStore(
             previous.diagnosis_revision !== revision ||
             previous.action_hash !== hash
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Proposal identity is immutable',
-            );
+            throw conflict('Proposal identity is immutable');
 
           return {
             action: previous.document,
@@ -287,11 +270,7 @@ export function createDeskStore(
             )
           ).rowCount
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'An executed action cannot be attached to a new case',
-          );
+          throw conflict('An executed action cannot be attached to a new case');
         const s = await load(tx, context.tenantId, id);
         if (
           s.execution ||
@@ -305,11 +284,7 @@ export function createDeskStore(
               !s.diagnosis!.provenance.evidence.some((e) => e.id === ref),
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Proposal must reference the current investigation',
-          );
+          throw conflict('Proposal must reference the current investigation');
         await tx.query(
           'INSERT INTO case_proposals(tenant_id,id,exception_id,diagnosis_revision,action_hash,document) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
           [context.tenantId, action.id, id, revision, hash, action],
@@ -331,9 +306,7 @@ export function createDeskStore(
           saved.exception_id !== id ||
           saved.diagnosis_revision !== revision
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'An immutable proposal already exists for this investigation',
           );
 

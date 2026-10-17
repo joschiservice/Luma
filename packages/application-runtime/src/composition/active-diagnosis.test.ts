@@ -1,12 +1,9 @@
 import type { CapabilityReader } from '@luma/connections';
 import type { DiagnosisInput } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 import { expect, it, vi } from 'vitest';
 
 import { createActiveDiagnosisRereader } from './active-diagnosis.js';
@@ -118,9 +115,7 @@ it('honors an occupied durable incident lease and fails before access-loss or ca
   await expect(
     env.adapter.read(context, snapshot, aborted.signal),
   ).rejects.toThrow();
-  env.refreshContext.mockRejectedValue(
-    new IdentityError(403, 'FORBIDDEN', 'Access changed'),
-  );
+  env.refreshContext.mockRejectedValue(forbidden('Access changed'));
   await expect(
     env.adapter.read(context, snapshot, new AbortController().signal),
   ).rejects.toMatchObject({ statusCode: 403 });

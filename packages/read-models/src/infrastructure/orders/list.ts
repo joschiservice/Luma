@@ -1,6 +1,7 @@
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
+import { hasPermission } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { unavailable } from '@luma/platform';
 
 import type {
   OrderList,
@@ -141,9 +142,7 @@ export async function listOrders(
       query.group ||
       !isLegacySort(query.sort))
   )
-    throw new IdentityError(
-      503,
-      'SERVICE_UNAVAILABLE',
+    throw unavailable(
       'Conditions, grouping, sorting by total, status, payment, fulfillment or lines, and warehouse and custom-field queries are unavailable while order projections rebuild or source access is restricted.',
     );
   const values: unknown[] = [

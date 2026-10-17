@@ -1,11 +1,11 @@
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type {
   NativeStockDemand,
@@ -28,8 +28,7 @@ export function createNativeStockReader(
   async function access(context: TenantContext) {
     const fresh = await refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.read');
 
     return fresh;

@@ -6,9 +6,9 @@ import {
   operationalMetricDefinitionSchema,
   operationalMetricResponseSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { orderMetricDefinitions } from '@luma/orders';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { OperationalMetrics } from '../application/metrics.js';
@@ -32,11 +32,7 @@ export function metricRoutes(
     operationalDefinitions: os.operationalDefinitions.handler(
       async ({ context: { request } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
         const reporting =
           (await reportingEnabled?.(request.tenantContext.tenantId)) ?? false;
 
@@ -63,17 +59,8 @@ export function metricRoutes(
     operationalQuery: os.operationalQuery.handler(
       async ({ context: { request }, input: { body } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!summary)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Operational metrics are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!summary) throw unavailable('Operational metrics are unavailable');
 
         return operationalMetricResponseSchema.parse(
           await summary(request.tenantContext, body),
@@ -84,21 +71,13 @@ export function metricRoutes(
       async ({ context: { request }, input: { body } }) => {
         const context = request.tenantContext;
         if (!context)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
         const parts = await Promise.all(
           body.parts.map(async (part) => {
             try {
               if (part.kind === 'orders') {
                 if (!service)
-                  throw new IdentityError(
-                    503,
-                    'SERVICE_UNAVAILABLE',
-                    'Operational metrics are unavailable',
-                  );
+                  throw unavailable('Operational metrics are unavailable');
 
                 return {
                   kind: part.kind,
@@ -109,11 +88,7 @@ export function metricRoutes(
                 };
               }
               if (!summary)
-                throw new IdentityError(
-                  503,
-                  'SERVICE_UNAVAILABLE',
-                  'Operational metrics are unavailable',
-                );
+                throw unavailable('Operational metrics are unavailable');
 
               return {
                 kind: part.kind,
@@ -124,7 +99,7 @@ export function metricRoutes(
               };
             } catch (error) {
               // Access and snapshot outcomes belong to the part; other failures fail the request.
-              if (!(error instanceof IdentityError)) throw error;
+              if (!(error instanceof ServiceError)) throw error;
 
               return {
                 kind: part.kind,
@@ -158,7 +133,7 @@ export function metricRoutes(
     ),
     definitions: os.definitions.handler(async ({ context: { request } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
       return orderMetricDefinitions.map((d) => ({
         ...d,
@@ -169,17 +144,8 @@ export function metricRoutes(
     query: os.query.handler(
       async ({ context: { request }, input: { body } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Operational metrics are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Operational metrics are unavailable');
 
         return metricResponseSchema.parse(
           await service(request.tenantContext, body),

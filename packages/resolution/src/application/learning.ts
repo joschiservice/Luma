@@ -6,11 +6,8 @@ import type {
   VerificationAttempt,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { forbidden, ServiceError } from '@luma/platform';
 
 import type {
   LearningCommand,
@@ -156,8 +153,7 @@ export function createLearningService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, 'issues.manage');
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
 
     return fresh;
   }
@@ -177,7 +173,7 @@ export function createLearningService(deps: {
 
       return deps.store.recordRun(fresh, incident, command, (sources) => {
         const conflict = learningSelectionConflict(incident, command, sources);
-        if (conflict) throw new IdentityError(409, 'CONFLICT', conflict);
+        if (conflict) throw new ServiceError(409, 'CONFLICT', conflict);
         const diagnosis = sources.diagnosis;
 
         return {
@@ -218,7 +214,7 @@ export function createLearningService(deps: {
         command,
         (sources) => {
           const conflict = learningEventConflict(command, sources);
-          if (conflict) throw new IdentityError(409, 'CONFLICT', conflict);
+          if (conflict) throw new ServiceError(409, 'CONFLICT', conflict);
 
           return {
             ...command,

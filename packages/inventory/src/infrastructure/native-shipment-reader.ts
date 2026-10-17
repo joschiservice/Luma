@@ -2,13 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { CapabilityOutput, CapabilityReader } from '@luma/connections';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, forbidden, type TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -61,8 +60,7 @@ export function createNativeShipmentReader(deps: ShipmentReaderDependencies) {
     z.string().uuid().parse(connectionId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.manage');
     requirePermission(fresh, 'orders.read');
     requirePermission(fresh, 'fulfillment.read');

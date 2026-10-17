@@ -1,11 +1,6 @@
 import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import {
-  hasPermission,
-  IdentityError,
-  isAppPermission,
-  isPermission,
-} from '@luma/identity';
+import { hasPermission, isAppPermission, isPermission } from '@luma/identity';
 import {
   orderChangeCapabilities,
   type OrderChangeRequest,
@@ -14,6 +9,7 @@ import {
   type PlanSource,
 } from '@luma/orders';
 import type { SqlTransaction } from '@luma/platform';
+import { invalid } from '@luma/platform';
 
 import type { OrderChangePlans } from '../../application/orders.js';
 import { readFulfillments } from './detail.js';
@@ -253,9 +249,7 @@ export async function readChangePlan(
     };
   } catch (error) {
     if (error instanceof OrderChangeRequestError)
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
+      throw invalid(
         error.code === 'unknown_line'
           ? 'Choose a line on this order.'
           : 'Enter a nonnegative quantity with at most six decimal places.',

@@ -1,6 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type { CollectionSortSql } from './keyset.js';
 import type { SqlParameters } from './parameters.js';
@@ -61,11 +61,7 @@ export async function collectionCustomFields(
     if (!row) throw collectionQueryError('A custom field is unavailable');
     const permission = row.document.readPermission;
     if (typeof permission !== 'string' || !context.permissions.has(permission))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role cannot use one of these custom fields.',
-      );
+      throw forbidden('Your role cannot use one of these custom fields.');
     const field = parameters.bind(id, 'uuid');
     const value = (column: string) =>
       `(SELECT ${column} FROM adaptive_field_values v WHERE v.tenant_id=$1 AND v.record_type='${record.type}' AND v.record_id=${record.id} AND v.field_id=${field})`;

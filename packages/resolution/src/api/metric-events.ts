@@ -11,7 +11,8 @@ import type {
   Permission,
   TenantContext,
 } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
+import { hasPermission } from '@luma/identity';
+import { ServiceError, unavailable } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 
 import type { MetricEvents } from '../application/metric-events.js';
@@ -55,12 +56,7 @@ export function registerMetricEvents(
   let running = 0;
   const waiting: (() => void)[] = [];
   const authorize = async <T>(read: () => Promise<T>) => {
-    if (waiting.length >= 100)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Live metrics are busy',
-      );
+    if (waiting.length >= 100) throw unavailable('Live metrics are busy');
     if (running >= 8)
       await new Promise<void>((resolve) => waiting.push(resolve));
     else running++;
@@ -81,11 +77,7 @@ export function registerMetricEvents(
     { config: { access: anyMember } },
     async (request, reply) => {
       if (!events || !identity || draining)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Live metrics are unavailable',
-        );
+        throw unavailable('Live metrics are unavailable');
       const parsed = metricEventsContract.events.pathParams.safeParse(
         request.params,
       );
@@ -98,7 +90,7 @@ export function registerMetricEvents(
       const { organizationId } = parsed.data;
       const context = request.tenantContext;
       if (!context)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
       const key = `${organizationId}:${context.actor.id}`;
       if (streams.size >= 100 || (actors.get(key) ?? 0) >= 3) {
         return reply.code(429).send({
@@ -205,12 +197,12 @@ export function registerMetricEvents(
         } catch (error) {
           if (!reply.raw.headersSent && !closed) {
             const status =
-              error instanceof IdentityError ? error.statusCode : 503;
+              error instanceof ServiceError ? error.statusCode : 503;
             reply.raw.writeHead(status, { 'content-type': 'application/json' });
             reply.raw.write(
               JSON.stringify({
                 code:
-                  error instanceof IdentityError
+                  error instanceof ServiceError
                     ? error.code
                     : 'SERVICE_UNAVAILABLE',
                 message: 'Live metrics are unavailable',
@@ -220,7 +212,7 @@ export function registerMetricEvents(
           } else if (
             !closed &&
             reply.raw.headersSent &&
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             [401, 403, 404].includes(error.statusCode)
           )
             reply.raw.write('event: access-check\ndata: {}\n\n');

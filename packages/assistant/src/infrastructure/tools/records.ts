@@ -1,4 +1,4 @@
-import { IdentityError } from '@luma/identity';
+import { notFound } from '@luma/platform';
 import type {
   CustomerWorkspace,
   FulfillmentWorkspace,
@@ -35,8 +35,7 @@ export function getStockTool(inventory: Pick<InventoryWorkspace, 'get'>) {
     describe: () => 'Read stock details',
     async run(context, { id }) {
       const detail = await inventory.get(context, id);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Stock position not found');
+      if (!detail) throw notFound('Stock position not found');
       const position = detail.position;
       const sources = position.sources.filter((source) => !source.deleted);
       const reference: RecordReference = {
@@ -91,8 +90,7 @@ export function getFulfillmentTool(
     describe: () => 'Read fulfillment details',
     async run(context, { id }) {
       const detail = await fulfillment.get(context, id);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Fulfillment not found');
+      if (!detail) throw notFound('Fulfillment not found');
       const { item, source } = detail;
       const reference: RecordReference = {
         kind: 'fulfillment',
@@ -146,8 +144,7 @@ export function getCustomerTool(customers: Pick<CustomerWorkspace, 'get'>) {
     describe: () => 'Read customer details',
     async run(context, { id }) {
       const detail = await customers.get(context, id);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Customer not found');
+      if (!detail) throw notFound('Customer not found');
       const { item, source } = detail;
       const reference: RecordReference = {
         kind: 'customer',

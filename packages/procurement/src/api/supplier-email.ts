@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -17,13 +17,8 @@ export function supplierEmailRoutes(
   const os = implement(apiContract.procurementEmail).$context<HttpContext>();
   const use = (request: FastifyRequest) => {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Supplier email is unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Supplier email is unavailable');
 
     return { context: request.tenantContext, service };
   };
@@ -44,11 +39,7 @@ export function supplierEmailRoutes(
       async ({ context: { request }, input: { params, body } }) => {
         const s = use(request);
         if (!procurement)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Supplier contact editing is unavailable',
-          );
+          throw unavailable('Supplier contact editing is unavailable');
 
         return procurement.updateSupplierContact(
           s.context,

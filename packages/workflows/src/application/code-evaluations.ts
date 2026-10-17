@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, notFound, unavailable } from '@luma/platform';
 
 import type {
   CodeEvaluation,
@@ -57,7 +54,7 @@ export function createCodeEvaluations(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, 'workflows.author');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -68,8 +65,7 @@ export function createCodeEvaluations(deps: {
       definitionId,
       id,
     );
-    if (!item)
-      throw new IdentityError(404, 'NOT_FOUND', 'Evaluation not found.');
+    if (!item) throw notFound('Evaluation not found.');
 
     return item;
   }
@@ -92,24 +88,15 @@ export function createCodeEvaluations(deps: {
         version.format !== 'workflow/2' ||
         version.digest !== request.reviewedDigest
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Reload the workflow and review its current version.',
-        );
+        throw conflict('Reload the workflow and review its current version.');
       const step = version.steps.find((item) => item.id === request.stepId);
-      if (!step || step.kind !== 'code')
-        throw new IdentityError(404, 'NOT_FOUND', 'Code Step not found.');
+      if (!step || step.kind !== 'code') throw notFound('Code Step not found.');
       if (
         Object.keys(request.replies).some(
           (grant) => !step.grants.includes(grant),
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Only declared capabilities may have example replies.',
-        );
+        throw conflict('Only declared capabilities may have example replies.');
       for (const [fields, values] of [
         [version.inputs, request.input.inputs],
         [version.context.fields, request.input.evidence],
@@ -123,9 +110,7 @@ export function createCodeEvaluations(deps: {
               (values[key] === null ? 'null' : typeof values[key]) !== type,
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Example inputs and expected outputs must match the declared fields.',
           );
       }
@@ -136,9 +121,7 @@ export function createCodeEvaluations(deps: {
       for (const [id, values] of Object.entries(request.input.steps)) {
         const previous = earlier.find((item) => item.id === id);
         if (!previous)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Example step outputs must name earlier workflow steps.',
           );
         if (
@@ -150,9 +133,7 @@ export function createCodeEvaluations(deps: {
                 (values[key] === null ? 'null' : typeof values[key]) !== type,
             ))
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Example step outputs must match their declared fields.',
           );
       }
@@ -175,18 +156,12 @@ export function createCodeEvaluations(deps: {
               (values[key] === null ? 'null' : typeof values[key]) !== type,
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Example capability replies must match their declared fields.',
           );
       }
       if (active >= 2)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'The evaluator is busy. Try again shortly.',
-        );
+        throw unavailable('The evaluator is busy. Try again shortly.');
       const now = new Date();
       const reserved = await deps.store.reserve(
         context,

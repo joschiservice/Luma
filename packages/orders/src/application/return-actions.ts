@@ -3,12 +3,11 @@ import type { ActionDiff } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, forbidden, ServiceError } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type {
@@ -139,7 +138,7 @@ interface Dependencies extends Pick<
 }
 
 function fail(status: 404 | 409 | 503, message: string): never {
-  throw new IdentityError(
+  throw new ServiceError(
     status,
     status === 404
       ? 'NOT_FOUND'
@@ -196,7 +195,7 @@ export function createReturnActions(deps: Dependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue');
+      throw forbidden('Sign in again to continue');
     requirePermission(fresh, write ? 'returns.manage' : 'returns.read');
 
     return fresh;

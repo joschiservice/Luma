@@ -1,8 +1,5 @@
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { conflict, forbidden } from '@luma/platform';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -202,7 +199,7 @@ function fixture(
               item.active && item.definitionId === activation.definitionId,
           )
         )
-          throw new IdentityError(409, 'CONFLICT', 'Already on.');
+          throw conflict('Already on.');
         activations.push(activation);
 
         return activation;
@@ -477,7 +474,7 @@ describe('case workflows', () => {
     ]);
 
     // Without assignment access, the case keeps its current owner and the run continues.
-    claim.mockRejectedValueOnce(new IdentityError(403, 'FORBIDDEN', 'No.'));
+    claim.mockRejectedValueOnce(forbidden('No.'));
     await expect(
       f.workflows.activities.record(run!, output('waiting')),
     ).resolves.toBeUndefined();

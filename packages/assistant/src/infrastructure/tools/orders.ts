@@ -1,4 +1,4 @@
-import { IdentityError } from '@luma/identity';
+import { notFound } from '@luma/platform';
 import type { OrderWorkspace } from '@luma/read-models';
 import { z } from 'zod';
 
@@ -176,7 +176,7 @@ export function getOrderTool(orders: Pick<OrderWorkspace, 'get'>) {
     describe: () => 'Read order details',
     async run(context, input) {
       const detail = await orders.get(context, input.orderId);
-      if (!detail) throw new IdentityError(404, 'NOT_FOUND', 'Order not found');
+      if (!detail) throw notFound('Order not found');
       const sources = new Map(
         detail.sources.map((source) => [source.connectionId, source]),
       );

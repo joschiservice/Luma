@@ -1,11 +1,10 @@
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, forbidden, notFound } from '@luma/platform';
 
 import {
   type AccountAddress,
@@ -68,8 +67,7 @@ export function createLedgerService(deps: LedgerDependencies) {
   ) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.read');
     requirePermission(fresh, permission);
     if (write) requireChangesAllowed(fresh);
@@ -220,8 +218,7 @@ export function createLedgerService(deps: LedgerDependencies) {
 
       return deps.store.transaction(fresh, async (tx) => {
         const review = await tx.review(id);
-        if (!review)
-          throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+        if (!review) throw notFound('Stock review not found');
 
         if (review.command.purchaseReceipt)
           requirePermission(fresh, 'procurement.read');
@@ -430,11 +427,7 @@ export function createLedgerService(deps: LedgerDependencies) {
       return deps.store.transaction(fresh, async (tx) => {
         const review = await tx.review(id);
         if (!review?.command.purchaseReceipt)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Purchase receipt review not found.',
-          );
+          throw notFound('Purchase receipt review not found.');
         const receipt = await tx.receipt(
           review.command.key,
           review.commandHash,
@@ -794,8 +787,7 @@ export function createLedgerService(deps: LedgerDependencies) {
             'This key belongs to another stock command.',
           );
         const original = await tx.entry(input.entryId);
-        if (!original)
-          throw new IdentityError(404, 'NOT_FOUND', 'Stock entry not found');
+        if (!original) throw notFound('Stock entry not found');
         if (original.reversed || original.command.purpose === 'reversal')
           throw new LedgerError(
             'already_reversed',
@@ -1030,8 +1022,7 @@ export function createLedgerService(deps: LedgerDependencies) {
       return deps.store.transaction(fresh, async (tx) => {
         await tx.lockCommand(`review:${id}`);
         const review = await tx.review(id);
-        if (!review)
-          throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+        if (!review) throw notFound('Stock review not found');
         for (const permission of ledgerReviewPermissions(review))
           requirePermission(fresh, permission);
         if (!canReviewLedgerChange(fresh, review))
@@ -1061,8 +1052,7 @@ export function createLedgerService(deps: LedgerDependencies) {
 
       return deps.store.transaction(fresh, async (tx) => {
         const review = await tx.review(id);
-        if (!review)
-          throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+        if (!review) throw notFound('Stock review not found');
         if (review.command.purchaseReceipt)
           requirePermission(fresh, 'procurement.manage');
         await tx.lockCommand(review.command.key);

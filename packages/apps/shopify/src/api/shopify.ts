@@ -1,7 +1,7 @@
 import '@luma/identity/http';
 
 import type { IdentityService } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { unavailable } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -29,12 +29,7 @@ export function registerShopifyRoutes(
     '/v1/shopify/callback',
     { config: { authentication: 'app' } },
     async (request, reply) => {
-      if (!oauth || !identity)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Shopify is not configured',
-        );
+      if (!oauth || !identity) throw unavailable('Shopify is not configured');
       const query = request.url.split('?')[1] ?? '';
       const tenant = oauth.callbackTenant(query);
       let result: string;
@@ -66,12 +61,7 @@ export function registerShopifyRoutes(
       '/v1/shopify/privacy',
       { config: { authentication: 'app' } },
       async (request, reply) => {
-        if (!privacy)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Shopify is not configured',
-          );
+        if (!privacy) throw unavailable('Shopify is not configured');
         const header = (name: string) =>
           typeof request.headers[name] === 'string'
             ? (request.headers[name] as string)
@@ -90,12 +80,7 @@ export function registerShopifyRoutes(
       '/v1/shopify/changes/:organizationId/:connectionId',
       { config: { authentication: 'app' } },
       async (request, reply) => {
-        if (!oauth)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Shopify is not configured',
-          );
+        if (!oauth) throw unavailable('Shopify is not configured');
         const params = z
           .object({
             organizationId: z.string().uuid(),
@@ -124,12 +109,7 @@ export function registerShopifyRoutes(
         `/v1/shopify/${action}/:organizationId/:connectionId`,
         { config: { authentication: 'app' } },
         async (request, reply) => {
-          if (!oauth)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Shopify is not configured',
-            );
+          if (!oauth) throw unavailable('Shopify is not configured');
           const params = z
             .object({
               organizationId: z.string().uuid(),

@@ -11,9 +11,9 @@ import {
   orderListSchema,
   ordersCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import type { OrderChangeRequest } from '@luma/orders';
+import { invalid, notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { OrderWorkspace } from '../application/orders.js';
@@ -25,11 +25,7 @@ function changeRequest(query: OrderChangePlanQuery): OrderChangeRequest | null {
   if (kind === 'location') return { kind, lineKey: lineKey ?? null };
   if (kind === 'cancellation' || kind === 'address') return { kind };
   if (!lineKey || (kind === 'quantity' && quantity === undefined))
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
-      'Choose a line and quantity.',
-    );
+    throw invalid('Choose a line and quantity.');
 
   return kind === 'item'
     ? { kind, lineKey }
@@ -81,17 +77,8 @@ export function orderRoutes(service?: OrderWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Orders are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Orders are unavailable');
 
         validateOrderListQuery(query);
 
@@ -102,39 +89,24 @@ export function orderRoutes(service?: OrderWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Order details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Order details are unavailable');
       const detail = await service.get(request.tenantContext, params.orderId);
-      if (!detail) throw new IdentityError(404, 'NOT_FOUND', 'Order not found');
+      if (!detail) throw notFound('Order not found');
 
       return orderDetailSchema.parse(detail);
     }),
     changePlan: os.changePlan.handler(
       async ({ context: { request }, input: { params, query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Order plans are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Order plans are unavailable');
         const plans = await service.changePlan(
           request.tenantContext,
           params.orderId,
           changeRequest(query),
         );
-        if (!plans)
-          throw new IdentityError(404, 'NOT_FOUND', 'Order not found');
+        if (!plans) throw notFound('Order not found');
 
         return orderChangePlansSchema.parse(plans);
       },

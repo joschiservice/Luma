@@ -1,7 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
@@ -14,7 +13,7 @@ import type {
   Observability,
   TraceContext,
 } from '@luma/platform';
-import { ModelGatewayError } from '@luma/platform';
+import { forbidden, ModelGatewayError, unavailable } from '@luma/platform';
 
 import {
   citationMarker,
@@ -181,7 +180,7 @@ export function createAssistant(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -273,16 +272,12 @@ export function createAssistant(deps: {
     ): Promise<AssistantAnswer> {
       let current = await authorize(context);
       if (!deps.availability.available || !deps.gateway)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           deps.availability.reason ??
             'Asking Luma isn’t set up on this server.',
         );
       if (request.context && !(await deps.contextualEnabled?.(current)))
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
+        throw forbidden(
           'Contextual assistance is not enabled for this workspace.',
         );
       const gateway = deps.gateway;
@@ -445,11 +440,7 @@ export function createAssistant(deps: {
               error.code === 'aborted' && timeout.aborted
                 ? 'timeout'
                 : error.code;
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              failureReason(code),
-            );
+            throw unavailable(failureReason(code));
           }
 
           const grounded =

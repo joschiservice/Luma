@@ -8,11 +8,10 @@ import type {
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict } from '@luma/platform';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import type {
   PlaybookDependencies,
@@ -196,14 +195,14 @@ export function createReplenishmentService(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function assertAvailable() {
     if (!available)
-      throw new IdentityError(
+      throw new ServiceError(
         503,
         'SERVICE_UNAVAILABLE',
         'Replenishment execution is unavailable. Check the workflow worker connection.',
@@ -236,12 +235,7 @@ export function createReplenishmentService(deps: {
 
   async function activation(context: TenantContext, id: string) {
     const item = (await store.list(context)).find((r) => r.id === id);
-    if (!item)
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Replenishment activation not found.',
-      );
+    if (!item) throw notFound('Replenishment activation not found.');
 
     return item;
   }
@@ -328,7 +322,7 @@ export function createReplenishmentService(deps: {
       run.definitionId !== definitionId ||
       run.versionDigest !== version.digest
     )
-      throw new IdentityError(404, 'NOT_FOUND', 'Replenishment run not found.');
+      throw notFound('Replenishment run not found.');
 
     return run;
   }
@@ -1048,11 +1042,11 @@ export function createReplenishmentService(deps: {
           );
         } catch (error) {
           if (
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             (error.statusCode === 401 || error.statusCode === 403)
           )
             throw error;
-          if (error instanceof IdentityError && error.statusCode < 500)
+          if (error instanceof ServiceError && error.statusCode < 500)
             result('failed', 'rejected', error.message);
           else
             result(
@@ -1080,8 +1074,7 @@ export function createReplenishmentService(deps: {
         ? findStock(stocks, rule)
         : (stocks.find((s) => s.positionId === positionId && !s.deleted) ??
           stocks.find((s) => s.positionId === positionId));
-      if (!rule && !stock)
-        throw new IdentityError(404, 'NOT_FOUND', 'Stock position not found.');
+      if (!rule && !stock) throw notFound('Stock position not found.');
       const active = rule?.active ? rule : null;
       const now = Date.now();
       const reason = active ? stockUnusableReason(stock, now) : null;
@@ -1498,9 +1491,7 @@ export function createReplenishmentService(deps: {
       if (!inventory || !proposal || !proposal.values.eligible)
         throw new Error('Replenishment proposal is unavailable');
       if (!(await store.claim(context, rule.positionId, rule.sku, run.id)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Another replenishment run is already handling this stock position.',
         );
       const id = deps.id(`${run.id}:order`);

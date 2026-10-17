@@ -8,8 +8,8 @@ import {
   collectionQueryIssue,
   issuesCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -29,13 +29,8 @@ function validateCaseQuery(query: Parameters<typeof collectionQueryIssue>[1]) {
 export function caseRoutes(service?: CaseService) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Case reads are unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Case reads are unavailable');
 
     return { context: request.tenantContext, service };
   }
@@ -62,7 +57,7 @@ export function caseRoutes(service?: CaseService) {
       async ({ context: { request }, input: { params, query } }) => {
         const { context, service } = use(request);
         const body = await service.evidence(context, params.exceptionId, query);
-        if (!body) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
+        if (!body) throw notFound('Case not found');
 
         return caseEvidencePageSchema.parse(body);
       },
@@ -70,7 +65,7 @@ export function caseRoutes(service?: CaseService) {
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       const { context, service } = use(request);
       const body = await service.get(context, params.exceptionId);
-      if (!body) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
+      if (!body) throw notFound('Case not found');
 
       return caseDetailSchema.parse(body);
     }),

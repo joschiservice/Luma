@@ -1,12 +1,8 @@
 import type { ActionAdmission } from '@luma/execution';
 import { AdmissionRejected } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { canonicalJson, ServiceError } from '@luma/platform';
 
 import type { CodeRunner } from '../domain/code-step.js';
 import type {
@@ -122,7 +118,7 @@ export function createProcessActivities(deps: {
           outputs,
         ));
       } catch (error) {
-        if (error instanceof IdentityError && error.statusCode === 409)
+        if (error instanceof ServiceError && error.statusCode === 409)
           return { state: 'denied', proposalId: run.id, reason: error.message };
         throw error;
       }

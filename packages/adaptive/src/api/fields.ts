@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -16,13 +16,8 @@ export function fieldsRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Custom fields are unavailable.',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+    if (!service) throw unavailable('Custom fields are unavailable.');
 
     return { service, context: request.tenantContext };
   }
@@ -34,11 +29,7 @@ export function fieldsRoutes(
       async ({ context: { request }, input: { query } }) => {
         const s = use(request);
         if (!workflows)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Custom field workflows are unavailable.',
-          );
+          throw unavailable('Custom field workflows are unavailable.');
 
         return (await workflows.pending(s.context)).filter(
           (item) =>
@@ -51,11 +42,7 @@ export function fieldsRoutes(
       async ({ context: { request }, input: { params } }) => {
         const s = use(request);
         if (!workflows)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Custom field workflows are unavailable.',
-          );
+          throw unavailable('Custom field workflows are unavailable.');
 
         return workflows.review(s.context, params.runId, params.stepId);
       },
@@ -64,11 +51,7 @@ export function fieldsRoutes(
       async ({ context: { request }, input: { params, body } }) => {
         const s = use(request);
         if (!workflows)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Custom field workflows are unavailable.',
-          );
+          throw unavailable('Custom field workflows are unavailable.');
 
         return workflows.respond(s.context, params.runId, params.stepId, body);
       },

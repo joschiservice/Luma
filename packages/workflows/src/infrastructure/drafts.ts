@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type {
   StoredWorkflowDraft,
@@ -148,9 +148,7 @@ export function createWorkflowDraftStore(
               await catalog.publish(context, version);
             } catch (error) {
               if (error instanceof Error && /immutable/.test(error.message))
-                throw new IdentityError(
-                  409,
-                  'CONFLICT',
+                throw conflict(
                   'Someone published this version or renamed this workflow first. Reload and choose a new version.',
                 );
               throw error;

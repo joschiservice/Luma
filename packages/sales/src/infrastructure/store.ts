@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { SalesEdit, SalesLine, SalesOrder } from '../domain/order.js';
 
@@ -55,12 +55,7 @@ export function createSalesStore(
           document,
         ],
       );
-      if (!saved.rows.length)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Order changed; reload and retry',
-        );
+      if (!saved.rows.length) throw conflict('Order changed; reload and retry');
       for (const [position, line] of lines.entries())
         await tx.query(
           `INSERT INTO sales_order_lines(tenant_id,sales_order_id,id,position,sku_id,quantity,current_quantity,unit_price,tax_included,tax_rate,document)
@@ -89,7 +84,7 @@ export function createSalesStore(
       );
       const previous = rows.rows[0];
       if (previous && !previous.matches)
-        throw new IdentityError(409, 'CONFLICT', 'Command ID already used');
+        throw conflict('Command ID already used');
 
       return previous?.result ?? null;
     },

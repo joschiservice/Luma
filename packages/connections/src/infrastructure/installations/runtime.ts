@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 
 import type {
   CapabilityDependencies,
@@ -74,7 +74,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
           adapter = await build(request?.readPurpose);
         } catch (error) {
           if (
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             [404, 409].includes(error.statusCode)
           )
             return null;

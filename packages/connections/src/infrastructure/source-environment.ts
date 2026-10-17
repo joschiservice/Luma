@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 
 import type { SourceEnvironmentRepository } from '../application/source-environment.js';
 import type { InstalledConnection } from '../domain/installation.js';
@@ -58,7 +58,7 @@ export function createSourceEnvironmentRepository(
         ).rows[0];
         if (receipt) {
           if (receipt.fingerprint !== fingerprint)
-            throw new IdentityError(409, 'CONFLICT', 'Command ID already used');
+            throw conflict('Command ID already used');
 
           return receipt.document;
         }
@@ -68,8 +68,7 @@ export function createSourceEnvironmentRepository(
             [context.tenantId, id],
           )
         ).rows[0]?.document;
-        if (!c)
-          throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+        if (!c) throw notFound('Connection not found');
         const previous =
           (
             await tx.query<{ document: SourceEnvironmentDeclaration }>(
@@ -78,11 +77,7 @@ export function createSourceEnvironmentRepository(
             )
           ).rows[0]?.document ?? null;
         if ((previous?.revision ?? 0) !== command.expectedRevision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Declaration changed; refresh it',
-          );
+          throw conflict('Declaration changed; refresh it');
         const declaration = await apply(previous, c);
         await tx.query(
           'INSERT INTO connector_source_environments(tenant_id,connection_id,revision,document) VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,connection_id) DO UPDATE SET revision=EXCLUDED.revision,document=EXCLUDED.document',

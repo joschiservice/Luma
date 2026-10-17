@@ -3,7 +3,8 @@ import {
   customFieldInputSchema,
   upgradeAdaptiveViewQuery,
 } from '@luma/api-contract';
-import { IdentityError, isPermission } from '@luma/identity';
+import { isPermission } from '@luma/identity';
+import { invalid } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -29,11 +30,7 @@ export function configurePurchasingPackage(
   const read = z.string().parse(config.parameters.fieldReadPermission),
     write = z.string().parse(config.parameters.fieldWritePermission);
   if (!isPermission(read) || !isPermission(write))
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
-      'Choose a known field permission.',
-    );
+    throw invalid('Choose a known field permission.');
   const label = {
     en: z.string().trim().min(1).max(100).parse(config.parameters.fieldLabelEn),
     de: z.string().trim().min(1).max(100).parse(config.parameters.fieldLabelDe),

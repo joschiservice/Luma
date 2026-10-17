@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { PolicyRepository } from '../application/policies.js';
 import type {
@@ -87,11 +87,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
             current.autonomyRevision,
           ) !== approval.policyVersion
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Approval policy changed. Refresh the review.',
-          );
+          throw conflict('Approval policy changed. Refresh the review.');
         await tx.query(
           'INSERT INTO policy_approvals(id, tenant_id, proposal_id, action_hash, policy_version, document) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, proposal_id, action_hash, policy_version) DO NOTHING',
           [

@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, invalid } from '@luma/platform';
 
 import type { CoordinationStore } from '../application/coordination.js';
 import type { WorkflowAuditEntry } from '../application/drafts.js';
@@ -285,7 +284,7 @@ export function createCoordinationStore(
           run?.state !== 'awaiting_admission' ||
           saved.state === 'cancelled'
         )
-          throw new IdentityError(409, 'CONFLICT', 'The task was cancelled.');
+          throw conflict('The task was cancelled.');
         if (saved.answer) {
           const { actorId, answeredAt, ...body } = saved.answer;
           void answeredAt;
@@ -293,11 +292,7 @@ export function createCoordinationStore(
             actorId !== context.actor.id ||
             canonicalJson(body) !== canonicalJson(answer)
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This task already has an answer.',
-            );
+            throw conflict('This task already has an answer.');
 
           return saved;
         }
@@ -305,11 +300,7 @@ export function createCoordinationStore(
         if (
           canonicalJson(effective.assignee) !== canonicalJson(expected.assignee)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The assignment changed. Refresh the task.',
-          );
+          throw conflict('The assignment changed. Refresh the task.');
         const document: HumanTask = {
           ...effective,
           state: 'answered',
@@ -344,11 +335,7 @@ export function createWorkflowEventSink(
   return (tenantId: string, event: WorkflowEvent): Promise<void> =>
     db.transaction(tenantId, async (tx) => {
       if (Date.parse(event.occurredAt) > now().getTime())
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Event time cannot be in the future.',
-        );
+        throw invalid('Event time cannot be in the future.');
       await tx.query(
         'INSERT INTO workflow_events(tenant_id,source_id,event_type,correlation_key,occurred_at,document) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
         [
@@ -367,10 +354,6 @@ export function createWorkflowEventSink(
         )
       ).rows[0];
       if (canonicalJson(row?.document) !== canonicalJson(event))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This event source already has different evidence.',
-        );
+        throw conflict('This event source already has different evidence.');
     });
 }

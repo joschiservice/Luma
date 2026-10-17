@@ -1,10 +1,7 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requireChangesAllowed,
-  requirePermission,
-} from '@luma/identity';
+import { requireChangesAllowed, requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 /** Archives package-owned workflow definitions without erasing immutable versions or run evidence. */
 export function createPackageWorkflowArchive(db: TenantDatabase) {
@@ -38,9 +35,7 @@ export function createPackageWorkflowArchive(db: TenantDatabase) {
             );
           })
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This workflow has a version owned outside the package.',
           );
         const active = await tx.query(
@@ -52,9 +47,7 @@ export function createPackageWorkflowArchive(db: TenantDatabase) {
           [context.tenantId, definitionId],
         );
         if (active.rowCount || pending.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Disable workflow triggers and finish or cancel its runs before removing this package.',
           );
         await tx.query(

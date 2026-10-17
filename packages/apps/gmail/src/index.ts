@@ -5,8 +5,8 @@ import type { ConnectionProvider } from '@luma/connections';
 import { simulationTransport } from '@luma/connections/adapters';
 import type { SimulationTransport } from '@luma/connections/composition';
 import { createQuotaPacer, type QuotaPacer } from '@luma/connector-gmail';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { ServiceError, unavailable } from '@luma/platform';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -64,7 +64,7 @@ export function createGmailProvider(
     ...(options.oauth ? { refreshCredential: options.oauth.credential } : {}),
     manage() {
       if (options.oauth)
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'Use Connect Gmail to authorize this mailbox',
@@ -203,18 +203,9 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       ) => {
         reply.header('cache-control', 'no-store');
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
         await context.requireInstalled(request.tenantContext, 'gmail');
-        if (!oauth)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Gmail authorization is not configured',
-          );
+        if (!oauth) throw unavailable('Gmail authorization is not configured');
 
         return { tenant: request.tenantContext, oauth };
       };

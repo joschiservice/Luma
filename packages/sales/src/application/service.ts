@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, invalid, notFound } from '@luma/platform';
 
 import type { SalesEdit, SalesOrder } from '../domain/order.js';
 import { publishedOrder, units } from '../domain/order.js';
@@ -62,10 +62,9 @@ export function createSalesService(deps: SalesDependencies) {
   async function access(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     if (!(await deps.enabled(fresh)))
-      throw new IdentityError(404, 'NOT_FOUND', 'Luma orders are unavailable');
+      throw notFound('Luma orders are unavailable');
     requirePermission(fresh, 'sales.manage');
 
     return fresh;
@@ -80,16 +79,11 @@ export function createSalesService(deps: SalesDependencies) {
     ): Promise<SalesStockDemand | null> {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+      if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
       requirePermission(fresh, 'inventory.manage');
       requirePermission(fresh, 'orders.read');
       if (requireAuthority && !(await deps.enabled(fresh)))
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Luma orders are unavailable',
-        );
+        throw notFound('Luma orders are unavailable');
 
       return deps.atomic(
         fresh,
@@ -162,25 +156,16 @@ export function createSalesService(deps: SalesDependencies) {
           const retry = await tx.receipt(input.commandId, orderId, input);
           if (retry) return retry;
           const previous = await tx.get(orderId);
-          if (!previous)
-            throw new IdentityError(404, 'NOT_FOUND', 'Luma order not found');
+          if (!previous) throw notFound('Luma order not found');
           await tx.requireAuthority(previous);
           if (previous.version !== input.version)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Order changed; reload and retry',
-            );
+            throw conflict('Order changed; reload and retry');
           if (
             previous.status === 'cancelled' &&
             input.status &&
             input.status !== 'cancelled'
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'A cancelled order cannot be reopened',
-            );
+            throw conflict('A cancelled order cannot be reopened');
           const changes = new Map(
             input.lines?.map((line) => [line.id, line.currentQuantity]),
           );
@@ -190,20 +175,14 @@ export function createSalesService(deps: SalesDependencies) {
               (id) => !previous.lines.some((line) => line.id === id),
             )
           )
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
+            throw invalid(
               'Each edited line must belong to this order and occur once',
             );
           const lines = previous.lines.map((line) => {
             const value = changes.get(line.id);
             if (value === undefined) return line;
             if (units(value) > units(line.quantity))
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'Current units cannot exceed ordered units',
-              );
+              throw invalid('Current units cannot exceed ordered units');
 
             return units(value) === units(line.currentQuantity)
               ? line

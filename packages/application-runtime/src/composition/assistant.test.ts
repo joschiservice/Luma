@@ -14,7 +14,6 @@ import {
   assistantModelProfile,
   createWorkspaceAssistant,
 } from '@luma/assistant/composition';
-import { IdentityError } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
@@ -27,6 +26,7 @@ import type {
   Operation,
   TraceContext,
 } from '@luma/platform';
+import { notFound } from '@luma/platform';
 import {
   createModelGateway,
   createObservability,
@@ -345,7 +345,7 @@ describe('workspace assistant', () => {
   it('gives nothing to someone who is no longer a member', async () => {
     const removed = setup(['Hello'], {
       refreshContext: async () => {
-        throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+        throw notFound('Organization not found');
       },
     });
     await expect(
@@ -360,8 +360,7 @@ describe('workspace assistant', () => {
       {
         refreshContext: async (current) => {
           checks += 1;
-          if (checks > 1)
-            throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+          if (checks > 1) throw notFound('Organization not found');
 
           return current;
         },

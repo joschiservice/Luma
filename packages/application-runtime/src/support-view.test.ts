@@ -3,12 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { apiContract, contractRoutes } from '@luma/api-contract';
 import { buildApp } from '@luma/application-runtime';
 import type { IdentityService } from '@luma/identity';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { requestIsReadOnly } from '@luma/identity/http';
+import { ServiceError } from '@luma/platform';
 import { afterEach, expect, it, vi } from 'vitest';
 
 const origin = 'http://localhost:3000';
@@ -34,7 +31,7 @@ function supportApp() {
       const support =
         options?.supportView && credentials.cookie?.includes(supportCookie);
       if (!support && !credentials.cookie?.includes('session='))
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
       return makeTenantContext(
         { userId: 'member', sessionId: support ? viewId : 'session' },

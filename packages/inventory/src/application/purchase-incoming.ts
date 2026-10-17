@@ -1,10 +1,10 @@
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import {
   decimalQuantity,
@@ -78,7 +78,7 @@ export function createPurchaseIncoming(deps: {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Actor changed.');
+        throw forbidden('Actor changed.');
       requireChangesAllowed(fresh);
       requirePermission(fresh, 'inventory.read');
       requirePermission(fresh, 'procurement.read');

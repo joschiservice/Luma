@@ -1,12 +1,18 @@
 import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   MembershipSuspendedError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson, conflict, notFound, unavailable } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import { consequentialReasons } from '../domain/consequential.js';
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
@@ -182,7 +188,7 @@ export function createReplies(deps: ReplyDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -410,7 +416,7 @@ export function createReplies(deps: ReplyDependencies) {
       await deps.settled(context, outbound);
     } catch (error) {
       if (
-        !(error instanceof IdentityError) ||
+        !(error instanceof ServiceError) ||
         error.statusCode !== 409 ||
         outbound.state !== 'sent'
       )

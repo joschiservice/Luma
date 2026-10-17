@@ -1,11 +1,11 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type {
   InsightChart,
@@ -78,7 +78,7 @@ export function createInsights(
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, 'insights.read');
     requirePermission(fresh, chartPermissions[chart]);
 

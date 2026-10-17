@@ -1,10 +1,10 @@
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
+import { forbidden, notFound } from '@luma/platform';
 
 import { LedgerError, quantityUnits } from '../domain/ledger.js';
 import {
@@ -28,8 +28,7 @@ export function createStockOwnershipService(deps: NativeStockDependencies) {
   async function access(context: TenantContext, review = false) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.read');
     requirePermission(fresh, review ? 'inventory.approve' : 'inventory.manage');
     if (!review) requirePermission(fresh, 'workspace.settings.manage');
@@ -296,17 +295,11 @@ export function createStockOwnershipService(deps: NativeStockDependencies) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       requirePermission(fresh, 'inventory.read');
-      if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+      if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
 
       return deps.store.transaction(fresh, async (tx) => {
         const value = await tx.ownershipReview(id);
-        if (!value)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Stock ownership review not found',
-          );
+        if (!value) throw notFound('Stock ownership review not found');
 
         return value;
       });
@@ -395,12 +388,7 @@ export function createStockOwnershipService(deps: NativeStockDependencies) {
       return deps.store.transaction(fresh, async (tx) => {
         await tx.ledger.lockCommand(`ownership-review:${id}`);
         const value = await tx.ownershipReview(id);
-        if (!value)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Stock ownership review not found',
-          );
+        if (!value) throw notFound('Stock ownership review not found');
         if (value.preparedBy === fresh.actor.id)
           throw new LedgerError(
             'review_required',
@@ -431,12 +419,7 @@ export function createStockOwnershipService(deps: NativeStockDependencies) {
 
       return deps.store.transaction(fresh, async (tx) => {
         const value = await tx.ownershipReview(id);
-        if (!value)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Stock ownership review not found',
-          );
+        if (!value) throw notFound('Stock ownership review not found');
         await tx.ledger.lockCommand(value.key);
         const receipt = await tx.transitionReceipt(value.id);
         if (receipt) return receipt;

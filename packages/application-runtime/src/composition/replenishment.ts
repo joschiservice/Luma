@@ -3,8 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { replenishmentRuleSchema } from '@luma/api-contract';
 import { createAuditLog } from '@luma/audit/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import {
   createReplenishmentService,
@@ -56,9 +56,7 @@ export function createReplenishmentRuntime(deps: {
           (r) => r.id === run.context.inputs.activationId,
         );
         if (!rule?.active || rule.principalId !== context.actor.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'The replenishment activation changed. Refresh before starting.',
           );
 

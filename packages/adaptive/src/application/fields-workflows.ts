@@ -7,13 +7,19 @@ import type {
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isPermission,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import type {
   CodeProcessBusinessAdapter,
@@ -103,11 +109,7 @@ function recordType(value: string): AdaptiveRecordType {
     value === 'purchase_order'
   )
     return value;
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
-    'Custom field workflows require a supported record subject.',
-  );
+  throw invalid('Custom field workflows require a supported record subject.');
 }
 
 function valueOf(
@@ -122,11 +124,7 @@ function valueOf(
 
   if (value.source === 'step')
     return outputs.find((o) => o.stepId === value.stepId)?.values[value.field];
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
-    'Unsupported workflow value reference.',
-  );
+  throw invalid('Unsupported workflow value reference.');
 }
 
 /** Supplies permission-visible field reads and admission-bound writes to custom workflow processes. */
@@ -162,7 +160,7 @@ export function createFieldsWorkflowAdapter(deps: {
     const context = await deps.resolveContext(run);
     requireTenant(context, run.tenantId);
     if (context.actor.id !== run.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Workflow principal changed.');
+      throw forbidden('Workflow principal changed.');
 
     return context;
   }
@@ -210,7 +208,7 @@ export function createFieldsWorkflowAdapter(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, 'adaptive.fields.read');
 
     return fresh;
@@ -228,14 +226,9 @@ export function createFieldsWorkflowAdapter(deps: {
       !isFieldWriteCapability(binding.action.capability) ||
       binding.subject?.kind !== 'adaptive_field_change'
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Field workflow proposal not found.',
-      );
+      throw notFound('Field workflow proposal not found.');
     const run = await deps.run(context, runId);
-    if (!run)
-      throw new IdentityError(404, 'NOT_FOUND', 'Workflow run not found.');
+    if (!run) throw notFound('Workflow run not found.');
     const type = recordType(binding.action.target.kind);
     const record = await deps.fields.readValues(
       context,
@@ -245,7 +238,7 @@ export function createFieldsWorkflowAdapter(deps: {
     const field = record.fields.find(
       (f) => f.id === binding.action.parameters.fieldId,
     );
-    if (!field) throw new IdentityError(404, 'NOT_FOUND', 'Field not found.');
+    if (!field) throw notFound('Field not found.');
     const current = record.values.find((v) => v.fieldId === field.id);
     const decisionId = await deps.latestDecisionId(context, binding.action.id);
     const decision = decisionId
@@ -319,7 +312,7 @@ export function createFieldsWorkflowAdapter(deps: {
           if (item.status === 'approval_required') result.push(item);
         } catch (error) {
           if (
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             (error.statusCode === 403 || error.statusCode === 404)
           )
             continue;
@@ -348,17 +341,9 @@ export function createFieldsWorkflowAdapter(deps: {
         item.decisionId !== input.decisionId ||
         item.actionHash !== input.reviewedActionHash
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The field proposal changed. Review it again.',
-        );
+        throw conflict('The field proposal changed. Review it again.');
       if (!item.canRespond)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'You cannot respond to this field proposal.',
-        );
+        throw forbidden('You cannot respond to this field proposal.');
       await deps.policies.respond(
         context,
         input.decisionId,
@@ -381,7 +366,7 @@ export function createFieldsWorkflowAdapter(deps: {
           fields = await deps.fields.list(context, type);
         } catch (error) {
           if (
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             (error.statusCode === 403 || error.statusCode === 404)
           )
             continue;
@@ -486,12 +471,7 @@ export function createFieldsWorkflowAdapter(deps: {
     async read(run: ProcessRun, step: Extract<ProcessStep, { kind: 'read' }>) {
       const context = await authorize(run);
       const selection = readSelection(step.source);
-      if (!selection)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Unsupported field read.',
-        );
+      if (!selection) throw invalid('Unsupported field read.');
       const type = recordType(run.subject.kind);
       const record = await deps.fields.readValues(
         context,
@@ -499,7 +479,7 @@ export function createFieldsWorkflowAdapter(deps: {
         run.subject.id,
       );
       const field = record.fields.find((f) => f.id === selection.fieldId);
-      if (!field) throw new IdentityError(404, 'NOT_FOUND', 'Field not found.');
+      if (!field) throw notFound('Field not found.');
       const current = record.values.find((v) => v.fieldId === field.id);
       const raw = current?.value ?? null;
       let value: string | number | boolean | null;
@@ -508,22 +488,14 @@ export function createFieldsWorkflowAdapter(deps: {
           !selection.choiceKey ||
           !field.choices.some((c) => c.key === selection.choiceKey)
         )
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Choose a multiple-choice option for this field read.',
-          );
+          throw invalid('Choose a multiple-choice option for this field read.');
         value =
           raw === null
             ? null
             : Array.isArray(raw) && raw.includes(selection.choiceKey);
       } else {
         if (selection.choiceKey || Array.isArray(raw))
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'This field read is invalid.',
-          );
+          throw invalid('This field read is invalid.');
         value = raw;
       }
 
@@ -558,11 +530,7 @@ export function createFieldsWorkflowAdapter(deps: {
         step.targetKind !== type ||
         step.capabilityVersion !== '1'
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Unsupported field write.',
-        );
+        throw invalid('Unsupported field write.');
       const prior = await deps.provisioning.step(context, run.id, step.id);
       if (prior) return { proposalId: prior.action.id };
       const fieldId = step.parameters.fieldId
@@ -572,11 +540,7 @@ export function createFieldsWorkflowAdapter(deps: {
         ? valueOf(step.parameters.valueJson, run, outputs)
         : null;
       if (typeof fieldId !== 'string' || typeof valueJson !== 'string')
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Map a field identity and JSON typed value.',
-        );
+        throw invalid('Map a field identity and JSON typed value.');
       const parsedValue = JSON.parse(valueJson);
       const record = await deps.fields.readValues(
         context,
@@ -585,11 +549,7 @@ export function createFieldsWorkflowAdapter(deps: {
       );
       const field = record.fields.find((f) => f.id === fieldId);
       if (!field || field.source !== 'luma')
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This field cannot be written.',
-        );
+        throw conflict('This field cannot be written.');
       const value = deps.parseValue(field, parsedValue);
       if (
         canonicalJson(value).length > 1000 ||
@@ -598,9 +558,7 @@ export function createFieldsWorkflowAdapter(deps: {
             null,
         ).length > 1000
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'Workflow field changes support JSON values up to 1,000 characters.',
         );
       // A single activated artifact is bound to this persisted run, reviewed version and principal.
@@ -656,11 +614,7 @@ export function createFieldsWorkflowAdapter(deps: {
       };
       const effect = await deps.effects.resolve(context, action);
       if (!effect || !(await effect.checkPreconditions(action)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The field change is unavailable.',
-        );
+        throw conflict('The field change is unavailable.');
       await deps.provisioning.bind(context, {
         runId: run.id,
         stepId: step.id,
@@ -689,21 +643,12 @@ export function createFieldsWorkflowAdapter(deps: {
           run.version,
         );
         if (!version || version.digest !== run.versionDigest)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The workflow version is unavailable.',
-          );
+          throw conflict('The workflow version is unavailable.');
         const action = version.steps.find(
           (item): item is Extract<ProcessStep, { kind: 'capability' }> =>
             item.kind === 'capability' && item.id === step.forStep,
         );
-        if (!action)
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'The approval has no supported action.',
-          );
+        if (!action) throw invalid('The approval has no supported action.');
         await adapter.bindAction(
           context,
           run,
@@ -715,12 +660,7 @@ export function createFieldsWorkflowAdapter(deps: {
       }
       if (!binding) return { state: 'pending' as const };
       const effect = await deps.effects.resolve(context, binding.action);
-      if (!effect)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The field change is unavailable.',
-        );
+      if (!effect) throw conflict('The field change is unavailable.');
       const decision = await deps.policies.evaluate(
         context,
         binding.action,
@@ -748,8 +688,7 @@ export function createFieldsWorkflowAdapter(deps: {
         run.id,
         step.forStep,
       );
-      if (!binding)
-        throw new IdentityError(404, 'NOT_FOUND', 'Field action not found.');
+      if (!binding) throw notFound('Field action not found.');
       const effect = await deps.effects.resolve(context, binding.action);
       const result = await effect?.verify(binding.action);
 

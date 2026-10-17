@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { ServiceError, unavailable } from '@luma/platform';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import { z } from 'zod';
 
@@ -73,13 +73,9 @@ export function createPushIntake(
 
   return async (authorization: string | undefined, body: unknown) => {
     if (!config?.push || !verify)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Gmail push is not configured',
-      );
+      throw unavailable('Gmail push is not configured');
     if (!(await verify(authorization)))
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Invalid push token');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Invalid push token');
     const message = envelope.safeParse(body);
     if (!message.success) return;
     let data: z.infer<typeof notification>;

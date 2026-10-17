@@ -1,4 +1,4 @@
-import { ServiceError } from '@luma/platform';
+import { forbidden, notFound, ServiceError } from '@luma/platform';
 
 import type { AppPermission, Permission } from './permissions.js';
 import type { BuiltInRoleKey, RoleReference } from './roles.js';
@@ -72,19 +72,10 @@ export interface TenantContext {
 }
 
 /**
- * The former name of `ServiceError`, kept so existing throws and `instanceof` checks behave the
- * same. Both names refer to one class: an error thrown as either matches checks for both and gets
- * the same HTTP response. New code throws `ServiceError` or its helpers from `@luma/platform`.
- */
-export const IdentityError = ServiceError;
-
-export type IdentityError = ServiceError;
-
-/**
  * Rejects a member's suspended or closed workspace. Callers see the same not-found response as
  * for a missing workspace; background work treats it as paused and checks again later.
  */
-export class WorkspaceInactiveError extends IdentityError {
+export class WorkspaceInactiveError extends ServiceError {
   constructor() {
     super(404, 'NOT_FOUND', 'Organization not found');
   }
@@ -95,7 +86,7 @@ export class WorkspaceInactiveError extends IdentityError {
  * with the `ACCESS_SUSPENDED` code.
  * Background work acting as the member pauses and checks again later instead of failing.
  */
-export class MembershipSuspendedError extends IdentityError {
+export class MembershipSuspendedError extends ServiceError {
   constructor(
     message = 'Your access to this workspace is suspended. Contact a workspace owner or Luma support.',
   ) {
@@ -153,7 +144,7 @@ export function requireActiveMembership(member: Membership): void {
  * Refuses a change in a support view. The guard already refuses routes that change data; services
  * that execute actions, approve or call models check again.
  */
-export class ReadOnlyAccessError extends IdentityError {
+export class ReadOnlyAccessError extends ServiceError {
   constructor() {
     super(
       403,
@@ -187,11 +178,11 @@ export function makeTenantContext(
     member.userId !== session.userId ||
     member.organizationId !== organization.id
   )
-    throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+    throw notFound('Organization not found');
   if (organization.status !== 'active') throw new WorkspaceInactiveError();
   requireActiveMembership(member);
   if (organization.dataRegion !== cellRegion)
-    throw new IdentityError(
+    throw new ServiceError(
       503,
       'REGION_UNAVAILABLE',
       'Organization region is unavailable',
@@ -231,7 +222,7 @@ export function builtInMembership(
 /** Rejects unresolved contexts and tenant mismatches with a not-found error. */
 export function requireTenant(context: TenantContext, tenantId: string): void {
   if (context[resolvedContext] !== true || context.tenantId !== tenantId)
-    throw new IdentityError(404, 'NOT_FOUND', 'Resource not found');
+    throw notFound('Resource not found');
 }
 
 /** Reports whether a resolved context grants a core or app permission. */
@@ -251,9 +242,7 @@ export function requirePermission(
 ): void {
   requireTenant(context, context.tenantId);
   if (!context.permissions.has(permission))
-    throw new IdentityError(
-      403,
-      'FORBIDDEN',
+    throw forbidden(
       'Your role does not allow this. Ask a workspace admin for access.',
     );
 }

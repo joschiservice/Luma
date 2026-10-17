@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 
 import type { ViewsStore, ViewsTransaction } from '../application/views.js';
 import type { StoredAdaptiveView } from '../domain/views.js';
@@ -26,9 +26,7 @@ export function createViewsStore(db: TenantDatabase): ViewsStore {
           );
           const limit = shared ? sharedViewLimit : personalViewLimit;
           if ((result.rows[0]?.count ?? 0) >= limit)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               shared
                 ? `This workspace already has ${sharedViewLimit} shared views. Archive one before sharing another.`
                 : `You already have ${personalViewLimit} personal views. Archive one before saving another.`,
@@ -56,8 +54,7 @@ export function createViewsStore(db: TenantDatabase): ViewsStore {
               : null;
           },
           async save(view, changedBy, expectedRevision) {
-            if (view.tenantId !== tenantId)
-              throw new IdentityError(404, 'NOT_FOUND', 'View not found.');
+            if (view.tenantId !== tenantId) throw notFound('View not found.');
             if (!view.archived) await requireCapacity(view);
             if (expectedRevision === null) {
               const result = await tx.query(
@@ -71,12 +68,7 @@ export function createViewsStore(db: TenantDatabase): ViewsStore {
                   JSON.stringify(view),
                 ],
               );
-              if (!result.rowCount)
-                throw new IdentityError(
-                  409,
-                  'CONFLICT',
-                  'This view already exists.',
-                );
+              if (!result.rowCount) throw conflict('This view already exists.');
             } else {
               const result = await tx.query(
                 'UPDATE adaptive_views SET revision=$3,archived=$4,updated_at=$5,document=$6 WHERE tenant_id=$1 AND id=$2 AND revision=$7 RETURNING id',
@@ -91,11 +83,7 @@ export function createViewsStore(db: TenantDatabase): ViewsStore {
                 ],
               );
               if (!result.rowCount)
-                throw new IdentityError(
-                  409,
-                  'CONFLICT',
-                  'The view changed. Reload it before saving.',
-                );
+                throw conflict('The view changed. Reload it before saving.');
             }
             await tx.query(
               'INSERT INTO adaptive_view_revisions(tenant_id,view_id,revision,document) VALUES($1,$2,$3,$4)',

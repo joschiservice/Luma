@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type {
   DraftTestStore,
@@ -122,9 +122,7 @@ export function createDraftTestStore(db: TenantDatabase): DraftTestStore {
           previous.principal_id !== context.actor.id ||
           previous.draft_id !== draftId
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This test run ID was already used with different inputs. Reuse the original request.',
           );
 

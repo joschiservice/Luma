@@ -1,7 +1,6 @@
 import type { Incident } from '@luma/exceptions';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { conflict, notFound } from '@luma/platform';
+import { conflict, notFound, unavailable } from '@luma/platform';
 
 import {
   type MeasurementStore,
@@ -226,9 +225,7 @@ export function createResolutionMetricReader(
         )
       ).rows;
       if (rows.length > 10000)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'The resolution cohort exceeds 10,000 incidents. Choose a shorter window.',
         );
 

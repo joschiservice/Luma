@@ -5,7 +5,8 @@ import type {
   VerificationResult,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import { createProcurementCapabilities } from '@luma/procurement/composition';
 import { z } from 'zod';
@@ -139,7 +140,7 @@ export function createProcurementEffects(
 
               return false;
             } catch (error) {
-              return error instanceof IdentityError && error.statusCode === 404;
+              return error instanceof ServiceError && error.statusCode === 404;
             }
           }
           const transition = boundInput as {

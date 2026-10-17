@@ -1,7 +1,6 @@
+import { ServiceError } from '@luma/platform';
 import type { Pool } from 'pg';
 import { Resend } from 'resend';
-
-import { IdentityError } from '../domain/context.js';
 
 const statuses = {
   'email.delivered': 'delivered',
@@ -40,7 +39,7 @@ export function createMailEvents(
           webhookSecret: settings.webhookSecret,
         });
       } catch {
-        throw new IdentityError(
+        throw new ServiceError(
           401,
           'UNAUTHENTICATED',
           'Invalid webhook signature',

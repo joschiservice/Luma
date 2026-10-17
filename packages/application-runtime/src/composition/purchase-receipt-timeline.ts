@@ -1,9 +1,6 @@
-import {
-  hasPermission,
-  IdentityError,
-  type TenantContext,
-} from '@luma/identity';
+import { hasPermission, type TenantContext } from '@luma/identity';
 import type { LedgerService } from '@luma/inventory';
+import { ServiceError } from '@luma/platform';
 import type { PurchasingTimelineEntry } from '@luma/procurement';
 
 /** Adds Inventory's reviewed receipts and independent current readback without posting stock. */
@@ -66,8 +63,7 @@ export function createPurchaseReceiptTimeline(ledger: () => LedgerService) {
           source: 'inventory',
         });
       } catch (error) {
-        if (error instanceof IdentityError && error.statusCode === 404)
-          continue;
+        if (error instanceof ServiceError && error.statusCode === 404) continue;
         throw error;
       }
     }

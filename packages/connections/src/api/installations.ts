@@ -2,8 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract, installedConnectionSchema } from '@luma/api-contract';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -28,13 +28,8 @@ export function connectionRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Connection service is unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Connection service is unavailable');
 
     return { service, context: request.tenantContext };
   }
