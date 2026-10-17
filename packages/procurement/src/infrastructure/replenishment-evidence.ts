@@ -103,7 +103,9 @@ export async function replenishmentRunCitations(
     citedAt: string | null,
   ) => ({ ref, citedAs, citedAt });
   const citations: RunCitation[] = steps.flatMap((step) => {
-    const refs = strings(step.refs).filter((ref) => !ref.startsWith('temporal:'));
+    const refs = strings(step.refs).filter(
+      (ref) => !ref.startsWith('temporal:'),
+    );
     switch (step.step_id) {
       case 'inventory':
         return refs.map((ref) => cite(ref, 'read', step.at));
@@ -143,9 +145,7 @@ export async function replenishmentRunCitations(
     actionIds: row.proposal_id ? [row.proposal_id] : [],
     citations: [
       ...(row.activation_id ? [cite(row.activation_id, 'record', null)] : []),
-      ...(row.proposal_id
-        ? [cite(row.proposal_id, 'record', admittedAt)]
-        : []),
+      ...(row.proposal_id ? [cite(row.proposal_id, 'record', admittedAt)] : []),
       ...citations,
       ...strings(row.context?.demandEvidenceRefs).map((ref) =>
         cite(ref, 'read', reviewedAt),
@@ -202,13 +202,11 @@ export async function replenishmentRunEvidence(
   );
 
   return [
-    ...rows.map(
-      (record): RunRecord => ({
-        kind: 'luma_record',
-        id: record.id,
-        record: record.record,
-      }),
-    ),
+    ...rows.map((record): RunRecord => ({
+      kind: 'luma_record',
+      id: record.id,
+      record: record.record,
+    })),
     ...(await lifecycleEvents(tx, tenantId, ids(row.draft_id), refs.uuids)),
   ];
 }

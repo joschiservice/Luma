@@ -121,7 +121,9 @@ export async function returnCitations(
 
   return {
     actionIds:
-      kind !== 'exchange' && kind !== 'wait' && typeof record.actionId === 'string'
+      kind !== 'exchange' &&
+      kind !== 'wait' &&
+      typeof record.actionId === 'string'
         ? [record.actionId]
         : [],
     citations: parts.flatMap(reads),

@@ -1673,7 +1673,12 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
             tenantId,
             activationId,
             position,
-            { id: activationId, positionId: position, principalId: 'u', supplierId },
+            {
+              id: activationId,
+              positionId: position,
+              principalId: 'u',
+              supplierId,
+            },
           ],
         );
         for (const [tenant, run] of [
@@ -1702,7 +1707,13 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
           stepId: string,
           state: string,
           evidenceRefs: string[],
-        ) => ({ stepId, state, evidenceRefs, observedAt: now, recordedAt: now });
+        ) => ({
+          stepId,
+          state,
+          evidenceRefs,
+          observedAt: now,
+          recordedAt: now,
+        });
         for (const [stepId, state, refs] of [
           ['inventory', 'completed', [stockRead]],
           ['proposal', 'completed', [stockRead, supplierId, openOrder]],
