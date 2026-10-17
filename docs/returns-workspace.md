@@ -150,9 +150,12 @@ exactly one source mapping blocks it. It follows the purchase-order submission p
 high-risk action, another person with `decisions.respond` and the app permission approves,
 and Luma dispatches once as the requester. Observe-only records `not_executed`.
 
-Success needs an independent read through `returns.created.read` that finds exactly one
-return for the case with the approved lines and units; more than one, or different lines,
-fails the request and nothing is sent again. An uncertain dispatch only reconciles by
+Success needs an independent, complete read through `returns.created.read` that finds exactly
+one return for the case with the approved lines and units; more than one, or different lines,
+fails the request and nothing is sent again. Orders stores every read that verification or the
+creation audit cites, with the connection, source record, read time and completeness, so each
+cited ID resolves to that read. A read that cannot be stored is not cited, and the outcome
+stays unknown. An uncertain dispatch only reconciles by
 reading, through a manual check or the [background follow-up](#background-follow-up). One request
 per case can be live or created. Approvals expire after 24 hours; an approved request that was
 not sent by then shows as expired. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
@@ -211,7 +214,9 @@ identity. An uncertain outcome is read again, never resent. Shopify uses native 
 Wawi stock changes have no provider idempotency guarantee. An independent read must find the exact
 operation marker, approved units and physical stock total. Concurrent unrelated movements leave the
 stock step uncertain. Financial proof requires successful transactions for the whole approved amount
-and currency. Pending, failed and partial payments never establish settlement. Case completion still
+and currency. Pending, failed and partial payments never establish settlement. Quotes, proofs,
+verification and the settlement audit cite only reads that orders stored, in the same
+transaction, as for creation; a partial read never verifies a step. Case completion still
 requires the other steps; neither accepted mutation nor one verified step closes a case.
 
 An admission rejection alone does not release a send fence: another caller may already have reserved
@@ -283,7 +288,8 @@ than opening duplicate cases. Policy or anchor changes supersede earlier occurre
 policies and cancelled cases pause their waits without claiming verification.
 
 Pending, failed and partial money remain unresolved. Only complete independent evidence no more
-than five minutes old can verify financial progress. Unavailable access, missing evidence and
+than five minutes old can verify financial progress; money proof from a partial read, or from a
+proof recorded before its reads were stored, is incomplete. Unavailable access, missing evidence and
 stale observations remain separate waiting reasons. Later recurrence creates a new occurrence
 and preserves the earlier verified or escalated history. Case assignment controls ownership;
 the workflow hands overdue steps to that owner rather than duplicating the Needs you item.
@@ -308,7 +314,9 @@ that sales order. Reported item availability is never used as proof of reservati
 Order and reservation scans stop at 500 records, with complete pagination required to prove uniqueness.
 Missing access, incomplete scans, duplicate references, unsettled money, price disagreement and
 concurrent stock movements leave the case open with its current owner and a specific handover in
-Needs you. Each verdict retains source observation references in the audit log. Damaged units remain
+Needs you. Each verdict cites only source reads that orders stored with it, in the audit log
+and on the exchange; a partial read establishes no check. Exchange quotes, proofs and the
+availability an exchange records are stored the same way. Damaged units remain
 unresolved because this pair cannot independently prove disposal in the physical stock owner.
 
 Only a complete fresh verdict closes the case and retires its active return waits. A later explicit

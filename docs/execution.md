@@ -60,10 +60,11 @@ reconciles the bound action under its recorded approval.
 Provider runtimes record no capability telemetry and keep no read observations, so a read's
 ID resolves only where its owner stored it. Owners that cite reads as verification evidence
 store them in their own tables, in the tenant's transaction, before returning the result:
-Shopify corrections and fulfillment recovery, Starshipit updates, and procurement's submission
-and revision reads. Mailbox verification cites the messages and outgoing send it stored.
-Return creation, settlement and exchange verification cite provider reads that are not
-stored, so those IDs do not resolve to evidence.
+Shopify corrections and fulfillment recovery, Starshipit updates, procurement's submission
+and revision reads, and orders' return creation, settlement, exchange and completion reads.
+Mailbox verification cites the messages and outgoing send it stored. Provider results that
+aggregate several reads, such as a refund quote or an exchange proof, return the reads their
+evidence references name, so the citing owner can store them.
 
 ## Observe-only
 
