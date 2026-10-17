@@ -305,6 +305,43 @@ test.each(['approval-required', 'rejected', 'resolved', 'failed'])(
         (await f.db.owner.query('SELECT count(*)::int AS n FROM audit_entries'))
           .rows[0].n,
       ).toBeGreaterThan(0);
+      // Every read and receipt the correction's attempt cites is stored by the JTL app.
+      const evidence = (
+        await f.db.owner.query(
+          'SELECT id::text,kind,document FROM jtl_shipping_method_evidence WHERE tenant_id=$1',
+          [f.manifest.organizationId],
+        )
+      ).rows;
+      const stored = new Map(evidence.map((row) => [row.id, row]));
+      const attempts = (
+        await f.db.owner.query(
+          "SELECT document->'attempt' AS attempt FROM executed_actions WHERE tenant_id=$1",
+          [f.manifest.organizationId],
+        )
+      ).rows.map((row) => row.attempt);
+      const receipts = attempts.flatMap((a) => a.effectEvidenceRefs ?? []);
+      const reads = attempts.flatMap(
+        (a) => a.verification?.observationRefs ?? [],
+      );
+      expect(receipts.length).toBeGreaterThan(0);
+      expect(reads.length).toBeGreaterThan(0);
+      for (const ref of receipts)
+        expect(stored.get(ref)).toMatchObject({
+          kind: 'write_receipt',
+          document: {
+            adapterVersion: expect.any(String),
+            dispatchIdentity: expect.any(String),
+            records: [{ resource: 'order', externalId: '10' }],
+          },
+        });
+      for (const ref of reads)
+        expect(stored.get(ref)).toMatchObject({
+          kind: 'read',
+          document: {
+            adapterVersion: expect.any(String),
+            completeness: 'complete',
+          },
+        });
     }
     if (scenario === 'approval-required') {
       const review = await f.pilot.desk.review(actor, source.id);

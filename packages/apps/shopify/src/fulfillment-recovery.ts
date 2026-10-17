@@ -28,7 +28,10 @@ import {
   recoveryBlocker,
   recoveryCapabilities,
 } from './domain/fulfillment-recovery.js';
-import { createFulfillmentProvider } from './infrastructure/fulfillment-recovery-provider.js';
+import {
+  createFulfillmentProvider,
+  fulfillmentRecoveryAdapterVersion,
+} from './infrastructure/fulfillment-recovery-provider.js';
 import { createRecoveryStore } from './infrastructure/fulfillment-recovery-store.js';
 import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 
@@ -138,9 +141,9 @@ export function createShopifyRecovery(
         id: connectionId,
         provider: 'shopify',
         status: 'active',
-        adapterVersion: 'shopify-fulfillment/1',
+        adapterVersion: fulfillmentRecoveryAdapterVersion,
         mechanism: 'api',
-        executor: { kind: 'connector', id: 'shopify-fulfillment/1' },
+        executor: { kind: 'connector', id: fulfillmentRecoveryAdapterVersion },
         capabilities,
       };
     },

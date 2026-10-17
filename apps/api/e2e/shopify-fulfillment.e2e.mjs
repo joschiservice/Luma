@@ -67,13 +67,20 @@ test('held Shopify order uses approval, one dispatch, and fresh business verific
   assert.equal(verified.state, 'verified');
   assert.equal(mutations.length, 1);
   const evidence = await f.db.owner.query(
-    'SELECT kind FROM shopify_fulfillment_evidence WHERE tenant_id=$1',
+    'SELECT kind,document FROM shopify_fulfillment_evidence WHERE tenant_id=$1',
     [f.org.id],
   );
-  assert.ok(evidence.rows.some((row) => row.kind === 'acceptance'));
-  assert.ok(
-    evidence.rows.filter((row) => row.kind === 'observation').length > 2,
-  );
+  const acceptance = evidence.rows.find((row) => row.kind === 'acceptance');
+  assert.equal(acceptance.document.adapterVersion, 'shopify-fulfillment/1');
+  assert.match(acceptance.document.dispatchIdentity, /shopify-fulfillment\/1/);
+  assert.ok(acceptance.document.records.length > 0);
+  const reads = evidence.rows.filter((row) => row.kind === 'observation');
+  assert.ok(reads.length > 2);
+  for (const { document } of reads) {
+    assert.equal(document.adapterVersion, 'shopify-fulfillment/1');
+    assert.equal(document.completeness, 'complete');
+    assert.match(document.sourceRevision, /^[a-f0-9]{64}$/);
+  }
 
   fulfillment.status = 'ON_HOLD';
   fulfillment.fulfillmentHolds = [

@@ -32,7 +32,10 @@ import {
   verifiedPublishingFulfillment,
 } from './domain/shipment-publishing.js';
 import { shopifyRequestBudget } from './infrastructure/request-budget.js';
-import { createPublishingProvider } from './infrastructure/shipment-publishing-provider.js';
+import {
+  createPublishingProvider,
+  shipmentPublishingAdapterVersion,
+} from './infrastructure/shipment-publishing-provider.js';
 import { createPublishingStore } from './infrastructure/shipment-publishing-store.js';
 
 /** Composes Shopify publishing with the platform's persistent Action Admission, policy and audit services. */
@@ -187,9 +190,9 @@ export function createShopifyPublishing(
         id: connectionId,
         provider: 'shopify',
         status: 'active',
-        adapterVersion: 'shopify-fulfillment/1',
+        adapterVersion: shipmentPublishingAdapterVersion,
         mechanism: 'api',
-        executor: { kind: 'connector', id: 'shopify-fulfillment/1' },
+        executor: { kind: 'connector', id: shipmentPublishingAdapterVersion },
         capabilities,
       };
     },

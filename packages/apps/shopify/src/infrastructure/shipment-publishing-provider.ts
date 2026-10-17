@@ -17,6 +17,13 @@ import {
   type PublishingSnapshot,
   publishingSnapshot,
 } from '../domain/shipment-publishing.js';
+import {
+  acceptanceProvenance,
+  type ReadProvenance,
+  settledDispatch,
+  sourceTime,
+  storeAcceptance,
+} from './evidence-provenance.js';
 
 const fields = `id updatedAt cancelledAt
  fulfillmentOrders(first: 5) { nodes { id status requestStatus supportedActions { action } assignedLocation { name location { id } } lineItems(first: 20) { nodes { id lineItem { id name } remainingQuantity totalQuantity } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
@@ -82,6 +89,9 @@ const rawSchema = z.object({
     }),
   ),
 });
+
+/** Identifies the normalization of publishing reads; publications dispatch under it too. */
+export const shipmentPublishingAdapterVersion = 'shopify-fulfillment/1';
 
 export interface PublishingEvidence {
   id: string;
@@ -188,11 +198,19 @@ export function createPublishingProvider(
       })),
       dispatch,
     });
+    // Pages and bounds Luma did not read leave the allocation read partial.
+    const provenance: ReadProvenance = {
+      adapterVersion: shipmentPublishingAdapterVersion,
+      completeness: current.complete ? 'complete' : 'partial',
+      sourceRevision: current.revision,
+      sourceUpdatedAt: sourceTime(raw.updatedAt),
+      record: { resource: 'order', externalId: orderId },
+    };
     await options.record({
       id: current.id,
       kind: 'observation',
       observedAt,
-      document: current,
+      document: { ...current, ...provenance },
     });
 
     return current;
@@ -359,19 +377,25 @@ export function createPublishingProvider(
           )
             throw new Error('Ambiguous shipment receipt');
           const id = randomUUID();
-          await options.record({
-            id,
-            kind: 'acceptance',
-            observedAt: now().toISOString(),
-            document: {
-              capability,
-              operationId: run.id,
-              mutation,
-              fulfillmentId: receipt.fulfillment.id,
-              orderId: run.target.orderId,
-              idempotencyKey: context.idempotencyKey,
-            },
-          });
+          const fulfillmentId = receipt.fulfillment.id;
+          await storeAcceptance(() =>
+            options.record({
+              id,
+              kind: 'acceptance',
+              observedAt: now().toISOString(),
+              document: {
+                capability,
+                operationId: run.id,
+                mutation,
+                fulfillmentId,
+                orderId: run.target.orderId,
+                ...acceptanceProvenance(context, [
+                  { resource: 'fulfillment', externalId: fulfillmentId },
+                  { resource: 'order', externalId: run.target.orderId },
+                ]),
+              },
+            }),
+          );
 
           return {
             status: 'accepted',
@@ -379,11 +403,7 @@ export function createPublishingProvider(
             providerRequestId: receipt.fulfillment.id,
           };
         } catch (error) {
-          if (
-            error instanceof ConnectorError &&
-            error.failure.dispatch === 'not_dispatched'
-          )
-            throw error;
+          if (settledDispatch(error)) throw error;
           throw new ConnectorError({
             code:
               error instanceof ConnectorError

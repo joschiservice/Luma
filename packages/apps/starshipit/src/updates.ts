@@ -35,7 +35,10 @@ import {
   updatePermission,
 } from './domain/updates.js';
 import { dispatchUpdate } from './infrastructure/update-dispatch.js';
-import { createUpdateProvider } from './infrastructure/update-provider.js';
+import {
+  createUpdateProvider,
+  updateAdapterVersion,
+} from './infrastructure/update-provider.js';
 import {
   createUpdateStore,
   type StoredUpdate,
@@ -225,6 +228,7 @@ export function createStarshipitUpdates(
       )
         return null;
       const run = saved.document;
+      const dispatchIdentity = `starshipit:${run.connectionId}:${updateAdapterVersion}`;
 
       return {
         capability: 'orders.quantity.update',
@@ -232,8 +236,8 @@ export function createStarshipitUpdates(
         minimumRisk: 'medium',
         permission: updatePermission,
         mechanism: 'api',
-        executor: { kind: 'connector', id: 'starshipit-update/1' },
-        dispatchIdentity: `starshipit:${run.connectionId}:starshipit-update/1`,
+        executor: { kind: 'connector', id: updateAdapterVersion },
+        dispatchIdentity,
         checkPreconditions: () => unchanged(tenant, run),
         async execute(_intent, idempotencyKey) {
           const client = await provider(tenant, run.connectionId, true);
@@ -243,14 +247,21 @@ export function createStarshipitUpdates(
             read: () => read(tenant, run),
             send: (id) => store.send(tenant, id),
             update: (order) => client.update(order),
-            accepted: async (id) => {
+            accepted: async (id, records) => {
               const evidenceId = randomUUID();
               await store.record(
                 tenant,
                 evidenceId,
                 run.connectionId,
                 new Date().toISOString(),
-                { kind: 'acceptance', operationId: id },
+                {
+                  kind: 'acceptance',
+                  operationId: id,
+                  adapterVersion: updateAdapterVersion,
+                  dispatchIdentity,
+                  idempotencyKey,
+                  records,
+                },
               );
               await store
                 .hint(tenant, run.connectionId, id)

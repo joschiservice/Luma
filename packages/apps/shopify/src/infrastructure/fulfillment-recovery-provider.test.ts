@@ -149,6 +149,26 @@ describe('Shopify fulfillment recovery', () => {
     expect(f.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'acceptance' }),
     );
+    expect(f.record.mock.calls[0]?.[0].document).toMatchObject({
+      adapterVersion: 'shopify-fulfillment/1',
+      completeness: 'complete',
+      sourceRevision: before.revision,
+      record: {
+        resource: 'fulfillment_order',
+        externalId: gid('FulfillmentOrder'),
+      },
+    });
+    expect(f.record.mock.calls.at(-1)?.[0].document).toMatchObject({
+      capability: 'fulfillment.hold.release',
+      idempotencyKey: 'recovery-1',
+      // Called without the capability runtime, nothing pinned a dispatch identity.
+      adapterVersion: null,
+      dispatchIdentity: null,
+      records: [
+        { resource: 'fulfillment_order', externalId: gid('FulfillmentOrder') },
+        { resource: 'order', externalId: gid('Order') },
+      ],
+    });
     const unchanged = await f.provider.read(
       gid('Order'),
       gid('FulfillmentOrder'),

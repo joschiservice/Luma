@@ -101,6 +101,20 @@ test('physical downstream parcels use exact approval, partial Shopify fulfillmen
     [f.manifest.organizationId],
   );
   assert.equal(receipts.rows.length, 2);
+  for (const { document } of receipts.rows) {
+    assert.equal(document.adapterVersion, 'shopify-fulfillment/1');
+    assert.match(document.dispatchIdentity, /shopify-fulfillment\/1/);
+    assert.equal(document.records[0].resource, 'fulfillment');
+  }
+  const reads = await f.db.owner.query(
+    `SELECT document FROM shopify_shipment_evidence WHERE tenant_id=$1 AND kind='observation' AND document->>'kind' IS NULL`,
+    [f.manifest.organizationId],
+  );
+  assert.ok(reads.rows.length > 0);
+  for (const { document } of reads.rows) {
+    assert.equal(document.adapterVersion, 'shopify-fulfillment/1');
+    assert.equal(document.completeness, 'complete');
+  }
   const second = await f.dispatch('PARCEL-2', 1),
     secondPreview = await f.preview(second);
   await f.call(

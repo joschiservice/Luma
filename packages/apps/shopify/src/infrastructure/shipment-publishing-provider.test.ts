@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PublishingRun } from '../application/shipment-publishing.js';
 import type { DispatchEvidence } from '../domain/shipment-publishing.js';
-import { createPublishingProvider } from './shipment-publishing-provider.js';
+import {
+  createPublishingProvider,
+  type PublishingEvidence,
+} from './shipment-publishing-provider.js';
 
 const schema = buildSchema(
   readFileSync(
@@ -90,13 +93,16 @@ async function fixture() {
 
     return Response.json({ data: { node } });
   });
+  const record = vi.fn<(evidence: PublishingEvidence) => Promise<void>>(
+    async () => {},
+  );
   const provider = createPublishingProvider({
     tenantId,
     connectionId,
     shop: 'publishing.myshopify.com',
     accessToken: async () => 'synthetic',
     fetch,
-    record: async () => {},
+    record,
     load: async () => run,
     dispatch: async () => dispatch,
     sent: async () => {
@@ -168,6 +174,7 @@ async function fixture() {
     provider,
     run,
     node,
+    record,
     mutations,
     context,
     input,
@@ -187,6 +194,37 @@ async function fixture() {
 }
 
 describe('persisted Shopify shipment provider', () => {
+  it('stores the read and the acceptance with their provenance', async () => {
+    const f = await fixture();
+    const context = {
+      ...f.context,
+      adapterVersion: 'shopify-fulfillment/1',
+      dispatchIdentity: '["shopify","shopify-fulfillment/1"]',
+    };
+    await f.provider.capabilities['fulfillment.shipment.create'].run(
+      context,
+      f.input,
+    );
+    expect(f.record.mock.calls[0]?.[0].document).toMatchObject({
+      adapterVersion: 'shopify-fulfillment/1',
+      completeness: 'complete',
+      sourceRevision: f.run.before.revision,
+      sourceUpdatedAt: '2026-10-13T00:00:00.000Z',
+      record: { resource: 'order', externalId: gid('Order') },
+    });
+    expect(f.record.mock.calls.at(-1)?.[0]).toMatchObject({
+      kind: 'acceptance',
+      document: {
+        adapterVersion: 'shopify-fulfillment/1',
+        dispatchIdentity: context.dispatchIdentity,
+        idempotencyKey: context.idempotencyKey,
+        records: [
+          { resource: 'fulfillment', externalId: gid('Fulfillment') },
+          { resource: 'order', externalId: gid('Order') },
+        ],
+      },
+    });
+  });
   it('sends only saved exact quantities and the explicit notification choice', async () => {
     const f = await fixture();
     await f.provider.capabilities['fulfillment.shipment.create'].run(

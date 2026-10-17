@@ -161,6 +161,10 @@ export type AppEvidence =
       acceptedAt: string;
       records: { resource: string; externalId: string }[];
       providerRequestId: string | null;
+      /** The adapter that sent the write; absent or null when the app did not record it. */
+      adapterVersion?: string | null;
+      /** The provider and adapter identity execution pinned for the attempt, when recorded. */
+      dispatchIdentity?: string | null;
     };
 
 export interface AppDefinition {

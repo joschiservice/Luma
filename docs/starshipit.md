@@ -103,7 +103,15 @@ when the exact reviewed source state still matches.
 
 Acceptance remains unverified until a fresh independent read confirms all quantities.
 Lost or malformed acknowledgements retain the claim and require reconciliation. Failed
-verification does not permit another send. Closing an unsent operation fences delayed
+verification does not permit another send.
+
+Each order read Luma stores for an update records the adapter version and completeness. One
+order detail is the whole read, and a response that does not parse is never stored, so stored
+reads are complete. Starshipit reports no order update time; the revision is Luma's
+fingerprint of the order's status and items. An acceptance records the adapter version and
+dispatch identity, the idempotency key, and the order and changed items the response named.
+If it cannot be stored, the update counts as sent with an unknown outcome and is reconciled
+by reading. Rows stored before these fields existed show them as not recorded. Closing an unsent operation fences delayed
 dispatch; uncertain sent operations remain claimed until their outcome is known.
 
 ## Refresh-only webhooks

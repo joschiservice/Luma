@@ -1,8 +1,9 @@
 import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 
-import type { CapabilityInput } from '../domain/capabilities.js';
+import type { CapabilityInput, CitedRead } from '../domain/capabilities.js';
 import { equalJson } from '../domain/equal-json.js';
+import type { WriteAcceptance } from '../domain/write-receipts.js';
 import type { CapabilityRuntime } from './capabilities.js';
 import type {
   EffectIntent,
@@ -20,10 +21,31 @@ export interface ShippingMethodEffectBinding {
     context: TenantContext,
     intent: EffectIntent,
   ): Promise<boolean>;
+  /**
+   * Stores the verification read in the tenant's transaction before verification cites it. A
+   * failed store throws; verification then cites nothing and stays inconclusive.
+   */
+  storeRead(
+    context: TenantContext,
+    intent: EffectIntent,
+    read: CitedRead,
+  ): Promise<void>;
+  /**
+   * Stores the accepted write's receipt in the tenant's transaction and returns the ID execution
+   * cites. A failed store throws; the write then counts as dispatched with an unknown outcome.
+   */
+  storeReceipt(
+    context: TenantContext,
+    intent: EffectIntent,
+    acceptance: WriteAcceptance,
+  ): Promise<string>;
   now?: () => Date;
 }
 
-/** Verify the correction independently; shipment progress still requires fulfillment evidence. */
+/**
+ * Verify the correction independently; shipment progress still requires fulfillment evidence.
+ * The binding stores every read and receipt the attempt cites, so cited IDs resolve to evidence.
+ */
 export function createShippingMethodEffects(
   runtime: CapabilityRuntime,
   binding: ShippingMethodEffectBinding,
@@ -109,6 +131,14 @@ export function createShippingMethodEffects(
               time > now().getTime()
             )
               return inconclusive();
+            try {
+              await binding.storeRead(context, intent, {
+                ...observation,
+                completeness: result.value.completeness,
+              });
+            } catch {
+              return inconclusive();
+            }
 
             return {
               outcome:
@@ -124,6 +154,8 @@ export function createShippingMethodEffects(
               evaluatorVersion: 'shipping-method/1',
             };
           },
+          storeReceipt: (context, intent, acceptance) =>
+            binding.storeReceipt(context, intent, acceptance),
         })
         .resolve(context, intent);
     },

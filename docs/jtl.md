@@ -123,8 +123,8 @@ backed by confirmed JTL `salesorders.read` and `salesorders.write` grants, witho
 verifier performing a write. These beta endpoints need an installation-specific sandbox
 smoke test of the detail and PATCH endpoints and their idempotency behavior first.
 
-- The adapter persists a fresh pre-action observation, rechecks credentials, grants and
-  connection state, then sends only `shippingMethodId` and
+- The adapter reads a fresh pre-action observation (a failed observation hook prevents
+  the PATCH), rechecks credentials, grants and connection state, then sends only `shippingMethodId` and
   `disableAutomaticWorkflows: true`. Disabling workflows suppresses triggers for this
   update; it does not lock shipment processing.
 - **No compare-and-swap.** The endpoint has no atomic revision precondition. The fresh
@@ -136,12 +136,22 @@ smoke test of the detail and PATCH endpoints and their idempotency behavior firs
   intent. JTL does not specify key retention, so never redispatch an uncertain attempt.
   A timeout, network loss, malformed response, throttling or server error after dispatch
   has an unknown effect and needs read-only reconciliation.
-- `orders.shipping-method.read` persists one allowlisted snapshot with the method and
+- `orders.shipping-method.read` returns one allowlisted snapshot with the method and
   cancellation flag. It is verification evidence, not a canonical order snapshot.
 - The host binding supplies tenant-owned order and method mappings, diagnosis evidence
-  validation and current eligibility checks. The expected postcondition's method must
-  equal the mapped replacement. Verification needs a fresh complete observation of the
-  order; read or persistence failures remain inconclusive.
+  validation and current eligibility checks, and stores the evidence the correction
+  cites. The expected postcondition's method must equal the mapped replacement.
+  Verification needs a fresh complete observation of the order; a partial read, a read
+  failure or a read that cannot be stored remains inconclusive and cites nothing.
+- The binding stores the verification read and the accepted write's receipt in the JTL
+  app's evidence table before execution cites them, and the evidence view resolves them
+  through the app's `evidence` hook. The attempt cites the receipt, never the adapter's
+  pre-action read. A receipt that cannot be stored leaves the write dispatched with an
+  unknown outcome. Corrections cited before the table existed stay unresolved.
+- Only the pilot (and the simulator runtime built on it) and the playbook evaluation
+  harness compose these effects, with synthetic bindings for their own orders. The API
+  and workers resolve no shipping-method write, because no owner yet supplies production
+  mappings and eligibility, so an activated correction is denied as unavailable there.
 
 To undo, create a separate, policy-evaluated and approved intent with a new logical key,
 the replacement as the expected current method and the recorded original as destination,

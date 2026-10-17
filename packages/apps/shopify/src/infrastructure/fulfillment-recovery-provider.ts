@@ -18,6 +18,16 @@ import {
   recoveryChoice,
   type RecoverySnapshot,
 } from '../domain/fulfillment-recovery.js';
+import {
+  acceptanceProvenance,
+  type ReadProvenance,
+  settledDispatch,
+  sourceTime,
+  storeAcceptance,
+} from './evidence-provenance.js';
+
+/** Identifies the normalization of fulfillment order reads; recoveries dispatch under it too. */
+export const fulfillmentRecoveryAdapterVersion = 'shopify-fulfillment/1';
 
 const id = (kind: string) =>
   z.string().regex(new RegExp(`^gid://shopify/${kind}/[0-9]+$`));
@@ -151,11 +161,18 @@ export function createFulfillmentProvider(
         total: line.totalQuantity,
       })),
     };
+    const provenance: ReadProvenance = {
+      adapterVersion: fulfillmentRecoveryAdapterVersion,
+      completeness: snapshot.complete ? 'complete' : 'partial',
+      sourceRevision: snapshot.revision,
+      sourceUpdatedAt: sourceTime(value.updatedAt),
+      record: { resource: 'fulfillment_order', externalId: fulfillmentOrderId },
+    };
     await options.record({
       id: snapshot.id,
       kind: 'observation',
       observedAt,
-      document: snapshot,
+      document: { ...snapshot, ...provenance },
     });
 
     return snapshot;
@@ -304,18 +321,24 @@ export function createFulfillmentProvider(
           )
             throw new Error('Invalid mutation receipt');
           const evidenceId = randomUUID();
-          await options.record({
-            id: evidenceId,
-            kind: 'acceptance',
-            observedAt: now().toISOString(),
-            document: {
-              capability,
-              idempotencyKey: context.idempotencyKey,
-              fulfillmentOrderId: input.fulfillmentOrderId,
-              resultFulfillmentOrderId: result.resultOrder.id,
-              orderId: input.orderId,
-            },
-          });
+          const resultOrder = result.resultOrder;
+          await storeAcceptance(() =>
+            options.record({
+              id: evidenceId,
+              kind: 'acceptance',
+              observedAt: now().toISOString(),
+              document: {
+                capability,
+                fulfillmentOrderId: input.fulfillmentOrderId,
+                resultFulfillmentOrderId: resultOrder.id,
+                orderId: input.orderId,
+                ...acceptanceProvenance(context, [
+                  { resource: 'fulfillment_order', externalId: resultOrder.id },
+                  { resource: 'order', externalId: resultOrder.order.id },
+                ]),
+              },
+            }),
+          );
 
           return {
             status: 'accepted',
@@ -323,11 +346,7 @@ export function createFulfillmentProvider(
             providerRequestId: null,
           };
         } catch (error) {
-          if (
-            error instanceof ConnectorError &&
-            error.failure.dispatch === 'not_dispatched'
-          )
-            throw error;
+          if (settledDispatch(error)) throw error;
           throw new ConnectorError({
             code:
               error instanceof ConnectorError

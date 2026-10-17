@@ -18,6 +18,26 @@ test('incident holds are verified, owned across reconstruction, tightened only d
   expect(f.mutations[0].variables.input.referenceDocumentUri).toMatch(
     /^luma:\/\/inventory-holds\//,
   );
+  // Holds dispatch under stock protection's adapter, through the correction reads.
+  const evidence = (
+    await f.f.db.owner.query(
+      'SELECT kind,document FROM shopify_inventory_evidence WHERE tenant_id=$1',
+      [f.actor.tenantId],
+    )
+  ).rows;
+  expect(
+    evidence.find((row) => row.kind === 'acceptance')?.document,
+  ).toMatchObject({
+    adapterVersion: 'shopify-stock-protection/1',
+    dispatchIdentity: expect.stringContaining('shopify-stock-protection/1'),
+  });
+  for (const { document } of evidence.filter(
+    (row) => row.kind === 'observation',
+  ))
+    expect(document).toMatchObject({
+      adapterVersion: 'shopify-inventory/1',
+      completeness: expect.stringMatching(/^(complete|partial)$/),
+    });
   await f.call(
     f.f.owner,
     'preview',

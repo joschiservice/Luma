@@ -14,7 +14,14 @@ export interface UpdateDispatchPorts {
   /** Durable fence; must mark sent before the request leaves. */
   send(id: string): Promise<boolean>;
   update(order: { order_id: number; items: unknown[] }): Promise<unknown>;
-  accepted(id: string): Promise<string>;
+  /**
+   * Stores the acceptance with the order and changed items the response named and returns its
+   * ID. A failed store throws; the update then counts as sent with an unknown outcome.
+   */
+  accepted(
+    id: string,
+    records: { resource: 'order' | 'order_line'; externalId: string }[],
+  ): Promise<string>;
 }
 
 /** Sends a reviewed update at most once. Lost responses and invalid acknowledgements require independent reconciliation. */
@@ -94,7 +101,27 @@ export async function dispatchUpdate(
       effect: 'unknown',
       retry: 'never',
     });
-  const evidence = await ports.accepted(run.id);
+  const changed = new Set(run.lines.map((line) => line.lineItemId));
+  let evidence: string;
+  try {
+    evidence = await ports.accepted(run.id, [
+      { resource: 'order', externalId: response.order.order_id },
+      ...response.order.items
+        .filter((item) => changed.has(item.item_id))
+        .map((item) => ({
+          resource: 'order_line' as const,
+          externalId: item.item_id,
+        })),
+    ]);
+  } catch {
+    // Starshipit accepted the update, but an unstored receipt must not be cited.
+    throw new ConnectorError({
+      code: 'internal',
+      effect: 'unknown',
+      retry: 'reconcile',
+      dispatch: 'dispatched',
+    });
+  }
 
   return { evidenceRefs: [evidence], providerRequestId: null };
 }

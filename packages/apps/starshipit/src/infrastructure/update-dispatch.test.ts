@@ -94,6 +94,29 @@ describe('one-shot downstream update', () => {
     ).rejects.toMatchObject({ failure: { effect: 'none' } });
     expect(ports.update).toHaveBeenCalledTimes(1);
   });
+  it('stores the acceptance with the order and changed items the response named', async () => {
+    const { ports } = fixture();
+    const accepted = vi.fn(async () => 'receipt');
+    ports.accepted = accepted;
+    await expect(dispatchUpdate(run, 'key', ports)).resolves.toEqual({
+      evidenceRefs: ['receipt'],
+      providerRequestId: null,
+    });
+    expect(accepted).toHaveBeenCalledWith('operation', [
+      { resource: 'order', externalId: '1' },
+      { resource: 'order_line', externalId: '11' },
+    ]);
+  });
+  it('counts an accepted update whose receipt cannot be stored as sent with an unknown outcome', async () => {
+    const { ports } = fixture();
+    ports.accepted = async () => {
+      throw new Error('Database unavailable');
+    };
+    await expect(dispatchUpdate(run, 'key', ports)).rejects.toMatchObject({
+      failure: { effect: 'unknown', dispatch: 'dispatched' },
+    });
+    expect(ports.update).toHaveBeenCalledTimes(1);
+  });
   it('withholds stale evidence, removed grants and release-off operations before any fence or write', async () => {
     const { ports } = fixture();
     ports.unchanged = async () => false;
