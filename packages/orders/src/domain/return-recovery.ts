@@ -18,7 +18,7 @@ export interface RecoverableReturnWrite {
 export type ReturnRecoveryStep = 'decision' | 'expire' | 'send' | 'reconcile';
 
 /** How long a write rests before the pass touches it, so it does not race a live request. */
-export const returnRecoveryWait = {
+const returnRecoveryWait = {
   /** An API request is normally still dispatching a write this recent. */
   sending: 2 * 60_000,
   /** Checks of an uncertain write by reading run at most once a minute. */
