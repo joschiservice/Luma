@@ -1,15 +1,22 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
+
 const uuid = z.string().uuid();
 const instant = z.string().datetime();
 
 /**
  * The record whose cited evidence is read. Each kind needs its own read permission:
- * `procurement.read` for purchase orders, `returns.read` for return writes, `messages.read` for
- * replies and `issues.read` for cases.
+ * `procurement.read` for purchase orders and purchasing plans, `inventory.read` for native stock
+ * receipts, `returns.read` for return writes, `messages.read` for replies, `issues.read` for
+ * cases, and for an app decision the read permission of its change's area (`inventory.read`,
+ * `orders.read` or `fulfillment.read`). An app decision is named by its proposal ID.
  */
-const evidenceSubjectSchema = z.discriminatedUnion('kind', [
+export const evidenceSubjectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('purchase_order'), id: uuid }).strict(),
+  z.object({ kind: z.literal('purchasing_plan'), id: uuid }).strict(),
+  z.object({ kind: z.literal('native_receipt'), id: uuid }).strict(),
+  z.object({ kind: z.literal('app_decision'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_creation'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_settlement'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_exchange_step'), id: uuid }).strict(),
@@ -44,6 +51,7 @@ export const evidenceSummaryFields = [
   'requestedDeliveryDate',
   'available',
   'onHand',
+  'reserved',
   'quantity',
   'amount',
   'currency',
@@ -71,6 +79,19 @@ export const evidenceRecordKinds = [
   'reply',
   'case',
   'case_proposal',
+  'procurement_event',
+  'stock_receipt_review',
+  'ledger_entry',
+  'stock_ownership_change',
+  'stock_booking',
+  'receipt_note',
+] as const;
+
+/** What a purchase order's lifecycle event recorded. */
+export const procurementEventKinds = [
+  'created',
+  'status_changed',
+  'revised',
 ] as const;
 
 const connectionSchema = z.object({
@@ -83,6 +104,48 @@ const providerRecordSchema = z.object({
   resource: z.string(),
   externalId: z.string(),
 });
+
+const quantity = z.string().max(40);
+
+/** Facts some Luma records carry, so the evidence view can show them without another read. */
+const evidenceRecordDetailSchema = z.discriminatedUnion('kind', [
+  z.object({
+    /** A purchase order was created, changed status or was revised to a new revision. */
+    kind: z.literal('procurement_event'),
+    event: z.enum(procurementEventKinds),
+    /** The order status before and after; null when the event did not record it. */
+    from: z.string().max(40).nullable(),
+    to: z.string().max(40).nullable(),
+    revision: z.number().int().nullable(),
+  }),
+  z.object({
+    /** A stock receipt waiting for, or given, an inventory review. */
+    kind: z.literal('stock_receipt_review'),
+    state: z.enum(['pending', 'approved', 'rejected']),
+    /** Good units the receipt books in total. */
+    quantity: quantity.nullable(),
+    unit: z.string().max(40).nullable(),
+  }),
+  z.object({
+    /** A committed stock ledger entry: what it posted to each account and the balance after. */
+    kind: z.literal('ledger_entry'),
+    purpose: z.string().max(40),
+    /** A later entry reversed this one. */
+    reversed: z.boolean(),
+    postings: z
+      .array(
+        z.object({
+          state: z.string().max(40),
+          unit: z.string().max(40),
+          quantity,
+          balanceAfter: quantity,
+          /** The account's version after this posting. */
+          version: z.number().int(),
+        }),
+      )
+      .max(20),
+  }),
+]);
 
 /** What a cited reference resolves to. */
 const evidenceResolutionSchema = z.discriminatedUnion('kind', [
@@ -125,6 +188,34 @@ const evidenceResolutionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('luma_record'),
     record: z.enum(evidenceRecordKinds),
     id: z.string(),
+    /** When the record was written, for records that keep the time. */
+    at: instant.nullable().optional(),
+    /** Who wrote the record, for records that keep the actor. */
+    actor: activityActorSchema.nullable().optional(),
+    detail: evidenceRecordDetailSchema.nullable().optional(),
+  }),
+  z.object({
+    /**
+     * A message Luma stored from a connected mailbox: who sent it, when, its subject and whether
+     * the receiving system authenticated the sender. The message text is never returned.
+     */
+    kind: z.literal('message'),
+    provider: z.string(),
+    connection: connectionSchema,
+    direction: z.enum(['inbound', 'outbound']),
+    sender: z.object({
+      address: z.string().max(320),
+      name: z.string().max(200).nullable(),
+    }),
+    receivedAt: instant,
+    subject: z.string().max(300),
+    /** Only `aligned` identifies the sender; `unknown` when the mailbox did not say. */
+    senderAuthentication: z.enum(['aligned', 'unaligned', 'unknown']),
+  }),
+  z.object({
+    /** Evidence another area guards; the reader lacks `permission`, so it is not shown. */
+    kind: z.literal('restricted'),
+    permission: z.string().max(100),
   }),
   z.object({
     /** Cited before Luma stored this kind of evidence; the read or receipt was never kept. */
@@ -163,3 +254,5 @@ export type EvidenceList = z.infer<typeof evidenceListSchema>;
 export type EvidenceSummaryField = (typeof evidenceSummaryFields)[number];
 
 export type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];
+
+export type EvidenceRecordDetail = z.infer<typeof evidenceRecordDetailSchema>;

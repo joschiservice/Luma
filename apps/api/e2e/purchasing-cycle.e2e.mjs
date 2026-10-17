@@ -961,6 +961,34 @@ for (const channel of ['jtl', 'email'])
         ),
       ).toBe(true);
     }
+    // Every reference the timeline cites resolves through its owner: plan stock and demand reads,
+    // lifecycle events, receipts, messages and records, never "unresolved".
+    const cited = [...new Set(timeline.flatMap((entry) => entry.evidenceRefs))];
+    expect(cited.length).toBeGreaterThan(0);
+    const resolved = [];
+    for (let index = 0; index < cited.length; index += 100) {
+      const page = await f.api('/evidence/resolve', {
+        subject: { kind: 'purchase_order', id: f.orderId },
+        refs: cited.slice(index, index + 100),
+      });
+      resolved.push(...page.items);
+    }
+    expect(
+      resolved
+        .filter((item) => item.resolution.kind === 'unresolved')
+        .map((item) => item.ref),
+    ).toEqual([]);
+    const kinds = new Set(
+      resolved.map((item) =>
+        item.resolution.kind === 'luma_record'
+          ? item.resolution.record
+          : item.resolution.kind,
+      ),
+    );
+    expect(kinds).toContain('procurement_event');
+    // The plan that drafted the order cites the stock reads it relied on.
+    expect(kinds).toContain('read');
+    if (channel === 'email') expect(kinds).toContain('message');
     // Every write receipt the cycle's provider writes cite resolves to one stored receipt.
     const receipts = await expectStoredWriteReceipts(
       f.f.db.owner,

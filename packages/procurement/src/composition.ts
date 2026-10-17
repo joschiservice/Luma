@@ -301,4 +301,7 @@ export {
 export {
   purchaseOrderCitations,
   purchaseOrderEvidence,
+  purchaseOrderMessageRefs,
+  purchasingPlanCitations,
+  purchasingPlanEvidence,
 } from './infrastructure/purchase-order-evidence.js';

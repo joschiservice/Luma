@@ -129,3 +129,67 @@ export async function replyEvidence(
     })),
   ];
 }
+
+/** A stored mailbox message as the evidence view shows it, without its text. */
+interface MessageEvidence {
+  kind: 'message';
+  id: string;
+  provider: string;
+  connectionId: string;
+  direction: 'inbound' | 'outbound';
+  sender: { address: string; name: string | null };
+  receivedAt: string;
+  subject: string;
+  senderAuthentication: 'aligned' | 'unaligned' | 'unknown';
+}
+
+/**
+ * Finds stored mailbox messages with these IDs, such as the order email a purchase order's
+ * submission sent: the sender, received time, subject and whether the receiving system
+ * authenticated the sender. The text, recipients and attachments never leave messaging.
+ * Callers pass only IDs a record cites, and only for readers with `messages.read`.
+ */
+export async function messageEvidence(
+  tx: SqlTransaction,
+  tenantId: string,
+  ids: string[],
+): Promise<MessageEvidence[]> {
+  if (!ids.length) return [];
+  const { rows } = await tx.query<{
+    id: string;
+    connection_id: string;
+    provider: string | null;
+    direction: 'inbound' | 'outbound';
+    address: string;
+    name: string | null;
+    received_at: Date;
+    subject: string | null;
+    authentication: string | null;
+  }>(
+    `SELECT m.id::text,m.connection_id::text,b.document->>'provider' AS provider,m.direction,
+      m.from_address AS address,m.document->'from'->>'name' AS name,m.received_at,
+      m.document->>'subject' AS subject,m.document->>'senderAuthentication' AS authentication
+     FROM messaging_messages m
+     LEFT JOIN messaging_mailboxes b ON b.tenant_id=m.tenant_id AND b.connection_id=m.connection_id
+     WHERE m.tenant_id=$1 AND m.id=ANY($2::uuid[])`,
+    [tenantId, ids],
+  );
+
+  return rows.map((row) => ({
+    kind: 'message',
+    id: row.id,
+    provider: row.provider ?? 'mailbox',
+    connectionId: row.connection_id,
+    direction: row.direction,
+    sender: {
+      address: row.address.slice(0, 320),
+      name: row.name?.slice(0, 200) || null,
+    },
+    receivedAt: row.received_at.toISOString(),
+    subject: (row.subject ?? '').slice(0, 300),
+    senderAuthentication:
+      row.authentication === 'aligned' || row.authentication === 'unaligned'
+        ? row.authentication
+        : 'unknown',
+  }));
+}

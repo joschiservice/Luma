@@ -76,3 +76,8 @@ export {
   createUnsettledStockEffectReader,
   createExecutionFailureReader,
 } from './infrastructure/stock-effects.js';
+
+export {
+  admittedActionCitations,
+  admittedActionRecords,
+} from './infrastructure/action-evidence.js';

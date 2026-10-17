@@ -173,6 +173,11 @@ Verified submissions and revisions cite their verifying reads and the stored wri
 together. Each entry's evidence resolves through the
 [evidence reader](execution.md#reading-cited-evidence) when opened. Purchasing-system
 observations behind commitment facts resolve as reads that record no completeness; plans,
-approvals, policy decisions, supplier messages and follow-ups show as Luma records. Shopify stock
-booking proof resolves only for readers with inventory access, like its timeline entries. Native
-stock receipt reviews and ledger proof are inventory records the evidence view does not show.
+approvals, policy decisions, supplier messages and follow-ups show as Luma records. The stock and
+demand reads a plan relied on resolve through the inventory and orders owners, lifecycle events
+as purchase order events with their status change, actor and time, an email submission's order
+email as a stored message, and notes recorded with a manual receipt as written. Native stock
+receipt reviews and the ledger entries that booked them resolve as inventory records with their
+state, quantity and postings. Readers without the guarding area's access see these as restricted.
+Shopify stock booking proof resolves only for readers with inventory access, like its timeline
+entries. The order number a purchasing system assigned is shown on the order, not cited.
