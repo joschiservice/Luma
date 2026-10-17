@@ -542,8 +542,7 @@ export const SelectedEvidence: Story = {
     await expect(
       canvas.queryByRole('list', { name: 'Cited evidence' }),
     ).not.toBeInTheDocument();
-    summary.focus();
-    await userEvent.keyboard('{Enter}');
+    await userEvent.click(summary);
     const evidence = await canvas.findByRole('list', {
       name: 'Cited evidence',
     });
