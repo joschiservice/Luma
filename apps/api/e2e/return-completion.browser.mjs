@@ -151,6 +151,25 @@ test('records receipt and inspection, approves stock and exchange separately, th
       .getByRole('region', { name: 'Stock and refund' })
       .getByText('Independently verified', { exact: true }),
   ).toBeVisible();
+  // Needs you: the restock is now the case's latest step, so the case cites it. It opens the
+  // provider read that verified the restock and the write receipt of the accepted request.
+  const restockCase = approver.url();
+  await approver.goto(
+    `/app/${f.org}/needs-you?item=${encodeURIComponent(`return-case:${f.detail.case.id}`)}`,
+  );
+  await approver.getByText('Evidence: restock step', { exact: true }).click();
+  const restockEvidence = approver.getByRole('list', {
+    name: 'Cited evidence',
+  });
+  await expect(restockEvidence.getByText(/^Read from /).first()).toBeVisible();
+  await expect(
+    restockEvidence.getByText('Write receipt', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    restockEvidence.getByText(/^Accepted by /).first(),
+  ).toBeVisible();
+  await expect(restockEvidence.getByText('Not found')).toHaveCount(0);
+  await approver.goto(restockCase);
   await requester.reload();
   await section
     .getByRole('button', { name: 'Request processing approval' })
@@ -174,6 +193,42 @@ test('records receipt and inspection, approves stock and exchange separately, th
     }),
   ).toBeVisible();
   const report = (await f.request(`${f.path}/exchange`)).operation;
+  // Needs you: the unresolved completion check is what the case cites. Opened by keyboard on a
+  // narrow screen, it shows the reads behind the replacement's availability and the check.
+  const casePage = approver.url();
+  await approver.goto(
+    `/app/${f.org}/needs-you?item=${encodeURIComponent(`return-case:${f.detail.case.id}`)}`,
+  );
+  const cites = approver.getByText('Evidence: exchange check', {
+    exact: true,
+  });
+  await cites.focus();
+  await approver.keyboard.press('Enter');
+  const exchangeEvidence = approver.getByRole('list', {
+    name: 'Cited evidence',
+  });
+  const readsOf = (part) =>
+    part.evidenceRefs.filter((ref) => /^[0-9a-f-]{36}$/i.test(ref));
+  const availabilityReads = readsOf(report.availability);
+  const completionReads = readsOf(report.completion);
+  expect(availabilityReads.length).toBeGreaterThan(0);
+  expect(completionReads.length).toBeGreaterThan(0);
+  for (const ref of [...availabilityReads, ...completionReads])
+    await expect(
+      exchangeEvidence.getByRole('listitem').filter({ hasText: ref }),
+    ).toContainText('Provider read');
+  await expect(exchangeEvidence.getByText('Not found')).toHaveCount(0);
+  expect(
+    await approver.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await approver.goto(casePage);
+  await expect(
+    review.getByText('Exchange unresolved · case owner must follow up', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     review.getByRole('textbox', { name: 'Replacement order reference' }),
   ).toHaveValue(`luma-ex:${report.id}`);

@@ -125,6 +125,24 @@ test('independently approves a refund, distinguishes pending payment, and checks
   await expect(
     section.getByText('Refund processing', { exact: true }),
   ).toHaveCount(0);
+  // Needs you: with no wait or exchange check, the case cites its latest step, the refund. It
+  // opens the provider reads that verified the refund. Its response was lost, so Shopify's
+  // acceptance was never received and no write receipt is shown in its place.
+  await approver.goto(
+    `/app/${f.org}/needs-you?item=${encodeURIComponent(`return-case:${f.detail.case.id}`)}`,
+  );
+  await approver.getByText('Evidence: refund step', { exact: true }).click();
+  const refundEvidence = approver.getByRole('list', { name: 'Cited evidence' });
+  await expect(refundEvidence.getByText(/^Read from /).first()).toBeVisible();
+  await expect(
+    refundEvidence.getByText('Write receipt', { exact: true }),
+  ).toHaveCount(0);
+  await expect(refundEvidence.getByText('Not found')).toHaveCount(0);
+  expect(
+    await approver.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   const items = (
     await f.call('runs/operations/records/shopify?kind=Refund&limit=100')
   ).items;
