@@ -341,7 +341,7 @@ const returnCases = [
   'packages/api-contract/src/return-actions.ts',
   'packages/application-runtime/migrations/0087_return_service_reads.sql',
   'packages/application-runtime/migrations/0086_return_creation_binding.sql',
-  'packages/application-runtime/migrations/0150_orders_return_read_evidence.sql',
+  'packages/application-runtime/migrations/0154_orders_return_read_evidence.sql',
   'packages/application-runtime/src/composition/return-reads.ts',
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
