@@ -918,6 +918,8 @@ export async function createPilot(
       procurementContext: application.http.procurementContext,
       decisions: application.http.decisions,
       followUp,
+      /** Return deadline checks, as the return step follow-up runs them in the workflow worker. */
+      returnDeadlines: application.returnDeadlines,
       /** The operations inbox, its replies and a `sync()` that reads due mailboxes now. */
       messaging: {
         service: application.messaging.service,
