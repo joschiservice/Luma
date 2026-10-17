@@ -38,7 +38,10 @@ export {
 
 export { createProcurementContext } from './infrastructure/procurement/context.js';
 
-export { procurementActionDecisionProvider } from './infrastructure/decisions/procurement-actions.js';
+export {
+  nativeReceiptDecision,
+  procurementActionDecisionProvider,
+} from './infrastructure/decisions/procurement-actions.js';
 
 export {
   createShipmentDispatchReader,
