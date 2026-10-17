@@ -4,10 +4,12 @@ import { applicationOptionsFor } from './application-options.js';
 
 const decision = { id: 'app-decisions' };
 const workflow = { id: 'app-workflow' };
+const evidence = { appId: 'app-evidence' };
 const host = {
   connections: { list: async () => [] },
   registry: {
     providers: () => [],
+    evidenceSources: () => [evidence],
     workflowSources: () => [workflow],
     actionPermission: () => null,
   },
@@ -24,6 +26,7 @@ describe('applicationOptionsFor', () => {
     const options = applicationOptionsFor(host);
 
     expect(options.decisionSources).toEqual([decision]);
+    expect(options.evidenceSources).toEqual([evidence]);
     expect(options.workflowSources).toEqual([workflow]);
     expect(options.nativeStockReader).toBeDefined();
     expect(options.purchasing?.installations).toBe(host.connections);

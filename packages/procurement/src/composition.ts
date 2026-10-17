@@ -297,3 +297,8 @@ export {
   listSubmissionScopes,
   purgeExpiredSupplierMessages,
 } from './infrastructure/background-scopes.js';
+
+export {
+  purchaseOrderCitations,
+  purchaseOrderEvidence,
+} from './infrastructure/purchase-order-evidence.js';

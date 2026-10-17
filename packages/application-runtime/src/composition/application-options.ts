@@ -31,6 +31,7 @@ export type HostApplicationOptions = Pick<
   | 'providerCatalog'
   | 'connectionEnvironment'
   | 'decisionSources'
+  | 'evidenceSources'
   | 'workflowSources'
   | 'actionPermission'
   | 'nativeStockReader'
@@ -78,6 +79,7 @@ export function applicationOptionsFor(
     providerCatalog: host.providerCatalog,
     connectionEnvironment: host.connectionEnvironment,
     decisionSources: host.decisionSources(),
+    evidenceSources: host.registry.evidenceSources(),
     workflowSources: host.registry.workflowSources(),
     actionPermission: host.registry.actionPermission,
     nativeStockReader: createInstalledRuntime(runtime),

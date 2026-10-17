@@ -133,6 +133,36 @@ export interface AppDecision {
   group: { key: string; label: string };
 }
 
+/**
+ * A provider read or write acceptance an app stored for its own provider writes, as the evidence
+ * view shows it. Reads carry the normalized read in `data`; the host shows only allowlisted
+ * fields of it. Null fields are ones the app did not record.
+ */
+export type AppEvidence =
+  | {
+      kind: 'read';
+      id: string;
+      provider: string;
+      connectionId: string;
+      record: { resource: string; externalId: string } | null;
+      observedAt: string;
+      sourceUpdatedAt: string | null;
+      sourceRevision: string | null;
+      adapterVersion: string | null;
+      completeness: 'complete' | 'partial' | null;
+      data: unknown;
+    }
+  | {
+      kind: 'write_receipt';
+      id: string;
+      provider: string;
+      connectionId: string;
+      capability: string | null;
+      acceptedAt: string;
+      records: { resource: string; externalId: string }[];
+      providerRequestId: string | null;
+    };
+
 export interface AppDefinition {
   manifest: AppManifest;
   connector?: ConnectionProvider;
@@ -171,6 +201,16 @@ export interface AppDefinition {
    * checks installation and that permission before the handler runs.
    */
   registerHttp?(server: FastifyInstance, identity?: IdentityService): void;
+  /**
+   * Reads the evidence the app stored for its provider writes with these IDs, inside the
+   * caller's read-only tenant transaction. Callers pass only IDs a record cites. Return no
+   * provider payloads, credentials or personal data. Do not perform provider reads.
+   */
+  evidence?(
+    tx: SqlTransaction,
+    tenantId: string,
+    ids: string[],
+  ): Promise<AppEvidence[]>;
   /** Updates app-owned storage inside the installation transaction. Do not perform network requests. */
   installed?(context: AppLifecycleContext): Promise<void>;
   /** Cleans up app-owned storage inside the uninstall transaction. Historical records should be retained. */

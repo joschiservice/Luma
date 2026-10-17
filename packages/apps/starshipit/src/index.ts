@@ -22,6 +22,7 @@ import {
   installationTarget,
 } from './domain/installation-validation.js';
 import { createStarshipitConnector } from './infrastructure/adapter.js';
+import { readStarshipitEvidence } from './infrastructure/evidence-reader.js';
 import { registerStarshipitRoutes } from './routes.js';
 import { createStarshipitUpdates } from './updates.js';
 
@@ -195,6 +196,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     },
     connector,
     decisions: updates.decisions,
+    evidence: readStarshipitEvidence,
     registerHttp(server) {
       registerStarshipitRoutes(server, updates, context);
     },

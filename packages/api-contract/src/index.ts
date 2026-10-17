@@ -139,6 +139,8 @@ export type { Diagnosis } from './diagnosis.js';
 
 export * from './draft-tests.js';
 
+export * from './evidence.js';
+
 export * from './fulfillment.js';
 
 export * from './incoming-stock.js';

@@ -6,7 +6,7 @@ import {
   createAdaptiveFields,
   createAdaptiveFieldWorkflows,
 } from '@luma/adaptive/composition';
-import type { AppFactoryContext } from '@luma/app-host';
+import type { AppFactoryContext, AppRegistry } from '@luma/app-host';
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
 import type {
@@ -233,6 +233,7 @@ export interface ApplicationServices {
     decisions: ReturnType<typeof createDecisionServices>['decisions'];
     desk: ReturnType<typeof createDeskServices>;
     draftTests: WorkflowAuthoring['draftTests'];
+    evidence: ReadModelServices['evidence'];
     fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
     fulfillment: ReadModelServices['fulfillment'];
     governedFollowUps: ReturnType<
@@ -295,6 +296,8 @@ export interface ApplicationOptions {
   workflowImprovementControls?: WorkflowImprovementControls;
   /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
+  /** Apps' readers of the evidence they store, such as `registry.evidenceSources()`. */
+  evidenceSources?: ReturnType<AppRegistry['evidenceSources']>;
   /**
    * The permission a person needs to request a provider write through an app, such as
    * `registry.actionPermission`. Without it, order change plans name no permission.
@@ -1068,6 +1071,7 @@ export function createApplicationServices(
     );
   const {
     customers,
+    evidence,
     fulfillment,
     insights,
     inventory,
@@ -1087,6 +1091,9 @@ export function createApplicationServices(
       ? { actionPermission: options.actionPermission }
       : {}),
     commitments,
+    ...(options.evidenceSources
+      ? { evidenceSources: options.evidenceSources }
+      : {}),
     procurement,
     release: purchasingRelease,
   });
@@ -1169,6 +1176,7 @@ export function createApplicationServices(
       decisions,
       desk,
       draftTests,
+      evidence,
       fieldWorkflows: adaptiveFieldWorkflows,
       fulfillment,
       governedFollowUps: scopedFollowUp.service,

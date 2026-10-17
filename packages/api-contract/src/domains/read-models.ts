@@ -1,5 +1,6 @@
 import { customersContract } from '../contracts/customers.js';
 import { decisionsContract } from '../contracts/decisions.js';
+import { evidenceContract } from '../contracts/evidence.js';
 import { fulfillmentContract } from '../contracts/fulfillment.js';
 import { insightsContract } from '../contracts/insights.js';
 import { inventoryContract } from '../contracts/inventory.js';
@@ -14,6 +15,7 @@ import { returnsContract } from '../contracts/returns.js';
 type ReadModelsContracts = {
   customers: typeof customersContract;
   decisions: typeof decisionsContract;
+  evidence: typeof evidenceContract;
   fulfillment: typeof fulfillmentContract;
   insights: typeof insightsContract;
   inventory: typeof inventoryContract;
@@ -29,6 +31,7 @@ type ReadModelsContracts = {
 export const readModelsContracts: ReadModelsContracts = {
   customers: customersContract,
   decisions: decisionsContract,
+  evidence: evidenceContract,
   fulfillment: fulfillmentContract,
   insights: insightsContract,
   inventory: inventoryContract,

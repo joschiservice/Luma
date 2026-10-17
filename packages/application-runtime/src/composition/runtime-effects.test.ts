@@ -95,6 +95,7 @@ function host() {
     connections: installations,
     registry: {
       providers: () => [provider],
+      evidenceSources: () => [],
       workflowSources: () => [],
       actionPermission: () => null,
     },

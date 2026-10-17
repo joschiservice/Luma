@@ -44,6 +44,7 @@ import {
 import { recordPermission } from './domain/records.js';
 import { createShopifyRecovery } from './fulfillment-recovery.js';
 import { createShopifyConnector } from './infrastructure/adapter.js';
+import { readShopifyEvidence } from './infrastructure/evidence-reader.js';
 import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
 import { createShopifyOAuth } from './infrastructure/oauth.js';
 import { createPrivacyIntake } from './infrastructure/privacy.js';
@@ -427,6 +428,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         },
       );
     },
+    evidence: readShopifyEvidence,
     registerHttp(server, identity) {
       registerShopifyRoutes(
         server,
@@ -566,3 +568,6 @@ export { createShopifyUnsettledStockReader } from './infrastructure/stock-effect
 export { createOrderEditStore } from './infrastructure/order-edit-store.js';
 
 export { createCorrectionStore } from './infrastructure/inventory-correction-store.js';
+
+/** Shopify's evidence reader, exported so runtime tests can prove the evidence view resolves it. */
+export { readShopifyEvidence } from './infrastructure/evidence-reader.js';

@@ -142,3 +142,9 @@ export function createReturnDeadlineService(
 export type { ReturnDeadlines } from './application/return-deadlines.js';
 
 export { createReturnMoneySource } from './application/return-money-source.js';
+
+export {
+  returnWriteCitations,
+  returnWriteEvidence,
+  type ReturnWriteKind,
+} from './infrastructure/return-evidence.js';

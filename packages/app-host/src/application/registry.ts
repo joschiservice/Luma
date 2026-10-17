@@ -124,6 +124,14 @@ export function createAppRegistry(
       [...apps.values()].flatMap((a) =>
         a.stockProtection ? [a.stockProtection] : [],
       ),
+    /**
+     * Lists the evidence readers of apps that store evidence for their provider writes. Apps
+     * keep historical evidence after uninstalling, so readers don't check installation.
+     */
+    evidenceSources: () =>
+      [...apps.values()].flatMap((a) =>
+        a.evidence ? [{ appId: a.manifest.id, read: a.evidence }] : [],
+      ),
     workflowSources: () => [...apps.values()].flatMap((a) => a.workflows ?? []),
     /**
      * Registers app-owned routes after host identity guards are attached. Tenant routes must
