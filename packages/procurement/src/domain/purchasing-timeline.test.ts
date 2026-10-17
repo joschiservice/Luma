@@ -6,6 +6,7 @@ import {
   purchasingExecutionVerified,
   purchasingTimeline,
   type PurchasingTimelineEntry,
+  restrictedNativeReceiptBookings,
   restrictStockBookings,
 } from './purchasing-timeline.js';
 
@@ -356,5 +357,102 @@ describe('stock bookings for a reader without inventory access', () => {
   it('leaves the timeline unchanged for inventory readers', () => {
     const entries = [...bookings, receipt];
     expect(restrictStockBookings(entries, true)).toBe(entries);
+  });
+});
+
+describe('native receipt bookings for a reader without inventory access', () => {
+  const restricted = {
+    kind: 'stock_booking',
+    actorId: null,
+    reason: null,
+    quantity: null,
+    unit: null,
+    revision: null,
+    detail: null,
+    source: 'inventory',
+    restricted: { permission: 'inventory.read' },
+  } as const;
+
+  it('shows each review stage and an approved booking readback, citing only the review', () => {
+    expect(
+      restrictedNativeReceiptBookings([
+        { reviewId: 'waiting', state: 'pending', at, verification: null },
+        {
+          reviewId: 'refused',
+          state: 'rejected',
+          at: '2026-10-13T13:00:00.000Z',
+          verification: null,
+        },
+        {
+          reviewId: 'booked',
+          state: 'approved',
+          at: '2026-10-13T14:00:00.000Z',
+          verification: {
+            outcome: 'verified',
+            observedAt: '2026-10-13T15:00:00.000Z',
+          },
+        },
+        {
+          reviewId: 'changed',
+          state: 'approved',
+          at: '2026-10-13T16:00:00.000Z',
+          verification: {
+            outcome: 'inconclusive',
+            observedAt: '2026-10-13T17:00:00.000Z',
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        ...restricted,
+        id: 'native-receipt:waiting:review',
+        stage: 'approval_required',
+        at,
+        evidenceRefs: ['waiting'],
+      },
+      {
+        ...restricted,
+        id: 'native-receipt:refused:review',
+        stage: 'rejected',
+        at: '2026-10-13T13:00:00.000Z',
+        evidenceRefs: ['refused'],
+      },
+      {
+        ...restricted,
+        id: 'native-receipt:booked:review',
+        stage: 'approved',
+        at: '2026-10-13T14:00:00.000Z',
+        evidenceRefs: ['booked'],
+      },
+      {
+        ...restricted,
+        id: 'native-receipt:booked:proof',
+        stage: 'verified',
+        at: '2026-10-13T15:00:00.000Z',
+        evidenceRefs: ['booked'],
+      },
+      {
+        ...restricted,
+        id: 'native-receipt:changed:review',
+        stage: 'approved',
+        at: '2026-10-13T16:00:00.000Z',
+        evidenceRefs: ['changed'],
+      },
+      {
+        ...restricted,
+        id: 'native-receipt:changed:proof',
+        stage: 'uncertain',
+        at: '2026-10-13T17:00:00.000Z',
+        evidenceRefs: ['changed'],
+      },
+    ]);
+  });
+
+  it('adds no readback for an approved review that was not posted', () => {
+    expect(
+      restrictedNativeReceiptBookings([
+        { reviewId: 'approved', state: 'approved', at, verification: null },
+      ]).map((entry) => entry.id),
+    ).toEqual(['native-receipt:approved:review']);
   });
 });

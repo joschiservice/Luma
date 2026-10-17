@@ -1,15 +1,35 @@
 import { hasPermission, type TenantContext } from '@luma/identity';
-import type { LedgerService } from '@luma/inventory';
+import type { LedgerService, PurchaseReceiptStage } from '@luma/inventory';
 import { ServiceError } from '@luma/platform';
-import type { PurchasingTimelineEntry } from '@luma/procurement';
+import {
+  nativeReceiptEntryId,
+  nativeReceiptProofStage,
+  nativeReceiptReviewStage,
+  type PurchasingTimelineEntry,
+  restrictedNativeReceiptBookings,
+} from '@luma/procurement';
 
-/** Adds Inventory's reviewed receipts and independent current readback without posting stock. */
-export function createPurchaseReceiptTimeline(ledger: () => LedgerService) {
+/**
+ * Adds Inventory's reviewed receipts and independent current readback without posting stock.
+ * Inventory readers get each review with what it books; other procurement readers get the
+ * restricted stages Inventory reports without them.
+ */
+export function createPurchaseReceiptTimeline(
+  ledger: () => Pick<
+    LedgerService,
+    'purchaseReceiptReviews' | 'verifyPurchaseReceipt'
+  >,
+  stages: (
+    context: TenantContext,
+    orderId: string,
+  ) => Promise<PurchaseReceiptStage[]>,
+) {
   return async (
     context: TenantContext,
     orderId: string,
   ): Promise<PurchasingTimelineEntry[]> => {
-    if (!hasPermission(context, 'inventory.read')) return [];
+    if (!hasPermission(context, 'inventory.read'))
+      return restrictedNativeReceiptBookings(await stages(context, orderId));
     const { items } = await ledger().purchaseReceiptReviews(context, orderId, {
       includeHistory: true,
     });
@@ -18,14 +38,9 @@ export function createPurchaseReceiptTimeline(ledger: () => LedgerService) {
       const receipt = review.command.purchaseReceipt;
       if (!receipt) continue;
       entries.push({
-        id: `native-receipt:${review.id}:review`,
+        id: nativeReceiptEntryId(review.id, 'review'),
         kind: 'stock_booking',
-        stage:
-          review.state === 'approved'
-            ? 'approved'
-            : review.state === 'rejected'
-              ? 'rejected'
-              : 'approval_required',
+        stage: nativeReceiptReviewStage(review.state),
         at: review.reviewedAt ?? review.createdAt,
         actorId: review.reviewedBy ?? review.preparedBy,
         reason: review.command.reason,
@@ -47,9 +62,9 @@ export function createPurchaseReceiptTimeline(ledger: () => LedgerService) {
         const proof = await ledger().verifyPurchaseReceipt(context, review.id);
         if (!proof.receipt) continue;
         entries.push({
-          id: `native-receipt:${review.id}:proof`,
+          id: nativeReceiptEntryId(review.id, 'proof'),
           kind: 'stock_booking',
-          stage: proof.outcome === 'verified' ? 'verified' : 'uncertain',
+          stage: nativeReceiptProofStage(proof.outcome),
           at: proof.observedAt,
           actorId: null,
           reason: null,

@@ -31,6 +31,7 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   createPurchaseIncoming,
   createPurchaseIncomingStore,
+  createPurchaseReceiptStages,
 } from '@luma/inventory/composition';
 import { createMessaging } from '@luma/messaging/composition';
 import {
@@ -667,6 +668,7 @@ export function createApplicationServices(
       incomingChanged: projectIncoming,
       additionalTimeline: createPurchaseReceiptTimeline(
         () => nativeStock.ledger,
+        createPurchaseReceiptStages(database),
       ),
       reconciliationAvailable: (context) =>
         purchasingRelease(context.tenantId, 'purchasing-receipts'),

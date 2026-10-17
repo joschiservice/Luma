@@ -301,6 +301,94 @@ export function restrictStockBookings(
   );
 }
 
+/** Where a native stock receipt review of the order stands, as Inventory reports it without what it books. */
+export interface NativeReceiptStage {
+  reviewId: string;
+  state: 'pending' | 'approved' | 'rejected';
+  at: string;
+  verification: {
+    outcome: 'verified' | 'inconclusive';
+    observedAt: string;
+  } | null;
+}
+
+/** The timeline entry ID of a native receipt review's decision or of its ledger readback. */
+export function nativeReceiptEntryId(
+  reviewId: string,
+  step: 'review' | 'proof',
+) {
+  return `native-receipt:${reviewId}:${step}`;
+}
+
+/** The timeline stage of a native receipt review: a pending review waits for approval. */
+export function nativeReceiptReviewStage(
+  state: NativeReceiptStage['state'],
+): PurchasingTimelineEntry['stage'] {
+  return state === 'pending' ? 'approval_required' : state;
+}
+
+/** The timeline stage of a native receipt's ledger readback; a changed account makes it uncertain. */
+export function nativeReceiptProofStage(
+  outcome: 'verified' | 'inconclusive',
+): PurchasingTimelineEntry['stage'] {
+  return outcome === 'verified' ? 'verified' : 'uncertain';
+}
+
+/**
+ * The native stock receipt bookings of an order for a reader without inventory access, under
+ * the same rules as `restrictStockBookings`: each review's decision and, once approved and
+ * posted, its ledger readback, with the entry IDs inventory readers see, the stage and the time.
+ * Each entry cites only its review, which the order's evidence lists as restricted for this
+ * reader; the supplier commitments and ledger entry an inventory reader's row cites are left
+ * out, because a procurement reader could open the commitments and so learn the booked
+ * quantities.
+ */
+export function restrictedNativeReceiptBookings(
+  stages: NativeReceiptStage[],
+): PurchasingTimelineEntry[] {
+  const entry = (
+    id: string,
+    stage: PurchasingTimelineEntry['stage'],
+    at: string,
+    reviewId: string,
+  ): PurchasingTimelineEntry => ({
+    id,
+    kind: 'stock_booking',
+    stage,
+    at,
+    actorId: null,
+    reason: null,
+    evidenceRefs: [reviewId],
+    quantity: null,
+    unit: null,
+    revision: null,
+    detail: null,
+    source: 'inventory',
+  });
+
+  return restrictStockBookings(
+    stages.flatMap((review) => [
+      entry(
+        nativeReceiptEntryId(review.reviewId, 'review'),
+        nativeReceiptReviewStage(review.state),
+        review.at,
+        review.reviewId,
+      ),
+      ...(review.state === 'approved' && review.verification
+        ? [
+            entry(
+              nativeReceiptEntryId(review.reviewId, 'proof'),
+              nativeReceiptProofStage(review.verification.outcome),
+              review.verification.observedAt,
+              review.reviewId,
+            ),
+          ]
+        : []),
+    ]),
+    false,
+  );
+}
+
 /** A successful dispatch is insufficient; verification must independently pass with concrete observations. */
 export function purchasingExecutionVerified(attempt: {
   businessOutcome?: string | undefined;
