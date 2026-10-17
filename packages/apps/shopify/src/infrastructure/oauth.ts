@@ -26,7 +26,7 @@ import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ShopifyAppConfig as ShopifyConfig } from '../application/oauth.js';
-import { storedCredentials } from './installation-validation.js';
+import { storedCredentials } from '../domain/installation-validation.js';
 import { shopifyRequestBudget } from './request-budget.js';
 import {
   canSubscribe,

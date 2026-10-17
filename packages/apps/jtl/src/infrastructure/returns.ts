@@ -14,7 +14,13 @@ import {
   type ReturnOptionSnapshot,
   type SourceIdentity,
 } from '@luma/connections';
-import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
+import {
+  API_VERSION,
+  createClient,
+  createPayloadCapture,
+  fail,
+  parse,
+} from '@luma/connector-jtl';
 import { z } from 'zod';
 
 import { jtlPermissions } from '../domain/permissions.js';
@@ -121,15 +127,9 @@ export function createJtlReturnCapabilities(
   /** Collects allowlisted payloads and observations for one capability call. */
   function session(capability: ReadKind) {
     const observedAt = now().toISOString();
-    const payloads: unknown[] = [];
+    const payloads = createPayloadCapture(options.rawRetentionMs, now);
+    const capture = payloads.capture;
     const observations: Observation<unknown>[] = [];
-
-    function capture<T>(schema: z.ZodType<T>, value: unknown): T {
-      const result = parse(schema, value);
-      if (options.rawRetentionMs !== undefined) payloads.push(result);
-
-      return result;
-    }
 
     async function page<T extends z.ZodTypeAny>(
       path: string,
@@ -202,16 +202,7 @@ export function createJtlReturnCapabilities(
         apiVersion: API_VERSION,
         capability,
         observations: result.items,
-        ...(options.rawRetentionMs === undefined
-          ? {}
-          : {
-              raw: {
-                payloads,
-                expiresAt: new Date(
-                  now().getTime() + options.rawRetentionMs,
-                ).toISOString(),
-              },
-            }),
+        ...payloads.raw(),
       });
 
       return result;

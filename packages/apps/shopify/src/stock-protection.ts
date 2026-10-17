@@ -34,6 +34,7 @@ import {
   createPolicies,
   createStockProtectionAdmission,
   createStockProtectionConsent,
+  policyAudit,
 } from '@luma/policies/composition';
 import { z } from 'zod';
 
@@ -223,28 +224,7 @@ export function createShopifyStockProtection(
   const policies: PolicyService = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
     undefined,
     async (tenant, action, version) => {
       const run = await store.action(tenant, action.id);

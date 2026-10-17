@@ -11,7 +11,7 @@ import {
 } from '@luma/connector-shopify';
 import { z } from 'zod';
 
-import { installationTarget } from './installation-validation.js';
+import { installationTarget } from '../domain/installation-validation.js';
 import { shopifyRequestBudget } from './request-budget.js';
 
 /** Verifies account identity and grants using app-owned provider probes. */

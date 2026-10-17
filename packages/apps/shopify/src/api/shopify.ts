@@ -6,7 +6,14 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import type { ShopifyOAuth } from '../application/oauth.js';
-import type { PrivacyIntake } from '../infrastructure/privacy.js';
+
+/** Accepts the original JSON bytes and verified-delivery headers; resolves only after durable intake. */
+type PrivacyIntake = (
+  body: Buffer,
+  signature: string,
+  shop: string,
+  topic: string,
+) => Promise<void>;
 
 /**
  * Registers Shopify authorization callbacks, lifecycle webhooks and record-change

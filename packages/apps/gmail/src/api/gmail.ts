@@ -1,11 +1,22 @@
 import '@luma/identity/http';
 
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import type { FastifyInstance } from 'fastify';
 
-import type { GmailOAuth } from '../infrastructure/oauth.js';
-import type { PushIntake } from '../infrastructure/push.js';
+/** Completes Google authorization for the workspace named in the callback state. */
+interface GmailCallback {
+  config: { webOrigin: string };
+  callbackTenant(query: string): string;
+  /** Resolves to the outcome shown on the settings page. */
+  callback(context: TenantContext, query: string): Promise<string>;
+}
+
+/** Verifies and records one push notification; resolves after durable intake. */
+type PushIntake = (
+  authorization: string | undefined,
+  body: unknown,
+) => Promise<void>;
 
 /**
  * Registers the Google authorization callback and the Pub/Sub push endpoint. Both
@@ -14,7 +25,7 @@ import type { PushIntake } from '../infrastructure/push.js';
  */
 export function registerGmailRoutes(
   app: FastifyInstance,
-  oauth: Pick<GmailOAuth, 'config' | 'callbackTenant' | 'callback'> | undefined,
+  oauth: GmailCallback | undefined,
   identity: Pick<IdentityService, 'resolveTenant'> | undefined,
   push: PushIntake,
 ) {

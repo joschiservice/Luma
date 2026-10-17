@@ -12,12 +12,12 @@ import { z } from 'zod';
 
 import { registerGmailRoutes } from './api/gmail.js';
 import { readGmailConfig } from './config.js';
-import { createGmailConnector } from './infrastructure/adapter.js';
 import {
   installationCredentials,
   installationInput,
   installationTarget,
-} from './infrastructure/installation-validation.js';
+} from './domain/installation-validation.js';
+import { createGmailConnector } from './infrastructure/adapter.js';
 import { createGmailOAuth, type GmailOAuth } from './infrastructure/oauth.js';
 import { createPushIntake } from './infrastructure/push.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  appLayers,
   connectorPackages,
   dependencies,
   domainPackages,
@@ -61,6 +62,33 @@ function apiImportTarget(specifier) {
   return null;
 }
 
+function appInfo(file) {
+  const match = /^packages\/apps\/([^/]+)\/src\/(.+)$/.exec(file);
+  if (!match) return null;
+  const [layer, ...rest] = match[2].split('/');
+
+  return { app: match[1], layer, root: rest.length === 0 };
+}
+
+/** Returns why an import between files of workspace apps is not permitted, or null. */
+function appViolation(from, source, target) {
+  if (source.app !== target.app)
+    return "Apps must not import another app's source.";
+  if (source.root || source.layer === 'test-support') return null;
+  const allowed = appLayers[source.layer];
+  if (!allowed)
+    return `Place app code in a ${Object.keys(appLayers).join('/')} layer or a root composition file.`;
+  if (allowed.includes(target.layer)) return null;
+  // Tests may also use test support and the app's composed entry points.
+  if (
+    /\.test\.ts$/.test(from) &&
+    (target.root || target.layer === 'test-support')
+  )
+    return null;
+
+  return 'Import violates the app layer direction.';
+}
+
 function moduleInfo(file) {
   if (!file.startsWith(modulePrefix)) return null;
   const [name, layer, ...rest] = file.slice(modulePrefix.length).split('/');
@@ -77,6 +105,9 @@ export function violation(from, to) {
   to = canonical(to);
   const source = moduleInfo(from);
   const target = moduleInfo(to);
+  const sourceApp = appInfo(from);
+  const targetApp = appInfo(to);
+  if (sourceApp && targetApp) return appViolation(from, sourceApp, targetApp);
   if (
     from.startsWith('packages/app-host/') &&
     (to.startsWith('packages/apps/') ||

@@ -26,4 +26,4 @@ export { buildQuery, mailboxFilter, matchesFilter } from './query.js';
 
 export { gmailId, type GmailMessage } from './schemas.js';
 
-export { fail } from '@luma/connector-core/transport';
+export { createCursorCodec, fail } from '@luma/connector-core/transport';
