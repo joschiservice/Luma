@@ -23,6 +23,7 @@ export { quantityUnits } from './domain/ledger.js';
 export type {
   LedgerReview,
   PurchaseReceiptEvidence,
+  PurchaseReceiptStage,
 } from './application/ledger.js';
 
 export type { PurchaseIncomingSource } from './application/purchase-incoming.js';

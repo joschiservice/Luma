@@ -72,3 +72,5 @@ export {
   purchaseReceiptEvidence,
   stockReadEvidence,
 } from './infrastructure/evidence.js';
+
+export { createPurchaseReceiptStages } from './infrastructure/purchase-receipt-stages.js';
