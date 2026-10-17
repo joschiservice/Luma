@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { expect, it } from 'vitest';
 
-import { database, signup, startApi, until } from './helpers.mjs';
+import {
+  addMembership,
+  database,
+  signup,
+  startApi,
+  until,
+} from './helpers.mjs';
 
 /** A draft with a decision, an action and a result check; it compiles without installed adapters. */
 const releaseHold = {
@@ -106,12 +112,7 @@ it('tests drafts with example data, keeps saved cases and never reaches connecte
     [admin, 'admin'],
     [member, 'member'],
   ])
-    await api.request(`/v1/organizations/${org.id}/members`, {
-      cookie: owner.cookie,
-      method: 'POST',
-      status: 201,
-      body: { userId: user.userId, roleId: role },
-    });
+    await addMembership(db.owner, org.id, user.userId, role);
   const base = `/v1/organizations/${org.id}`;
   const as =
     (user) =>

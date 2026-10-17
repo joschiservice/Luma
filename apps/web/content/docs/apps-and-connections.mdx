@@ -141,6 +141,13 @@ Enter a recognizable connection name and account name, then the **API key** and
 **Subscription key** from Starshipit **Settings → API**. Choose **Save connection** and
 **Validate access**. The account name is your label for the account connected by those keys.
 
+After saving, Luma shows a change notification URL and an Authorization header once. Copy
+both into Starshipit now; you can't view the secret again. Starshipit sends them with each
+change notification, and Luma reads the current shipping state in response. If you lose
+the secret, open **Connection settings** and choose **Generate a new webhook secret**. The
+previous secret stops working immediately, so update Starshipit right away. Saving new keys
+also replaces the secret. Each new secret is recorded in Activity.
+
 Luma reads shipping orders and carrier tracking. Link its source records to your existing
 orders before using them in an order change plan. Printed labels do not count as carrier
 handoff. Corrections require separately enabled and confirmed write access; requesting

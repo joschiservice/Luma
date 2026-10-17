@@ -77,6 +77,18 @@ function eventLabel(event: SecurityEventResponse) {
       return m.settings_security_event_account_deletion_scheduled();
     case 'account.restored':
       return m.settings_security_event_account_restored();
+    case 'support-inspection.requested':
+      return m.settings_security_event_support_inspection_requested();
+    case 'support-inspection.approved':
+      return m.settings_security_event_support_inspection_approved();
+    case 'support-inspection.declined':
+      return m.settings_security_event_support_inspection_declined();
+    case 'support-inspection.expired':
+      return m.settings_security_event_support_inspection_expired();
+    case 'support-inspection.revoked':
+      return m.settings_security_event_support_inspection_revoked();
+    case 'support-inspection.emergency-opened':
+      return m.settings_security_event_support_inspection_emergency_opened();
   }
 }
 

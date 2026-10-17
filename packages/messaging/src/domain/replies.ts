@@ -5,7 +5,7 @@
  */
 
 import type { RecordKind } from './linking.js';
-import type { Address } from './threads.js';
+import type { Address, MessageData } from './threads.js';
 
 /** Evidence older than this is stated as unconfirmed instead of restated. */
 const staleAfterMs = 24 * 3_600_000;
@@ -550,4 +550,61 @@ export function replyActions(
     canCheck:
       sender && (reply.state === 'sending' || reply.state === 'uncertain'),
   };
+}
+
+/** How a person or the supplier settled a send whose delivery was uncertain. */
+export type DeliveryOutcome = 'delivered' | 'not_delivered';
+
+/** The Message-ID Luma gives a send: `luma.<outbound ID>@<sending mailbox domain>`. */
+function sentMessageId(outboundId: string, fromAddress: string) {
+  return `luma.${outboundId}@${fromAddress.slice(fromAddress.lastIndexOf('@') + 1)}`;
+}
+
+/**
+ * The outbound ID of the Luma send an inbound message answers directly: its `In-Reply-To`, or
+ * without one, the last `References` entry (its parent). Earlier `References` entries are not
+ * used: a reply to a later message in the chain repeats them without proving they arrived.
+ */
+export function repliedOutboundId(
+  message: Pick<MessageData, 'inReplyTo' | 'references'>,
+) {
+  const parent = message.inReplyTo ?? message.references.at(-1) ?? null;
+
+  return /^luma\.([A-Za-z0-9-]{1,64})@/.exec(parent ?? '')?.[1] ?? null;
+}
+
+/**
+ * Whether an inbound message proves a send reached its recipient: the receiving mailbox
+ * authenticated the sender's domain (DMARC aligned), the sender is one of the send's
+ * recipients, and the message replies directly to the send's exact Message-ID. Delivery
+ * reports never count here; unauthenticated replies could come from anyone.
+ */
+export function replyProvesDelivery(
+  send: { id: string; fromAddress: string; recipients: readonly Address[] },
+  message: Pick<
+    MessageData,
+    | 'direction'
+    | 'deliveryFailure'
+    | 'senderAuthentication'
+    | 'from'
+    | 'inReplyTo'
+    | 'references'
+  >,
+) {
+  if (
+    message.direction !== 'inbound' ||
+    message.deliveryFailure ||
+    message.senderAuthentication !== 'aligned'
+  )
+    return false;
+  const from = message.from.address.toLowerCase();
+  if (!send.recipients.some((a) => a.address.toLowerCase() === from))
+    return false;
+  const parent = message.inReplyTo ?? message.references.at(-1) ?? null;
+
+  // Message-ID domains compare without case; outbound IDs are lower-case UUIDs.
+  return (
+    parent?.toLowerCase() ===
+    sentMessageId(send.id, send.fromAddress).toLowerCase()
+  );
 }

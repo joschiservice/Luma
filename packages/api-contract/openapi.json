@@ -16,6 +16,7 @@
               "UNAUTHENTICATED",
               "FORBIDDEN",
               "ACCESS_SUSPENDED",
+              "EMAIL_NOT_VERIFIED",
               "READ_ONLY",
               "NOT_FOUND",
               "CONFLICT",
@@ -34699,7 +34700,13 @@
                               "account.disabled",
                               "account.enabled",
                               "account.deletion-scheduled",
-                              "account.restored"
+                              "account.restored",
+                              "support-inspection.requested",
+                              "support-inspection.approved",
+                              "support-inspection.declined",
+                              "support-inspection.expired",
+                              "support-inspection.revoked",
+                              "support-inspection.emergency-opened"
                             ],
                             "type": "string"
                           },
@@ -34860,6 +34867,580 @@
           },
           "422": {
             "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/support-inspections": {
+      "get": {
+        "operationId": "identity.listSupportInspections",
+        "summary": "List Luma support requests for your account",
+        "description": "Returns requests from Luma support to inspect your account, and approved inspections that are still open, newest first. Inspection shows your workspaces and roles, sign-in factor status, active sessions and security activity; it never shows passwords or factor secrets.",
+        "tags": ["identity"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["items"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/support-inspections/{requestId}": {
+      "post": {
+        "operationId": "identity.decideSupportInspection",
+        "summary": "Approve or decline a Luma support request for your account",
+        "description": "Approving lets the support team member who asked inspect your account for thirty minutes from now. Repeating the same answer returns the current list; a request that lapsed or got another answer returns 409.",
+        "tags": ["identity"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "enum": ["approve", "decline"],
+                    "type": "string"
+                  }
+                },
+                "required": ["decision"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["items"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account/support-inspections/{requestId}/revoke": {
+      "post": {
+        "operationId": "identity.revokeSupportInspection",
+        "summary": "End an approved Luma support inspection of your account",
+        "description": "Ends approved access now; the support team’s next read is refused. Emergency access can’t be revoked. Revoking again returns the current list; access that already ended returns 409.",
+        "tags": ["identity"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["items"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
             "content": {
               "application/json": {
                 "schema": {
@@ -35657,211 +36238,6 @@
                     }
                   },
                   "required": ["items"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "400",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "401",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "403",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "409",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "413",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "415",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "500",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "503",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "identity.addMember",
-        "summary": "Add a registered user to an organization",
-        "description": "Requires `members.manage`. Only owners can grant ownership, and others can only assign roles whose permissions they hold.",
-        "tags": ["identity"],
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "x-command-id",
-            "in": "header",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "userId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "roleId": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": ["userId", "roleId"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "email": {
-                      "type": "string"
-                    },
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "organizationId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "userId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "role": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "key": {
-                          "enum": ["owner", "admin", "member", "custom"],
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "builtIn": {
-                          "type": "boolean"
-                        },
-                        "revision": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": ["id", "key", "name", "builtIn", "revision"]
-                    },
-                    "status": {
-                      "enum": ["active", "suspended"],
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "organizationId",
-                    "userId",
-                    "role",
-                    "status"
-                  ]
                 }
               }
             }
@@ -41063,7 +41439,7 @@
       "get": {
         "operationId": "settings.supportAccess",
         "summary": "Read Luma support access",
-        "description": "Returns until when Luma support may open read-only views of this workspace, and pending requests from Luma support.",
+        "description": "Returns until when Luma support may open read-only views of this workspace, pending requests from Luma support, and inspection requests with approved inspections that are still open.",
         "tags": ["settings"],
         "parameters": [
           {
@@ -41153,13 +41529,79 @@
                           "expiresAt"
                         ]
                       }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "allowedUntil",
                     "changedAt",
                     "revision",
-                    "requests"
+                    "requests",
+                    "inspections"
                   ]
                 }
               }
@@ -41376,13 +41818,79 @@
                           "expiresAt"
                         ]
                       }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "allowedUntil",
                     "changedAt",
                     "revision",
-                    "requests"
+                    "requests",
+                    "inspections"
                   ]
                 }
               }
@@ -41598,13 +42106,79 @@
                           "expiresAt"
                         ]
                       }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "allowedUntil",
                     "changedAt",
                     "revision",
-                    "requests"
+                    "requests",
+                    "inspections"
                   ]
                 }
               }
@@ -41828,13 +42402,667 @@
                           "expiresAt"
                         ]
                       }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "allowedUntil",
                     "changedAt",
                     "revision",
-                    "requests"
+                    "requests",
+                    "inspections"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/settings/support-access/inspections/{requestId}": {
+      "post": {
+        "operationId": "settings.decideSupportInspection",
+        "summary": "Approve or decline a Luma support inspection request",
+        "description": "Approving lets the support team member who asked inspect this workspace’s records for thirty minutes from now. Inspection reads members, connections, sync health and access history; it can’t change anything. A request that lapsed or was answered returns 409.",
+        "tags": ["settings"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "decision": {
+                    "enum": ["approve", "decline"],
+                    "type": "string"
+                  }
+                },
+                "required": ["commandId", "decision"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "allowedUntil": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "changedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "durationHours": {
+                            "anyOf": [
+                              {
+                                "const": 24
+                              },
+                              {
+                                "const": 72
+                              },
+                              {
+                                "const": 168
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "reason",
+                          "durationHours",
+                          "requestedAt",
+                          "expiresAt"
+                        ]
+                      }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "allowedUntil",
+                    "changedAt",
+                    "revision",
+                    "requests",
+                    "inspections"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/settings/support-access/inspections/{requestId}/revoke": {
+      "post": {
+        "operationId": "settings.revokeSupportInspection",
+        "summary": "End an approved Luma support inspection",
+        "description": "Ends approved inspection access now; the support team’s next read is refused. Emergency access can’t be revoked. Access that already ended returns 409.",
+        "tags": ["settings"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["commandId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "allowedUntil": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "changedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "durationHours": {
+                            "anyOf": [
+                              {
+                                "const": 24
+                              },
+                              {
+                                "const": 72
+                              },
+                              {
+                                "const": 168
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "reason",
+                          "durationHours",
+                          "requestedAt",
+                          "expiresAt"
+                        ]
+                      }
+                    },
+                    "inspections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "enum": ["pending", "approved"],
+                            "type": "string"
+                          },
+                          "emergency": {
+                            "anyOf": [
+                              {
+                                "enum": ["security_incident", "legal_request"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "accessExpiresAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "emergency",
+                          "reason",
+                          "requestedAt",
+                          "expiresAt",
+                          "accessExpiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "allowedUntil",
+                    "changedAt",
+                    "revision",
+                    "requests",
+                    "inspections"
                   ]
                 }
               }
@@ -54013,6 +55241,17 @@
                             },
                             "required": ["address", "name"]
                           },
+                          "senderAuthentication": {
+                            "anyOf": [
+                              {
+                                "enum": ["aligned", "unaligned", "unknown"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "to": {
                             "type": "array",
                             "items": {
@@ -54168,6 +55407,7 @@
                           "threadId",
                           "direction",
                           "from",
+                          "senderAuthentication",
                           "to",
                           "cc",
                           "subject",
@@ -54288,9 +55528,18 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "senderUnverified": {
+                                "type": "boolean"
                               }
                             },
-                            "required": ["messageId", "ruleId", "text", "span"]
+                            "required": [
+                              "messageId",
+                              "ruleId",
+                              "text",
+                              "span",
+                              "senderUnverified"
+                            ]
                           },
                           "createdBy": {
                             "type": "string"
@@ -54358,6 +55607,7 @@
                               "reply_approved",
                               "reply_rejected",
                               "reply_withheld",
+                              "delivery_resolved",
                               "text_removed",
                               "fact_reviewed"
                             ],
@@ -54740,6 +55990,82 @@
                               }
                             ]
                           },
+                          "delivery": {
+                            "type": "object",
+                            "properties": {
+                              "report": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "recipient": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["recipient", "status"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "resolution": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "outcome": {
+                                        "enum": ["delivered", "not_delivered"],
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "enum": ["person", "reply"],
+                                        "type": "string"
+                                      },
+                                      "by": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "note": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "outcome",
+                                      "source",
+                                      "by",
+                                      "at",
+                                      "note"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["report", "resolution"]
+                          },
                           "canEdit": {
                             "type": "boolean"
                           },
@@ -54753,6 +56079,9 @@
                             "type": "boolean"
                           },
                           "canCheck": {
+                            "type": "boolean"
+                          },
+                          "canResolveDelivery": {
                             "type": "boolean"
                           },
                           "revision": {
@@ -54785,11 +56114,13 @@
                           "decisionId",
                           "approverId",
                           "sentMessageId",
+                          "delivery",
                           "canEdit",
                           "canRequest",
                           "canApprove",
                           "canSend",
                           "canCheck",
+                          "canResolveDelivery",
                           "revision",
                           "createdAt",
                           "updatedAt"
@@ -56478,6 +57809,17 @@
                             },
                             "required": ["address", "name"]
                           },
+                          "senderAuthentication": {
+                            "anyOf": [
+                              {
+                                "enum": ["aligned", "unaligned", "unknown"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "to": {
                             "type": "array",
                             "items": {
@@ -56633,6 +57975,7 @@
                           "threadId",
                           "direction",
                           "from",
+                          "senderAuthentication",
                           "to",
                           "cc",
                           "subject",
@@ -56753,9 +58096,18 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "senderUnverified": {
+                                "type": "boolean"
                               }
                             },
-                            "required": ["messageId", "ruleId", "text", "span"]
+                            "required": [
+                              "messageId",
+                              "ruleId",
+                              "text",
+                              "span",
+                              "senderUnverified"
+                            ]
                           },
                           "createdBy": {
                             "type": "string"
@@ -56823,6 +58175,7 @@
                               "reply_approved",
                               "reply_rejected",
                               "reply_withheld",
+                              "delivery_resolved",
                               "text_removed",
                               "fact_reviewed"
                             ],
@@ -57205,6 +58558,82 @@
                               }
                             ]
                           },
+                          "delivery": {
+                            "type": "object",
+                            "properties": {
+                              "report": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "recipient": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["recipient", "status"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "resolution": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "outcome": {
+                                        "enum": ["delivered", "not_delivered"],
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "enum": ["person", "reply"],
+                                        "type": "string"
+                                      },
+                                      "by": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "note": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "outcome",
+                                      "source",
+                                      "by",
+                                      "at",
+                                      "note"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["report", "resolution"]
+                          },
                           "canEdit": {
                             "type": "boolean"
                           },
@@ -57218,6 +58647,9 @@
                             "type": "boolean"
                           },
                           "canCheck": {
+                            "type": "boolean"
+                          },
+                          "canResolveDelivery": {
                             "type": "boolean"
                           },
                           "revision": {
@@ -57250,11 +58682,13 @@
                           "decisionId",
                           "approverId",
                           "sentMessageId",
+                          "delivery",
                           "canEdit",
                           "canRequest",
                           "canApprove",
                           "canSend",
                           "canCheck",
+                          "canResolveDelivery",
                           "revision",
                           "createdAt",
                           "updatedAt"
@@ -57652,6 +59086,17 @@
                             },
                             "required": ["address", "name"]
                           },
+                          "senderAuthentication": {
+                            "anyOf": [
+                              {
+                                "enum": ["aligned", "unaligned", "unknown"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "to": {
                             "type": "array",
                             "items": {
@@ -57807,6 +59252,7 @@
                           "threadId",
                           "direction",
                           "from",
+                          "senderAuthentication",
                           "to",
                           "cc",
                           "subject",
@@ -57927,9 +59373,18 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "senderUnverified": {
+                                "type": "boolean"
                               }
                             },
-                            "required": ["messageId", "ruleId", "text", "span"]
+                            "required": [
+                              "messageId",
+                              "ruleId",
+                              "text",
+                              "span",
+                              "senderUnverified"
+                            ]
                           },
                           "createdBy": {
                             "type": "string"
@@ -57997,6 +59452,7 @@
                               "reply_approved",
                               "reply_rejected",
                               "reply_withheld",
+                              "delivery_resolved",
                               "text_removed",
                               "fact_reviewed"
                             ],
@@ -58379,6 +59835,82 @@
                               }
                             ]
                           },
+                          "delivery": {
+                            "type": "object",
+                            "properties": {
+                              "report": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "recipient": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["recipient", "status"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "resolution": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "outcome": {
+                                        "enum": ["delivered", "not_delivered"],
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "enum": ["person", "reply"],
+                                        "type": "string"
+                                      },
+                                      "by": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "note": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "outcome",
+                                      "source",
+                                      "by",
+                                      "at",
+                                      "note"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["report", "resolution"]
+                          },
                           "canEdit": {
                             "type": "boolean"
                           },
@@ -58392,6 +59924,9 @@
                             "type": "boolean"
                           },
                           "canCheck": {
+                            "type": "boolean"
+                          },
+                          "canResolveDelivery": {
                             "type": "boolean"
                           },
                           "revision": {
@@ -58424,11 +59959,13 @@
                           "decisionId",
                           "approverId",
                           "sentMessageId",
+                          "delivery",
                           "canEdit",
                           "canRequest",
                           "canApprove",
                           "canSend",
                           "canCheck",
+                          "canResolveDelivery",
                           "revision",
                           "createdAt",
                           "updatedAt"
@@ -58820,6 +60357,17 @@
                             },
                             "required": ["address", "name"]
                           },
+                          "senderAuthentication": {
+                            "anyOf": [
+                              {
+                                "enum": ["aligned", "unaligned", "unknown"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "to": {
                             "type": "array",
                             "items": {
@@ -58975,6 +60523,7 @@
                           "threadId",
                           "direction",
                           "from",
+                          "senderAuthentication",
                           "to",
                           "cc",
                           "subject",
@@ -59095,9 +60644,18 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "senderUnverified": {
+                                "type": "boolean"
                               }
                             },
-                            "required": ["messageId", "ruleId", "text", "span"]
+                            "required": [
+                              "messageId",
+                              "ruleId",
+                              "text",
+                              "span",
+                              "senderUnverified"
+                            ]
                           },
                           "createdBy": {
                             "type": "string"
@@ -59165,6 +60723,7 @@
                               "reply_approved",
                               "reply_rejected",
                               "reply_withheld",
+                              "delivery_resolved",
                               "text_removed",
                               "fact_reviewed"
                             ],
@@ -59547,6 +61106,82 @@
                               }
                             ]
                           },
+                          "delivery": {
+                            "type": "object",
+                            "properties": {
+                              "report": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "recipient": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["recipient", "status"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "resolution": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "outcome": {
+                                        "enum": ["delivered", "not_delivered"],
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "enum": ["person", "reply"],
+                                        "type": "string"
+                                      },
+                                      "by": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "note": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "outcome",
+                                      "source",
+                                      "by",
+                                      "at",
+                                      "note"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["report", "resolution"]
+                          },
                           "canEdit": {
                             "type": "boolean"
                           },
@@ -59560,6 +61195,9 @@
                             "type": "boolean"
                           },
                           "canCheck": {
+                            "type": "boolean"
+                          },
+                          "canResolveDelivery": {
                             "type": "boolean"
                           },
                           "revision": {
@@ -59592,11 +61230,13 @@
                           "decisionId",
                           "approverId",
                           "sentMessageId",
+                          "delivery",
                           "canEdit",
                           "canRequest",
                           "canApprove",
                           "canSend",
                           "canCheck",
+                          "canResolveDelivery",
                           "revision",
                           "createdAt",
                           "updatedAt"
@@ -59988,6 +61628,17 @@
                             },
                             "required": ["address", "name"]
                           },
+                          "senderAuthentication": {
+                            "anyOf": [
+                              {
+                                "enum": ["aligned", "unaligned", "unknown"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "to": {
                             "type": "array",
                             "items": {
@@ -60143,6 +61794,7 @@
                           "threadId",
                           "direction",
                           "from",
+                          "senderAuthentication",
                           "to",
                           "cc",
                           "subject",
@@ -60263,9 +61915,18 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "senderUnverified": {
+                                "type": "boolean"
                               }
                             },
-                            "required": ["messageId", "ruleId", "text", "span"]
+                            "required": [
+                              "messageId",
+                              "ruleId",
+                              "text",
+                              "span",
+                              "senderUnverified"
+                            ]
                           },
                           "createdBy": {
                             "type": "string"
@@ -60333,6 +61994,7 @@
                               "reply_approved",
                               "reply_rejected",
                               "reply_withheld",
+                              "delivery_resolved",
                               "text_removed",
                               "fact_reviewed"
                             ],
@@ -60715,6 +62377,82 @@
                               }
                             ]
                           },
+                          "delivery": {
+                            "type": "object",
+                            "properties": {
+                              "report": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "recipient": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["recipient", "status"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "resolution": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "outcome": {
+                                        "enum": ["delivered", "not_delivered"],
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "enum": ["person", "reply"],
+                                        "type": "string"
+                                      },
+                                      "by": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "note": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "outcome",
+                                      "source",
+                                      "by",
+                                      "at",
+                                      "note"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["report", "resolution"]
+                          },
                           "canEdit": {
                             "type": "boolean"
                           },
@@ -60728,6 +62466,9 @@
                             "type": "boolean"
                           },
                           "canCheck": {
+                            "type": "boolean"
+                          },
+                          "canResolveDelivery": {
                             "type": "boolean"
                           },
                           "revision": {
@@ -60760,11 +62501,13 @@
                           "decisionId",
                           "approverId",
                           "sentMessageId",
+                          "delivery",
                           "canEdit",
                           "canRequest",
                           "canApprove",
                           "canSend",
                           "canCheck",
+                          "canResolveDelivery",
                           "revision",
                           "createdAt",
                           "updatedAt"
@@ -67580,6 +69323,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -67593,6 +69412,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -67625,11 +69447,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -68034,6 +69858,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -68047,6 +69947,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -68079,11 +69982,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -68458,6 +70363,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -68471,6 +70452,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -68503,11 +70487,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -68887,6 +70873,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -68900,6 +70962,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -68932,11 +70997,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -69311,6 +71378,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -69324,6 +71467,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -69356,11 +71502,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -69735,6 +71883,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -69748,6 +71972,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -69780,11 +72007,538 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
+                    "revision",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/messaging/outbound/{outboundId}/delivery": {
+      "post": {
+        "operationId": "messaging.resolveOutboundDelivery",
+        "summary": "Mark an uncertain supplier email as delivered or not delivered",
+        "description": "Requires `messages.send` and `procurement.manage`. Records a person's decision after checking with the supplier; nothing is sent. `delivered` settles the email as sent; `not_delivered` as failed, so the order's submission can be drafted again. Only supplier emails in the `uncertain` state can be resolved; fails with 409 when `expectedRevision` is not current. Retry with the same ID and body after an uncertain response.",
+        "tags": ["messaging"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "outboundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "outcome": {
+                    "enum": ["delivered", "not_delivered"],
+                    "type": "string"
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["id", "expectedRevision", "outcome"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "purchaseOrderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "attachments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "filename": {
+                            "type": "string"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["filename", "mimeType", "size"]
+                      }
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "threadId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "to": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "address": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["address", "name"]
+                      }
+                    },
+                    "cc": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "address": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["address", "name"]
+                      }
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "citations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "record": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "order",
+                                  "customer",
+                                  "supplier",
+                                  "purchase_order",
+                                  "case"
+                                ],
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "label": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["kind", "id", "label"]
+                          },
+                          "statement": {
+                            "type": "string"
+                          },
+                          "observedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "freshness": {
+                            "enum": ["fresh", "stale", "missing"],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "record",
+                          "statement",
+                          "observedAt",
+                          "freshness"
+                        ]
+                      }
+                    },
+                    "consequential": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "date",
+                          "quantity",
+                          "money",
+                          "workspace_policy"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "state": {
+                      "enum": [
+                        "draft",
+                        "approval_required",
+                        "approved",
+                        "rejected",
+                        "expired",
+                        "sending",
+                        "uncertain",
+                        "sent",
+                        "failed",
+                        "withheld",
+                        "discarded"
+                      ],
+                      "type": "string"
+                    },
+                    "stateReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "requestedBy": {
+                      "type": "string"
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approverId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sentMessageId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
+                    "canEdit": {
+                      "type": "boolean"
+                    },
+                    "canRequest": {
+                      "type": "boolean"
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "canSend": {
+                      "type": "boolean"
+                    },
+                    "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "threadId",
+                    "connectionId",
+                    "to",
+                    "cc",
+                    "subject",
+                    "text",
+                    "citations",
+                    "consequential",
+                    "state",
+                    "stateReason",
+                    "requestedBy",
+                    "decisionId",
+                    "approverId",
+                    "sentMessageId",
+                    "delivery",
+                    "canEdit",
+                    "canRequest",
+                    "canApprove",
+                    "canSend",
+                    "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -70159,6 +72913,82 @@
                         }
                       ]
                     },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
                     "canEdit": {
                       "type": "boolean"
                     },
@@ -70172,6 +73002,9 @@
                       "type": "boolean"
                     },
                     "canCheck": {
+                      "type": "boolean"
+                    },
+                    "canResolveDelivery": {
                       "type": "boolean"
                     },
                     "revision": {
@@ -70204,11 +73037,13 @@
                     "decisionId",
                     "approverId",
                     "sentMessageId",
+                    "delivery",
                     "canEdit",
                     "canRequest",
                     "canApprove",
                     "canSend",
                     "canCheck",
+                    "canResolveDelivery",
                     "revision",
                     "createdAt",
                     "updatedAt"
@@ -111647,6 +114482,9 @@
                               }
                             ]
                           },
+                          "senderVerified": {
+                            "type": "boolean"
+                          },
                           "digest": {
                             "type": "string"
                           },
@@ -114745,7 +117583,8 @@
                                 "quantity_changed",
                                 "date_later",
                                 "unmatched_line",
-                                "supplier_condition"
+                                "supplier_condition",
+                                "sender_unverified"
                               ],
                               "type": "string"
                             }
@@ -114954,6 +117793,9 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "senderVerified": {
+                            "type": "boolean"
                           },
                           "digest": {
                             "type": "string"
@@ -117245,7 +120087,8 @@
                                 "quantity_changed",
                                 "date_later",
                                 "unmatched_line",
-                                "supplier_condition"
+                                "supplier_condition",
+                                "sender_unverified"
                               ],
                               "type": "string"
                             }
@@ -117454,6 +120297,9 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "senderVerified": {
+                            "type": "boolean"
                           },
                           "digest": {
                             "type": "string"
@@ -120478,6 +123324,9 @@
                         }
                       ]
                     },
+                    "senderVerified": {
+                      "type": "boolean"
+                    },
                     "digest": {
                       "type": "string"
                     },
@@ -121002,7 +123851,8 @@
                           "quantity_changed",
                           "date_later",
                           "unmatched_line",
-                          "supplier_condition"
+                          "supplier_condition",
+                          "sender_unverified"
                         ],
                         "type": "string"
                       }
@@ -121517,7 +124367,8 @@
                           "quantity_changed",
                           "date_later",
                           "unmatched_line",
-                          "supplier_condition"
+                          "supplier_condition",
+                          "sender_unverified"
                         ],
                         "type": "string"
                       }
@@ -121963,7 +124814,8 @@
                           "quantity_changed",
                           "date_later",
                           "unmatched_line",
-                          "supplier_condition"
+                          "supplier_condition",
+                          "sender_unverified"
                         ],
                         "type": "string"
                       }
@@ -127624,6 +130476,93 @@
                                   },
                                   "required": ["filename", "mimeType", "size"]
                                 }
+                              },
+                              "delivery": {
+                                "type": "object",
+                                "properties": {
+                                  "report": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "recipient": {
+                                            "type": "string"
+                                          },
+                                          "status": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["recipient", "status"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "resolution": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "outcome": {
+                                            "enum": [
+                                              "delivered",
+                                              "not_delivered"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "source": {
+                                            "enum": ["person", "reply"],
+                                            "type": "string"
+                                          },
+                                          "by": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "note": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "outcome",
+                                          "source",
+                                          "by",
+                                          "at",
+                                          "note"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["report", "resolution"]
+                              },
+                              "canResolveDelivery": {
+                                "type": "boolean"
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
                               }
                             },
                             "required": [
@@ -127634,7 +130573,10 @@
                               "text",
                               "state",
                               "stateReason",
-                              "sentMessageId"
+                              "sentMessageId",
+                              "delivery",
+                              "canResolveDelivery",
+                              "revision"
                             ]
                           },
                           "work": {
@@ -127949,6 +130891,90 @@
                         },
                         "required": ["filename", "mimeType", "size"]
                       }
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
+                    "canResolveDelivery": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -127959,7 +130985,10 @@
                     "text",
                     "state",
                     "stateReason",
-                    "sentMessageId"
+                    "sentMessageId",
+                    "delivery",
+                    "canResolveDelivery",
+                    "revision"
                   ]
                 }
               }
@@ -128212,6 +131241,90 @@
                         },
                         "required": ["filename", "mimeType", "size"]
                       }
+                    },
+                    "delivery": {
+                      "type": "object",
+                      "properties": {
+                        "report": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "recipient": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["recipient", "status"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "outcome": {
+                                  "enum": ["delivered", "not_delivered"],
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "enum": ["person", "reply"],
+                                  "type": "string"
+                                },
+                                "by": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "note": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "outcome",
+                                "source",
+                                "by",
+                                "at",
+                                "note"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["report", "resolution"]
+                    },
+                    "canResolveDelivery": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -128222,7 +131335,10 @@
                     "text",
                     "state",
                     "stateReason",
-                    "sentMessageId"
+                    "sentMessageId",
+                    "delivery",
+                    "canResolveDelivery",
+                    "revision"
                   ]
                 }
               }

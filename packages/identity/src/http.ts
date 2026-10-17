@@ -32,6 +32,7 @@ export function registerIdentityHttp(
     identity.handler,
     identity.baseURL,
     identity.regionConfig,
+    identity.clientIpHeader,
   );
   if (identity.mailEvents)
     registerMailEvents(app, (payload, headers) =>

@@ -265,6 +265,17 @@ export function messagingRoutes(
         return await s.replies.check(s.context, params.outboundId);
       },
     ),
+    resolveOutboundDelivery: os.resolveOutboundDelivery.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = useReplies(request);
+
+        return await s.replies.resolveDelivery(
+          s.context,
+          params.outboundId,
+          body,
+        );
+      },
+    ),
     discardOutbound: os.discardOutbound.handler(
       async ({ context: { request }, input: { params, body } }) => {
         const s = useReplies(request);

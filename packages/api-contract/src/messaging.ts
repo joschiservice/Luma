@@ -156,7 +156,10 @@ const threadLinkSchema = z.object({
   id,
   record: recordRefSchema,
   method: linkMethodSchema,
-  /** `suggested`: a reference matched several records or needs confirmation; never acted on. */
+  /**
+   * `suggested`: the evidence matched several records, or came from a sender address the
+   * mailbox provider did not authenticate; never acted on until someone confirms it.
+   */
   state: z.enum(['active', 'suggested']),
   evidence: z.object({
     messageId: id.nullable(),
@@ -166,6 +169,8 @@ const threadLinkSchema = z.object({
     span: z
       .object({ start: z.number().int().min(0), end: z.number().int().min(0) })
       .nullable(),
+    /** The link came from the address of a sender the mailbox provider did not authenticate. */
+    senderUnverified: z.boolean(),
   }),
   createdBy: z.string(),
   createdAt: instant,
@@ -214,6 +219,14 @@ const messageSchema = z.object({
   threadId: id,
   direction: z.enum(['inbound', 'outbound']),
   from: messageAddressSchema,
+  /**
+   * Whether the mailbox provider authenticated the From address's domain, for inbound
+   * messages; null for messages the mailbox sent. `aligned`: authenticated (DMARC, or a DKIM
+   * signature by the mailbox's own domain). `unaligned`: checked and not authenticated, so the
+   * From address may be forged. `unknown`: no result, as for imported mail. Only `aligned`
+   * identifies the sender.
+   */
+  senderAuthentication: z.enum(['aligned', 'unaligned', 'unknown']).nullable(),
   to: z.array(messageAddressSchema),
   cc: z.array(messageAddressSchema),
   subject: z.string(),
@@ -259,6 +272,8 @@ const threadEventSchema = z.object({
     'reply_approved',
     'reply_rejected',
     'reply_withheld',
+    /** Delivery of an uncertain send was settled; `details.outcome` and `details.source` say how. */
+    'delivery_resolved',
     'text_removed',
     /** Someone confirmed, corrected or rejected a document fact; `details.outcome` says which. */
     'fact_reviewed',
@@ -271,8 +286,9 @@ const threadEventSchema = z.object({
    * Stable keys for people-facing text: `ownerId` (assigned; absent when unassigned),
    * `replyDueAt` and `automatic` (deadline_set), `status` and `reason` (status_changed),
    * `record` (a display label, absent when the reader can't read it) for linked, unlinked and
-   * handed_off, `outcome` for handed_off and fact_reviewed, `documentId`, `factId` and `kind` for fact_reviewed, and
-   * `reason` for reply_withheld.
+   * handed_off, `outcome` for handed_off and fact_reviewed, `documentId`, `factId` and `kind` for fact_reviewed,
+   * `reason` for reply_withheld, and `outboundId`, `outcome` (`delivered` or `not_delivered`) and
+   * `source` (`person` or `reply`) for delivery_resolved.
    */
   details: z.record(z.string(), z.string()),
   occurredAt: instant,
@@ -483,6 +499,9 @@ const outboundStateSchema = z.enum([
   'discarded',
 ]);
 
+/** A person's or the recipient's answer to whether an uncertain send arrived. */
+const deliveryOutcomeSchema = z.enum(['delivered', 'not_delivered']);
+
 export const outboundSchema = z.object({
   purchaseOrderId: id.optional(),
   attachments: z
@@ -512,11 +531,35 @@ export const outboundSchema = z.object({
   decisionId: z.string().nullable(),
   approverId: z.string().nullable(),
   sentMessageId: id.nullable(),
+  /** Delivery evidence for a sent message beyond the provider's acceptance. */
+  delivery: z.object({
+    /**
+     * A delivery report from a sender the mail provider did not authenticate. It leaves
+     * delivery uncertain; `recipient` and `status` are what the report claims.
+     */
+    report: z.object({ recipient: z.string(), status: z.string() }).nullable(),
+    /**
+     * How uncertain delivery was settled: by a person after checking with the recipient, or
+     * by the recipient's reply from an authenticated address. `by` is the deciding member.
+     */
+    resolution: z
+      .object({
+        outcome: deliveryOutcomeSchema,
+        source: z.enum(['person', 'reply']),
+        by: z.string().nullable(),
+        at: instant,
+        /** Internal note from the person who decided; never sent. */
+        note: z.string().nullable(),
+      })
+      .nullable(),
+  }),
   canEdit: z.boolean(),
   canRequest: z.boolean(),
   canApprove: z.boolean(),
   canSend: z.boolean(),
   canCheck: z.boolean(),
+  /** Whether the reader may mark this uncertain supplier email as delivered or not delivered. */
+  canResolveDelivery: z.boolean(),
   revision,
   createdAt: instant,
   updatedAt: instant,
@@ -666,6 +709,19 @@ export const outboundInputSchema = z
   })
   .strict();
 
+/**
+ * A person's decision about an uncertain supplier email after checking with the supplier. The
+ * note stays internal.
+ */
+export const outboundDeliveryInputSchema = z
+  .object({
+    ...command,
+    expectedRevision: revision,
+    outcome: deliveryOutcomeSchema,
+    note: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict();
+
 export const outboundDecisionInputSchema = z
   .object({
     decisionId: z.string().min(1).max(200),
@@ -746,3 +802,5 @@ export type FactReviewInput = z.infer<typeof factReviewInputSchema>;
 export type OutboundInput = z.infer<typeof outboundInputSchema>;
 
 export type OutboundDecisionInput = z.infer<typeof outboundDecisionInputSchema>;
+
+export type OutboundDeliveryInput = z.infer<typeof outboundDeliveryInputSchema>;

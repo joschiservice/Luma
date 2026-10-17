@@ -123,6 +123,7 @@ export function createDecisionServices(
         (await owners.commitments.pending(context)).map((item) => ({
           key: item.attention.key,
           submissionId: item.submission?.id,
+          channel: item.submission?.channel,
           kind: item.attention.kind,
           purchaseOrderId: item.order.id,
           reference: item.order.reference,

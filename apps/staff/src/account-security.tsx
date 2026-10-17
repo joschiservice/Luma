@@ -31,6 +31,13 @@ const eventLabels: Record<SecurityEvent['type'], string> = {
   'account.enabled': 'Account enabled by staff',
   'account.deletion-scheduled': 'Account scheduled for deletion by staff',
   'account.restored': 'Account restored by staff',
+  'support-inspection.requested': 'Account inspection requested by staff',
+  'support-inspection.approved': 'Account inspection approved by the customer',
+  'support-inspection.declined': 'Account inspection declined by the customer',
+  'support-inspection.expired': 'Account inspection request lapsed',
+  'support-inspection.revoked': 'Account inspection revoked by the customer',
+  'support-inspection.emergency-opened':
+    'Emergency account inspection opened by staff',
 };
 
 const reasonLabels: Record<string, string> = {
@@ -42,6 +49,8 @@ const reasonLabels: Record<string, string> = {
   'passkey-rejected': 'Passkey not accepted',
   'account-disabled': 'Account disabled',
   rejected: 'Rejected',
+  'security-incident': 'Security incident',
+  'legal-request': 'Legal request',
   'second-factor-required': 'Password accepted, code requested',
   'authenticator-code': 'Authenticator code',
   'backup-code': 'Backup code',

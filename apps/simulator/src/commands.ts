@@ -343,6 +343,7 @@ export const gmailCommandSchema = z.discriminatedUnion('kind', [
     message: z.string().min(1).max(300),
     recipient: z.string().email().max(320),
     status: z.string().regex(/^5\.\d{1,3}\.\d{1,3}$/),
+    authentication: z.enum(['pass', 'fail', 'none']).optional(),
   }),
   z.object({
     kind: z.literal('seed-mailbox'),
@@ -378,6 +379,7 @@ export const gmailCommandSchema = z.discriminatedUnion('kind', [
       )
       .max(10)
       .optional(),
+    authentication: z.enum(['pass', 'fail', 'none']).optional(),
   }),
 ]);
 

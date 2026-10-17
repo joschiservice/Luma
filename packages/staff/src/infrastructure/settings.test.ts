@@ -74,6 +74,21 @@ describe('staff configuration safety', () => {
         STAFF_REGIONAL_API_ORIGINS: '{}',
       }),
     ).toThrow('regional API origin');
+    for (const STAFF_AUTH_SECRET of [
+      'replace-with-at-least-32-random-characters',
+      'x'.repeat(40),
+    ]) {
+      expect(() =>
+        readStaffSettings({
+          ...google,
+          STAFF_TRUSTED_PROXY: '127.0.0.1',
+          STAFF_AUTH_SECRET,
+        }),
+      ).toThrow('placeholder');
+      expect(readStaffSettings({ ...env, STAFF_AUTH_SECRET }).secret).toBe(
+        STAFF_AUTH_SECRET,
+      );
+    }
   });
   it('allows a bounded loopback development login', () => {
     expect(readStaffSettings(env).mode).toBe('local');

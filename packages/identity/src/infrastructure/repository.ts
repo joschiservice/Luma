@@ -19,10 +19,16 @@ import {
 } from '../domain/sessions.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect, storedRole } from './access.js';
+import { createAccountInspections } from './account-inspections.js';
 import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
 import * as schema from './schema.js';
-import { listSecurityEvents, securityEventsPlugin } from './security-events.js';
+import {
+  listSecurityEvents,
+  securityEmailHash,
+  securityEventsPlugin,
+} from './security-events.js';
+import { signInLockoutPlugin } from './sign-in-protection.js';
 import { createSupportViewCredentials } from './support-view.js';
 
 const organizationDto = (
@@ -72,6 +78,7 @@ function normalizeDatabaseError(error: unknown): never {
 export function createRepository(pool: Pool, settings: AuthSettings) {
   const db = drizzle(pool, { schema });
   const auth = createAuth(db, settings, undefined, [
+    signInLockoutPlugin(pool, securityEmailHash(settings.secret)),
     securityEventsPlugin(pool, settings.secret, settings.passwordMail),
   ]);
   const repository: IdentityRepository = {
@@ -107,6 +114,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
       return { userId: session.user.id, sessionId: session.session.id };
     },
     supportViews: createSupportViewCredentials(pool, settings),
+    accountInspections: createAccountInspections(pool),
     listSecurityEvents: (userId, after, limit) =>
       listSecurityEvents(pool, userId, after, limit),
     async setLanguage(userId, language) {

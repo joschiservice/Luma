@@ -103,6 +103,29 @@ const supportAccessRequestSchema = z.object({
   expiresAt: z.string().datetime(),
 });
 
+/**
+ * A Luma support request to inspect a workspace or account, waiting for an answer or approved
+ * and still open. Approved access lasts thirty minutes from approval.
+ */
+export const supportInspectionSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(['pending', 'approved']),
+  /**
+   * Set for emergency access, which Luma support opens without approval for a security incident
+   * or legal request. It can't be revoked, and its reason isn't shown.
+   */
+  emergency: z.enum(['security_incident', 'legal_request']).nullable(),
+  /** Why Luma support asks, written by the support team; null for emergency access. */
+  reason: z.string().nullable(),
+  requestedAt: z.string().datetime(),
+  /** An unanswered request lapses at this time. */
+  expiresAt: z.string().datetime(),
+  /** When approved access ends; null while the request waits for an answer. */
+  accessExpiresAt: z.string().datetime().nullable(),
+});
+
+export type SupportInspection = z.infer<typeof supportInspectionSchema>;
+
 export const supportAccessSchema = z.object({
   /** When Luma support access ends; null when it isn't allowed. */
   allowedUntil: z.string().datetime().nullable(),
@@ -111,6 +134,11 @@ export const supportAccessSchema = z.object({
   revision: z.number().int().nonnegative(),
   /** Pending requests from Luma support; at most one. */
   requests: z.array(supportAccessRequestSchema),
+  /**
+   * Requests from Luma support to inspect this workspace's records, and approved inspections that
+   * are still open, newest first.
+   */
+  inspections: z.array(supportInspectionSchema),
 });
 
 export type SupportAccess = z.infer<typeof supportAccessSchema>;

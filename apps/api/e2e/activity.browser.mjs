@@ -4,7 +4,13 @@ import { mkdir, readFile } from 'node:fs/promises';
 
 import { seedActivity } from './activity-fixture.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 test('filters, saves views, previews, returns, loads older and new events and recovers workspace activity on desktop and narrow screens', async ({
   resources: t,
@@ -33,17 +39,11 @@ test('filters, saves views, previews, returns, loads older and new events and re
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada Lovelace');
-  await page.getByLabel('Email', { exact: true }).fill('activity@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada Lovelace',
+    email: 'activity@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Activity studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

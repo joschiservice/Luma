@@ -205,6 +205,7 @@ export function createGmailConnector(
         direction: parsed.direction,
         providerSent: parsed.providerSent === true,
         from: parsed.from,
+        senderAuthentication: parsed.senderAuthentication,
         to: parsed.to,
         cc: parsed.cc,
         replyTo: parsed.replyTo,
@@ -372,9 +373,11 @@ export function createGmailConnector(
               providerThreadId.slice(9),
               mailbox,
             );
+            // Only the mailbox's own sent copy locates the thread: anyone can send a message
+            // with the same Message-ID into the mailbox.
             const found = (
               await client.listMessages({
-                q: `rfc822msgid:${messageId}`,
+                q: `in:sent rfc822msgid:${messageId}`,
                 maxResults: 1,
                 includeSpamTrash: true,
               })

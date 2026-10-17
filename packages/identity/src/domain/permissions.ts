@@ -196,7 +196,7 @@ export const permissionCatalog = [
     group: 'access',
     label: 'Manage Luma support access',
     description:
-      'Allow or revoke read-only access for Luma support, and approve or decline their requests.',
+      'Allow or revoke read-only access for Luma support, approve or decline their access and inspection requests, and end inspections early.',
     consequential: true,
     introduced: '2026-10-10',
   },

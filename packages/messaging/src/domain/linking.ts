@@ -1,6 +1,7 @@
 /**
  * Deterministic thread links with evidence. A link is active only when its evidence names
- * exactly one record; anything that could mean several records is only suggested.
+ * exactly one record; anything that could mean several records is only suggested. A sender
+ * address is evidence only when the mailbox provider authenticated it.
  */
 
 import type { MailboxRule } from './mailbox.js';
@@ -24,6 +25,11 @@ export interface LinkEvidence {
   text: string | null;
   /** Position of `text` in the message text; null when it came from the subject or a rule. */
   span: Span | null;
+  /**
+   * The link came from a correspondent address the mailbox provider did not authenticate, so
+   * it waits for a person instead of becoming active.
+   */
+  senderUnverified?: true;
 }
 
 export interface LinkProposal {
@@ -81,6 +87,11 @@ export function referenceTokens(subject: string, text: string) {
 /** Rule matches and directory lookups for one message, from which links are proposed. */
 export interface LinkSignals {
   messageId: string;
+  /**
+   * The provider authenticated the sender (an inbound DMARC-aligned message) or the mailbox
+   * sent the message itself. Otherwise the addresses are only claims.
+   */
+  senderVerified: boolean;
   rules: { rule: MailboxRule; address: string | null }[];
   /** Correspondent addresses with the customer profiles that have that email. */
   customers: { address: string; ids: string[] }[];
@@ -94,9 +105,17 @@ export interface LinkSignals {
 /**
  * Proposes links from a message: supplier rules, customer addresses and exact references.
  * One matching record gives an active link; several give suggestions for each candidate.
+ * Supplier rules and customer addresses match on addresses anyone can write into a message,
+ * so from an unverified sender they are only suggested. References are text in the message
+ * and follow the same rule whoever sent it.
  */
 export function proposeLinks(signals: LinkSignals): LinkProposal[] {
   const proposals = new Map<string, LinkProposal>();
+  const claimed = signals.senderVerified
+    ? {}
+    : { senderUnverified: true as const };
+  const byAddress = (state: LinkProposal['state']) =>
+    signals.senderVerified ? state : 'suggested';
   const add = (proposal: LinkProposal) => {
     const key = `${proposal.kind}:${proposal.recordId}`;
     const existing = proposals.get(key);
@@ -112,12 +131,13 @@ export function proposeLinks(signals: LinkSignals): LinkProposal[] {
         kind: 'supplier',
         recordId: rule.party.supplierId,
         method: 'rule',
-        state: 'active',
+        state: byAddress('active'),
         evidence: {
           messageId: signals.messageId,
           ruleId: rule.id,
           text: address ?? rule.value,
           span: null,
+          ...claimed,
         },
       });
   for (const { address, ids } of signals.customers)
@@ -126,12 +146,13 @@ export function proposeLinks(signals: LinkSignals): LinkProposal[] {
         kind: 'customer',
         recordId: id,
         method: 'address',
-        state: new Set(ids).size === 1 ? 'active' : 'suggested',
+        state: byAddress(new Set(ids).size === 1 ? 'active' : 'suggested'),
         evidence: {
           messageId: signals.messageId,
           ruleId: null,
           text: address,
           span: null,
+          ...claimed,
         },
       });
   for (const { token, records } of signals.references) {

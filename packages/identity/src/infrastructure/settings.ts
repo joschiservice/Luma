@@ -16,6 +16,7 @@ import {
 import type {
   SettingsSnapshot,
   SupportAccess,
+  SupportInspection,
   WorkspaceLayout,
 } from '../domain/settings.js';
 import type { MembershipRow } from './access.js';
@@ -25,6 +26,38 @@ import {
   roleFromRow,
   storedRole,
 } from './access.js';
+
+/** Columns of an open inspection request as customers see them; never the staff identity. */
+export const inspectionSelect = `SELECT id,status,emergency_category AS emergency,
+  CASE WHEN mode='emergency' THEN NULL ELSE reason END AS reason,
+  requested_at AS "requestedAt",expires_at AS "expiresAt",access_expires_at AS "accessExpiresAt"`;
+
+/** Pending requests that haven't lapsed, and approved access that hasn't ended. */
+export const openInspection = `((status='pending' AND expires_at>now()) OR (status='approved' AND access_expires_at>now()))`;
+
+/** An inspection request row read with `inspectionSelect`. */
+export interface InspectionRow {
+  id: string;
+  status: 'pending' | 'approved';
+  emergency: 'security_incident' | 'legal_request' | null;
+  reason: string | null;
+  requestedAt: Date;
+  expiresAt: Date;
+  accessExpiresAt: Date | null;
+}
+
+/** Converts an inspection row to its public form. */
+export function inspectionDto(row: InspectionRow): SupportInspection {
+  return {
+    id: row.id,
+    status: row.status,
+    emergency: row.emergency,
+    reason: row.reason,
+    requestedAt: row.requestedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    accessExpiresAt: row.accessExpiresAt?.toISOString() ?? null,
+  };
+}
 
 /**
  * Runs a serialized workspace transaction, installing only transaction-local identity context.
@@ -354,6 +387,10 @@ function transaction(
         row?.allowedUntil && row.allowedUntil.getTime() > Date.now()
           ? row.allowedUntil.toISOString()
           : null;
+      const inspections = await tx.query<InspectionRow>(
+        `${inspectionSelect} FROM workspace_inspection_requests WHERE tenant_id=$1 AND ${openInspection} ORDER BY requested_at DESC LIMIT 20`,
+        [tenantId],
+      );
 
       return {
         allowedUntil,
@@ -364,6 +401,7 @@ function transaction(
           requestedAt: request.requestedAt.toISOString(),
           expiresAt: request.expiresAt.toISOString(),
         })),
+        inspections: inspections.rows.map(inspectionDto),
       } satisfies SupportAccess;
     },
     async saveSupportAccess(value, actorId) {
@@ -393,6 +431,23 @@ function transaction(
         'UPDATE workspace_support_access_requests SET status=$3,decided_by=$4,decided_at=now() WHERE tenant_id=$1 AND id=$2',
         [tenantId, id, status, actorId],
       );
+    },
+    async decideInspection(id, status, actorId) {
+      // A trigger enforces the lifecycle, sets the access window and records the answer.
+      const result = await tx.query(
+        "UPDATE workspace_inspection_requests SET status=$3,decided_by=$4 WHERE tenant_id=$1 AND id=$2 AND status='pending' AND expires_at>now()",
+        [tenantId, id, status, actorId],
+      );
+
+      return !!result.rowCount;
+    },
+    async revokeInspection(id, actorId) {
+      const result = await tx.query(
+        "UPDATE workspace_inspection_requests SET status='revoked',revoked_by=$3 WHERE tenant_id=$1 AND id=$2 AND status='approved' AND mode='consent' AND access_expires_at>now()",
+        [tenantId, id, actorId],
+      );
+
+      return !!result.rowCount;
     },
     async pendingInvitation(email) {
       return !!(
@@ -470,14 +525,17 @@ function transaction(
       );
     },
     async email(userId) {
-      return (
-        (
-          await tx.query<{ email: string }>(
-            'SELECT email FROM users WHERE id=$1',
-            [userId],
-          )
-        ).rows[0]?.email ?? ''
-      );
+      const row = (
+        await tx.query<{ email: string; email_verified: boolean }>(
+          'SELECT email,email_verified FROM users WHERE id=$1',
+          [userId],
+        )
+      ).rows[0];
+
+      return {
+        email: row?.email ?? '',
+        verified: row?.email_verified ?? false,
+      };
     },
     async accept(invitation, userId) {
       await tx.query(

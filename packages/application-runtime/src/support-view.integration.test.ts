@@ -49,6 +49,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
   let customerApp: ReturnType<typeof Fastify>;
   let staffCookie: string;
   let grantId: string;
+  let inspectionRequestId: string;
 
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${database}"`);
@@ -112,6 +113,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
           'staff.workspace.inspect',
           'staff.view-as',
           'staff.view-as.emergency',
+          'staff.inspect.emergency',
         ],
       },
       adminUrl,
@@ -147,14 +149,6 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       .filter((value): value is string => typeof value === 'string')
       .map((value) => value.split(';')[0])
       .join('; ');
-    const grant = await staffApp.inject({
-      method: 'POST',
-      url: `/v1/staff/workspaces/${tenant}/access`,
-      headers: { origin: staffOrigin, cookie: staffCookie },
-      payload: { reason: 'Customer reported a missing order on Home' },
-    });
-    expect(grant.statusCode, grant.body).toBe(201);
-    grantId = grant.json().id;
     identity = createIdentity({
       databaseUrl: as(customerLogin),
       secret: 'support-view-customer-secret-at-least-32-chars',
@@ -187,6 +181,12 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       settingsRoutes(identity.settings),
     );
     await customerApp.ready();
+    // Staff inspect the workspace only after an owner approves their request.
+    const approved = await approvedGrant(
+      'Customer reported a missing order on Home',
+    );
+    grantId = approved.id;
+    inspectionRequestId = approved.requestId;
   }, 60_000);
 
   afterAll(async () => {
@@ -205,6 +205,38 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
 
   const ownerContext = () =>
     identity.service.resolveWorkflowContext(owner, tenant, randomUUID());
+
+  const staffRequest = (
+    method: 'GET' | 'POST',
+    path: string,
+    payload?: Record<string, unknown>,
+  ) =>
+    staffApp.inject({
+      method,
+      url: `/v1/staff/workspaces/${tenant}/${path}`,
+      headers: { origin: staffOrigin, cookie: staffCookie },
+      ...(payload ? { payload } : {}),
+    });
+
+  /** Requests inspection, approves it as the owner and opens a grant for the staff session. */
+  async function approvedGrant(reason: string) {
+    const requested = await staffRequest('POST', 'access-requests', { reason });
+    expect(requested.statusCode, requested.body).toBe(201);
+    await identity.settings.decideSupportInspection(
+      await ownerContext(),
+      requested.json().id,
+      { commandId: randomUUID(), decision: 'approve' },
+    );
+    const opened = await staffRequest('POST', 'access', {
+      requestId: requested.json().id,
+    });
+    expect(opened.statusCode, opened.body).toBe(201);
+
+    return {
+      id: opened.json().id as string,
+      requestId: requested.json().id as string,
+    };
+  }
 
   const startView = (body: Record<string, unknown>, userId: string = member) =>
     staffApp.inject({
@@ -590,5 +622,211 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
         database.transaction(tenant, (tx) => tx.query('SELECT 1')),
       ),
     ).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('lets owners answer and revoke inspection, lapses unanswered requests and records each state', async () => {
+    const context = await ownerContext();
+    const latest = async () =>
+      (await staffRequest('GET', 'access-requests/latest')).json().request;
+    const readWorkspace = (grant: string) =>
+      staffApp.inject({
+        url: `/v1/staff/workspaces/${tenant}?grantId=${grant}`,
+        headers: { cookie: staffCookie },
+      });
+    const actors = async (type: string) =>
+      (
+        await owners.query<{ actor_id: string; actor_kind: string }>(
+          'SELECT actor_id,actor_kind FROM workspace_access_events WHERE tenant_id=$1 AND event_type=$2 ORDER BY created_at',
+          [tenant, type],
+        )
+      ).rows;
+
+    // Owners see the reason they must judge, never who asked.
+    const open = await identity.settings.supportAccess(context);
+    expect(open.inspections).toEqual([
+      {
+        id: inspectionRequestId,
+        status: 'approved',
+        emergency: null,
+        reason: 'Customer reported a missing order on Home',
+        requestedAt: expect.any(String),
+        expiresAt: expect.any(String),
+        accessExpiresAt: expect.any(String),
+      },
+    ]);
+    expect(
+      Date.parse(open.inspections[0]!.accessExpiresAt!) - Date.now(),
+    ).toBeLessThanOrEqual(30 * 60_000);
+
+    // Revoking ends the grant on its next use.
+    expect((await readWorkspace(grantId)).statusCode).toBe(200);
+    const revoked = await identity.settings.revokeSupportInspection(
+      context,
+      inspectionRequestId,
+      { commandId: randomUUID() },
+    );
+    expect(revoked.inspections).toEqual([]);
+    expect((await readWorkspace(grantId)).statusCode).toBe(403);
+    expect(await latest()).toMatchObject({
+      id: inspectionRequestId,
+      status: 'revoked',
+    });
+    expect(await actors('support_inspection.revoked')).toEqual([
+      { actor_id: owner, actor_kind: 'member' },
+    ]);
+    await expect(
+      identity.settings.revokeSupportInspection(context, inspectionRequestId, {
+        commandId: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // A declined request opens nothing.
+    const declined = (
+      await staffRequest('POST', 'access-requests', {
+        reason: 'Check the order sync history again',
+      })
+    ).json().id as string;
+    await identity.settings.decideSupportInspection(context, declined, {
+      commandId: randomUUID(),
+      decision: 'decline',
+    });
+    expect(await latest()).toMatchObject({ id: declined, status: 'declined' });
+    expect(
+      (await staffRequest('POST', 'access', { requestId: declined }))
+        .statusCode,
+    ).toBe(403);
+    expect(await actors('support_inspection.declined')).toEqual([
+      { actor_id: owner, actor_kind: 'member' },
+    ]);
+
+    // An unanswered request lapses after 24 hours; the sweep records it as Luma's.
+    const lapsing = (
+      await staffRequest('POST', 'access-requests', {
+        reason: 'Look at the sync errors from last week',
+      })
+    ).json().id as string;
+    const shift = await owners.connect();
+    try {
+      await shift.query('BEGIN');
+      // Move the request into the past without the lifecycle trigger, as time would.
+      await shift.query('SET LOCAL session_replication_role=replica');
+      await shift.query(
+        "UPDATE workspace_inspection_requests SET expires_at=now()-interval '1 second' WHERE id=$1",
+        [lapsing],
+      );
+      await shift.query('COMMIT');
+    } finally {
+      shift.release();
+    }
+    expect(await latest()).toMatchObject({ id: lapsing, status: 'expired' });
+    await expect(
+      identity.settings.decideSupportInspection(context, lapsing, {
+        commandId: randomUUID(),
+        decision: 'approve',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await identity.service.sweepSupportViews('inspection-sweep');
+    expect(await actors('support_inspection.expired')).toEqual([
+      {
+        actor_id: '00000000-0000-0000-0000-000000000000',
+        actor_kind: 'member',
+      },
+    ]);
+
+    // Emergency access opens at once, is recorded and emailed, and owners can't revoke it.
+    const emergency = await staffRequest('POST', 'access', {
+      reason: 'Account takeover reported to the security team',
+      emergency: { category: 'security_incident', reference: 'SEC-204' },
+    });
+    expect(emergency.statusCode, emergency.body).toBe(201);
+    expect((await readWorkspace(emergency.json().id)).statusCode).toBe(200);
+    const emergencyRecord = await owners.query(
+      "SELECT actor_kind,after_value FROM workspace_access_events WHERE tenant_id=$1 AND event_type='support_inspection.emergency_opened'",
+      [tenant],
+    );
+    expect(emergencyRecord.rows).toEqual([
+      {
+        actor_kind: 'staff',
+        after_value: {
+          status: 'approved',
+          category: 'security_incident',
+          expiresAt: expect.any(String),
+        },
+      },
+    ]);
+    expect(JSON.stringify(emergencyRecord.rows)).not.toMatch(
+      /SEC-204|takeover/,
+    );
+    expect(
+      (
+        await owners.query(
+          "SELECT user_id FROM workspace_mail WHERE tenant_id=$1 AND kind='support_inspection_emergency'",
+          [tenant],
+        )
+      ).rows,
+    ).toEqual([{ user_id: owner }]);
+    expect(
+      (
+        await owners.query(
+          "SELECT reason,details->>'reference' AS reference FROM staff_audit WHERE event='workspace.access.emergency' AND tenant_id=$1",
+          [tenant],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        reason: 'Account takeover reported to the security team',
+        reference: 'SEC-204',
+      },
+    ]);
+    const listed = await identity.settings.supportAccess(context);
+    expect(listed.inspections).toEqual([
+      expect.objectContaining({
+        status: 'approved',
+        emergency: 'security_incident',
+        reason: null,
+      }),
+    ]);
+    await expect(
+      identity.settings.revokeSupportInspection(
+        context,
+        listed.inspections[0]!.id,
+        { commandId: randomUUID() },
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // Runtimes reach requests only through their narrow grants and row security.
+    await expect(
+      customerPool.query(
+        'SELECT staff_user_id FROM workspace_inspection_requests',
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      customerPool.query(
+        "UPDATE workspace_inspection_requests SET reason='Forged reason text'",
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      staffPool.query('SELECT id FROM workspace_inspection_requests'),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      customerPool.query(
+        "SELECT support_inspection_request($1,'consent','A forged request text',NULL,NULL,'forged')",
+        [tenant],
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+    const scoped = await customerPool.connect();
+    try {
+      await scoped.query('BEGIN');
+      await scoped.query("SELECT set_config('app.tenant_id',$1,true)", [
+        randomUUID(),
+      ]);
+      expect(
+        (await scoped.query('SELECT id FROM workspace_inspection_requests'))
+          .rowCount,
+      ).toBe(0);
+      await scoped.query('ROLLBACK');
+    } finally {
+      scoped.release();
+    }
   });
 });

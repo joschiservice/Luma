@@ -164,7 +164,25 @@ describe.skipIf(!databaseUrl)(
         }),
       );
       expect(customerResponse.status).toBe(200);
-      customerCookie = customerResponse.headers
+      // The emailed confirmation link would set this before the first sign-in.
+      await owner.query(
+        "UPDATE users SET email_verified=true WHERE email='bob@example.test'",
+      );
+      const customerSignIn = await identity.handler(
+        new Request(`${customerOrigin}/auth/sign-in/email`, {
+          method: 'POST',
+          headers: {
+            origin: customerOrigin,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'bob@example.test',
+            password: 'customer-test-password-long-enough',
+          }),
+        }),
+      );
+      expect(customerSignIn.status).toBe(200);
+      customerCookie = customerSignIn.headers
         .getSetCookie()
         .map((value) => value.split(';')[0])
         .join('; ');
@@ -189,6 +207,70 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP ROLE IF EXISTS "${customerLogin}"`);
       await admin.end();
     });
+
+    type OpenedGrant = {
+      id: string;
+      expiresAt: string;
+      reason: string;
+      requestId: string;
+    };
+
+    /**
+     * Opens a grant the way staff must: request inspection, have the customer approve it, then
+     * open access under the approval. Reuses an approval that is still open unless `fresh`.
+     * Approval goes through the lifecycle trigger as the customer runtime's update would.
+     */
+    async function openGrant(
+      target: 'workspaces' | 'accounts',
+      id: string,
+      reason: string,
+      fresh = false,
+    ): Promise<OpenedGrant> {
+      const base = `/v1/staff/${target}/${id}`;
+      if (fresh)
+        // The customer revokes earlier approvals, so a new request is allowed.
+        await owner.query(
+          target === 'workspaces'
+            ? "UPDATE workspace_inspection_requests SET status='revoked',revoked_by=$2 WHERE tenant_id=$1 AND status='approved' AND mode='consent' AND access_expires_at>now()"
+            : "UPDATE account_inspection_requests SET status='revoked',revoked_by=user_id WHERE user_id=$1 AND status='approved' AND mode='consent' AND access_expires_at>now() AND $2::uuid IS NOT NULL",
+          [id, customer],
+        );
+      const latest = await app.inject({
+        url: `${base}/access-requests/latest`,
+        headers: { cookie },
+      });
+      expect(latest.statusCode, latest.body).toBe(200);
+      let requestId: string | null =
+        !fresh && latest.json().request?.status === 'approved'
+          ? latest.json().request.id
+          : null;
+      if (!requestId) {
+        const requested = await app.inject({
+          method: 'POST',
+          url: `${base}/access-requests`,
+          headers: { cookie, origin },
+          payload: { reason },
+        });
+        expect(requested.statusCode, requested.body).toBe(201);
+        requestId = requested.json().id as string;
+        await owner.query(
+          target === 'workspaces'
+            ? "UPDATE workspace_inspection_requests SET status='approved',decided_by=$2 WHERE id=$1"
+            : "UPDATE account_inspection_requests SET status='approved',decided_by=user_id WHERE id=$1 AND $2::uuid IS NOT NULL",
+          [requestId, customer],
+        );
+      }
+      const opened = await app.inject({
+        method: 'POST',
+        url: `${base}/access`,
+        headers: { cookie, origin },
+        payload: { requestId },
+      });
+      expect(opened.statusCode, opened.body).toBe(201);
+
+      return { ...opened.json(), requestId };
+    }
+
     it('denies and audits staff outside this cell before directory, grants or commands', async () => {
       await owner.query(
         "UPDATE staff_access SET regions=ARRAY['EU'] WHERE email='support@example.test'",
@@ -198,13 +280,13 @@ describe.skipIf(!databaseUrl)(
           { url: '/v1/staff/directory?query=alice', headers: { cookie } },
           {
             method: 'POST' as const,
-            url: `/v1/staff/workspaces/${tenantA}/access`,
+            url: `/v1/staff/workspaces/${tenantA}/access-requests`,
             headers: { cookie, origin },
             payload: { reason: 'Customer requested investigation' },
           },
           {
             method: 'POST' as const,
-            url: `/v1/staff/accounts/${customer}/access`,
+            url: `/v1/staff/accounts/${customer}/access-requests`,
             headers: { cookie, origin },
             payload: { reason: 'Customer requested investigation' },
           },
@@ -235,9 +317,14 @@ describe.skipIf(!databaseUrl)(
         "INSERT INTO organizations(id,name,slug,data_region,status,created_at) VALUES($1::uuid,'Other cell',$1::uuid::text,'EU','active',now())",
         [target],
       );
+      const approval = randomUUID();
       await owner.query(
-        "INSERT INTO staff_support_grants(id,staff_user_id,staff_session_id,tenant_id,reason,expires_at) VALUES($1,$2,$3,$4,'Retained regional support grant',now()+interval '30 minutes')",
-        [grant, session.user_id, session.id, target],
+        "INSERT INTO workspace_inspection_requests(id,tenant_id,staff_user_id,mode,reason,status,expires_at,decided_by,decided_at,access_expires_at) VALUES($1,$2,$3,'consent','Retained regional support grant','approved',now()+interval '23 hours',$4,now(),now()+interval '30 minutes')",
+        [approval, target, session.user_id, customer],
+      );
+      await owner.query(
+        "INSERT INTO staff_support_grants(id,staff_user_id,staff_session_id,tenant_id,reason,expires_at,request_id) VALUES($1,$2,$3,$4,'Retained regional support grant',now()+interval '30 minutes',$5)",
+        [grant, session.user_id, session.id, target, approval],
       );
       const tx = await runtime.connect();
       try {
@@ -269,6 +356,14 @@ describe.skipIf(!databaseUrl)(
         await owner.query('DELETE FROM staff_support_grants WHERE id=$1', [
           grant,
         ]);
+        await owner.query(
+          'DELETE FROM workspace_access_events WHERE tenant_id=$1',
+          [target],
+        );
+        await owner.query(
+          'DELETE FROM workspace_inspection_requests WHERE id=$1',
+          [approval],
+        );
         await owner.query('DELETE FROM organizations WHERE id=$1', [target]);
       }
     });
@@ -319,7 +414,7 @@ describe.skipIf(!databaseUrl)(
         },
         {
           method: 'POST' as const,
-          url: `/v1/staff/workspaces/${tenantA}/access`,
+          url: `/v1/staff/workspaces/${tenantA}/access-requests`,
           headers: { cookie, origin: 'http://attacker.example' },
           payload: { reason: 'Customer support investigation' },
         },
@@ -344,7 +439,7 @@ describe.skipIf(!databaseUrl)(
       }
       const deniedMutation = await app.inject({
         method: 'POST',
-        url: `/v1/staff/workspaces/${tenantA}/access`,
+        url: `/v1/staff/workspaces/${tenantA}/access-requests`,
         headers: { cookie: customerCookie, origin },
         payload: { reason: 'Customer must not create staff support access' },
       });
@@ -379,15 +474,148 @@ describe.skipIf(!databaseUrl)(
         );
       }
     });
-    it('requires a reason and scopes workspace access to the operator session and tenant', async () => {
-      const response = await app.inject({
+    it('opens workspace access only under the customer’s approval, recorded in Activity', async () => {
+      const base = `/v1/staff/workspaces/${tenantA}`;
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `${base}/access-requests`,
+            headers: { cookie, origin },
+            payload: { reason: 'short' },
+          })
+        ).statusCode,
+      ).toBe(400);
+      // Suspended workspaces can't answer, so only emergency access could open them.
+      const suspended = await app.inject({
         method: 'POST',
-        url: `/v1/staff/workspaces/${tenantA}/access`,
+        url: `/v1/staff/workspaces/${tenantB}/access-requests`,
+        headers: { cookie, origin },
+        payload: { reason: 'Investigating the suspended workspace' },
+      });
+      expect(suspended.statusCode).toBe(409);
+      expect(suspended.json().message).toMatch(/nobody can approve/);
+      const requested = await app.inject({
+        method: 'POST',
+        url: `${base}/access-requests`,
         headers: { cookie, origin },
         payload: { reason: 'Investigating the customer access ticket' },
       });
+      expect(requested.statusCode, requested.body).toBe(201);
+      const request = requested.json();
+      expect(request).toMatchObject({ mode: 'consent', status: 'pending' });
+      expect(
+        Date.parse(request.expiresAt) - Date.parse(request.requestedAt),
+      ).toBe(24 * 3600_000);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `${base}/access-requests`,
+            headers: { cookie, origin },
+            payload: { reason: 'Asking a second time too soon' },
+          })
+        ).statusCode,
+      ).toBe(409);
+      // Nothing opens before the customer answers.
+      const early = await app.inject({
+        method: 'POST',
+        url: `${base}/access`,
+        headers: { cookie, origin },
+        payload: { requestId: request.id },
+      });
+      expect(early.statusCode).toBe(403);
+      expect(early.json().message).toMatch(/isn’t approved/);
+      expect(
+        (
+          await owner.query(
+            "SELECT user_id FROM workspace_mail WHERE tenant_id=$1 AND kind='support_inspection_requested'",
+            [tenantA],
+          )
+        ).rows,
+      ).toEqual([{ user_id: customer }]);
+      // The runtime can neither read the request table nor insert a grant for a pending request.
+      await expect(
+        runtime.query('SELECT reason FROM workspace_inspection_requests'),
+      ).rejects.toMatchObject({ code: '42501' });
+      // A lapsed or answered request can't be answered again, and the request can't change.
+      await expect(
+        owner.query(
+          "UPDATE workspace_inspection_requests SET reason='Changed reason text' WHERE id=$1",
+          [request.id],
+        ),
+      ).rejects.toMatchObject({ code: '55000' });
+      await expect(
+        owner.query(
+          "UPDATE workspace_inspection_requests SET status='expired' WHERE id=$1",
+          [request.id],
+        ),
+      ).rejects.toMatchObject({ code: '55000' });
+      await owner.query(
+        "UPDATE workspace_inspection_requests SET status='approved',decided_by=$2 WHERE id=$1",
+        [request.id, customer],
+      );
+      await expect(
+        owner.query(
+          "UPDATE workspace_inspection_requests SET status='declined',decided_by=$2 WHERE id=$1",
+          [request.id, customer],
+        ),
+      ).rejects.toMatchObject({ code: '55000' });
+      const latest = await app.inject({
+        url: `${base}/access-requests/latest`,
+        headers: { cookie },
+      });
+      expect(latest.json().request).toMatchObject({
+        id: request.id,
+        status: 'approved',
+        accessExpiresAt: expect.any(String),
+      });
+      const response = await app.inject({
+        method: 'POST',
+        url: `${base}/access`,
+        headers: { cookie, origin },
+        payload: { requestId: request.id },
+      });
       expect(response.statusCode, response.body).toBe(201);
       grantId = response.json().id;
+      expect(response.json()).toMatchObject({
+        reason: 'Investigating the customer access ticket',
+        expiresAt: new Date(
+          latest.json().request.accessExpiresAt,
+        ).toISOString(),
+      });
+      const records = await owner.query(
+        "SELECT actor_id,actor_kind,event_type,target_id,after_value FROM workspace_access_events WHERE tenant_id=$1 AND event_type LIKE 'support_inspection.%' ORDER BY created_at",
+        [tenantA],
+      );
+      expect(records.rows).toEqual([
+        {
+          actor_id: '00000000-0000-0000-0000-000000000000',
+          actor_kind: 'staff',
+          event_type: 'support_inspection.requested',
+          target_id: request.id,
+          after_value: { status: 'pending', lapsesAt: expect.any(String) },
+        },
+        {
+          actor_id: customer,
+          actor_kind: 'member',
+          event_type: 'support_inspection.approved',
+          target_id: request.id,
+          after_value: { status: 'approved', expiresAt: expect.any(String) },
+        },
+      ]);
+      expect(JSON.stringify(records.rows)).not.toContain('Investigating');
+      expect(
+        (
+          await owner.query(
+            "SELECT event,details->>'requestId' AS request FROM staff_audit WHERE event IN ('workspace.access.requested','workspace.access.opened') AND tenant_id=$1 ORDER BY sequence",
+            [tenantA],
+          )
+        ).rows,
+      ).toEqual([
+        { event: 'workspace.access.requested', request: request.id },
+        { event: 'workspace.access.opened', request: request.id },
+      ]);
       expect(
         (
           await app.inject({
@@ -397,11 +625,22 @@ describe.skipIf(!databaseUrl)(
         ).statusCode,
       ).toBe(403);
       const detail = await app.inject({
-        url: `/v1/staff/workspaces/${tenantA}?grantId=${grantId}`,
+        url: `${base}?grantId=${grantId}`,
         headers: { cookie },
       });
       expect(detail.statusCode, detail.body).toBe(200);
       expect(detail.json().members[0].userId).toBe(customer);
+      // Emergency access needs its own permission.
+      const emergency = await app.inject({
+        method: 'POST',
+        url: `${base}/access`,
+        headers: { cookie, origin },
+        payload: {
+          reason: 'Credential stuffing against this workspace',
+          emergency: { category: 'security_incident', reference: 'INC-1' },
+        },
+      });
+      expect(emergency.statusCode).toBe(403);
     });
     it('restricts account data to the listed columns behind an account grant', async () => {
       for (const statement of [
@@ -505,7 +744,7 @@ describe.skipIf(!databaseUrl)(
         (
           await app.inject({
             method: 'POST',
-            url: `${url}/access`,
+            url: `${url}/access-requests`,
             headers: { cookie, origin },
             payload: { reason: 'short' },
           })
@@ -515,20 +754,44 @@ describe.skipIf(!databaseUrl)(
         (
           await app.inject({
             method: 'POST',
-            url: `/v1/staff/accounts/${randomUUID()}/access`,
+            url: `/v1/staff/accounts/${randomUUID()}/access-requests`,
             headers: { cookie, origin },
             payload: { reason: 'Investigating a missing customer account' },
           })
         ).statusCode,
       ).toBe(404);
-      const opened = await app.inject({
-        method: 'POST',
-        url: `${url}/access`,
-        headers: { cookie, origin },
-        payload: { reason: 'Investigating a customer sign-in ticket' },
-      });
-      expect(opened.statusCode, opened.body).toBe(201);
-      const accountGrant = opened.json().id as string;
+      const opened = await openGrant(
+        'accounts',
+        customer,
+        'Investigating a customer sign-in ticket',
+      );
+      const accountGrant = opened.id;
+      const record = await owner.query(
+        "SELECT event_type,outcome,reason_code,staff_command_id FROM account_security_events WHERE user_id=$1 AND event_type LIKE 'support-inspection.%' ORDER BY created_at",
+        [customer],
+      );
+      expect(record.rows).toEqual([
+        {
+          event_type: 'support-inspection.requested',
+          outcome: 'succeeded',
+          reason_code: null,
+          staff_command_id: opened.requestId,
+        },
+        {
+          event_type: 'support-inspection.approved',
+          outcome: 'succeeded',
+          reason_code: null,
+          staff_command_id: null,
+        },
+      ]);
+      expect(
+        (
+          await owner.query(
+            'SELECT kind FROM account_mail WHERE user_id=$1 AND inspection_request_id=$2',
+            [customer, opened.requestId],
+          )
+        ).rows,
+      ).toEqual([{ kind: 'inspection_requested' }]);
       const detail = await app.inject({
         url: `${url}?grantId=${accountGrant}`,
         headers: { cookie },
@@ -581,7 +844,11 @@ describe.skipIf(!databaseUrl)(
         {
           event: 'account.access.opened',
           reason: 'Investigating a customer sign-in ticket',
-          details: { grantId: accountGrant, userId: customer },
+          details: {
+            grantId: accountGrant,
+            requestId: opened.requestId,
+            userId: customer,
+          },
         },
         {
           event: 'account.inspected',
@@ -714,7 +981,7 @@ describe.skipIf(!databaseUrl)(
         staff_command_id: string;
         request_id: string;
       }>(
-        'SELECT event_type,staff_command_id,request_id FROM account_security_events WHERE user_id=$1',
+        "SELECT event_type,staff_command_id,request_id FROM account_security_events WHERE user_id=$1 AND event_type NOT LIKE 'support-inspection.%'",
         [customer],
       );
       expect(events.rows).toEqual([
@@ -983,14 +1250,80 @@ describe.skipIf(!databaseUrl)(
         (await identity.service.resolveTenant(credentials, tenantA, 'before'))
           .actor.role.key,
       ).toBe('admin');
+      // Bob answers the request himself, through the customer runtime and his own session.
+      const requested = await app.inject({
+        method: 'POST',
+        url: `/v1/staff/accounts/${bob}/access-requests`,
+        headers: { cookie, origin },
+        payload: { reason: 'Compromise report from the workspace owner' },
+      });
+      expect(requested.statusCode, requested.body).toBe(201);
+      const requestId: string = requested.json().id;
+      const pending = await identity.service.supportInspections(credentials);
+      expect(pending.items).toEqual([
+        expect.objectContaining({
+          id: requestId,
+          status: 'pending',
+          emergency: null,
+          reason: 'Compromise report from the workspace owner',
+          accessExpiresAt: null,
+        }),
+      ]);
+      expect(JSON.stringify(pending)).not.toContain('support@example.test');
+      // Another person can't answer it.
+      await expect(
+        identity.service.decideSupportInspection(
+          {},
+          requestId,
+          'approve',
+          'anonymous',
+        ),
+      ).rejects.toMatchObject({ statusCode: 401 });
+      const approved = await identity.service.decideSupportInspection(
+        credentials,
+        requestId,
+        'approve',
+        'bob-approves',
+      );
+      expect(approved.items[0]).toMatchObject({
+        id: requestId,
+        status: 'approved',
+        accessExpiresAt: expect.any(String),
+      });
+      // Repeating the same answer is safe; a different one conflicts.
+      await identity.service.decideSupportInspection(
+        credentials,
+        requestId,
+        'approve',
+        'bob-approves-again',
+      );
+      await expect(
+        identity.service.decideSupportInspection(
+          credentials,
+          requestId,
+          'decline',
+          'bob-declines',
+        ),
+      ).rejects.toMatchObject({ statusCode: 409 });
       const accountGrant = await app.inject({
         method: 'POST',
         url: `/v1/staff/accounts/${bob}/access`,
         headers: { cookie, origin },
-        payload: { reason: 'Compromise report from the workspace owner' },
+        payload: { requestId },
       });
       expect(accountGrant.statusCode, accountGrant.body).toBe(201);
       const accountGrantId: string = accountGrant.json().id;
+      // The person sees the request by support and their own approval in their security events.
+      const own = (await identity.service.listSecurityEvents(credentials))
+        .items;
+      expect(own.slice(0, 2)).toMatchObject([
+        { type: 'support-inspection.approved', bySupport: false },
+        {
+          type: 'support-inspection.requested',
+          bySupport: true,
+          ipAddress: null,
+        },
+      ]);
       const change = (
         action: 'disable' | 'enable',
         payload: Record<string, unknown>,
@@ -1206,16 +1539,142 @@ describe.skipIf(!databaseUrl)(
         );
       }
     });
+    it('ends account access when the person revokes it, and opens emergency access only with its permission', async () => {
+      const url = `/v1/staff/accounts/${customer}`;
+      const opened = await openGrant(
+        'accounts',
+        customer,
+        'Checking the passkey problem again',
+        true,
+      );
+      expect(
+        (
+          await app.inject({
+            url: `${url}?grantId=${opened.id}`,
+            headers: { cookie },
+          })
+        ).statusCode,
+      ).toBe(200);
+      await owner.query(
+        "UPDATE account_inspection_requests SET status='revoked',revoked_by=user_id WHERE id=$1",
+        [opened.requestId],
+      );
+      expect(
+        (
+          await app.inject({
+            url: `${url}?grantId=${opened.id}`,
+            headers: { cookie },
+          })
+        ).statusCode,
+      ).toBe(403);
+      const emergency = {
+        reason: 'Account takeover reported by the workspace owner',
+        emergency: { category: 'security_incident', reference: 'SEC-77' },
+      };
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `${url}/access`,
+            headers: { cookie, origin },
+            payload: emergency,
+          })
+        ).statusCode,
+      ).toBe(403);
+      await owner.query(
+        "UPDATE staff_access SET permissions=array_append(permissions,'staff.inspect.emergency') WHERE email='support@example.test'",
+      );
+      try {
+        const response = await app.inject({
+          method: 'POST',
+          url: `${url}/access`,
+          headers: { cookie, origin },
+          payload: emergency,
+        });
+        expect(response.statusCode, response.body).toBe(201);
+        expect(
+          (
+            await app.inject({
+              url: `${url}?grantId=${response.json().id}`,
+              headers: { cookie },
+            })
+          ).statusCode,
+        ).toBe(200);
+        const request = (
+          await owner.query<{ id: string }>(
+            "SELECT id FROM account_inspection_requests WHERE user_id=$1 AND mode='emergency'",
+            [customer],
+          )
+        ).rows[0]!.id;
+        expect(
+          (
+            await owner.query(
+              "SELECT event_type,reason_code,staff_command_id FROM account_security_events WHERE user_id=$1 AND event_type LIKE 'support-inspection.%' ORDER BY created_at DESC LIMIT 2",
+              [customer],
+            )
+          ).rows,
+        ).toEqual([
+          {
+            event_type: 'support-inspection.emergency-opened',
+            reason_code: 'security-incident',
+            staff_command_id: request,
+          },
+          {
+            event_type: 'support-inspection.revoked',
+            reason_code: null,
+            staff_command_id: null,
+          },
+        ]);
+        expect(
+          (
+            await owner.query(
+              'SELECT kind FROM account_mail WHERE inspection_request_id=$1',
+              [request],
+            )
+          ).rows,
+        ).toEqual([{ kind: 'inspection_emergency' }]);
+        expect(
+          (
+            await owner.query(
+              "SELECT details->>'reference' AS reference FROM staff_audit WHERE event='account.access.emergency'",
+            )
+          ).rows,
+        ).toEqual([{ reference: 'SEC-77' }]);
+        // Emergency access can't be revoked by the person.
+        await expect(
+          owner.query(
+            "UPDATE account_inspection_requests SET status='revoked',revoked_by=user_id WHERE id=$1",
+            [request],
+          ),
+        ).rejects.toMatchObject({ code: '55000' });
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect'] WHERE email='support@example.test'",
+        );
+        // End the emergency access as time would, so later tests can ask again.
+        const shift = await owner.connect();
+        try {
+          await shift.query('BEGIN');
+          await shift.query('SET LOCAL session_replication_role=replica');
+          await shift.query(
+            "UPDATE account_inspection_requests SET access_expires_at=now()-interval '1 second' WHERE user_id=$1 AND mode='emergency'",
+            [customer],
+          );
+          await shift.query('COMMIT');
+        } finally {
+          shift.release();
+        }
+      }
+    });
     it('pages an account’s security events under an account grant and audits each page', async () => {
       const url = `/v1/staff/accounts/${customer}/security-events`;
-      const opened = await app.inject({
-        method: 'POST',
-        url: `/v1/staff/accounts/${customer}/access`,
-        headers: { cookie, origin },
-        payload: { reason: 'Reviewing recent account security activity' },
-      });
-      expect(opened.statusCode, opened.body).toBe(201);
-      const accountGrant = opened.json().id as string;
+      const opened = await openGrant(
+        'accounts',
+        customer,
+        'Reviewing recent account security activity',
+        true,
+      );
+      const accountGrant = opened.id;
       for (const denied of [grantId, randomUUID()])
         expect(
           (
@@ -1237,11 +1696,27 @@ describe.skipIf(!databaseUrl)(
       expect(first.statusCode, first.body).toBe(200);
       const page = first.json();
       expect(page.items).toHaveLength(25);
-      expect(page.items[0]).toMatchObject({
-        type: 'sessions.revoked-by-staff',
-        staffCommandId: expect.any(String),
-      });
-      expect(page.items[1]).toMatchObject({
+      // This request and its approval are the newest events; earlier requests, answers and the
+      // staff session revocation follow.
+      expect(page.items.slice(0, 2)).toMatchObject([
+        { type: 'support-inspection.approved', staffCommandId: null },
+        {
+          type: 'support-inspection.requested',
+          staffCommandId: opened.requestId,
+        },
+      ]);
+      expect(
+        page.items.find(
+          (item: { type: string }) => item.type === 'sessions.revoked-by-staff',
+        ),
+      ).toMatchObject({ staffCommandId: expect.any(String) });
+      const recorded = (
+        await owner.query<{ count: number }>(
+          "SELECT count(*)::integer AS count FROM account_security_events WHERE user_id=$1 AND request_id<>'seed'",
+          [customer],
+        )
+      ).rows[0]!.count;
+      expect(page.items[recorded]).toMatchObject({
         type: 'sign-in.password',
         outcome: 'failed',
         reason: 'invalid-credentials',
@@ -1254,7 +1729,7 @@ describe.skipIf(!databaseUrl)(
         url: `${url}?grantId=${accountGrant}&cursor=${page.nextCursor}`,
         headers: { cookie },
       });
-      expect(next.json().items).toHaveLength(2);
+      expect(next.json().items).toHaveLength(recorded + 1);
       expect(next.json().nextCursor).toBeNull();
       expect(
         (
@@ -1269,7 +1744,10 @@ describe.skipIf(!databaseUrl)(
       }>(
         "SELECT details FROM staff_audit WHERE event='account.security-events.inspected' ORDER BY sequence",
       );
-      expect(audits.rows.map((row) => row.details.events)).toEqual([25, 2]);
+      expect(audits.rows.map((row) => row.details.events)).toEqual([
+        25,
+        recorded + 1,
+      ]);
     });
     it('exposes only allowlisted customer columns and metadata views to the staff runtime', async () => {
       const columns = await runtime.query<{ relname: string; attname: string }>(
@@ -1534,14 +2012,13 @@ describe.skipIf(!databaseUrl)(
       } finally {
         seed.release();
       }
-      const opened = await app.inject({
-        method: 'POST',
-        url: `/v1/staff/workspaces/${tenantA}/access`,
-        headers: { cookie, origin },
-        payload: { reason: 'Investigating a failing order sync' },
-      });
-      expect(opened.statusCode, opened.body).toBe(201);
-      const grant = opened.json().id;
+      const grant = (
+        await openGrant(
+          'workspaces',
+          tenantA,
+          'Investigating a failing order sync',
+        )
+      ).id;
       const health = await app.inject({
         url: `/v1/staff/workspaces/${tenantA}/health?grantId=${grant}`,
         headers: { cookie },
@@ -1634,7 +2111,17 @@ describe.skipIf(!databaseUrl)(
       expect(first.body).not.toContain('private-invitee@example.test');
       const page = first.json();
       expect(page.events).toHaveLength(50);
+      // Every inspection request and answer is newer than the seeded changes.
+      const inspections = (
+        await owner.query<{ count: number }>(
+          "SELECT count(*)::integer AS count FROM workspace_access_events WHERE tenant_id=$1 AND event_type LIKE 'support_inspection.%'",
+          [tenantA],
+        )
+      ).rows[0]!.count;
       expect(page.events[0]).toMatchObject({
+        type: expect.stringMatching(/^support_inspection\./),
+      });
+      expect(page.events[inspections]).toMatchObject({
         type: 'member.update',
         summary: 'Member → Admin',
         actor: { id: customer, name: 'Customer Alice', member: true },
@@ -1645,7 +2132,7 @@ describe.skipIf(!databaseUrl)(
         headers: { cookie },
       });
       expect(second.statusCode, second.body).toBe(200);
-      expect(second.json().events).toHaveLength(5);
+      expect(second.json().events).toHaveLength(5 + inspections);
       expect(second.json().nextCursor).toBeNull();
       expect(
         new Set(
@@ -1653,7 +2140,7 @@ describe.skipIf(!databaseUrl)(
             (event: { id: string }) => event.id,
           ),
         ).size,
-      ).toBe(55);
+      ).toBe(55 + inspections);
       const audit = await owner.query<{ event: string; count: number }>(
         "SELECT event,count(*)::int AS count FROM staff_audit WHERE tenant_id=$1 AND event IN ('workspace.health.read','workspace.access-history.read') AND details->>'grantId'=$2 GROUP BY event ORDER BY event",
         [tenantA, grant],

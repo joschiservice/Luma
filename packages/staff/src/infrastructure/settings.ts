@@ -61,6 +61,7 @@ const provisioningSchema = z
         'staff.view-as.emergency',
         'staff.accounts.manage',
         'staff.accounts.delete',
+        'staff.inspect.emergency',
       ]),
     ),
     operator: z.string().trim().min(1).max(200),
@@ -124,6 +125,18 @@ const settingsSchema = z
       .default([]),
   })
   .superRefine((settings, context) => {
+    // Same rule as BETTER_AUTH_SECRET in @luma/config: no sample value or repeated pattern.
+    if (
+      settings.environment === 'production' &&
+      (/replace|placeholder|change-?me|example|your-?secret/i.test(
+        settings.secret,
+      ) ||
+        new Set(settings.secret).size < 10)
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'STAFF_AUTH_SECRET must be a random value, not a placeholder.',
+      });
     if (
       settings.environment === 'production' &&
       !settings.regionalApiOrigins[settings.region]

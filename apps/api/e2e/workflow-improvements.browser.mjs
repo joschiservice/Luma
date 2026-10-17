@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 import { seedResolutionMeasurement } from './resolution-measurement-fixture.mjs';
 
 /** Retains synthetic learning history with the same immutable bindings as the runtime owners. */
@@ -135,17 +141,11 @@ test('discovers evidence explicitly, compares an immutable candidate and rejects
   page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Improver');
-  await page.getByLabel('Email', { exact: true }).fill('improver@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Improver',
+    email: 'improver@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Improvement studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

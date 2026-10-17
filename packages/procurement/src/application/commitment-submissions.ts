@@ -470,6 +470,16 @@ export function createSubmissionRequests(
         state: 'submitted' | 'failed' | 'uncertain';
         sentMessageId?: string;
         reason?: string;
+        /**
+         * How uncertain delivery was settled, when it was: a person's decision (`by`) or the
+         * supplier's authenticated reply. Each decision is recorded once.
+         */
+        decision?: {
+          id: string;
+          source: 'person' | 'reply';
+          by: string | null;
+          at: string;
+        };
       },
     ) {
       context = await authorize(context, true);
@@ -496,7 +506,12 @@ export function createSubmissionRequests(
               prior.requestedBy !== context.actor.id)
           )
             throw conflict('This email submission ID was already used.');
-          if (prior?.state === 'submitted' && request.state === 'submitted')
+          // Handoffs are retried until acknowledged, so an outcome already recorded is kept.
+          if (
+            prior?.state === request.state &&
+            (request.state === 'submitted' ||
+              (prior.failure ?? null) === (request.reason ?? null))
+          )
             return { submission: prior, order };
           if (
             !prior &&
@@ -538,9 +553,10 @@ export function createSubmissionRequests(
             submittedAt:
               prior?.submittedAt ??
               (request.state === 'submitted' ? now : null),
-            decidedBy: null,
-            decidedAt: null,
-            failure: request.reason ?? null,
+            decidedBy: request.decision?.by ?? null,
+            decidedAt: request.decision?.by ? request.decision.at : null,
+            failure:
+              request.state === 'submitted' ? null : (request.reason ?? null),
             updatedAt: now,
           };
           if (prior) await tx.saveSubmission(submission, true);
@@ -552,12 +568,26 @@ export function createSubmissionRequests(
             audit(
               context,
               'purchase_order.email_submission',
-              `${request.id}:${request.state}`,
+              `${request.id}:${request.state}${request.decision ? `:${request.decision.id}` : ''}`,
               order.id,
               {
                 state: request.state,
                 outboundId: request.outboundId,
                 threadId: request.threadId,
+                ...(request.decision
+                  ? {
+                      reason:
+                        request.decision.source === 'person'
+                          ? request.state === 'submitted'
+                            ? 'A team member confirmed the order email was delivered'
+                            : 'A team member confirmed the order email was not delivered'
+                          : 'The supplier replied to the order email',
+                      decision: request.decision.source,
+                      ...(request.decision.by
+                        ? { decidedBy: request.decision.by }
+                        : {}),
+                    }
+                  : {}),
               },
               [request.outboundId],
             ),

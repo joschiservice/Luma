@@ -1,4 +1,10 @@
-import { conflict, forbidden, notFound, unavailable } from '@luma/platform';
+import {
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import type {
   Membership,
@@ -79,6 +85,17 @@ export interface SettingsTransaction {
     status: 'approved' | 'declined',
     actorId: string,
   ): Promise<void>;
+  /**
+   * Answers a pending, unlapsed inspection request; false when there is none to answer. The
+   * database records the answer in Activity and starts approved access.
+   */
+  decideInspection(
+    id: string,
+    status: 'approved' | 'declined',
+    actorId: string,
+  ): Promise<boolean>;
+  /** Ends approved consented inspection access that is still open; false when there is none. */
+  revokeInspection(id: string, actorId: string): Promise<boolean>;
   invitations(): Promise<InvitationRecord[]>;
   pendingInvitation(email: string): Promise<boolean>;
   invitation(id: string): Promise<InvitationRecord | null>;
@@ -86,7 +103,8 @@ export interface SettingsTransaction {
   saveInvitation(value: InvitationRecord, inviterId: string): Promise<void>;
   queueInvitation(value: InvitationRecord): Promise<void>;
   queueTest(userId: string, id: string): Promise<void>;
-  email(userId: string): Promise<string>;
+  /** The account's email address and whether its owner confirmed controlling it. */
+  email(userId: string): Promise<{ email: string; verified: boolean }>;
   accept(invitation: InvitationRecord, userId: string): Promise<void>;
 }
 
@@ -193,7 +211,8 @@ export function createSettingsService(deps: SettingsDependencies) {
       session.userId,
       async (tx) => {
         const invitation = await tx.invitation(input.invitationId);
-        const email = (await tx.email(session.userId)).toLowerCase();
+        const account = await tx.email(session.userId);
+        const email = account.email.toLowerCase();
         if (
           !invitation ||
           invitation.tokenHash !== deps.hash(input.token) ||
@@ -210,6 +229,13 @@ export function createSettingsService(deps: SettingsDependencies) {
             'The role in this invitation is no longer available. Ask for a new invitation.',
           );
         if (accept) {
+          // An unconfirmed address may belong to someone else; joining would hand them access.
+          if (!account.verified)
+            throw new ServiceError(
+              403,
+              'EMAIL_NOT_VERIFIED',
+              'Confirm your email address before you join a workspace. Use the link Luma sent you, or send a new one from this page.',
+            );
           if (await tx.member(session.userId))
             throw conflict('You already belong to this workspace.');
           await tx.accept(invitation, session.userId);
@@ -606,6 +632,60 @@ export function createSettingsService(deps: SettingsDependencies) {
               status: input.decision === 'approve' ? 'approved' : 'declined',
             },
           );
+
+          return tx.supportAccess();
+        },
+      );
+    },
+    /**
+     * Approves or declines a Luma support request to inspect the workspace. Approval opens thirty
+     * minutes of inspection from now for the staff member who asked. A request that lapsed or
+     * was answered returns 409.
+     */
+    decideSupportInspection(
+      context: TenantContext,
+      requestId: string,
+      input: { commandId: string; decision: 'approve' | 'decline' },
+    ) {
+      return command(
+        context,
+        'support_access.manage',
+        { ...input, requestId },
+        'support_inspection.decide',
+        async (tx) => {
+          const answered = await tx.decideInspection(
+            requestId,
+            input.decision === 'approve' ? 'approved' : 'declined',
+            context.actor.id,
+          );
+          if (!answered)
+            throw conflict(
+              'This request was already answered or has lapsed. Refresh the page.',
+            );
+
+          return tx.supportAccess();
+        },
+      );
+    },
+    /**
+     * Ends approved inspection access now; the staff member's next read is refused. Emergency
+     * access can't be revoked, and access that already ended returns 409.
+     */
+    revokeSupportInspection(
+      context: TenantContext,
+      requestId: string,
+      input: { commandId: string },
+    ) {
+      return command(
+        context,
+        'support_access.manage',
+        { ...input, requestId },
+        'support_inspection.revoke',
+        async (tx) => {
+          if (!(await tx.revokeInspection(requestId, context.actor.id)))
+            throw conflict(
+              'This access already ended or can’t be revoked. Refresh the page.',
+            );
 
           return tx.supportAccess();
         },

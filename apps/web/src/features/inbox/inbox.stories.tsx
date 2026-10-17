@@ -301,6 +301,77 @@ export const ThreadUncertain: Story = {
   },
 };
 
+export const ThreadUnverifiedDeliveryReport: Story = {
+  args: {
+    screen: {
+      kind: 'inbox',
+      search: { thread: threadFixtures[0]!.id },
+      detail: {
+        ...threadDetailFixture,
+        outbound: [outboundFixtures.unverifiedReport],
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Recipient in the report'),
+    ).toBeVisible();
+    const actions = canvas.getByRole('group', { name: 'Delivery decision' });
+    await expect(
+      within(actions).getByRole('button', { name: 'Mark as delivered' }),
+    ).toBeEnabled();
+    await expect(
+      within(actions).getByRole('button', { name: 'Mark as not delivered' }),
+    ).toBeEnabled();
+  },
+};
+
+export const ThreadUnverifiedSender: Story = {
+  args: {
+    screen: {
+      kind: 'inbox',
+      search: { thread: threadFixtures[0]!.id },
+      detail: {
+        ...threadDetailFixture,
+        messages: threadDetailFixture.messages.map((message, index) =>
+          index === 1
+            ? { ...message, senderAuthentication: 'unaligned' as const }
+            : message,
+        ),
+        links: threadDetailFixture.links.map((link) =>
+          link.record.kind === 'supplier'
+            ? {
+                ...link,
+                state: 'suggested' as const,
+                evidence: { ...link.evidence, senderUnverified: true },
+              }
+            : link,
+        ),
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText('Sender not verified')).toBeVisible();
+    await expect(
+      canvas.getByText(/couldn’t confirm that it came from northstar\.example/),
+    ).toBeVisible();
+    // Imported mail without a check is explained, not called forged.
+    await expect(canvas.getByText('Sender couldn’t be verified')).toBeVisible();
+    await expect(
+      canvas.getByText(
+        'Suggested because Luma couldn’t verify the sender’s address.',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const ThreadUnverifiedSenderDark: Story = {
+  args: ThreadUnverifiedSender.args!,
+  globals: { theme: 'dark' },
+};
+
 export const ThreadDark: Story = {
   args: Thread.args!,
   globals: { theme: 'dark' },

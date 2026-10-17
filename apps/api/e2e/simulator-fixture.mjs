@@ -86,6 +86,7 @@ export async function setupSimulator(
       WORKFLOW_DATABASE_URL: db.runtimeUrl,
       BETTER_AUTH_SECRET: secret,
       BETTER_AUTH_URL: origin,
+      AUTH_RATE_LIMIT: 'off',
       CONNECTIONS_ACTIVE_KEY_ID: 'test',
       CONNECTIONS_KEYS: JSON.stringify({
         test: randomBytes(32).toString('base64'),

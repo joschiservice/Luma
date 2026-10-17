@@ -1132,19 +1132,31 @@ describe('Shopify edited order lines', () => {
 });
 
 describe('Shopify webhook refresh hints', () => {
-  const body = Buffer.from(
-    '{"id":9007199254740993,"email":"private@example.com"}',
-  );
+  const signed = (payload: unknown) => {
+    const body = Buffer.from(JSON.stringify(payload));
+
+    return {
+      body,
+      hmac: createHmac('sha256', 'webhook-secret')
+        .update(body)
+        .digest('base64'),
+    };
+  };
+  const order = {
+    id: 450789469,
+    admin_graphql_api_id: 'gid://shopify/Order/450789469',
+    email: 'private@example.com',
+    updated_at: '2026-09-18T09:00:00Z',
+  };
   const options = {
     tenantId: 'tenant-a',
     connectionId: 'connection-a',
     expectedShop: 'example.myshopify.com',
     shop: 'example.myshopify.com',
     secret: 'webhook-secret',
-    hmac: createHmac('sha256', 'webhook-secret').update(body).digest('base64'),
     eventId: 'event-1',
     topic: 'orders/updated',
-    body,
+    ...signed(order),
   };
   it('verifies original bytes and creates a scoped, stable refresh key without copying partial data', () => {
     const event = mapShopifyWebhook(options);
@@ -1154,26 +1166,121 @@ describe('Shopify webhook refresh hints', () => {
       'fulfillment.read',
       'returns.read',
     ]);
-    expect(JSON.stringify(event)).not.toMatch(
-      /private@example|9007199254740993/,
-    );
+    expect(JSON.stringify(event)).not.toMatch(/private@example|450789469/);
     expect(
       mapShopifyWebhook({ ...options, connectionId: 'connection-b' })?.eventKey,
     ).not.toBe(event?.eventKey);
     expect(mapShopifyWebhook({ ...options, topic: 'unknown' })).toBeNull();
     expect(mapShopifyWebhook({ ...options, topic: 'constructor' })).toBeNull();
   });
+  it('deduplicates a replayed signed body whatever its unsigned delivery ID', () => {
+    const event = mapShopifyWebhook(options);
+    expect(
+      mapShopifyWebhook({ ...options, eventId: 'replayed-with-new-id' })
+        ?.eventKey,
+    ).toBe(event?.eventKey);
+    expect(
+      mapShopifyWebhook({ ...options, ...signed({ ...order, note: 'later' }) })
+        ?.eventKey,
+    ).not.toBe(event?.eventKey);
+  });
+  it('accepts a relabelled body only under topics about the same resource', () => {
+    expect(
+      mapShopifyWebhook({ ...options, topic: 'orders/paid' })?.capabilities,
+    ).toEqual(['orders.read']);
+    for (const topic of [
+      'products/update',
+      'customers/update',
+      'refunds/create',
+      'fulfillment_orders/moved',
+      'inventory_levels/update',
+      // A change body cannot pose as a deletion and request a full reread.
+      'orders/delete',
+    ])
+      expect(mapShopifyWebhook({ ...options, topic }), topic).toBeNull();
+    for (const payload of ['[]', 'not json', '{"id":1}'])
+      expect(
+        mapShopifyWebhook({
+          ...options,
+          body: Buffer.from(payload),
+          hmac: createHmac('sha256', 'webhook-secret')
+            .update(payload)
+            .digest('base64'),
+        }),
+        payload,
+      ).toBeNull();
+  });
+  it('recognizes payloads that carry their resource in a nested member', () => {
+    const moved = signed({
+      original_fulfillment_order: { id: 'gid://shopify/FulfillmentOrder/1' },
+      moved_fulfillment_order: { id: 'gid://shopify/FulfillmentOrder/2' },
+      destination: { id: 'gid://shopify/Location/3' },
+    });
+    expect(
+      mapShopifyWebhook({
+        ...options,
+        ...moved,
+        topic: 'fulfillment_orders/moved',
+      }),
+    ).not.toBeNull();
+    for (const topic of ['orders/updated', 'locations/update'])
+      expect(
+        mapShopifyWebhook({ ...options, ...moved, topic }),
+        topic,
+      ).toBeNull();
+    expect(
+      mapShopifyWebhook({
+        ...options,
+        ...signed({ order_edit: { id: 4, order_id: 5 } }),
+        topic: 'orders/edited',
+      }),
+    ).not.toBeNull();
+    expect(
+      mapShopifyWebhook({
+        ...options,
+        ...signed({ inventory_item_id: 6, location_id: 7 }),
+        topic: 'inventory_levels/disconnect',
+      })?.capabilities,
+    ).toEqual(['inventory.read']);
+  });
+  it('gives look-alike deletion bodies one key so relabelling cannot repeat a full reread', () => {
+    const deleted = { ...options, ...signed({ id: 123 }) };
+    const event = mapShopifyWebhook({ ...deleted, topic: 'products/delete' });
+    expect(event?.capabilities).toEqual(['products.read', 'inventory.read']);
+    for (const topic of ['orders/delete', 'locations/delete'])
+      expect(mapShopifyWebhook({ ...deleted, topic })?.eventKey, topic).toBe(
+        event?.eventKey,
+      );
+    expect(
+      mapShopifyWebhook({ ...deleted, topic: 'orders/updated' }),
+    ).toBeNull();
+  });
   it.each([
-    'orders/edited',
-    'fulfillment_orders/moved',
-    'fulfillment_orders/split',
-    'fulfillment_orders/merged',
-    'fulfillment_orders/cancelled',
-  ])('rereads orders and fulfillment work after %s', (topic) => {
-    const event = mapShopifyWebhook({ ...options, topic });
+    ['orders/edited', order],
+    [
+      'fulfillment_orders/moved',
+      {
+        original_fulfillment_order: { id: 'gid://shopify/FulfillmentOrder/1' },
+      },
+    ],
+    [
+      'fulfillment_orders/split',
+      { fulfillment_order: { id: 'gid://shopify/FulfillmentOrder/1' } },
+    ],
+    [
+      'fulfillment_orders/merged',
+      { fulfillment_order: { id: 'gid://shopify/FulfillmentOrder/1' } },
+    ],
+    [
+      'fulfillment_orders/cancelled',
+      { admin_graphql_api_id: 'gid://shopify/FulfillmentOrder/1' },
+    ],
+  ])('rereads orders and fulfillment work after %s', (topic, payload) => {
+    const delivery = { ...options, ...signed(payload), topic };
+    const event = mapShopifyWebhook(delivery);
     expect(event?.capabilities).toEqual(['orders.read', 'fulfillment.read']);
     expect(event?.eventKey).not.toBe(mapShopifyWebhook(options)?.eventKey);
-    expect(event).toEqual(mapShopifyWebhook({ ...options, topic }));
+    expect(event).toEqual(mapShopifyWebhook(delivery));
   });
   it('rejects bad signatures, modified payloads and wrong shops', () => {
     expect(() => mapShopifyWebhook({ ...options, hmac: '' })).toThrow(

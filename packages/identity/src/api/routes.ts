@@ -75,6 +75,27 @@ export function identityRoutes(service?: IdentityService) {
       async ({ context: { request }, input: { query } }) =>
         use().listSecurityEvents(credentials(request), query.cursor),
     ),
+    listSupportInspections: os.listSupportInspections.handler(
+      async ({ context: { request } }) =>
+        use().supportInspections(credentials(request)),
+    ),
+    decideSupportInspection: os.decideSupportInspection.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        use().decideSupportInspection(
+          credentials(request),
+          params.requestId,
+          body.decision,
+          request.id,
+        ),
+    ),
+    revokeSupportInspection: os.revokeSupportInspection.handler(
+      async ({ context: { request }, input: { params } }) =>
+        use().revokeSupportInspection(
+          credentials(request),
+          params.requestId,
+          request.id,
+        ),
+    ),
     setLanguage: os.setLanguage.handler(
       async ({ context: { request }, input: { body } }) => {
         await use().setLanguage(credentials(request), body.language);
@@ -105,14 +126,6 @@ export function identityRoutes(service?: IdentityService) {
     listMembers: os.listMembers.handler(async ({ context: { request } }) => ({
       items: await use().listMembers(tenantContext(request)),
     })),
-    addMember: os.addMember.handler(
-      async ({ context: { request }, input: { headers, body } }) =>
-        (await use().changeMember(tenantContext(request), {
-          ...commandId(headers),
-          action: 'add',
-          ...body,
-        }))!,
-    ),
     updateMember: os.updateMember.handler(
       async ({ context: { request }, input: { params, headers, body } }) =>
         (await use().changeMember(tenantContext(request), {
@@ -161,6 +174,9 @@ const supportViewRoutes = new Set([
 const accountRoutes = new Set([
   '/v1/organizations',
   '/v1/account/security-events',
+  '/v1/account/support-inspections',
+  '/v1/account/support-inspections/:requestId',
+  '/v1/account/support-inspections/:requestId/revoke',
   '/v1/account/language',
   '/v1/invitations/preview',
   '/v1/invitations/accept',

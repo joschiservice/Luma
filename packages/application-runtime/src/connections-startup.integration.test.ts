@@ -166,7 +166,16 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       password: 'test-password-long-enough',
     });
     expect(signup.status).toBe(200);
-    cookie = signup.headers
+    // The emailed confirmation link would set this before the first sign-in.
+    await owner.query(
+      "UPDATE users SET email_verified=true WHERE email='operator@example.test'",
+    );
+    const signIn = await call('/auth/sign-in/email', {
+      email: 'operator@example.test',
+      password: 'test-password-long-enough',
+    });
+    expect(signIn.status).toBe(200);
+    cookie = signIn.headers
       .getSetCookie()
       .map((c) => c.split(';')[0])
       .join('; ');

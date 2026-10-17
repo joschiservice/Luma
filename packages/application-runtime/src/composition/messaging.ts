@@ -167,8 +167,9 @@ export function createMemberDirectory(
 }
 
 /**
- * Hands inbound supplier messages to procurement's message path, which stores them once per
- * Message-ID and starts extraction, commitments and follow-ups.
+ * Hands inbound supplier messages to procurement's message path, which stores them once and
+ * starts extraction, commitments and follow-ups. Only authenticated senders claim a Message-ID
+ * there, so a forged copy cannot suppress the genuine message.
  */
 export function createProcurementHandoff(
   commitments: () => SupplierCommitments,
@@ -176,12 +177,13 @@ export function createProcurementHandoff(
   return {
     async record(context: TenantContext, input) {
       if (!hasPermission(context, 'procurement.manage')) return 'forbidden';
-      const { purchaseOrderId, ...message } = input;
+      const { purchaseOrderId, senderVerified, ...message } = input;
       try {
         const result = await commitments().recordMessage(
           context,
           purchaseOrderId,
           { ...message, channel: 'email' },
+          { senderVerified },
         );
 
         return result.duplicate ? 'duplicate' : 'recorded';

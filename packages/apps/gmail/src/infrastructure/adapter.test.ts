@@ -451,12 +451,13 @@ describe('messages.send', () => {
 });
 
 describe('new supplier email threads', () => {
-  it('verifies a newly composed send through a read-only Message-ID lookup', async () => {
+  it('verifies a newly composed send through a read-only lookup of its sent Message-ID', async () => {
     const outboundId = '11111111-1111-4111-8111-111111111111';
     const gmail = fakeGmail({
       messages: (url) => {
+        // A message someone else sent with the same Message-ID must not choose the thread.
         expect(url.searchParams.get('q')).toBe(
-          `rfc822msgid:luma.${outboundId}@shop.example`,
+          `in:sent rfc822msgid:luma.${outboundId}@shop.example`,
         );
 
         return { messages: [{ id: 'sent', threadId: 't-new' }] };

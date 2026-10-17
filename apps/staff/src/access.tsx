@@ -16,130 +16,18 @@ import {
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { useForm } from '@tanstack/react-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { staffActivity } from './activity';
-import { createStaffApi, useRegionalStaffApi } from './api';
+import { useRegionalStaffApi } from './api';
 import { Failure } from './feedback';
-import { regionalFetch, type StaffRegion, staffRegion } from './regions';
+import { staffRegion } from './regions';
 
 export const reasonSchema = z
   .string()
   .trim()
   .min(10, 'Explain the support reason in at least 10 characters.')
   .max(500, 'Use no more than 500 characters.');
-
-/** Requests auditable, workspace-scoped access before displaying customer details. */
-export function AccessDialog({
-  workspaceId,
-  region = staffRegion(),
-  name,
-  onClose,
-}: {
-  workspaceId: string;
-  region?: StaffRegion;
-  name: string;
-  onClose: () => void;
-}) {
-  const navigate = useNavigate();
-  const client = useQueryClient();
-  const access = useMutation({
-    mutationFn: (reason: string) =>
-      createStaffApi(regionalFetch(region), staffActivity, region).grant(
-        workspaceId,
-        reason,
-      ),
-    onSuccess: async (grant) => {
-      client.setQueryData(
-        ['staff', region, 'grant', workspaceId, grant.id],
-        grant,
-      );
-      onClose();
-      await navigate({
-        to: '/workspaces/$workspaceId',
-        params: { workspaceId },
-        search: { region, grantId: grant.id },
-      });
-    },
-  });
-  const form = useForm({
-    defaultValues: { reason: '' },
-    onSubmit: async ({ value }) => {
-      try {
-        await access.mutateAsync(reasonSchema.parse(value.reason));
-      } catch {
-        /* Mutation and field feedback describe the failed request. */
-      }
-    },
-  });
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !access.isPending) onClose();
-      }}
-    >
-      <DialogContent showCloseButton={!access.isPending}>
-        <DialogHeader>
-          <DialogTitle>Inspect {name}</DialogTitle>
-          <DialogDescription>
-            Open time-limited support access to this workspace. Your identity,
-            reason and subsequent operations are recorded.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="staff-form"
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            void form.handleSubmit();
-          }}
-        >
-          <form.Field name="reason" validators={{ onChange: reasonSchema }}>
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="access-reason">
-                  Support reason or ticket reference
-                </FieldLabel>
-                <Textarea
-                  id="access-reason"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  disabled={access.isPending}
-                  maxLength={500}
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  aria-describedby="access-reason-error"
-                />
-                <FieldError
-                  id="access-reason-error"
-                  errors={field.state.meta.errors}
-                />
-              </Field>
-            )}
-          </form.Field>
-          {access.isError ? <Failure error={access.error} /> : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={onClose}
-              disabled={access.isPending}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={access.isPending}>
-              {access.isPending ? 'Opening access…' : 'Open support access'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /** Requires an explicit global-effect acknowledgement and retains an idempotency key on retry. */
 export function RevokeSessionsDialog({

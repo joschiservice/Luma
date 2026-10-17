@@ -11,6 +11,7 @@ export const staffPermissions = [
   'staff.view-as.emergency',
   'staff.accounts.manage',
   'staff.accounts.delete',
+  'staff.inspect.emergency',
 ] as const;
 
 export type StaffPermission = (typeof staffPermissions)[number];

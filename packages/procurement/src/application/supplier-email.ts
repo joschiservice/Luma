@@ -38,6 +38,18 @@ export interface SupplierEmailDraft {
   stateReason: string | null;
   sentMessageId: string | null;
   attachments?: { filename: string; mimeType: string; size: number }[];
+  delivery: {
+    report: { recipient: string; status: string } | null;
+    resolution: {
+      outcome: 'delivered' | 'not_delivered';
+      source: 'person' | 'reply';
+      by: string | null;
+      at: string;
+      note: string | null;
+    } | null;
+  };
+  canResolveDelivery: boolean;
+  revision: number;
 }
 
 export interface SupplierMailWork {
@@ -471,6 +483,12 @@ export function createSupplierEmail(deps: {
           procurement?: SupplierMailWork;
           sentMessageId?: string | null;
           stateReason?: string | null;
+          deliveryResolution?: {
+            id: string;
+            source: 'person' | 'reply';
+            by: string | null;
+            at: string;
+          };
         };
       },
     ) {
@@ -499,6 +517,9 @@ export function createSupplierEmail(deps: {
             : {}),
           ...(outbound.document.stateReason
             ? { reason: outbound.document.stateReason }
+            : {}),
+          ...(outbound.document.deliveryResolution
+            ? { decision: outbound.document.deliveryResolution }
             : {}),
         });
       }

@@ -44,9 +44,15 @@ Mit der Tastatur: **J** und **K** oder die Pfeiltasten bewegen dich durch die Li
 
 Der Verlauf zeigt, wer wann was geändert hat.
 
+### Absenderprüfung [#sender-verification]
+
+Gmail prüft, ob eine empfangene Nachricht wirklich von der Domain in ihrer Absenderadresse stammt. Schlägt diese Prüfung fehl, zeigt die Nachricht **Absender nicht verifiziert**: Die Absenderadresse kann gefälscht sein, kläre es also mit dem Absender, etwa per Telefon, bevor du danach handelst. Hat Gmail keine Prüfung aufgezeichnet, etwa bei Nachrichten, die in das Postfach importiert wurden, zeigt die Nachricht **Absender konnte nicht verifiziert werden**. Nachrichten verifizierter Absender zeigen keinen Hinweis. Nachrichten von Kolleginnen und Kollegen aus deiner eigenen Google-Workspace-Domain gelten als verifiziert, wenn Google sie für diese Domain signiert hat.
+
+Luma behandelt die Nachricht eines nicht verifizierten Absenders nie als Nachweis: Lieferantenzusagen daraus warten auf deine Prüfung, und sie bestätigt nicht, dass eine Bestell-E-Mail angekommen ist.
+
 ## Verknüpfte Datensätze [#linked-records]
 
-Luma verknüpft einen Thread, wenn der Nachweis eindeutig ist: eine Lieferantenregel, die E-Mail-Adresse eines Kunden oder eine Bestell- oder Lieferantenbestellnummer in der Nachricht. Jede Verknüpfung zeigt, wie sie gefunden wurde. Eine Referenz, die zu mehreren Datensätzen passt, ist nur ein **Vorschlag**; bestätige den richtigen oder verwirf ihn. Mit **Datensatz verknüpfen** fügst du selbst eine Verknüpfung hinzu, mit **Verknüpfung entfernen** entfernst du eine; Luma fügt eine entfernte Verknüpfung nicht erneut hinzu.
+Luma verknüpft einen Thread, wenn der Nachweis eindeutig ist: eine Lieferantenregel, die E-Mail-Adresse eines Kunden oder eine Bestell- oder Lieferantenbestellnummer in der Nachricht. Jede Verknüpfung zeigt, wie sie gefunden wurde. Eine Referenz, die zu mehreren Datensätzen passt, ist nur ein **Vorschlag**; bestätige den richtigen oder verwirf ihn. Auch eine Lieferantenregel oder Kundenadresse, die zu einem Absender passt, den Luma nicht verifizieren konnte, ist nur ein **Vorschlag**, denn jeder kann eine fremde Adresse als Absender eintragen. Mit **Datensatz verknüpfen** fügst du selbst eine Verknüpfung hinzu, mit **Verknüpfung entfernen** entfernst du eine; Luma fügt eine entfernte Verknüpfung nicht erneut hinzu.
 
 Verknüpfte Datensätze zeigen ihre Threads auf ihrer eigenen Seite unter **Posteingang-Threads**. Eine Lieferantennachricht, die mit genau einer Lieferantenbestellung verknüpft ist, wird auch bei dieser Bestellung erfasst, wo ihre Zusagen geprüft werden.
 

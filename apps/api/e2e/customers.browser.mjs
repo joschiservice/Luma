@@ -5,7 +5,7 @@ import { createObservability } from '@luma/platform/composition';
 
 import { appScopes } from './app-scopes.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
+import { addMembership, availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -352,13 +352,7 @@ test('opens an imported customer from an order, lists their imported orders and 
     { name: 'Other workspace', slug: `customer-other-${Date.now()}` },
     201,
   );
-  await f.request(
-    f.owner,
-    `/v1/organizations/${other.id}/members`,
-    'POST',
-    { userId: f.member.id, roleId: 'member' },
-    201,
-  );
+  await addMembership(f.db.owner, other.id, f.member.id, 'member');
   await page.goto(`/app/${other.id}/customers`);
   await page
     .getByRole('heading', { name: 'Customers aren’t shared yet' })

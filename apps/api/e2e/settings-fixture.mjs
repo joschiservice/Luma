@@ -4,12 +4,18 @@ import { randomUUID } from 'node:crypto';
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { createIdentity } from '@luma/identity/composition';
 
-import { database, secret } from './helpers.mjs';
+import { addMembership, database, secret, verifyEmail } from './helpers.mjs';
 
 export async function settingsFixture(
   t,
   origin = 'http://localhost:3000',
-  { connections, observability, mailWebhookSecret, morningBriefEnabled } = {},
+  {
+    connections,
+    observability,
+    mailWebhookSecret,
+    morningBriefEnabled,
+    rateLimit = false,
+  } = {},
 ) {
   const db = await database(t);
   await db.migrate();
@@ -23,6 +29,8 @@ export async function settingsFixture(
     secret,
     baseURL: origin,
     trustedOrigins: [origin],
+    // Fixtures sign in many times from one inject address; tests of limits turn them on.
+    rateLimit: { enabled: rateLimit },
     mailOrigin: origin,
     ...(morningBriefEnabled ? { morningBriefEnabled } : {}),
     ...(mailWebhookSecret
@@ -71,8 +79,13 @@ export async function settingsFixture(
     return response.statusCode === 204 ? null : response.json();
   }
 
-  async function signup(name) {
+  /**
+   * Registers a person. Unless `verified` is false, confirms the address and signs in; an
+   * unverified person has no session cookie.
+   */
+  async function signup(name, { verified = true } = {}) {
     const email = `${name.toLowerCase()}@example.test`;
+    const password = 'settings-test-password-123';
     const response = await app.inject({
       method: 'POST',
       url: '/auth/sign-up/email',
@@ -81,14 +94,24 @@ export async function settingsFixture(
         name,
         email,
         dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
-        password: 'settings-test-password-123',
+        password,
       },
     });
     assert.equal(response.statusCode, 200, response.body);
-    const cookies = response.headers['set-cookie'];
+    const id = response.json().user.id;
+    if (!verified) return { id, email, cookie: '' };
+    await verifyEmail(db.owner, email);
+    const signedIn = await app.inject({
+      method: 'POST',
+      url: '/auth/sign-in/email',
+      headers: { origin },
+      payload: { email, password },
+    });
+    assert.equal(signedIn.statusCode, 200, signedIn.body);
+    const cookies = signedIn.headers['set-cookie'];
 
     return {
-      id: response.json().user.id,
+      id,
       email,
       cookie: (Array.isArray(cookies) ? cookies : [cookies])
         .map((value) => value.split(';')[0])
@@ -107,13 +130,9 @@ export async function settingsFixture(
     201,
   );
   const base = `/v1/organizations/${org.id}`;
-  const membership = await request(
-    owner,
-    `${base}/members`,
-    'POST',
-    { userId: member.id, roleId: 'member' },
-    201,
-  );
+  const membership = {
+    id: await addMembership(db.owner, org.id, member.id, 'member'),
+  };
   const command = (body) => ({ commandId: randomUUID(), ...body });
 
   return {

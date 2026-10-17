@@ -1,9 +1,13 @@
-import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
+import type { Email } from '@luma/email';
+import type { DBAdapter, DBTransactionAdapter } from 'better-auth';
+import { getCurrentAdapter } from 'better-auth';
 import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto';
 import type { Pool } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
+import { deriveKey } from './keys.js';
 import { requestLocale } from './locale.js';
 import {
   dispatchMail,
@@ -16,23 +20,131 @@ export function passwordMailLocale(request: Request | undefined) {
   return requestLocale(request?.headers).locale;
 }
 
-/** Queues reset links and mandatory password notices using the existing delivery provider. */
-export function createPasswordMail(pool: Pool, secret: string) {
-  return {
-    async reset(userId: string, token: string, locale: 'en' | 'de') {
-      const encrypted = await symmetricEncrypt({ key: secret, data: token });
-      await pool.query(
-        "INSERT INTO password_security_mail(id,user_id,kind,reset_token,locale,expires_at) VALUES($1,$2,'reset',$3,$4,now()+interval '15 minutes')",
-        [randomUUID(), userId, encrypted, locale],
-      );
+/** Seconds an email confirmation link stays valid. */
+export const emailVerificationSeconds = 24 * 3600;
+
+/** A sign-in factor whose addition the account owner is told about. */
+export type AddedFactor = 'passkey' | 'authenticator';
+
+/** One account security message: a reset or confirmation link, or a mandatory notice. */
+export type SecurityMail =
+  | { kind: 'reset' | 'verify'; userId: string; token: string }
+  | { kind: 'factor_added'; userId: string; factor: AddedFactor }
+  | { kind: 'changed'; userId: string };
+
+/**
+ * Better Auth model of the `password_security_mail` outbox. Luma's migrations own the table, so
+ * Better Auth neither migrates nor validates it; the Drizzle table in `schema.ts` must match.
+ */
+const securityMailModel = 'securityMail';
+
+/** Plugin schema that lets Better Auth's adapter, and so its transactions, write the outbox. */
+export const securityMailSchema = {
+  [securityMailModel]: {
+    disableMigration: true,
+    fields: {
+      userId: { type: 'string', required: true },
+      kind: { type: 'string', required: true },
+      resetToken: { type: 'string', required: false },
+      factor: { type: 'string', required: false },
+      locale: { type: 'string', required: true },
+      expiresAt: { type: 'date', required: true },
     },
-    async changed(userId: string, locale: 'en' | 'de') {
-      await pool.query(
-        "INSERT INTO password_security_mail(id,user_id,kind,locale,expires_at) VALUES($1,$2,'changed',$3,now()+interval '23 hours')",
-        [randomUUID(), userId, locale],
-      );
-    },
-  };
+  },
+} as const;
+
+// Reset links work for 15 minutes. Other messages stop an hour before a link would expire, so
+// a delayed confirmation still works.
+const queuedSeconds = { reset: 15 * 60, verify: 23 * 3600 } as const;
+
+/** Holds the first outbox write error of the Better Auth transaction it runs in. */
+const transactionFailures = new AsyncLocalStorage<{ error?: unknown }>();
+
+/**
+ * Queues one account security message. Inside a Better Auth transaction, such as sign-up, the
+ * row is written in that transaction, so the account change and its mail commit together;
+ * otherwise it is written through `adapter` at once. Link tokens are stored encrypted. A failed
+ * write rejects, and a transaction it ran in is rolled back by `failTransactionsOnOutboxError`
+ * even where Better Auth swallows the rejection.
+ */
+export async function queueSecurityMail(
+  adapter: DBTransactionAdapter,
+  secret: string,
+  mail: SecurityMail,
+  locale: 'en' | 'de',
+) {
+  try {
+    const resetToken =
+      mail.kind === 'reset' || mail.kind === 'verify'
+        ? await symmetricEncrypt({
+            key: deriveKey(secret, 'password-mail'),
+            data: mail.token,
+          })
+        : null;
+    const seconds =
+      mail.kind === 'reset' ? queuedSeconds.reset : queuedSeconds.verify;
+    await (
+      await getCurrentAdapter(adapter)
+    ).create({
+      model: securityMailModel,
+      data: {
+        userId: mail.userId,
+        kind: mail.kind,
+        resetToken,
+        factor: mail.kind === 'factor_added' ? mail.factor : null,
+        locale,
+        expiresAt: new Date(Date.now() + seconds * 1000),
+      },
+    });
+  } catch (error) {
+    const transaction = transactionFailures.getStore();
+    if (transaction && !('error' in transaction)) transaction.error = error;
+    throw error;
+  }
+}
+
+/**
+ * Makes every transaction of `adapter` roll back and reject when a `queueSecurityMail` call in
+ * it failed. Better Auth catches and only logs errors of mail callbacks such as
+ * `sendVerificationEmail`, so without this a sign-up could commit without its confirmation
+ * link. Changes `adapter` in place, so checks Better Auth attached to it stay in effect.
+ */
+export function failTransactionsOnOutboxError(adapter: DBAdapter) {
+  const transaction = adapter.transaction.bind(adapter);
+  adapter.transaction = (callback) =>
+    transaction(async (trx) => {
+      const state: { error?: unknown } = {};
+      const result = await transactionFailures.run(state, () => callback(trx));
+      if ('error' in state) throw state.error;
+
+      return result;
+    });
+
+  return adapter;
+}
+
+/** Builds the email for one queued message; links carry their credential in the fragment. */
+function securityEmail(
+  message: { kind: string; factor: AddedFactor | null },
+  token: string | null,
+  origin: string,
+): Email {
+  const link = (path: string) => new URL(path, origin).href;
+  if (token)
+    return message.kind === 'verify'
+      ? {
+          kind: 'email_verification',
+          link: `${link('/verify-email')}#${token}`,
+        }
+      : { kind: 'password_reset', link: `${link('/reset-password')}#${token}` };
+  if (message.kind === 'factor_added')
+    return {
+      kind: 'security_factor_added',
+      factor: message.factor ?? 'passkey',
+      resetLink: link('/forgot-password'),
+    };
+
+  return { kind: 'password_changed', resetLink: link('/forgot-password') };
 }
 
 /**
@@ -55,27 +167,34 @@ export async function drainPasswordMail(
       await pool.query<{
         id: string;
         user_id: string;
-        kind: 'reset' | 'changed';
+        kind: 'reset' | 'changed' | 'verify' | 'factor_added';
+        factor: AddedFactor | null;
         locale: 'en' | 'de';
         reset_token: string | null;
         attempts: number;
       }>(
         `WITH next AS (SELECT id FROM password_security_mail WHERE state='queued' AND expires_at>now() AND next_attempt_at<=now() AND attempts<${maxAttempts} ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1)
        UPDATE password_security_mail m SET attempts=attempts+1,first_attempt_at=COALESCE(first_attempt_at,now()),next_attempt_at=now()+interval '60 seconds'
-       FROM next WHERE m.id=next.id RETURNING m.id,m.user_id,m.kind,m.locale,m.reset_token,m.attempts`,
+       FROM next WHERE m.id=next.id RETURNING m.id,m.user_id,m.kind,m.factor,m.locale,m.reset_token,m.attempts`,
       )
     ).rows[0];
     if (!message) break;
     const user = (
-      await pool.query<{ email: string }>(
-        'SELECT email FROM users WHERE id=$1',
+      await pool.query<{ email: string; email_verified: boolean }>(
+        'SELECT email,email_verified FROM users WHERE id=$1',
         [message.user_id],
       )
     ).rows[0];
     if (!user) continue;
+    if (message.kind === 'verify' && user.email_verified) {
+      await pool.query('DELETE FROM password_security_mail WHERE id=$1', [
+        message.id,
+      ]);
+      continue;
+    }
     const token = message.reset_token
       ? await symmetricDecrypt({
-          key: secret,
+          key: deriveKey(secret, 'password-mail'),
           data: message.reset_token,
         }).catch(() => null)
       : null;
@@ -91,15 +210,7 @@ export async function drainPasswordMail(
       id: message.id,
       to: user.email,
       locale: message.locale,
-      email: token
-        ? {
-            kind: 'password_reset',
-            link: `${new URL('/reset-password', origin).href}#${token}`,
-          }
-        : {
-            kind: 'password_changed',
-            resetLink: new URL('/forgot-password', origin).href,
-          },
+      email: securityEmail(message, token, origin),
     });
     if (outcome.status === 'deferred') {
       // A rate-limited request was never processed, so it doesn't use up an attempt.

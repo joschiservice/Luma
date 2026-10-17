@@ -108,10 +108,27 @@ dispatch; uncertain sent operations remain claimed until their outcome is known.
 
 ## Refresh-only webhooks
 
-The optional installation-owned bearer secret authenticates the sender's Authorization
-header. This is Luma's wakeup protocol, not a claim that Starshipit signs events with a
-documented signature. Without a configured secret delivery is denied. Installation,
-tenant, connection status and version are rechecked before storing a refresh hint.
+An installation-owned bearer secret authenticates the sender's Authorization header. This
+is Luma's wakeup protocol, not a claim that Starshipit signs events with a documented
+signature. The secret is readable exactly once: Luma generates 32 random bytes only in the
+`generate-webhook-secret` app command and returns the wakeup path and header in that
+response. No command reads it back. The setup form calls the command right after saving
+keys and offers it again in connection settings for a lost secret.
+
+Generation requires current `connections.manage`, a writable session and the reviewed
+connection version. It replaces the secret immediately without an overlap: senders are
+configured by hand, a second valid secret would extend the life of a leaked one, and a
+missed wakeup only delays a read that scheduled sync still performs. The connection version
+advances without changing the credential version, and a `webhook_secret_generated`
+lifecycle event appears in Activity without the secret.
+
+Saving keys replaces the stored credentials, so it drops the secret unless one is supplied.
+Programmatic installs, such as the pilot and simulator, may supply their own secret of at
+least 32 printable characters that is not a short repeated pattern. Every credential parse
+rejects shorter or weaker secrets; a connection holding one fails reads and wakeups until
+its keys are saved again. A missing or malformed bearer header is refused before the
+connection is read or its credentials decrypted. Installation, tenant, connection status
+and version are rechecked before storing a refresh hint.
 
 Payloads never update canonical state. Identical deliveries are deduplicated; delayed or
 reordered events request a current read. That read supplies the evidence, so old events

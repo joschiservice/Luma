@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 
 import { authoringModel } from './authoring-fixture.mjs';
-import { database, signup, startApi } from './helpers.mjs';
+import { addMembership, database, signup, startApi } from './helpers.mjs';
 
 /** A computation workflow that validates against the default installed vocabulary. */
 const checkOrder = {
@@ -31,7 +31,7 @@ const checkOrder = {
   ],
 };
 
-async function workspace(api, name) {
+async function workspace(api, db, name) {
   const owner = await signup(api, `${name}-owner`);
   const member = await signup(api, `${name}-member`);
   const org = (
@@ -46,12 +46,7 @@ async function workspace(api, name) {
       },
     })
   ).body;
-  await api.request(`/v1/organizations/${org.id}/members`, {
-    cookie: owner.cookie,
-    method: 'POST',
-    status: 201,
-    body: { userId: member.userId, roleId: 'member' },
-  });
+  await addMembership(db.owner, org.id, member.userId, 'member');
 
   return { org, owner, member, base: `/v1/organizations/${org.id}` };
 }
@@ -61,8 +56,8 @@ it('explains why describing is unavailable without a regional route and keeps te
   await db.migrate();
   await db.grantRuntime();
   const api = await startApi(t, db);
-  const { owner, member, base } = await workspace(api, 'describing');
-  const other = await workspace(api, 'elsewhere');
+  const { owner, member, base } = await workspace(api, db, 'describing');
+  const other = await workspace(api, db, 'elsewhere');
   const call = (user, path, options = {}) =>
     api.request(`${base}${path}`, { cookie: user.cookie, ...options });
 
@@ -215,7 +210,7 @@ it('describes, refines and records a draft through the regional route without lo
     'http://localhost:3000',
     'e2e/authoring-server.mjs',
   );
-  const { owner, member, base } = await workspace(api, 'authoring-route');
+  const { owner, member, base } = await workspace(api, db, 'authoring-route');
   const call = (user, path, options = {}) =>
     api.request(`${base}${path}`, { cookie: user.cookie, ...options });
   expect((await call(member, '/workflow-authoring/generation')).body).toEqual({

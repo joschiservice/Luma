@@ -66,7 +66,9 @@ before returning a page. Dropped messages are fetched but never stored or return
   complete once every listed message is fetched; messages deleted in between are skipped.
   The cursor carries Gmail's page token and is bound to the connection and query.
 - `message-threads.read` returns every message of a thread, paged locally; it is the read
-  that verifies a send.
+  that verifies a send. A newly composed send's thread is found through its Message-ID in
+  `in:sent` only, so a message someone else sent with the same Message-ID cannot redirect
+  the read.
 - Bodies prefer text/plain; HTML-only bodies are converted to plain text without rendering.
   Text is capped at 100,000 characters and marked truncated. UTF-8, Latin-1 and other
   charsets Node knows are decoded; unknown ones fall back to UTF-8.
@@ -74,6 +76,20 @@ before returning a page. Dropped messages are fetched but never stored or return
   change between reads, so they are never used as identity. Inline parts without a filename,
   such as embedded images, are not attachments. `message-attachments.read` rejects content
   above the requested size before downloading it.
+- Each message reports whether Gmail authenticated its sender. Only the topmost
+  `Authentication-Results` header with authserv-id `mx.google.com` counts: Gmail adds it on
+  receipt, and anything below it travelled with the message and may be forged. The sender is
+  `aligned` when that header reports `dmarc=pass` with `header.from` equal to the domain of
+  the single From address, `unaligned` when it reports anything else, and `unknown` without
+  such a header (messages the mailbox sent, mail imported into the mailbox, or other mail
+  that never crossed Gmail's inbound boundary). SPF or DKIM passing alone does not identify
+  an external From address.
+- Mail between users of the same Google Workspace domain often carries no DMARC result.
+  When the From domain is the mailbox's own domain, a `dkim=pass` in that trusted header
+  whose `header.d` (or `header.i`) is exactly that domain also counts as `aligned`: only the
+  domain's own key can produce it. SPF never does, because Google's sending servers serve
+  every Workspace customer. Internal mail without any Gmail header stays `unknown`, which
+  people see as "could not be verified" rather than as a failed check.
 - Message reads are returned to the messaging owner only. They are not recorded as commerce
   observations, because messages are personal data with their own retention.
 
@@ -183,5 +199,8 @@ seconds; unknown mailboxes and malformed payloads get 204 so Pub/Sub stops redel
 
 Simulated connections (labels starting with `SIMULATED`, or `.invalid` mailboxes) route every
 request, including token refresh, to the [simulator](simulator.md) and never reach Google.
+The simulator writes Gmail's `Authentication-Results` header with `dmarc=pass` for mail it
+delivers from other senders, so simulated suppliers are authenticated unless a command asks
+for `fail` or `none`.
 Without OAuth settings, connections are created with an access token and no refresh, as the
 pilot does.

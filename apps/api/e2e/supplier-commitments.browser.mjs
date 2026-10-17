@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
+import { createObservability } from '@luma/platform/composition';
+
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess, until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
@@ -282,6 +284,245 @@ test('sends an order with a second approver, follows the supplier to receipt and
     await narrow.goto(orderPath);
     await narrow
       .getByRole('heading', { name: 'PO-2026-201', exact: true })
+      .waitFor();
+    expect(
+      await narrow.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('settles an order email left uncertain by an unverified bounce with a confirmed decision', async ({
+  resources: t,
+}) => {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const flags = { 'procurement-email-submission': true };
+  const f = await setupSimulator(t, {
+    origin,
+    featureFlagOverrides: flags,
+    observability: createObservability({
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      featureFlagOverrides: flags,
+    }),
+  });
+  await f.pilot.observe();
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+  const org = f.manifest.organizationId;
+  const login = async (email) => {
+    const response = await f.pilot.app.inject({
+      method: 'POST',
+      url: '/auth/sign-in/email',
+      headers: { origin },
+      payload: { email, password: f.password },
+    });
+    assert.equal(response.statusCode, 200, response.body);
+
+    return []
+      .concat(response.headers['set-cookie'])
+      .map((v) => v.split(';')[0])
+      .join('; ');
+  };
+  const buyerCookie = await login('pilot-operator@example.test');
+  const approverCookie = await login('pilot-requester@example.test');
+  const api = async (path, body, cookie = buyerCookie) => {
+    const response = await f.pilot.app.inject({
+      method: body ? 'POST' : 'GET',
+      url: `/v1/organizations/${org}${path}`,
+      headers: { cookie, origin },
+      ...(body ? { payload: body } : {}),
+    });
+    assert.equal(response.statusCode, 200, `${path}: ${response.body}`);
+
+    return response.json();
+  };
+  const supplier = await api('/procurement/suppliers', {
+    id: randomUUID(),
+    name: 'Kontor Papier',
+    email: 'orders@kontor-papier.example',
+    language: 'en',
+    externalReferences: [],
+  });
+  const sku = (
+    await f.db.owner.query(
+      `SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2
+       AND resource='sku' AND external_id='2'`,
+      [org, f.manifest.connections.jtl],
+    )
+  ).rows[0].canonical_id;
+  const order = await api('/procurement/purchase-orders', {
+    id: randomUUID(),
+    supplierId: supplier.id,
+    reference: 'PO-2026-301',
+    lines: [
+      {
+        id: randomUUID(),
+        sku,
+        description: 'Canvas tote',
+        quantity: 20,
+        unit: 'each',
+      },
+    ],
+  });
+
+  // The order email is approved by a second person and verified as sent by the mailbox.
+  await api('/messaging/mailboxes');
+  const draft = await api(
+    `/procurement/purchase-orders/${order.id}/email/submission`,
+    {
+      id: randomUUID(),
+      connectionId: f.manifest.connections.gmail,
+      requestedDeliveryDate: new Date(Date.now() + 7 * 86_400_000)
+        .toISOString()
+        .slice(0, 10),
+      company: {
+        name: 'Luma Goods GmbH',
+        address: 'Hauptstraße 1\n10115 Berlin',
+        registration: null,
+      },
+    },
+  );
+  const requested = await api(`/messaging/outbound/${draft.id}/request`, {
+    id: randomUUID(),
+  });
+  const sent = await api(
+    `/messaging/outbound/${draft.id}/decision`,
+    { decisionId: requested.decisionId, outcome: 'approved' },
+    approverCookie,
+  );
+  expect(sent.state).toBe('sent');
+
+  // A bounce whose sender Gmail could not authenticate leaves delivery uncertain.
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'gmail',
+    command: {
+      kind: 'bounce',
+      message: `luma.${draft.id}@luma-goods.example`,
+      recipient: supplier.email,
+      status: '5.1.1',
+      authentication: 'fail',
+    },
+  });
+  await until(
+    async () => {
+      // Bounces match no mailbox rule; the supplier mail pass rereads the send's thread.
+      await f.db.owner.query(
+        `UPDATE messaging_outbound SET document=jsonb_set(document,'{deliveryCheckedAt}','"2026-01-01T00:00:00Z"')
+         WHERE tenant_id=$1 AND id=$2`,
+        [org, draft.id],
+      );
+      await api(
+        `/messaging/mailboxes/${f.manifest.connections.gmail}/sync`,
+        {},
+      );
+      await f.pilot.messaging.sync({ passes: 5 });
+      const record = await api(
+        `/procurement/purchase-orders/${order.id}/record`,
+      );
+
+      return record.submission?.state === 'uncertain';
+    },
+    'the unverified bounce makes the order email uncertain',
+    30_000,
+  );
+
+  const context = await t.newContext({
+    baseURL: origin,
+    viewport: { width: 1440, height: 1000 },
+  });
+  await context.addCookies(
+    buyerCookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
+
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  const buyer = await context.newPage();
+  buyer.setDefaultTimeout(20000);
+  const errors = [];
+  buyer.on('pageerror', (error) => errors.push(error.message));
+  await buyer.goto(`/app/${org}/procurement/${order.id}`);
+  const panel = buyer.getByRole('region', { name: 'Supplier email' });
+  await panel.getByText('Recipient in the report').waitFor();
+  await expect(panel.getByText(supplier.email).first()).toBeVisible();
+  await expect(panel.getByText('5.1.1').first()).toBeVisible();
+  await expect(
+    panel.getByRole('button', { name: 'Draft order email' }),
+  ).toHaveCount(0);
+
+  // Cancel leaves it unchanged; a lost response is retried with the same request.
+  const actions = panel.getByRole('group', { name: 'Delivery decision' });
+  await actions.getByRole('button', { name: 'Mark as not delivered' }).click();
+  let dialog = buyer.getByRole('dialog');
+  await expect(
+    dialog.getByRole('heading', { name: 'Mark this email as not delivered?' }),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await actions.getByRole('button', { name: 'Mark as not delivered' }).click();
+  dialog = buyer.getByRole('dialog');
+  await dialog
+    .getByLabel('Note (optional)')
+    .fill('Called Kontor Papier; the order never arrived.');
+  await buyer.route(
+    '**/messaging/outbound/*/delivery',
+    async (route) => {
+      await route.fetch();
+      await route.abort('failed');
+    },
+    { times: 1 },
+  );
+  await dialog.getByRole('button', { name: 'Mark as not delivered' }).click();
+  await dialog.getByRole('alert').waitFor();
+  await dialog.getByRole('button', { name: 'Retry', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+
+  await expect(panel.getByText(/Marked as not delivered by You/)).toBeVisible();
+  await expect(
+    panel.getByText('Note: Called Kontor Papier; the order never arrived.'),
+  ).toBeVisible();
+  // Not delivered lets the buyer draft the order email again.
+  await expect(
+    panel.getByRole('button', { name: 'Draft order email' }),
+  ).toBeEnabled();
+  const record = await api(`/procurement/purchase-orders/${order.id}/record`);
+  expect(record.submission).toMatchObject({
+    channel: 'email',
+    state: 'failed',
+  });
+
+  for (const colorScheme of ['dark', 'light']) {
+    const narrow = await (
+      await t.newContext({
+        baseURL: origin,
+        viewport: { width: 390, height: 844 },
+        colorScheme,
+      })
+    ).newPage();
+    await narrow.context().addCookies(
+      buyerCookie.split('; ').map((value) => {
+        const [name, ...rest] = value.split('=');
+
+        return { name, value: rest.join('='), url: origin };
+      }),
+    );
+    await narrow.goto(`/app/${org}/procurement/${order.id}`);
+    await narrow
+      .getByRole('region', { name: 'Supplier email' })
+      .getByText(/Marked as not delivered by You/)
       .waitFor();
     expect(
       await narrow.evaluate(

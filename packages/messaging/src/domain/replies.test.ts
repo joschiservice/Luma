@@ -5,7 +5,9 @@ import type { RecordState, ReplyBasis } from './replies.js';
 import {
   composeReply,
   detectLanguage,
+  repliedOutboundId,
   replyActions,
+  replyProvesDelivery,
   replyRecipients,
   replySubject,
   threadHeaders,
@@ -311,5 +313,94 @@ describe('reply actions', () => {
       replyActions(reply({ state: 'sent' }), reader('bob', sender), now)
         .canCheck,
     ).toBe(false);
+  });
+});
+
+describe('delivery proven by a reply', () => {
+  const send = {
+    id: '6f1c2c1e-0000-4000-8000-000000000001',
+    fromAddress: 'ops@shop.example',
+    recipients: [{ address: 'Anna@Acme.example', name: 'Anna' }],
+  };
+  const sentId = `luma.${send.id}@shop.example`;
+  const reply = (
+    input: Partial<Parameters<typeof replyProvesDelivery>[1]> = {},
+  ): Parameters<typeof replyProvesDelivery>[1] => ({
+    direction: 'inbound',
+    from: { address: 'anna@acme.example', name: 'Anna' },
+    senderAuthentication: 'aligned',
+    inReplyTo: sentId,
+    references: [sentId],
+    ...input,
+  });
+
+  it('accepts an authenticated direct reply from a recipient', () => {
+    expect(replyProvesDelivery(send, reply())).toBe(true);
+    expect(repliedOutboundId(reply())).toBe(send.id);
+    // Without In-Reply-To the last reference is the parent.
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({ inReplyTo: null, references: ['x@y', sentId] }),
+      ),
+    ).toBe(true);
+    expect(
+      replyProvesDelivery(send, reply({ inReplyTo: sentId.toUpperCase() })),
+    ).toBe(true);
+  });
+
+  it('rejects unauthenticated senders, other senders and delivery reports', () => {
+    expect(
+      replyProvesDelivery(send, reply({ senderAuthentication: 'unaligned' })),
+    ).toBe(false);
+    expect(
+      replyProvesDelivery(send, reply({ senderAuthentication: 'unknown' })),
+    ).toBe(false);
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({ from: { address: 'someone@acme.example', name: null } }),
+      ),
+    ).toBe(false);
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({
+          deliveryFailure: {
+            originalMessageId: sentId,
+            recipient: 'anna@acme.example',
+            status: '5.1.1',
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(replyProvesDelivery(send, reply({ direction: 'outbound' }))).toBe(
+      false,
+    );
+  });
+
+  it('rejects replies to another message, even when the chain names the send', () => {
+    const later = 'luma.6f1c2c1e-0000-4000-8000-000000000002@shop.example';
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({ inReplyTo: later, references: [sentId, later] }),
+      ),
+    ).toBe(false);
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({ inReplyTo: null, references: [sentId, 'other@acme.example'] }),
+      ),
+    ).toBe(false);
+    expect(
+      replyProvesDelivery(
+        send,
+        reply({ inReplyTo: `luma.${send.id}@attacker.example` }),
+      ),
+    ).toBe(false);
+    expect(repliedOutboundId(reply({ inReplyTo: 'm1@acme.example' }))).toBe(
+      null,
+    );
   });
 });

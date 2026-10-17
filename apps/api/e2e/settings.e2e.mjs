@@ -367,10 +367,10 @@ it('sends deduplicated opt-in notifications, cancels muted or removed recipients
       'sensitive-provider-secret',
     ],
   );
-  const emit = async (version) =>
+  const emit = async (version, status = 'degraded') =>
     f.db.owner.query(
-      "INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version) VALUES($1,$2,$3,'degraded',$4,'degraded',1) ON CONFLICT DO NOTHING",
-      [org.id, connection, version, owner.id],
+      'INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version) VALUES($1,$2,$3,$4,$5,$4,1) ON CONFLICT DO NOTHING',
+      [org.id, connection, version, status, owner.id],
     );
   await emit(1);
   await emit(1);
@@ -379,13 +379,18 @@ it('sends deduplicated opt-in notifications, cancels muted or removed recipients
   expect([...f.messages.values()][1].text).not.toContain(
     'sensitive-provider-secret',
   );
+  // A connection that stays degraded announces nothing new.
   await emit(2);
+  await f.drain();
+  expect(f.messages.size).toBe(2);
   await request(
     member,
     `${base}/settings/notifications`,
     'PATCH',
     command({ revision: 1, issues: false, connections: false }),
   );
+  await emit(3, 'active');
+  await emit(4);
   await f.drain();
   expect(f.messages.size).toBe(2);
   await request(
@@ -394,7 +399,8 @@ it('sends deduplicated opt-in notifications, cancels muted or removed recipients
     'PATCH',
     command({ revision: 2, issues: true, connections: true }),
   );
-  await emit(3);
+  await emit(5, 'active');
+  await emit(6);
   await request(
     owner,
     `${base}/members/${f.membership.id}`,
@@ -823,12 +829,21 @@ it('lets solo owners approve, preserves team preferences and invalidates reviews
     command({ email: outsider.email, roleId: 'admin' }),
   );
   expect(await policies.requiresIndependentApproval(f.org.id)).toBe(false);
+  // The removed member rejoins only by accepting an invitation.
   await request(
     owner,
-    `${base}/members`,
+    `${base}/settings/invitations`,
     'POST',
-    { userId: member.id, roleId: 'admin' },
-    201,
+    command({ email: member.email, roleId: 'admin' }),
+  );
+  await f.drain();
+  await request(
+    member,
+    '/v1/invitations/accept',
+    'POST',
+    invitationProof(
+      [...f.messages.values()].findLast((m) => m.to === member.email),
+    ),
   );
   expect(await policies.requiresIndependentApproval(f.org.id)).toBe(true);
   expect((await evaluate()).outcome).toBe('approval_required');

@@ -13,7 +13,12 @@ import { MailCheck } from 'lucide-react';
 import { useState } from 'react';
 
 import { EntryFrame } from '../../kit/identity/common';
-import { organizationsOptions } from '../../kit/identity/data';
+import {
+  ApiError,
+  auth,
+  organizationsOptions,
+  sessionOptions,
+} from '../../kit/identity/data';
 import {
   forgetInvitationToken,
   invitationToken,
@@ -37,6 +42,12 @@ export function AcceptInvitation() {
   const client = useQueryClient();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  // Set when joining was refused because the account's address isn't confirmed yet.
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [confirmation, setConfirmation] = useState<
+    'sending' | 'sent' | 'failed'
+  >();
+  const session = useQuery(sessionOptions());
   const invitation = useQuery({
     queryKey: ['private', 'invitation', organizationId, invitationId, token],
     retry: false,
@@ -47,6 +58,8 @@ export function AcceptInvitation() {
   async function accept() {
     setPending(true);
     setError('');
+    setUnconfirmed(false);
+    setConfirmation(undefined);
     try {
       await settingsApi.settings.acceptInvitation({ body: proof });
       forgetInvitationToken(path);
@@ -75,6 +88,9 @@ export function AcceptInvitation() {
       } catch {
         /* Keep the invitation available for a safe retry after connectivity returns. */
       }
+      setUnconfirmed(
+        error instanceof ApiError && error.code === 'EMAIL_NOT_VERIFIED',
+      );
       setError(
         error instanceof Error
           ? error.message
@@ -82,6 +98,18 @@ export function AcceptInvitation() {
       );
     } finally {
       setPending(false);
+    }
+  }
+
+  async function sendConfirmation() {
+    const email = session.data?.user.email;
+    if (!email) return setConfirmation('failed');
+    setConfirmation('sending');
+    try {
+      const result = await auth.sendVerificationEmail({ email });
+      setConfirmation(result.error ? 'failed' : 'sent');
+    } catch {
+      setConfirmation('failed');
     }
   }
 
@@ -124,6 +152,26 @@ export function AcceptInvitation() {
           <Alert role="alert" tone="danger">
             {error}
           </Alert>
+        ) : null}
+        {unconfirmed && session.data?.user.email ? (
+          <>
+            <Button
+              variant="outline"
+              disabled={confirmation === 'sending'}
+              onClick={() => void sendConfirmation()}
+            >
+              {m.settings_invitation_verify_send()}
+            </Button>
+            <p role="status">
+              {confirmation === 'sent'
+                ? m.settings_invitation_verify_sent({
+                    email: session.data.user.email,
+                  })
+                : confirmation === 'failed'
+                  ? m.settings_invitation_verify_failed()
+                  : ''}
+            </p>
+          </>
         ) : null}
         <Link className="entry-back" to="/app">
           {m.settings_invitation_back()}

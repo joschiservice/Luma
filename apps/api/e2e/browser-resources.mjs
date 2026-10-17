@@ -1,6 +1,13 @@
-/** Provides isolated contexts and reverse-order cleanup, attempting every cleanup even after failures. */
+/* global document */
+
+/**
+ * Provides isolated contexts and reverse-order cleanup, attempting every cleanup even after
+ * failures. A test fails when any of its pages reports a Content Security Policy violation,
+ * so framework or feature scripts that miss the response nonce are caught by every journey.
+ */
 export async function useBrowserResources({ browser }, use, testInfo) {
   const cleanup = [];
+  const cspViolations = [];
   let cleanupFailed = false;
   const resources = {
     get failed() {
@@ -13,6 +20,21 @@ export async function useBrowserResources({ browser }, use, testInfo) {
     async newContext(options) {
       const context = await browser.newContext(options);
       cleanup.push(() => context.close());
+      await context.exposeBinding(
+        '__lumaReportCspViolation',
+        ({ page }, violation) =>
+          cspViolations.push({ page: page.url(), ...violation }),
+      );
+      await context.addInitScript(() =>
+        document.addEventListener('securitypolicyviolation', (event) =>
+          globalThis.__lumaReportCspViolation({
+            directive: event.effectiveDirective,
+            blocked: event.blockedURI,
+            source: `${event.sourceFile}:${event.lineNumber}`,
+            sample: event.sample,
+          }),
+        ),
+      );
 
       return context;
     },
@@ -23,6 +45,12 @@ export async function useBrowserResources({ browser }, use, testInfo) {
   let bodyError;
   try {
     await use(resources);
+    if (cspViolations.length)
+      throw new Error(
+        `Content Security Policy violations:\n${cspViolations
+          .map((violation) => JSON.stringify(violation))
+          .join('\n')}`,
+      );
   } catch (error) {
     bodyError = error;
     cleanupFailed = true;

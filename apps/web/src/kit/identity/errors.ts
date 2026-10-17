@@ -44,6 +44,8 @@ export function requestErrorMessage(error: unknown, fallback?: string) {
     return m.identity_error_unauthenticated();
   if (code === 'ACCESS_SUSPENDED') return m.identity_error_access_suspended();
   if (code === 'READ_ONLY') return m.identity_error_read_only();
+  if (code === 'EMAIL_NOT_VERIFIED')
+    return m.identity_auth_email_not_verified();
   if (status === 403 || code === 'FORBIDDEN')
     return m.identity_error_forbidden();
   if (status === 404 || code === 'NOT_FOUND')

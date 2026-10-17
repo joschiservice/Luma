@@ -3,7 +3,13 @@ import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { seedCodeSteps } from './code-steps-fixture.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 test('reviews and evaluates a code example on desktop and mobile', async ({
   resources: t,
@@ -30,17 +36,11 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('code@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'code@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Code studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

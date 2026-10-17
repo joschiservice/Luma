@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, hkdfSync, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
@@ -60,20 +60,33 @@ describe.skipIf(!databaseUrl)(
     let orgB: string;
     const headers = (cookie: string) => ({ cookie, origin });
 
+    /** Registers a person, confirms the address as the emailed link would, and signs in. */
     async function signup(name: string) {
+      const email = `${name}@example.test`;
       const response = await app.inject({
         method: 'POST',
         url: '/auth/sign-up/email',
         headers: { origin },
         payload: {
           name,
-          email: `${name}@example.test`,
+          email,
           dataRegion: 'AU',
           password: 'test-password-long-enough',
         },
       });
       expect(response.statusCode, response.body).toBe(200);
-      const cookies = response.headers['set-cookie'];
+      expect(response.headers['set-cookie']).toBeUndefined();
+      await owner.query('UPDATE users SET email_verified=true WHERE email=$1', [
+        email,
+      ]);
+      const signedIn = await app.inject({
+        method: 'POST',
+        url: '/auth/sign-in/email',
+        headers: { origin },
+        payload: { email, password: 'test-password-long-enough' },
+      });
+      expect(signedIn.statusCode, signedIn.body).toBe(200);
+      const cookies = signedIn.headers['set-cookie'];
 
       return {
         id: response.json().user.id as string,
@@ -141,6 +154,8 @@ describe.skipIf(!databaseUrl)(
         secret,
         baseURL: origin,
         trustedOrigins: [origin],
+        // The suite signs in many times from one inject address.
+        rateLimit: { enabled: false },
       });
       app.get(
         '/v1/organizations/:organizationId/probe',
@@ -364,14 +379,19 @@ describe.skipIf(!databaseUrl)(
       expect(bypass.statusCode).toBe(404);
     });
     it('supports multiple memberships, role guards, scoped mutation and immediate revocation', async () => {
-      const added = await app.inject({
+      // People join by invitation; no customer route adds an account by ID.
+      const byId = await app.inject({
         method: 'POST',
         url: `/v1/organizations/${orgA}/members`,
         headers: headers(alice.cookie),
         payload: { userId: bob.id, roleId: 'member' },
       });
-      expect(added.statusCode, added.body).toBe(201);
-      const memberId = added.json().id;
+      expect(byId.statusCode, byId.body).toBe(404);
+      const memberId = randomUUID();
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'member',now())",
+        [memberId, orgA, bob.id],
+      );
       const list = await app.inject({
         url: '/v1/organizations',
         headers: headers(bob.cookie),
@@ -558,13 +578,11 @@ describe.skipIf(!databaseUrl)(
     });
     it('serializes competing owner removals and keeps one owner', async () => {
       const organizationId = await createOrg(alice.cookie, 'concurrent');
-      const added = await app.inject({
-        method: 'POST',
-        url: `/v1/organizations/${organizationId}/members`,
-        headers: headers(alice.cookie),
-        payload: { userId: bob.id, roleId: 'owner' },
-      });
-      expect(added.statusCode).toBe(201);
+      const bobMemberId = randomUUID();
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'owner',now())",
+        [bobMemberId, organizationId, bob.id],
+      );
       const list = await app.inject({
         url: `/v1/organizations/${organizationId}/members`,
         headers: headers(alice.cookie),
@@ -581,7 +599,7 @@ describe.skipIf(!databaseUrl)(
         }),
         app.inject({
           method: 'PATCH',
-          url: `/v1/organizations/${organizationId}/members/${added.json().id}`,
+          url: `/v1/organizations/${organizationId}/members/${bobMemberId}`,
           headers: headers(bob.cookie),
           payload: { roleId: 'member' },
         }),
@@ -948,7 +966,18 @@ describe.skipIf(!databaseUrl)(
             event_type: 'sign-in.password',
             outcome: 'failed',
             reason_code: 'invalid-credentials',
-            email_hash: createHmac('sha256', secret)
+            email_hash: createHmac(
+              'sha256',
+              Buffer.from(
+                hkdfSync(
+                  'sha256',
+                  secret,
+                  'luma-auth-secret',
+                  'luma:security-event-email:v1',
+                  32,
+                ),
+              ).toString('hex'),
+            )
               .update('account-security-email:nobody@example.test')
               .digest('hex'),
           }),
@@ -1037,6 +1066,8 @@ describe.skipIf(!databaseUrl)(
             event.reason_code,
           ]),
         ).toEqual([
+          // The fixture's first sign-in after confirming the email address.
+          ['sign-in.password', 'succeeded', null],
           ['two-factor.enabled', 'succeeded', null],
           ['two-factor.backup-codes-regenerated', 'succeeded', null],
           ['sign-in.password', 'succeeded', 'second-factor-required'],
@@ -1046,6 +1077,71 @@ describe.skipIf(!databaseUrl)(
           ['sessions.revoked', 'succeeded', 'others'],
           ['password.changed', 'succeeded', null],
         ]);
+      });
+
+      it('ends one own session by ID without exposing session tokens', async () => {
+        const ivy = await signup('ivy');
+        const jack = await signup('jack');
+        const second = await signIn('ivy@example.test');
+        expect(second.statusCode, second.body).toBe(200);
+        const other = responseCookies(second);
+        const list = await app.inject({
+          url: '/auth/list-sessions',
+          headers: headers(ivy.cookie),
+        });
+        expect(list.statusCode, list.body).toBe(200);
+        const sessions = list.json() as { id: string; current: boolean }[];
+        expect(sessions).toHaveLength(2);
+        expect(list.body).not.toMatch(/token/i);
+        const jackSession = (
+          await owner.query<{ id: string }>(
+            'SELECT id FROM sessions WHERE user_id=$1',
+            [jack.id],
+          )
+        ).rows[0]!.id;
+
+        for (const sessionId of [jackSession, 'not-a-session'])
+          expect(
+            (
+              await post('/auth/revoke-session-by-id', ivy.cookie, {
+                sessionId,
+              })
+            ).statusCode,
+          ).toBe(200);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/organizations',
+              headers: headers(jack.cookie),
+            })
+          ).statusCode,
+        ).toBe(200);
+        const target = sessions.find((session) => !session.current)!.id;
+        for (let attempt = 0; attempt < 2; attempt++)
+          expect(
+            (
+              await post('/auth/revoke-session-by-id', ivy.cookie, {
+                sessionId: target,
+              })
+            ).statusCode,
+          ).toBe(200);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/organizations',
+              headers: headers(other),
+            })
+          ).statusCode,
+        ).toBe(401);
+        expect(
+          (await post('/auth/revoke-session', ivy.cookie, { token: target }))
+            .statusCode,
+        ).toBe(404);
+        expect(
+          (await events(ivy.id))
+            .filter((event) => event.event_type === 'sessions.revoked')
+            .map((event) => [event.outcome, event.reason_code]),
+        ).toEqual([['succeeded', 'one']]);
       });
 
       it('lists only the signed-in person’s own events, newest first, in pages', async () => {
@@ -1081,7 +1177,8 @@ describe.skipIf(!databaseUrl)(
         const next = (
           await list(grace.cookie, page.nextCursor!)
         ).json() as Page;
-        expect(next.items).toHaveLength(2);
+        // 22 seeded events and the fixture's first sign-in.
+        expect(next.items).toHaveLength(3);
         expect(next.nextCursor).toBeNull();
         const items = [...page.items, ...next.items];
         const times = items.map((item) => Date.parse(item.createdAt));
@@ -1097,6 +1194,10 @@ describe.skipIf(!databaseUrl)(
           expect.objectContaining({
             type: 'sign-in.password',
             outcome: 'failed',
+          }),
+          expect.objectContaining({
+            type: 'sign-in.password',
+            outcome: 'succeeded',
           }),
         ]);
         expect((await list('')).statusCode).toBe(401);
@@ -1181,14 +1282,11 @@ describe.skipIf(!databaseUrl)(
         }
         organizationId = await createOrg(alice.cookie, 'roles');
         carol = await signup('role-tester');
-        const added = await app.inject({
-          method: 'POST',
-          url: `/v1/organizations/${organizationId}/members`,
-          headers: commandHeaders(alice.cookie),
-          payload: { userId: carol.id, roleId: 'member' },
-        });
-        expect(added.statusCode, added.body).toBe(201);
-        carolMember = added.json().id;
+        carolMember = randomUUID();
+        await owner.query(
+          "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'member',now())",
+          [carolMember, organizationId, carol.id],
+        );
       });
 
       it('applies a custom role and its edits on the next request', async () => {

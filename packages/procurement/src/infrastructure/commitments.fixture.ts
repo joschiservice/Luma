@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
+import type { ModelGateway } from '@luma/platform';
 
 import {
   type CommitmentDependencies,
@@ -15,6 +16,8 @@ import type {
 } from '../application/purchasing-reads.js';
 import type {
   Commitment,
+  Communication,
+  Extraction,
   FollowUp,
   Submission,
 } from '../domain/commitments.js';
@@ -31,8 +34,11 @@ import {
   supplierLinkInputSchema,
 } from './validation.js';
 
-/** An in-memory supplier-commitment service with inspectable records, for owner tests. */
-export function commitmentFixture() {
+/**
+ * An in-memory supplier-commitment service with inspectable records, for owner tests. Pass a
+ * model gateway to extract commitments from recorded messages.
+ */
+export function commitmentFixture(gateway: ModelGateway | null = null) {
   const tenantId = randomUUID();
   const userId = randomUUID();
   const context = (
@@ -86,6 +92,8 @@ export function commitmentFixture() {
     updatedAt: supplier.createdAt,
   };
   const commitments: Commitment[] = [];
+  const communications = new Map<string, Communication>();
+  const extractions: Extraction[] = [];
   const followUps: FollowUp[] = [];
   const submissions: Submission[] = [];
   const audits: AuditEntry[] = [];
@@ -113,13 +121,19 @@ export function commitmentFixture() {
       if (index >= 0) submissions[index] = value;
     },
     liveSubmissions: async () => submissions,
-    communications: async () => [],
-    communication: async () => null,
-    communicationByKey: async () => null,
-    insertCommunication: async () => {},
+    communications: async () => [...communications.values()],
+    communication: async (id) =>
+      [...communications.values()].find((c) => c.id === id) ?? null,
+    communicationByKey: async (key) => communications.get(key) ?? null,
+    insertCommunication: async (value, key) => {
+      communications.set(key, value);
+    },
     purgeCommunication: async () => {},
-    extractions: async () => [],
-    insertExtraction: async () => {},
+    extractions: async (ids) =>
+      extractions.filter((e) => ids.includes(e.communicationId)),
+    insertExtraction: async (value) => {
+      extractions.push(value);
+    },
     commitments: async () => commitments,
     commitment: async (id) => commitments.find((c) => c.id === id) ?? null,
     insertCommitment: async (value) => {
@@ -182,9 +196,9 @@ export function commitmentFixture() {
     openOrder: async () => {},
     verifiedDrafts: async () => new Set(),
     model: {
-      gateway: null,
-      available: false,
-      reason: 'Not configured',
+      gateway,
+      available: !!gateway,
+      reason: gateway ? '' : 'Not configured',
       output: extractionOutput,
     },
     trace: (ctx) => ({

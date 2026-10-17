@@ -8,6 +8,7 @@ import {
 import { defaultConfiguration } from '@luma/exceptions';
 import { parseInput } from '@luma/exceptions/composition';
 import { createIdentity } from '@luma/identity/composition';
+import { Pool } from 'pg';
 
 import { stateDirectory } from './environment.mjs';
 
@@ -57,18 +58,28 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
 
     return response.json();
   };
+  const users = new Pool({ connectionString: settings.databaseUrl, max: 1 });
   try {
-    let auth = await request('/auth/sign-in/email', {
-      email,
-      password: saved.seedPassword,
-    });
+    const signIn = () =>
+      request('/auth/sign-in/email', { email, password: saved.seedPassword });
+    let auth = await signIn();
     if (auth.statusCode === 401)
-      auth = await request('/auth/sign-up/email', {
-        dataRegion: env.LUMA_REGION ?? 'AU',
+      expect(
+        await request('/auth/sign-up/email', {
+          dataRegion: env.LUMA_REGION ?? 'AU',
+          email,
+          password: saved.seedPassword,
+          name: 'Demo operator',
+        }),
+        200,
+      );
+    if (auth.statusCode !== 200) {
+      // The synthetic demo address has no mailbox, so the seed confirms it directly.
+      await users.query('UPDATE users SET email_verified=true WHERE email=$1', [
         email,
-        password: saved.seedPassword,
-        name: 'Demo operator',
-      });
+      ]);
+      auth = await signIn();
+    }
     expect(auth, 200);
     const cookies = auth.headers['set-cookie'];
     cookie = (Array.isArray(cookies) ? cookies : [cookies])
@@ -144,6 +155,11 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
       'Demo workspace and two synthetic exception scenarios are ready.',
     );
   } finally {
-    await Promise.all([app.close(), identity.close(), detection.close()]);
+    await Promise.all([
+      app.close(),
+      identity.close(),
+      detection.close(),
+      users.end(),
+    ]);
   }
 }

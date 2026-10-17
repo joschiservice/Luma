@@ -113,11 +113,24 @@ export function composeHeaders(input: {
   references: string[];
   date: number;
   deliveredTo?: string | undefined;
+  /** Gmail's DMARC result for the From domain; omitted for `none`. */
+  authentication?: 'pass' | 'fail' | 'none' | undefined;
 }): Header[] {
+  const domain = input.from.address.slice(input.from.address.indexOf('@') + 1);
+  const authentication = input.authentication ?? 'none';
+
   return [
     ...(input.deliveredTo
       ? [{ name: 'Delivered-To', value: input.deliveredTo }]
       : []),
+    ...(authentication === 'none'
+      ? []
+      : [
+          {
+            name: 'Authentication-Results',
+            value: `mx.google.com; spf=${authentication} smtp.mailfrom=${input.from.address}; dmarc=${authentication} (p=NONE sp=NONE dis=NONE) header.from=${domain}`,
+          },
+        ]),
     { name: 'MIME-Version', value: '1.0' },
     { name: 'Date', value: mailDate(input.date) },
     { name: 'Message-ID', value: `<${input.messageId}>` },

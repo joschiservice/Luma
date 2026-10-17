@@ -64,7 +64,12 @@ restarts the scan. People see `needs_rules`, `syncing`, `current`, `paused`, `re
 
 ## Threads
 
-Messages and threads are stored once per provider ID. Each new message recomputes its thread:
+Messages and threads are stored once per provider ID. The RFC Message-ID is never an identity:
+anyone can copy it into another message, so two messages that share one are both kept, and
+it serves only as a threading hint and as the postcondition of Luma's own sends, where only
+the mailbox's own sent copy counts. Each inbound message keeps whether the mailbox provider
+authenticated its sender (`aligned`, `unaligned` or `unknown`, see [Gmail](gmail.md#reads));
+the thread shows a label for the last two. Each new message recomputes its thread:
 participants, the latest correspondent outside the mailbox, a snippet, counts and the latest
 inbound and outbound times. A new inbound message reopens a closed or waiting thread.
 
@@ -103,7 +108,18 @@ A reference or address that matches exactly one record gives an active link with
 text and its position in the message. When it matches several records, each becomes a
 suggestion: suggestions are shown but never acted on, and confirming one activates only that
 link. An ambiguous reference is not resolved by recency or similarity, because an action on the
-wrong order is worse than a person picking the right one. A link someone removed is never added
+wrong order is worse than a person picking the right one.
+
+Rule and address evidence counts only when the sender is authenticated (inbound and DMARC
+aligned, see [Gmail](gmail.md#reads)) or the mailbox provider confirms the mailbox sent the
+message. Otherwise it is a claim anyone can write into the From line, so it becomes a
+suggestion whose evidence says the sender was not verified, rather than an active link with
+an "unverified" flag: every consumer of active links (procurement handoff, document supplier
+matching, reply drafts, record pages) would otherwise need to know about the flag. A later
+message from an authenticated sender activates the suggestion, as any unambiguous evidence
+does, and a forged message never changes an existing link. References are text in the
+message and link the same way whoever sent it; the procurement handoff still needs the
+order's supplier. A link someone removed is never added
 again automatically. Record labels are shown only to readers with the record's own read
 permission.
 
@@ -114,8 +130,13 @@ sender matched a rule for that order's supplier or the thread is linked to that 
 message is recorded on the purchase order through procurement's message path, under the
 member the mailbox is read as. Procurement then extracts commitments and follows up as for
 messages recorded by hand ([supplier commitments](supplier-commitments.md#supplier-messages)).
-The record ID derives from the workspace and message, and procurement deduplicates by
-Message-ID, so rereads record nothing twice. A member without `procurement.manage` records a
+The record ID derives from the workspace and the inbox message (its provider ID), so
+rereads record nothing twice. The From address and the supplier rule it matched are only
+claims; the handoff also says whether the mailbox provider authenticated the sender's domain
+(DMARC aligned, see [Gmail](gmail.md#reads)). Procurement holds every fact from an
+unauthenticated sender for review, and only an authenticated message claims its Message-ID
+there, so a forged message sent first cannot make the genuine one a duplicate
+([supplier commitments](supplier-commitments.md#supplier-messages)). A member without `procurement.manage` records a
 `forbidden` outcome on the timeline instead. Only messages new to the inbox are handed off;
 linking an order to an older thread does not resend its history. Incomplete message text,
 including content beyond the procurement handoff limit, stays in the inbox with a reason and
@@ -246,8 +267,34 @@ not be recorded. An owner handoff interrupted by a restart is retried without an
 
 For 60 days after sending, periodic thread reads check for structured permanent delivery
 reports. Only a MIME delivery-status report naming the exact original Message-ID and an
-approved recipient marks the send failed; text saying "delivery failed" is insufficient.
-A bounce is separate evidence and does not erase the original acceptance. Gmail acceptance
+approved recipient counts; text saying "delivery failed" is insufficient. Anyone who has
+seen the email can send such a report, so it marks the send failed only when the mailbox
+provider authenticated the report's sender (DMARC aligned for its From domain, which covers
+Gmail's own `mailer-daemon@googlemail.com`). Any other report makes the send `uncertain`
+with a reason asking people to confirm with the supplier, so a forged report never prompts
+another order email. That uncertainty is about delivery, not acceptance: further reads of
+the send do not settle it. Three things do:
+
+- A later authenticated report marks it failed.
+- An inbound message that proves delivery marks it sent: the mailbox provider authenticated
+  its sender (DMARC aligned), the sender is one of the send's recipients, and its
+  `In-Reply-To` (or, without one, its last `References` entry) is the send's exact
+  Message-ID. Earlier `References` entries don't count, because a reply to a later follow-up
+  repeats them without proving they arrived. Unauthenticated replies prove nothing.
+- A person who asked the supplier records **delivered** (sent) or **not delivered**
+  (failed), with an optional internal note. This is a record of their decision, not an
+  external effect, so it needs no approval; like other recorded decisions it needs the
+  authority to send the email (`messages.send` and `procurement.manage`), the current
+  revision and a command ID, and it writes a `delivery_resolved` thread event and an audit
+  entry. It applies to any uncertain supplier email, including one whose send the mailbox
+  never confirmed: the person is the escalation execution asks for, and nothing is sent
+  again. Not delivered lets procurement draft the submission again.
+
+Each settlement keeps who or what decided, writes a thread event and an audit entry, and
+reopens the owner handoff, which the decision sends at once as the requester and the
+supplier mail pass retries. After a person or a reply settled delivery, only an
+authenticated report changes it again. A bounce is separate evidence and does not erase the
+original acceptance. Gmail acceptance
 does not establish supplier confirmation or guarantee final delivery. Stored draft PDF
 copies follow the mailbox retention policy, as do attachments read back from the provider.
 

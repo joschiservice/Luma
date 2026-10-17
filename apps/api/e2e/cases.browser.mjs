@@ -10,7 +10,13 @@ import {
 } from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 test('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async ({
   resources: t,
@@ -43,17 +49,11 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     if (request.url().includes('/adaptive/views'))
       disabledViewRequests.push(request.url());
   });
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('cases@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'cases@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('North Studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

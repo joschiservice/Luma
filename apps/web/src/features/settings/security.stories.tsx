@@ -96,7 +96,6 @@ function mockSecurity(state: SecurityState = 'off') {
         : Response.json([
             {
               id: 'session',
-              token: 'preview-token',
               current: true,
               lastActiveAt: '2026-10-09T08:40:00Z',
               ipAddress: '192.0.2.24',
@@ -127,6 +126,24 @@ function mockSecurity(state: SecurityState = 'off') {
                 ]
               : [],
           );
+    if (path === '/api/v1/account/support-inspections')
+      return Response.json({
+        items:
+          state === 'off'
+            ? []
+            : [
+                {
+                  id: '6d1f4b0e-3c2a-4e5f-9a8b-7c6d5e4f3a2b',
+                  status: 'pending',
+                  emergency: null,
+                  reason:
+                    'Ticket 4830: you reported that your passkey stopped working. We want to check your sign-in factors.',
+                  requestedAt: '2026-10-12T08:05:00Z',
+                  expiresAt: '2026-10-13T08:05:00Z',
+                  accessExpiresAt: null,
+                },
+              ],
+      });
     if (path === '/api/v1/account/security-events')
       return Response.json({
         items: state === 'off' ? [] : securityEvents,

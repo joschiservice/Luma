@@ -1,4 +1,5 @@
 import type {
+  OutboundDeliveryInput,
   SupplierContactInput,
   SupplierEmailInput,
   SupplierFollowUpInput,
@@ -8,7 +9,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { createProcurementClient, procurementKey } from './data';
 
-const api = createProcurementClient().procurementEmail;
+const client = createProcurementClient();
+const api = client.procurementEmail;
 
 /** Reads existing supplier mail alongside the server's tenant release decision. */
 export const supplierEmailOptions = (
@@ -35,6 +37,20 @@ export const draftSupplierFollowUp = (
   purchaseOrderId: string,
   body: SupplierFollowUpInput,
 ) => api.followUp({ params: { organizationId, purchaseOrderId }, body });
+
+/**
+ * Records a person's decision about an uncertain supplier email; nothing is sent. Repeat the
+ * same body after an unknown outcome.
+ */
+export const resolveSupplierEmailDelivery = (
+  organizationId: string,
+  outboundId: string,
+  body: OutboundDeliveryInput,
+) =>
+  client.messaging.resolveOutboundDelivery({
+    params: { organizationId, outboundId },
+    body,
+  });
 
 /** Updates contact details with a revision check and an idempotent command ID. */
 export const updateSupplierContact = (

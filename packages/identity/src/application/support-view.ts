@@ -42,6 +42,9 @@ export interface SupportViewCredentials {
   ): Promise<{ id: string; tenantId: string; token: string } | null>;
   /** Ends the view, recording who ended it as the view's staff member. */
   end(token: string, requestId: string): Promise<void>;
-  /** Ends open views that are no longer valid; returns how many ended. */
+  /**
+   * Ends open views that are no longer valid and lapses unanswered inspection requests; returns
+   * how many views ended.
+   */
   sweep(requestId: string): Promise<number>;
 }

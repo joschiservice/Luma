@@ -30,6 +30,7 @@ export async function seedStaff(
         'staff.view-as.emergency',
         'staff.accounts.manage',
         'staff.accounts.delete',
+        'staff.inspect.emergency',
       ],
     },
     migrationUrl,

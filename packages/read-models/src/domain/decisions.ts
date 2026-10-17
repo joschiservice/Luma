@@ -434,6 +434,8 @@ export function presentReplenishment(
 /** Something about a sent or sending purchase order that needs a person, from the procurement owner. */
 export interface SupplierCommitmentDecision {
   submissionId?: string | undefined;
+  /** How the order was sent; email sends are resolved on the order, not by a read. */
+  channel?: 'purchasing_system' | 'email' | undefined;
   observeOnly?: boolean;
   key: string;
   kind:
@@ -473,6 +475,7 @@ const reasonText: Record<string, string> = {
   date_later: 'the date is later than requested',
   unmatched_line: 'it could not be matched to an order line',
   supplier_condition: 'the supplier added a condition',
+  sender_unverified: 'the sender’s email domain could not be verified',
 };
 
 const said = (
@@ -573,6 +576,29 @@ export function presentSupplierCommitment(
         },
       };
     case 'submission_uncertain':
+      if (item.channel === 'email')
+        return {
+          ...base,
+          reason: 'recovery',
+          title: `Confirm whether the order email for ${item.reference} reached ${item.supplierName}`,
+          why: 'Luma can’t tell whether the supplier received the order email and will not send it again on its own.',
+          consequences: [
+            {
+              response: 'Open the order',
+              text: 'Ask the supplier, then mark the email as delivered or not delivered. Not delivered lets you draft the order email again.',
+            },
+          ],
+          change: [order, supplier, { label: 'Lines', value: lines }],
+          impact: { level: 'high', text: 'Delivery unknown' },
+          deadline: null,
+          evidence: { observedAt: item.dueAt, validUntil: null },
+          response: 'view_only',
+          group: {
+            key: 'supplier:submission_uncertain',
+            label: 'Orders with an uncertain send',
+          },
+        };
+
       return {
         ...base,
         reason: 'recovery',

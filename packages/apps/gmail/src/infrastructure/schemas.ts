@@ -132,6 +132,9 @@ const message = z
         direction: z.enum(['inbound', 'outbound']),
         providerSent: z.boolean().optional(),
         from: address,
+        senderAuthentication: z
+          .enum(['aligned', 'unaligned', 'unknown'])
+          .optional(),
         to: z.array(address),
         cc: z.array(address),
         replyTo: z.array(address),

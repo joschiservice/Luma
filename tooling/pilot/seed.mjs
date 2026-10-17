@@ -119,18 +119,36 @@ export async function seedPilot(
 
   async function login(email, name = 'Synthetic pilot operator') {
     const payload = { email, password: saved.seedPassword };
-    let response = await app.inject({
-      method: 'POST',
-      url: '/auth/sign-in/email',
-      headers: { origin: settings.baseURL },
-      payload,
-    });
+    const signIn = () =>
+      app.inject({
+        method: 'POST',
+        url: '/auth/sign-in/email',
+        headers: { origin: settings.baseURL },
+        payload,
+      });
+    let response = await signIn();
     if (response.statusCode === 401)
-      response = await request('/auth/sign-up/email', {
+      await request('/auth/sign-up/email', {
         ...payload,
         name,
         dataRegion: env.LUMA_REGION ?? 'AU',
       });
+    if (response.statusCode !== 200) {
+      // Synthetic pilot addresses have no mailbox, so the seed confirms them directly.
+      const users = new Pool({
+        connectionString: settings.databaseUrl,
+        max: 1,
+      });
+      try {
+        await users.query(
+          'UPDATE users SET email_verified=true WHERE email=$1',
+          [email],
+        );
+      } finally {
+        await users.end();
+      }
+      response = await signIn();
+    }
     if (response.statusCode !== 200) throw new Error('Pilot sign-in failed');
     const cookies = response.headers['set-cookie'];
     cookie = (Array.isArray(cookies) ? cookies : [cookies])
@@ -177,13 +195,12 @@ export async function seedPilot(
       organization.id,
       'pilot-seed',
     );
-    await identity.service.changeMember(context, {
-      action: 'add',
+    // Synthetic accounts join without an invitation through internal provisioning.
+    await identity.service.provisionMember(context, {
       userId: manifest.operatorId,
       roleId: 'admin',
     });
-    await identity.service.changeMember(context, {
-      action: 'add',
+    await identity.service.provisionMember(context, {
       userId: manifest.warehouseId,
       roleId: 'member',
     });

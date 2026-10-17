@@ -4,6 +4,7 @@ import { createMemoryStore, createTransport } from '@luma/simulator-core';
 import { readOrder, shopify } from '@luma/simulator-shopify';
 
 import { appScopes } from './app-scopes.mjs';
+import { addMembership } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 const config = {
@@ -126,13 +127,7 @@ export async function orderEditFixture(t, origin = 'http://localhost:3000') {
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,
   );
   const admin = await f.signup('EditApprover');
-  await f.request(
-    f.owner,
-    `${f.base}/members`,
-    'POST',
-    { userId: admin.id, roleId: 'admin' },
-    201,
-  );
+  await addMembership(f.db.owner, f.org.id, admin.id, 'admin');
   await f.request(f.owner, `${f.base}/apps/shopify/install`, 'POST', {
     version: null,
     scopes: appScopes.shopify,

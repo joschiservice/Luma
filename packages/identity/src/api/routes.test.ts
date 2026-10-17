@@ -152,6 +152,11 @@ function fixture() {
     placement: { regionForTenant },
     getSession,
     supportViews,
+    accountInspections: {
+      list: async () => [],
+      decide: async () => 'conflict',
+      revoke: async () => 'conflict',
+    },
     listSecurityEvents: async () => [],
     setLanguage: async () => undefined,
     withUser: async (_userId, operation) => operation(tx),
@@ -195,11 +200,6 @@ it('resolves a support view as the viewed member, read-only, and records the rea
 });
 
 it.each([
-  {
-    method: 'POST' as const,
-    path: '/members',
-    payload: { userId: member.userId, roleId: 'member' },
-  },
   { method: 'PATCH' as const, path: `/members/${member.id}`, payload: {} },
   { method: 'DELETE' as const, path: `/members/${member.id}` },
 ])(
@@ -340,12 +340,6 @@ it.each(['context', 'members'])(
 
 it.each([
   {
-    method: 'POST' as const,
-    path: '/members',
-    payload: { userId: member.userId, roleId: 'member' },
-    status: 201,
-  },
-  {
     method: 'PATCH' as const,
     path: `/members/${member.id}`,
     payload: { roleId: 'admin' },
@@ -376,6 +370,18 @@ it.each([
     expect(tx.findOrganization).toHaveBeenCalledTimes(2);
   },
 );
+
+it('offers no way to add an account by ID; people join through invitations', async () => {
+  const { app, tx } = fixture();
+  const response = await app.inject({
+    method: 'POST',
+    url: `${base}/members`,
+    headers,
+    payload: { userId: member.userId, roleId: 'admin' },
+  });
+  expect(response.statusCode).toBe(404);
+  expect(tx.addMember).not.toHaveBeenCalled();
+});
 
 it.each(['revoked', 'demoted', 'suspended', 'member-suspended'] as const)(
   'rejects mutations when access is %s while waiting for the lock',

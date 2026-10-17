@@ -24,6 +24,7 @@ import {
   usePasskeySupport,
 } from '../../kit/identity/data';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { AccountSupportAccess } from './account-support-access';
 import { PasswordSettings } from './password';
 import { SectionHeading } from './section-heading';
 import { SecurityActivity, securityActivityKey } from './security-activity';
@@ -129,6 +130,7 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
       </div>
       <PasskeySettings disabled={disabled} />
       <SessionSettings disabled={disabled} />
+      <AccountSupportAccess disabled={disabled} />
       <SecurityActivity />
       {flow ? (
         <FactorDialog

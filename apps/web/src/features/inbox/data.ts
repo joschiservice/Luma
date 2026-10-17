@@ -11,6 +11,7 @@ import type {
   MailboxSettingsInput,
   NoteInput,
   OutboundDecisionInput,
+  OutboundDeliveryInput,
   OutboundInput,
   StatusInput,
   ThreadDetail,
@@ -498,6 +499,17 @@ export const checkOutbound = (
   id: string,
 ) =>
   api.checkOutbound({ params: { organizationId, outboundId }, body: { id } });
+
+/** Records a person's delivery decision for an uncertain supplier email; never sends. */
+export const resolveOutboundDelivery = (
+  { organizationId }: Org,
+  outboundId: string,
+  body: OutboundDeliveryInput,
+) =>
+  api.resolveOutboundDelivery({
+    params: { organizationId, outboundId },
+    body,
+  });
 
 /** Discards a draft or a reply waiting for approval. */
 export const discardOutbound = (

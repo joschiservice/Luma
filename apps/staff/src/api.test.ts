@@ -118,6 +118,59 @@ describe('staff browser API', () => {
     });
   });
 
+  it('requests inspection, reads the latest request and opens access under it', async () => {
+    const request = {
+      id: commandId,
+      mode: 'consent',
+      status: 'approved',
+      requestedAt: '2026-10-10T12:00:00.000Z',
+      expiresAt: '2026-10-11T12:00:00.000Z',
+      decidedAt: '2026-10-10T12:05:00.000Z',
+      accessExpiresAt: '2026-10-10T12:35:00.000Z',
+      revokedAt: null,
+    };
+    const requested = fetchResult(request);
+    await createStaffApi(requested).requestAccess(
+      workspaceId,
+      'Ticket 4821: sync stopped',
+    );
+    expect(requested).toHaveBeenCalledWith(
+      `/api/v1/staff/workspaces/${workspaceId}/access-requests`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Ticket 4821: sync stopped' }),
+      }),
+    );
+    const latest = fetchResult({ request });
+    expect(await createStaffApi(latest).accountAccessRequest(userId)).toEqual(
+      request,
+    );
+    expect(latest).toHaveBeenCalledWith(
+      `/api/v1/staff/accounts/${userId}/access-requests/latest`,
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(
+      await createStaffApi(fetchResult({ request: null })).accessRequest(
+        workspaceId,
+      ),
+    ).toBeNull();
+    const opened = fetchResult({
+      id: grantId,
+      workspaceId,
+      reason: 'Ticket 4821: sync stopped',
+      expiresAt: request.accessExpiresAt,
+    });
+    await createStaffApi(opened).openAccess(workspaceId, {
+      requestId: commandId,
+    });
+    expect(opened).toHaveBeenCalledWith(
+      `/api/v1/staff/workspaces/${workspaceId}/access`,
+      expect.objectContaining({
+        body: JSON.stringify({ requestId: commandId }),
+      }),
+    );
+  });
+
   it('passes the access history cursor and grant without retaining them elsewhere', async () => {
     const cursor = `2026-10-09T08:00:00.123456Z_${grantId}`;
     const fetcher = fetchResult({ events: [], nextCursor: null });

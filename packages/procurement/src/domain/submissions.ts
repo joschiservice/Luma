@@ -149,7 +149,10 @@ export function submissionActions(input: {
     expired: 'The approval request expired. Nothing was sent.',
     submitting: 'Luma is placing the order in the purchasing system.',
     uncertain:
-      'The purchasing system did not confirm the request. Luma checks whether the order was created and will not send it again.',
+      submission.channel === 'email'
+        ? (submission.failure ??
+          'Luma can’t tell whether the order email reached the supplier and will not send it again. Confirm with the supplier, then mark it as delivered or not delivered.')
+        : 'The purchasing system did not confirm the request. Luma checks whether the order was created and will not send it again.',
     submitted:
       'An independent read found the order in the purchasing system. The purchasing system sends it to the supplier.',
     failed:

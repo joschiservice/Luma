@@ -55,6 +55,12 @@ describe.skipIf(!databaseUrl)(
         }),
       );
       expect(response.status).toBe(200);
+      // The emailed confirmation link would set this before the first sign-in, which opens the
+      // account's session.
+      await db.query('UPDATE users SET email_verified=true WHERE email=$1', [
+        email,
+      ]);
+      expect((await signIn(email)).status).toBe(200);
 
       return ((await response.json()) as { user: { id: string } }).user.id;
     };
@@ -77,12 +83,25 @@ describe.skipIf(!databaseUrl)(
         'INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,$4,now())',
         [randomUUID(), tenantId, userId, role],
       );
+    // Staff ask; the account holder approves (here through the lifecycle trigger directly).
     const grant = async (userId: string) => {
+      const requested = await app.inject({
+        method: 'POST',
+        url: `/v1/staff/accounts/${userId}/access-requests`,
+        headers: { cookie, origin },
+        payload: { reason: 'Deletion request from the account holder' },
+      });
+      expect(requested.statusCode, requested.body).toBe(201);
+      const requestId = requested.json().id as string;
+      await db.query(
+        "UPDATE account_inspection_requests SET status='approved',decided_by=user_id WHERE id=$1",
+        [requestId],
+      );
       const response = await app.inject({
         method: 'POST',
         url: `/v1/staff/accounts/${userId}/access`,
         headers: { cookie, origin },
-        payload: { reason: 'Deletion request from the account holder' },
+        payload: { requestId },
       });
       expect(response.statusCode, response.body).toBe(201);
 

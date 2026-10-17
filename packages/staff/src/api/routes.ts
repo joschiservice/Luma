@@ -19,6 +19,8 @@ const protectedRoutes = new Set([
   'GET /v1/staff/session',
   'GET /v1/staff/directory',
   'GET /v1/staff/workspaces/:workspaceId/placement',
+  'POST /v1/staff/workspaces/:workspaceId/access-requests',
+  'GET /v1/staff/workspaces/:workspaceId/access-requests/latest',
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
@@ -29,6 +31,8 @@ const protectedRoutes = new Set([
   'GET /v1/staff/workspaces/:workspaceId/health',
   'GET /v1/staff/workspaces/:workspaceId/access-history',
   'GET /v1/staff/audit',
+  'POST /v1/staff/accounts/:userId/access-requests',
+  'GET /v1/staff/accounts/:userId/access-requests/latest',
   'POST /v1/staff/accounts/:userId/access',
   'GET /v1/staff/accounts/:userId',
   'GET /v1/staff/accounts/:userId/security-events',
@@ -42,6 +46,14 @@ const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
   'GET /v1/staff/directory': ['staff.directory.read'],
   'GET /v1/staff/workspaces/:workspaceId/placement': ['staff.directory.read'],
+  'POST /v1/staff/workspaces/:workspaceId/access-requests': [
+    'staff.workspace.inspect',
+    'staff.directory.read',
+  ],
+  'GET /v1/staff/workspaces/:workspaceId/access-requests/latest': [
+    'staff.workspace.inspect',
+  ],
+  // Emergency access additionally needs `staff.inspect.emergency`, checked by the service.
   'POST /v1/staff/workspaces/:workspaceId/access': [
     'staff.workspace.inspect',
     'staff.directory.read',
@@ -70,6 +82,14 @@ const routePermissions: Record<string, StaffPermission[]> = {
     'staff.workspace.inspect',
   ],
   'GET /v1/staff/audit': ['staff.audit.read'],
+  'POST /v1/staff/accounts/:userId/access-requests': [
+    'staff.accounts.inspect',
+    'staff.directory.read',
+  ],
+  'GET /v1/staff/accounts/:userId/access-requests/latest': [
+    'staff.accounts.inspect',
+  ],
+  // Emergency access additionally needs `staff.inspect.emergency`, checked by the service.
   'POST /v1/staff/accounts/:userId/access': [
     'staff.accounts.inspect',
     'staff.directory.read',
@@ -347,12 +367,28 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           query.query,
         ),
     ),
+    requestAccess: os.requestAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.requestAccess(
+          context(request.staffContext),
+          params.workspaceId,
+          body.reason,
+        ),
+    ),
+    accessRequest: os.accessRequest.handler(
+      async ({ context: { request }, input: { params } }) => ({
+        request: await staff.service.accessRequest(
+          context(request.staffContext),
+          params.workspaceId,
+        ),
+      }),
+    ),
     grantAccess: os.grantAccess.handler(
       async ({ context: { request }, input: { params, body } }) =>
         await staff.service.grant(
           context(request.staffContext),
           params.workspaceId,
-          body.reason,
+          body,
         ),
     ),
     workspace: os.workspace.handler(
@@ -422,12 +458,28 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
       async ({ context: { request }, input: { query } }) =>
         await staff.service.audit(context(request.staffContext), query),
     ),
+    requestAccountAccess: os.requestAccountAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.requestAccountAccess(
+          context(request.staffContext),
+          params.userId,
+          body.reason,
+        ),
+    ),
+    accountAccessRequest: os.accountAccessRequest.handler(
+      async ({ context: { request }, input: { params } }) => ({
+        request: await staff.service.accountAccessRequest(
+          context(request.staffContext),
+          params.userId,
+        ),
+      }),
+    ),
     grantAccountAccess: os.grantAccountAccess.handler(
       async ({ context: { request }, input: { params, body } }) =>
         await staff.service.accountGrant(
           context(request.staffContext),
           params.userId,
-          body.reason,
+          body,
         ),
     ),
     account: os.account.handler(

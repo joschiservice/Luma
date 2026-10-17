@@ -237,6 +237,8 @@ export async function environment(saved, workflows = false, observing = false) {
   /** @type {Record<string, string>} */
   const generated = {
     SHOPIFY_ADMISSION_URL: `redis://:${encodeURIComponent(saved.databasePassword)}@127.0.0.1:${admissionPort}`,
+    // Auth rate limits share the local Valkey, as they would a region's in production.
+    AUTH_RATE_LIMIT_URL: `redis://:${encodeURIComponent(saved.databasePassword)}@127.0.0.1:${admissionPort}`,
     LUMA_REGION: apiEnv.LUMA_REGION ?? 'AU',
     LUMA_ENABLED_REGIONS:
       apiEnv.LUMA_ENABLED_REGIONS ?? apiEnv.LUMA_REGION ?? 'AU',

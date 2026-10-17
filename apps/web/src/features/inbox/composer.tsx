@@ -8,19 +8,25 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { useQueryClient } from '@tanstack/react-query';
 import { PenLine, Send } from 'lucide-react';
 import { useId, useState } from 'react';
 import { z } from 'zod';
 
+import { DeliveryDecision } from '../../shared/messaging/delivery-decision';
 import { CommandFeedback } from './command-feedback';
 import {
   checkOutbound,
+  commandError,
   decideOutbound,
   discardOutbound,
   downloadSupplierPdf,
   draftReply,
+  messagingKey,
   requestOutbound,
+  resolveOutboundDelivery,
   sendOutbound,
+  uncertainOutcome,
   updateOutbound,
   useInboxCommand,
 } from './data';
@@ -160,6 +166,7 @@ function ReplyCard({
   people: People;
 }) {
   const org = { organizationId };
+  const client = useQueryClient();
   const editing = reply.state === 'draft' && reply.canEdit && send;
   const [to, setTo] = useState(() => reply.to.map((a) => a.address).join(', '));
   const [cc, setCc] = useState(() => reply.cc.map((a) => a.address).join(', '));
@@ -225,6 +232,20 @@ function ReplyCard({
         {outboundStateText[reply.state]()}
         {reply.stateReason ? ` ${reply.stateReason}` : ''}
       </p>
+      {reply.purchaseOrderId ? (
+        <DeliveryDecision
+          outbound={reply}
+          name={people.name}
+          resolve={(body) => resolveOutboundDelivery(org, reply.id, body)}
+          errorText={commandError}
+          isUncertain={uncertainOutcome}
+          onResolved={() =>
+            void client.invalidateQueries({
+              queryKey: messagingKey(organizationId),
+            })
+          }
+        />
+      ) : null}
       {consequential ? (
         <Alert tone="warning" className="messaging-reply-reasons">
           {m.messaging_reply_needs_approval({

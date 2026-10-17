@@ -21,6 +21,8 @@ import type {
   AccountSecurityEvents,
   DirectoryUser,
   DirectoryWorkspace,
+  InspectionRequest,
+  OpenAccessInput,
   StaffRepository,
 } from '../application/staff.js';
 import type { StaffContext, StaffPermission } from '../domain/access.js';
@@ -41,7 +43,13 @@ const stateConflicts: Record<string, string> = {
     'This person’s access to the workspace is suspended, so there is nothing to view.',
   'workspace inactive':
     'This workspace is suspended or closed, so it can’t be viewed.',
-  'request pending': 'A request is already waiting for the workspace’s answer.',
+  'request pending': 'A request is already waiting for an answer.',
+  'access approved':
+    'Your request was approved and its access is still open. Open it instead of asking again.',
+  'consent unavailable':
+    'This workspace is suspended or closed, so nobody can approve a request. Use emergency access only for a security incident or legal request.',
+  'account consent unavailable':
+    'This account is disabled, so the person can’t sign in to approve a request. Use emergency access only for a security incident or legal request.',
   'access allowed': 'The workspace already allows support access.',
   'account disabled':
     'This person’s account is disabled, so there is nothing to view.',
@@ -59,6 +67,34 @@ const stateConflicts: Record<string, string> = {
     'Erasure of this account was requested, so it can’t be restored.',
 };
 
+/** An inspection request as the request functions return it, with JSON timestamps. */
+interface StoredRequest {
+  id: string;
+  mode: InspectionRequest['mode'];
+  status: InspectionRequest['status'];
+  requestedAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+  accessExpiresAt: string | null;
+  revokedAt: string | null;
+}
+
+const isoOrNull = (value: string | null) =>
+  value ? new Date(value).toISOString() : null;
+
+function inspectionDto(row: StoredRequest): InspectionRequest {
+  return {
+    id: row.id,
+    mode: row.mode,
+    status: row.status,
+    requestedAt: new Date(row.requestedAt).toISOString(),
+    expiresAt: new Date(row.expiresAt).toISOString(),
+    decidedAt: isoOrNull(row.decidedAt),
+    accessExpiresAt: isoOrNull(row.accessExpiresAt),
+    revokedAt: isoOrNull(row.revokedAt),
+  };
+}
+
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
 export function createStaffRepository(pool: Pool): StaffRepository {
   async function transaction<T>(
@@ -71,8 +107,8 @@ export function createStaffRepository(pool: Pool): StaffRepository {
     try {
       await tx.query('BEGIN');
       await tx.query(
-        "SELECT set_config('staff.user_id',$1,true),set_config('staff.session_id',$2,true),set_config('staff.grant_id',$3,true)",
-        [context.userId, context.sessionId, grantId ?? ''],
+        "SELECT set_config('staff.user_id',$1,true),set_config('staff.session_id',$2,true),set_config('staff.grant_id',$3,true),set_config('staff.request_id',$4,true)",
+        [context.userId, context.sessionId, grantId ?? '', context.requestId],
       );
       const access = await tx.query<{ allowed: boolean }>(
         'SELECT staff_has_access($1) AS allowed',
@@ -89,7 +125,12 @@ export function createStaffRepository(pool: Pool): StaffRepository {
       if (error instanceof StaffError) throw error;
       if (error && typeof error === 'object' && 'code' in error) {
         if (error.code === '42501')
-          throw new StaffError(403, 'Staff access is unavailable.');
+          throw new StaffError(
+            403,
+            'message' in error && error.message === 'inspection not approved'
+              ? 'This request isn’t approved, or its access ended. Request access again.'
+              : 'Staff access is unavailable.',
+          );
         if (error.code === '23505')
           throw new StaffError(
             409,
@@ -100,7 +141,9 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             404,
             'message' in error && error.message === 'account unavailable'
               ? 'Customer account unavailable.'
-              : 'Customer membership unavailable.',
+              : 'message' in error && error.message === 'workspace unavailable'
+                ? 'Workspace is unavailable in this region.'
+                : 'Customer membership unavailable.',
           );
         if (error.code === '22023')
           throw new StaffError(400, 'Check the reason and details.');
@@ -163,6 +206,44 @@ export function createStaffRepository(pool: Pool): StaffRepository {
       );
   }
 
+  /** Asks for inspection, or opens emergency access, through the target owner's function. */
+  async function inspectionRequest(
+    tx: PoolClient,
+    context: StaffContext,
+    target: 'workspace' | 'account',
+    id: string,
+    input: OpenAccessInput | { reason: string },
+  ) {
+    const emergency = 'emergency' in input ? input.emergency : null;
+    const result = await tx.query<{ request: StoredRequest }>(
+      `SELECT ${target === 'workspace' ? 'support_inspection_request' : 'identity_account_inspection_request'}($1,$2,$3,$4,$5,$6) AS request`,
+      [
+        id,
+        emergency ? 'emergency' : 'consent',
+        'reason' in input ? input.reason : null,
+        emergency?.category ?? null,
+        emergency?.reference ?? null,
+        context.requestId,
+      ],
+    );
+
+    return inspectionDto(result.rows[0]!.request);
+  }
+
+  async function latestRequest(
+    tx: PoolClient,
+    target: 'workspace' | 'account',
+    id: string,
+  ) {
+    const result = await tx.query<{ request: StoredRequest | null }>(
+      `SELECT ${target === 'workspace' ? 'support_inspection_status' : 'identity_account_inspection_status'}($1) AS request`,
+      [id],
+    );
+    const request = result.rows[0]?.request;
+
+    return request ? inspectionDto(request) : null;
+  }
+
   return {
     workspacePlacement(context, workspaceId) {
       return transaction(context, null, 'staff.directory.read', async (tx) => {
@@ -218,40 +299,55 @@ export function createStaffRepository(pool: Pool): StaffRepository {
         };
       });
     },
-    grant(context, workspaceId, reason) {
+    requestAccess(context, workspaceId, reason) {
+      return transaction(context, null, 'staff.workspace.inspect', (tx) =>
+        inspectionRequest(tx, context, 'workspace', workspaceId, { reason }),
+      );
+    },
+    accessRequest(context, workspaceId) {
+      return transaction(context, null, 'staff.workspace.inspect', (tx) =>
+        latestRequest(tx, 'workspace', workspaceId),
+      );
+    },
+    grant(context, workspaceId, input) {
       return transaction(
         context,
         null,
         'staff.workspace.inspect',
         async (tx) => {
-          const workspace = await tx.query(
-            'SELECT id FROM organizations WHERE id=$1 AND data_region=(SELECT region FROM luma_cell_region)',
-            [workspaceId],
-          );
-          if (!workspace.rowCount)
-            throw new StaffError(
-              404,
-              'Workspace is unavailable in this region.',
-            );
+          const requestId =
+            'requestId' in input
+              ? input.requestId
+              : (
+                  await inspectionRequest(
+                    tx,
+                    context,
+                    'workspace',
+                    workspaceId,
+                    input,
+                  )
+                ).id;
           const id = randomUUID();
-          const result = await tx.query<{ expiresAt: Date }>(
-            'INSERT INTO staff_support_grants(id,staff_user_id,staff_session_id,tenant_id,reason,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval \'30 minutes\') RETURNING expires_at AS "expiresAt"',
-            [id, context.userId, context.sessionId, workspaceId, reason],
+          // The admission trigger takes the reason and end from the approved request.
+          const result = await tx.query<{ expiresAt: Date; reason: string }>(
+            'INSERT INTO staff_support_grants(id,staff_user_id,staff_session_id,tenant_id,reason,expires_at,request_id) VALUES($1,$2,$3,$4,NULL,NULL,$5) RETURNING expires_at AS "expiresAt",reason',
+            [id, context.userId, context.sessionId, workspaceId, requestId],
           );
+          const grant = result.rows[0]!;
           await audit(
             tx,
             context,
             'workspace.access.opened',
             workspaceId,
-            reason,
-            { grantId: id },
+            grant.reason,
+            { grantId: id, requestId },
           );
 
           return {
             id,
             workspaceId,
-            reason,
-            expiresAt: result.rows[0]!.expiresAt.toISOString(),
+            reason: grant.reason,
+            expiresAt: grant.expiresAt.toISOString(),
           };
         },
       );
@@ -484,32 +580,52 @@ export function createStaffRepository(pool: Pool): StaffRepository {
         return page;
       });
     },
-    accountGrant(context, userId, reason) {
+    requestAccountAccess(context, userId, reason) {
+      return transaction(context, null, 'staff.accounts.inspect', (tx) =>
+        inspectionRequest(tx, context, 'account', userId, { reason }),
+      );
+    },
+    accountAccessRequest(context, userId) {
+      return transaction(context, null, 'staff.accounts.inspect', (tx) =>
+        latestRequest(tx, 'account', userId),
+      );
+    },
+    accountGrant(context, userId, input) {
       return transaction(
         context,
         null,
         'staff.accounts.inspect',
         async (tx) => {
-          const account = await tx.query('SELECT id FROM users WHERE id=$1', [
-            userId,
-          ]);
-          if (!account.rowCount)
-            throw new StaffError(404, 'Customer account unavailable.');
+          const requestId =
+            'requestId' in input
+              ? input.requestId
+              : (await inspectionRequest(tx, context, 'account', userId, input))
+                  .id;
           const id = randomUUID();
-          const result = await tx.query<{ expiresAt: Date }>(
-            'INSERT INTO staff_account_grants(id,staff_user_id,staff_session_id,user_id,reason,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval \'30 minutes\') RETURNING expires_at AS "expiresAt"',
-            [id, context.userId, context.sessionId, userId, reason],
+          // The admission trigger takes the reason and end from the approved request.
+          const result = await tx.query<{ expiresAt: Date; reason: string }>(
+            'INSERT INTO staff_account_grants(id,staff_user_id,staff_session_id,user_id,reason,expires_at,request_id) VALUES($1,$2,$3,$4,NULL,NULL,$5) RETURNING expires_at AS "expiresAt",reason',
+            [id, context.userId, context.sessionId, userId, requestId],
           );
-          await audit(tx, context, 'account.access.opened', null, reason, {
-            grantId: id,
-            userId,
-          });
+          const grant = result.rows[0]!;
+          await audit(
+            tx,
+            context,
+            'account.access.opened',
+            null,
+            grant.reason,
+            {
+              grantId: id,
+              requestId,
+              userId,
+            },
+          );
 
           return {
             id,
             userId,
-            reason,
-            expiresAt: result.rows[0]!.expiresAt.toISOString(),
+            reason: grant.reason,
+            expiresAt: grant.expiresAt.toISOString(),
           };
         },
       );

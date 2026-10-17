@@ -81,6 +81,7 @@ export function createSupplierMessages({
         for (const fact of result.facts) {
           const line = order.lines.find((l) => l.id === fact.lineId) ?? null;
           const reasons = reviewReasons(fact, line, requestedDate, {
+            senderVerified: communication.senderVerified,
             confident: fact.confident && result.relatesToOrder,
             lineRequired:
               multiLine &&
@@ -146,18 +147,31 @@ export function createSupplierMessages({
   return {
     /**
      * Captures a supplier message for an order and reads its commitments when a model is
-     * configured. Repeated deliveries of the same message are recorded once.
+     * configured. Repeated deliveries of the same message are recorded once. `provenance` comes
+     * only from trusted callers such as the inbox handoff, never from request input; an
+     * unverified sender sends every extracted fact to review.
+     *
+     * Anyone can copy a Message-ID, so only trusted messages (an authenticated sender, or one a
+     * person recorded) claim it. An unverified message is keyed by its Message-ID and content:
+     * it never suppresses a different message with the same ID, and it is a duplicate only of
+     * a copy with the same text.
      */
     async recordMessage(
       context: TenantContext,
       orderId: string,
       input: unknown,
+      provenance?: { senderVerified: boolean },
     ) {
       context = await authorize(context, true);
       const request = deps.parse.message(input);
-      const key = request.messageId
+      const digest = deps.digest(messageText(request));
+      const trustedKey = request.messageId
         ? `id:${request.messageId}`
         : `digest:${deps.digest({ from: request.from.toLowerCase(), subject: request.subject, receivedAt: request.receivedAt, body: request.body })}`;
+      const unverified = provenance?.senderVerified === false;
+      const key = unverified
+        ? `unverified:${deps.digest({ key: trustedKey, digest })}`
+        : trustedKey;
       const { communication, order, created } = await command(
         context,
         request.id,
@@ -165,7 +179,12 @@ export function createSupplierMessages({
         async (tx) => {
           const order = await tx.order(orderId);
           if (!order) throw notFound('Purchase order not found');
-          const duplicate = await tx.communicationByKey(key);
+          const trustedCopy = unverified
+            ? await tx.communicationByKey(trustedKey)
+            : null;
+          const duplicate =
+            (await tx.communicationByKey(key)) ??
+            (trustedCopy?.digest === digest ? trustedCopy : null);
           if (duplicate)
             return { communication: duplicate, order, created: false };
           const now = deps.now();
@@ -180,7 +199,10 @@ export function createSupplierMessages({
             body: request.body,
             receivedAt: request.receivedAt,
             messageId: request.messageId,
-            digest: deps.digest(messageText(request)),
+            ...(provenance
+              ? { senderVerified: provenance.senderVerified }
+              : {}),
+            digest,
             capturedBy: context.actor.id,
             capturedAt: now.toISOString(),
             retainUntil: new Date(

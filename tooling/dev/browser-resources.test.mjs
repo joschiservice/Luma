@@ -11,6 +11,8 @@ test('browser resources close contexts before earlier services and keep cleaning
       {
         browser: {
           newContext: async () => ({
+            exposeBinding: async () => {},
+            addInitScript: async () => {},
             close: async () => order.push('context'),
           }),
         },
@@ -51,4 +53,32 @@ test('browser resources expose failures and still clean up when the test throws'
     /test failed/,
   );
   assert.equal(closed, true);
+});
+
+test('browser resources fail a test whose page reported a Content Security Policy violation', async () => {
+  let report;
+  await assert.rejects(
+    useBrowserResources(
+      {
+        browser: {
+          newContext: async () => ({
+            exposeBinding: async (_name, binding) => {
+              report = binding;
+            },
+            addInitScript: async () => {},
+            close: async () => {},
+          }),
+        },
+      },
+      async (resources) => {
+        await resources.newContext({});
+        report(
+          { page: { url: () => 'http://localhost/sign-in' } },
+          { directive: 'script-src-elem', blocked: 'inline' },
+        );
+      },
+      { status: 'passed', expectedStatus: 'passed' },
+    ),
+    /Content Security Policy violations:[\s\S]*script-src-elem/,
+  );
 });

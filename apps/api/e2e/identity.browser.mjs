@@ -1,6 +1,14 @@
 /* global document, window, innerWidth, requestAnimationFrame */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  confirmAndSignIn,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+  verifyEmail,
+} from './helpers.mjs';
 
 let origin;
 
@@ -43,16 +51,8 @@ async function heading(page, name) {
   }
 }
 
-async function register(page, email = 'ada@example.test') {
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(password);
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+async function register(page, db, email = 'ada@example.test') {
+  await createAccount(page, db, { name: 'Ada', email, password });
   await heading(page, 'Create a workspace');
 }
 
@@ -80,7 +80,7 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await page.goto('/');
   expect(await page.title()).toBe('Luma');
   await page.getByRole('link', { name: 'Create account' }).waitFor();
-  await register(page);
+  await register(page, db);
   const first = await createWorkspace(page, 'North Studio');
   const row = await db.owner.query(
     'SELECT data_region FROM organizations WHERE id = $1',
@@ -205,7 +205,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
   await page.getByText('Enter your name.', { exact: true }).waitFor();
-  await register(page);
+  await register(page, db);
   // A lost response must not cause an automatic second creation.
   let creations = 0;
   await page.route('**/api/v1/organizations', async (route) => {
@@ -250,7 +250,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
   const unavailableText = await page.locator('main').textContent();
   const outsider = await t.newContext({ baseURL: origin });
   const outsiderPage = await outsider.newPage();
-  await register(outsiderPage, 'outsider@example.test');
+  await register(outsiderPage, db, 'outsider@example.test');
   await outsiderPage.goto(`/app/${organizationId}/home`);
   await heading(outsiderPage, 'Workspace unavailable');
   expect(await outsiderPage.locator('main').textContent()).toBe(
@@ -299,7 +299,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
 test('handles missing sessions, uncertain registration, conflicts and permission failures', async ({
   resources: t,
 }) => {
-  const { page, context } = await fixture(t);
+  const { db, page, context } = await fixture(t);
   let registrations = 0;
   await page.route('**/api/auth/sign-up/email', async (route) => {
     registrations++;
@@ -332,6 +332,8 @@ test('handles missing sessions, uncertain registration, conflicts and permission
   );
   await page.unroute('**/api/auth/sign-up/email');
   await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  // The account was created; it opens once its email address is confirmed.
+  await verifyEmail(db.owner, 'ada@example.test');
   await signIn(page);
   await heading(page, 'Create a workspace');
   const cookies = await context.cookies();
@@ -408,31 +410,37 @@ test('handles missing sessions, uncertain registration, conflicts and permission
   await heading(page, 'Needs you');
   await page.goto('/sign-out');
   await heading(page, 'Sign in to Luma');
-  // Registration can succeed without issuing a session under another account policy.
-  await page.route('**/api/auth/get-session', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: 'null',
-    }),
-  );
+  // Registration issues no session until the email address is confirmed.
   await page.goto('/sign-up');
   await page.getByRole('radio', { name: /Australia/ }).check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Grace');
   await page.getByLabel('Email', { exact: true }).fill('grace@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);
+  const registered = page.waitForResponse('**/api/auth/sign-up/email');
   await page
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
-  await heading(page, 'Sign in to Luma');
+  expect((await registered).status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe('/sign-up');
+  expect(
+    (await context.cookies()).some((cookie) =>
+      cookie.name.includes('session_token'),
+    ),
+  ).toBe(false);
+  const refused = await context.request.post('/api/auth/sign-in/email', {
+    headers: { origin },
+    data: { email: 'grace@example.test', password },
+  });
+  expect(refused.status()).toBe(403);
+  expect((await refused.json()).code).toBe('EMAIL_NOT_VERIFIED');
 });
 
 test('preserves workspace drafts during session revalidation and clears them on session loss', async ({
   resources: t,
 }) => {
   const { db, page } = await fixture(t);
-  await register(page);
+  await register(page, db);
   const name = page.getByLabel('Workspace name');
   await name.fill('Draft workspace');
   let release;
@@ -476,7 +484,7 @@ test('shows a suspended membership as Access suspended until it is reactivated',
   resources: t,
 }) => {
   const { db, page, errors } = await fixture(t);
-  await register(page);
+  await register(page, db);
   const kept = await createWorkspace(page, 'Kept access');
   await page.goto('/app/workspaces/new');
   const suspended = await createWorkspace(page, 'Suspended access');
@@ -558,9 +566,12 @@ test('requires regional confirmation before account creation and keeps it visibl
     .getByLabel('Email', { exact: true })
     .fill('regional-owner@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);
+  const registered = page.waitForResponse('**/api/auth/sign-up/email');
   await page
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
+  expect((await registered).status()).toBe(200);
+  await confirmAndSignIn(page, db, 'regional-owner@example.test', password);
   await heading(page, 'Create a workspace');
   await expect(
     page.getByText(

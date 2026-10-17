@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { ModelGateway } from '@luma/platform';
 import { describe, expect, it } from 'vitest';
 
 import { commitmentFixture as fixture } from './commitments.fixture.js';
@@ -111,5 +112,134 @@ describe('receipt reconciliation commands', () => {
         key: `${body.key}:${body.nextCheckAt}`,
       }),
     );
+  });
+});
+
+describe('supplier messages from the inbox', () => {
+  /** A model that confirms the ordered quantity, which would count without review. */
+  const confirming: ModelGateway = {
+    generate: (async (_trace, request) => ({
+      output: request.output!.parse({
+        relatesToOrder: true,
+        facts: [
+          {
+            kind: 'confirmed_quantity',
+            lineId: null,
+            quantity: 100,
+            date: null,
+            text: null,
+            quote: 'confirm 100 units',
+            confident: true,
+          },
+        ],
+      }),
+      toolCalls: [],
+      metadata: {
+        adapter: 'bedrock' as const,
+        model: 'eu.model',
+        latencyMs: 1,
+        inputTokens: 1,
+        outputTokens: 1,
+        costUsd: null,
+      },
+    })) as ModelGateway['generate'],
+  };
+  const message = () => ({
+    id: randomUUID(),
+    channel: 'email' as const,
+    from: 'sales@supplier.example',
+    subject: 'Re: PO-1',
+    body: 'We confirm 100 units, on time.',
+    receivedAt: '2026-10-02T10:00:00.000Z',
+    messageId: `${randomUUID()}@supplier.example`,
+  });
+
+  it('holds facts from an unauthenticated sender for review instead of confirming them', async () => {
+    const f = fixture(confirming);
+    await f.service.recordMessage(f.context(), f.order.id, message(), {
+      senderVerified: false,
+    });
+    expect(f.commitments).toEqual([
+      expect.objectContaining({
+        kind: 'confirmed_quantity',
+        quantity: 100,
+        status: 'needs_review',
+        reviewReasons: ['sender_unverified'],
+      }),
+    ]);
+  });
+
+  it('confirms matching facts from an authenticated sender or a message a person recorded', async () => {
+    const f = fixture(confirming);
+    await f.service.recordMessage(f.context(), f.order.id, message(), {
+      senderVerified: true,
+    });
+    await f.service.recordMessage(f.context(), f.order.id, message());
+    expect(f.commitments.map((c) => [c.status, c.reviewReasons])).toEqual([
+      ['confirmed', []],
+      ['confirmed', []],
+    ]);
+  });
+
+  /** Which message each extracted commitment came from, with its status. */
+  const outcomes = (f: ReturnType<typeof fixture>) =>
+    f.commitments.map((c) => [
+      c.source.kind === 'communication' ? c.source.communicationId : null,
+      c.status,
+    ]);
+
+  it('lets a genuine message through after a forged one claimed its Message-ID', async () => {
+    const f = fixture(confirming);
+    const genuine = message();
+    const forged = {
+      ...genuine,
+      id: randomUUID(),
+      body: 'We confirm 100 units, delivery moved to December.',
+    };
+    expect(
+      await f.service.recordMessage(f.context(), f.order.id, forged, {
+        senderVerified: false,
+      }),
+    ).toEqual({ communicationId: forged.id, duplicate: false });
+    expect(
+      await f.service.recordMessage(f.context(), f.order.id, genuine, {
+        senderVerified: true,
+      }),
+    ).toEqual({ communicationId: genuine.id, duplicate: false });
+    expect(outcomes(f)).toEqual([
+      [forged.id, 'needs_review'],
+      [genuine.id, 'confirmed'],
+    ]);
+  });
+
+  it('keeps a genuine message when a forged one with its Message-ID arrives later', async () => {
+    const f = fixture(confirming);
+    const genuine = message();
+    await f.service.recordMessage(f.context(), f.order.id, genuine, {
+      senderVerified: true,
+    });
+    const forged = {
+      ...genuine,
+      id: randomUUID(),
+      body: 'We confirm 100 units, delivery moved to December.',
+    };
+    expect(
+      await f.service.recordMessage(f.context(), f.order.id, forged, {
+        senderVerified: false,
+      }),
+    ).toEqual({ communicationId: forged.id, duplicate: false });
+    // An unverified copy with the same text adds nothing.
+    expect(
+      await f.service.recordMessage(
+        f.context(),
+        f.order.id,
+        { ...genuine, id: randomUUID() },
+        { senderVerified: false },
+      ),
+    ).toEqual({ communicationId: genuine.id, duplicate: true });
+    expect(outcomes(f)).toEqual([
+      [genuine.id, 'confirmed'],
+      [forged.id, 'needs_review'],
+    ]);
   });
 });
