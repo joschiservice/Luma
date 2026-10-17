@@ -79,8 +79,11 @@ reconciles the bound action under its recorded approval.
 Provider runtimes record no capability telemetry and keep no read observations, so a read's
 ID resolves only where its owner stored it. Owners that cite reads as verification evidence
 store them in their own tables, in the tenant's transaction, before returning the result:
-Shopify corrections and fulfillment recovery, Starshipit updates, procurement's submission
-and revision reads, and orders' return creation, settlement, exchange and completion reads.
+Shopify corrections and fulfillment recovery, Starshipit updates, JTL shipping-method
+corrections, procurement's submission and revision reads, and orders' return creation,
+settlement, exchange and completion reads. A stored read keeps its adapter version and its
+completeness, and its source revision and update time where the provider reports them; a read
+whose page or scan was cut short is `partial`.
 Mailbox verification cites the messages and outgoing send it stored. Provider results that
 aggregate several reads, such as a refund quote or an exchange proof, return the reads their
 evidence references name, so the citing owner can store them.
@@ -90,12 +93,14 @@ effect stores the receipt in the tenant's transaction before execution sees it, 
 attempt and its completion audit cite only that receipt's ID, never the adapter's own
 references. Procurement (submissions and order revisions) and orders (return creations,
 settlements and exchange steps) store receipts beside their cited reads with kind
-`write_receipt`; messaging stores reply send receipts beside the reply. Shopify corrections,
-stock protection, order edits, fulfillment recovery and shipment publishing, and Starshipit
-updates store their acceptances in their own evidence tables. A receipt keeps the provider,
-connection, the provider records the response named, the provider request ID, the attempt's
-idempotency key and dispatch identity, the adapter version and the time; never the payload,
-credentials or message content. A lost or unreadable response has no receipt, so nothing is
+`write_receipt`; messaging stores reply send receipts beside the reply; JTL shipping-method
+corrections store receipts beside their verification reads in the JTL app's table. Shopify
+corrections, stock protection, order edits, fulfillment recovery and shipment publishing, and
+Starshipit updates store their acceptances in their own evidence tables; the capability
+runtime tells such adapters the adapter version and dispatch identity it pinned for the write.
+A receipt keeps the provider, connection, the provider records the response named, the provider
+request ID, the attempt's idempotency key and dispatch identity, the adapter version and the
+time; never the payload, credentials or message content. A lost or unreadable response has no receipt, so nothing is
 cited. If the receipt cannot be stored, the attempt records the write as dispatched with an
 unknown outcome, cites nothing and reconciles by reading. Internal effects, such as adaptive
 fields, Luma purchase orders and supplier follow-ups, cite the Luma record they changed.
@@ -111,11 +116,13 @@ subject cites, up to 100. The reader needs the subject area's read permission (`
 The subject's owner reports what the subject cites and looks up stored evidence only through the
 subject: procurement's reads and receipts of that order, orders' evidence of that return case,
 messaging's send receipts and the messages of that reply's thread. App evidence tables are not
-linked to a record, so Shopify and Starshipit evidence is read only for references the case's
-execution attempts cite. Each reference resolves to a read (source, record, read and source-update
-times, revision, completeness, adapter version and an allowlisted summary of the normalized
-read), a write receipt, a Luma record, `not_retained` or `unresolved`. Provider payloads, message
-content and addresses never leave the owner.
+linked to a record, so Shopify, Starshipit and JTL shipping-method evidence is read only for
+references the case's execution attempts cite, through each app's `evidence` hook. App rows
+written before an app recorded adapter versions, completeness or accepted records return those
+fields as null, which the view shows as not recorded. Each reference resolves to a read (source,
+record, read and source-update times, revision, completeness, adapter version and an
+allowlisted summary of the normalized read), a write receipt, a Luma record, `not_retained` or
+`unresolved`. Provider payloads, message content and addresses never leave the owner.
 
 Records written before an owner stored a kind of evidence cite IDs that were never kept and
 cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return

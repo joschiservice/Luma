@@ -113,6 +113,10 @@ into HTTP handlers or workflow activities.
   documented and needs operationally controlled targets.
 - A receipt means accepted. `verify` reads authoritative state, persists fresh
   observation evidence and checks the expected postcondition. It never writes.
+- The binding's owner stores the receipt and every read it cites (see
+  [execution](execution.md#runtimes)). A write handler that stores its own acceptance gets
+  the connection's adapter version and the pinned dispatch identity with the idempotency
+  key, and records them on the receipt.
 
 Descriptor retry limits are advisory: execution reserves one attempt and never
 redispatches it.
