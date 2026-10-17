@@ -1,4 +1,4 @@
-import { conflict, unavailable } from '@luma/platform';
+import { conflict, forbidden, notFound, unavailable } from '@luma/platform';
 
 import type {
   Membership,
@@ -6,7 +6,6 @@ import type {
   TenantContext,
 } from '../domain/context.js';
 import {
-  IdentityError,
   requireActiveMembership,
   requireChangesAllowed,
 } from '../domain/context.js';
@@ -141,13 +140,10 @@ export function createSettingsService(deps: SettingsDependencies) {
       context.actor.id,
       async (tx) => {
         const actor = await tx.member(context.actor.id);
-        if (!actor)
-          throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        if (!actor) throw notFound('Workspace not found');
         requireActiveMembership(actor);
         if (permission && !actor.permissions.has(permission))
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
+          throw forbidden(
             'Your role does not allow this. Ask a workspace admin for access.',
           );
 
@@ -205,16 +201,12 @@ export function createSettingsService(deps: SettingsDependencies) {
           invitation.status !== 'pending' ||
           Date.parse(invitation.expiresAt) <= deps.now().getTime()
         ) {
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
+          throw notFound(
             'This invitation is unavailable for your account. Check the email address or ask for a new invitation.',
           );
         }
         if (invitation.role.archived)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
+          throw notFound(
             'The role in this invitation is no longer available. Ask for a new invitation.',
           );
         if (accept) {
@@ -329,11 +321,7 @@ export function createSettingsService(deps: SettingsDependencies) {
 
       return command(context, null, input, 'write_mode', async (tx, actor) => {
         if (actor.role.key !== 'owner')
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
-            'Only workspace owners can change write mode.',
-          );
+          throw forbidden('Only workspace owners can change write mode.');
         const before = (await tx.snapshot(context.actor.id)).workspace;
         if (before.revision !== input.revision)
           throw conflict('Write settings changed. Refresh before saving.');
@@ -656,9 +644,7 @@ export function createSettingsService(deps: SettingsDependencies) {
             actor.role.key !== 'owner' &&
             !actor.permissions.covers(role.permissions)
           )
-            throw new IdentityError(
-              403,
-              'FORBIDDEN',
+            throw forbidden(
               'You can only invite people with roles whose permissions you hold.',
             );
           if (await tx.memberWithEmail(input.email))

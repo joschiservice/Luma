@@ -1,9 +1,9 @@
 import { apiContract, homeModuleIds } from '@luma/api-contract';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { SettingsService } from '../application/settings.js';
-import { IdentityError } from '../domain/context.js';
 import type { WorkspaceLayout } from '../domain/settings.js';
 import type { HttpContext } from './contract-routes.js';
 import { credentials } from './routes.js';
@@ -26,18 +26,13 @@ function currentLayout(layout: WorkspaceLayout) {
 /** Routes workspace controls through fresh membership checks; invitations require a matching session. */
 export function settingsRoutes(service?: SettingsService) {
   const use = () => {
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Settings are unavailable',
-      );
+    if (!service) throw unavailable('Settings are unavailable');
 
     return service;
   };
   const context = (request: FastifyRequest) => {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
     return request.tenantContext;
   };

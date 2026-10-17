@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { conflict } from '@luma/platform';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
@@ -8,7 +9,6 @@ import type {
   RolesTransaction,
   StoredRole,
 } from '../application/roles.js';
-import { IdentityError } from '../domain/context.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect } from './access.js';
 import { workspaceTransaction } from './settings.js';
@@ -29,9 +29,7 @@ function duplicateName(error: unknown): never {
     'code' in error &&
     error.code === '23505'
   )
-    throw new IdentityError(
-      409,
-      'CONFLICT',
+    throw conflict(
       'Another active role already has this name. Choose a different name.',
     );
   throw error;

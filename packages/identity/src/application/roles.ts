@@ -1,7 +1,7 @@
-import { conflict, forbidden } from '@luma/platform';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 
 import type { Membership, TenantContext } from '../domain/context.js';
-import { IdentityError, requireActiveMembership } from '../domain/context.js';
+import { requireActiveMembership } from '../domain/context.js';
 import type { PermissionDefinition } from '../domain/permissions.js';
 import {
   appPermissionGroupDescription,
@@ -118,8 +118,7 @@ export function createRolesService(deps: {
       context.actor.id,
       async (tx) => {
         const actor = await tx.member(context.actor.id);
-        if (!actor)
-          throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        if (!actor) throw notFound('Workspace not found');
         requireActiveMembership(actor);
         if (manage && !actor.permissions.has('roles.manage'))
           throw forbidden(
@@ -181,7 +180,7 @@ export function createRolesService(deps: {
       );
     });
     if (invalid.length)
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'VALIDATION_ERROR',
         `These permissions are unknown or unavailable: ${invalid.slice(0, 5).join(', ')}.`,
@@ -340,11 +339,7 @@ export function createRolesService(deps: {
         async (tx, actor) => {
           const before = uuid.test(roleId) ? await tx.role(roleId) : null;
           if (!before)
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
-              'Role not found. Built-in roles cannot be changed.',
-            );
+            throw notFound('Role not found. Built-in roles cannot be changed.');
           if (before.archived)
             throw conflict('Archived roles cannot be changed.');
           if (before.revision !== input.revision)
@@ -409,9 +404,7 @@ export function createRolesService(deps: {
         async (tx, actor) => {
           const before = uuid.test(roleId) ? await tx.role(roleId) : null;
           if (!before)
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
+            throw notFound(
               'Role not found. Built-in roles cannot be archived.',
             );
           if (before.archived) throw conflict('This role is already archived.');
