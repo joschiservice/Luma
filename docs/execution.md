@@ -85,6 +85,21 @@ Mailbox verification cites the messages and outgoing send it stored. Provider re
 aggregate several reads, such as a refund quote or an exchange proof, return the reads their
 evidence references name, so the citing owner can store them.
 
+Write receipts follow the same rule. When a provider accepts a write, the owner that bound the
+effect stores the receipt in the tenant's transaction before execution sees it, and the
+attempt and its completion audit cite only that receipt's ID, never the adapter's own
+references. Procurement (submissions and order revisions) and orders (return creations,
+settlements and exchange steps) store receipts beside their cited reads with kind
+`write_receipt`; messaging stores reply send receipts beside the reply. Shopify corrections,
+stock protection, order edits, fulfillment recovery and shipment publishing, and Starshipit
+updates store their acceptances in their own evidence tables. A receipt keeps the provider,
+connection, the provider records the response named, the provider request ID, the attempt's
+idempotency key and dispatch identity, the adapter version and the time; never the payload,
+credentials or message content. A lost or unreadable response has no receipt, so nothing is
+cited. If the receipt cannot be stored, the attempt records the write as dispatched with an
+unknown outcome, cites nothing and reconciles by reading. Internal effects, such as adaptive
+fields, Luma purchase orders and supplier follow-ups, cite the Luma record they changed.
+
 ## Observe-only
 
 Owners choose `observe_only` or `writes_enabled` for the workspace. New workspaces
