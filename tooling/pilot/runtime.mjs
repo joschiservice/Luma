@@ -2,7 +2,10 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { createJtlConnector } from '@luma/app-jtl';
+import {
+  createJtlConnector,
+  createShippingMethodEvidenceStore,
+} from '@luma/app-jtl';
 import {
   applicationOptionsFor,
   buildApp,
@@ -397,7 +400,9 @@ export async function createPilot(
       action.tenantId === manifest.organizationId &&
       action.connectionId === manifest.connections.jtl &&
       action.target.id === manifest.subjects.workflow_failure;
+    // The JTL app stores the verification read and the write receipt the correction cites.
     const effectBinding = {
+      ...createShippingMethodEvidenceStore(db),
       map: async (_actor, action) =>
         supported(action)
           ? {

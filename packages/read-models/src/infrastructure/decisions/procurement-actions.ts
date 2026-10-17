@@ -38,6 +38,8 @@ export interface ProcurementActionDecision {
   expiresAt: string | null;
   canApprove: boolean;
   quantity: number | null;
+  /** For a revision: the change, its policy decision and the reads that verified it. */
+  evidenceRefs?: string[] | undefined;
 }
 
 /** Presents persisted purchasing actions without reading providers or granting execution authority. */
@@ -109,6 +111,17 @@ export function procurementActionDecisionProvider(
         owner: item.orderId
           ? { kind: 'purchase_order', purchaseOrderId: item.orderId }
           : { kind: 'purchasing_plan', planId: item.id },
+        citedEvidence:
+          item.kind === 'plan'
+            ? { subject: { kind: 'purchasing_plan', id: item.id } }
+            : item.kind === 'native_receipt'
+              ? { subject: { kind: 'native_receipt', id: item.id } }
+              : item.orderId
+                ? {
+                    subject: { kind: 'purchase_order', id: item.orderId },
+                    refs: [item.id, ...(item.evidenceRefs ?? [])].slice(0, 100),
+                  }
+                : undefined,
         group: {
           key: `purchasing:${item.kind}`,
           label:

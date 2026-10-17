@@ -19,6 +19,7 @@ import { ArrowUpRight, Clock } from 'lucide-react';
 import { type ReactNode, useContext, useId } from 'react';
 
 import { useNow } from '../../kit/live/now';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import {
   assigneeOptions,
   decisionStatus,
@@ -196,6 +197,71 @@ function RecordLinks({
   );
 }
 
+/** The read permission each kind of evidence subject needs; app decisions are checked by the API. */
+const evidencePermissions: Partial<
+  Record<NonNullable<DecisionItem['citedEvidence']>['subject']['kind'], string>
+> = {
+  purchase_order: 'procurement.read',
+  purchasing_plan: 'procurement.read',
+  replenishment_run: 'procurement.read',
+  native_receipt: 'inventory.read',
+  return_creation: 'returns.read',
+  return_settlement: 'returns.read',
+  return_exchange: 'returns.read',
+  return_exchange_step: 'returns.read',
+  return_wait: 'returns.read',
+  reply: 'messages.read',
+  case: 'issues.read',
+};
+
+type EvidenceCovers = NonNullable<
+  NonNullable<DecisionItem['citedEvidence']>['covers']
+>;
+
+/** Names the record a decision cites when it could cite another one, such as a return's step. */
+const coveredLabels: Record<EvidenceCovers, () => string> = {
+  return_creation: m.decisions_cited_evidence_return_creation,
+  exchange_check: m.decisions_cited_evidence_exchange_check,
+  deadline_wait: m.decisions_cited_evidence_deadline_wait,
+  refund_step: m.decisions_cited_evidence_refund_step,
+  restock_step: m.decisions_cited_evidence_restock_step,
+  exchange_step: m.decisions_cited_evidence_exchange_step,
+};
+
+/**
+ * Opens what the decision cites, read through the owner's evidence only when opened. The label
+ * names the cited record when the decision could cite another one. Hidden
+ * when the reader's role can't read the subject's area; the API checks again.
+ */
+function DecisionEvidence({
+  organizationId,
+  item,
+  canRead,
+}: {
+  organizationId: string;
+  item: DecisionItem;
+  canRead: (permission: string) => boolean;
+}) {
+  const cited = item.citedEvidence;
+  if (!cited) return null;
+  const permission = evidencePermissions[cited.subject.kind];
+  if (permission && !canRead(permission)) return null;
+
+  return (
+    <EvidenceDisclosure
+      className="decision-evidence"
+      organizationId={organizationId}
+      subject={cited.subject}
+      label={
+        cited.covers
+          ? coveredLabels[cited.covers]()
+          : m.decisions_cited_evidence()
+      }
+      {...(cited.refs ? { refs: cited.refs } : {})}
+    />
+  );
+}
+
 /**
  * Lets people take or release a decision; people who can assign decisions can also hand it to
  * anyone.
@@ -267,6 +333,7 @@ export function DecisionInspector({
   members,
   self,
   assignmentAccess,
+  canRead = () => true,
   now,
   navigation,
   onClose,
@@ -283,6 +350,11 @@ export function DecisionInspector({
   members: readonly Member[];
   self: string | undefined;
   assignmentAccess: AssignmentAccess;
+  /**
+   * Whether the reader holds a read permission, to hide evidence they can't open. Shows it by
+   * default; the API checks access either way.
+   */
+  canRead?: (permission: string) => boolean;
   /** A fixed time for the deadline; the shared clock by default. */
   now?: number | undefined;
   navigation?: ReactNode;
@@ -569,6 +641,12 @@ export function DecisionInspector({
               {m.issues_observe_only_proposal()}
             </CaseNotice>
           ) : null}
+          <DecisionEvidence
+            key={item.id}
+            organizationId={organizationId}
+            item={item}
+            canRead={canRead}
+          />
           <RecordLinks organizationId={organizationId} item={item} />
         </section>
       </div>

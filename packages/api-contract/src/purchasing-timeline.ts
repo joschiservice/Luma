@@ -46,6 +46,12 @@ export const purchasingTimelineSchema = z.object({
           'email',
           'inventory',
         ]),
+        restricted: z
+          .object({ permission: z.literal('inventory.read') })
+          .optional()
+          .describe(
+            'Present when the entry is a stock booking step and the reader lacks the named permission. The entry then keeps only its kind, stage, time, source and evidence references; actor, reason, quantity, unit, revision and detail are null.',
+          ),
       }),
     )
     .max(500),

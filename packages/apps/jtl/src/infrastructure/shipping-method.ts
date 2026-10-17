@@ -40,6 +40,9 @@ const receipt = z
     status: z.literal('accepted'),
     evidenceRefs: z.array(z.string().min(1)).min(1),
     providerRequestId: z.string().nullable(),
+    records: z
+      .array(z.object({ resource: z.literal('order'), externalId }).strict())
+      .length(1),
   })
   .strict();
 
@@ -244,10 +247,12 @@ export function createJtlShippingMethodCapabilities(
           retry: 'reconcile',
         });
 
+      // The owner's binding stores the receipt and execution cites it instead of these refs.
       return {
         status: 'accepted',
         evidenceRefs: [before.id],
         providerRequestId,
+        records: [{ resource: 'order', externalId: parsed.data.salesOrderId }],
       };
     },
   };

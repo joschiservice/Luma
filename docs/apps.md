@@ -105,18 +105,25 @@ procedure, including the protocol client, simulator, pilot and tests.
    ID, why a person is needed, what each response causes, the exact change and its
    deadline, and points to the app's `inventory` or `fulfillment` slot, whose controls take
    the response.
-5. Register workspace HTTP operations below
+5. If the app stores the reads and receipts its provider writes cite, implement
+   `evidence(tx, tenantId, ids)` so the [evidence view](execution.md#reading-cited-evidence)
+   resolves them. It reads only the cited IDs inside the caller's read-only transaction and
+   returns each read's source record, times, revision, completeness and adapter version, and
+   each receipt's records, adapter version and dispatch identity. Fields the app never
+   recorded are null. Return no payloads, credentials or personal data, and make no
+   provider requests.
+6. Register workspace HTTP operations below
    `/v1/organizations/:organizationId/apps/<app-id>/...` with `config.access` (a
    permission or `{ access: 'member' }`). The host applies membership and Origin checks
    and checks installation and the declared permission before the handler runs; a tenant
    route without a declaration fails at startup. Services still call `requirePermission`
    for the full check. Signed callbacks and webhooks declare
    `config.authentication: 'app'` and must validate their own signature and session.
-6. Put app migrations in `packages/apps/<app-id>/migrations/*.sql`. They run after core
-   migrations, in directory and filename order, recorded as `app:<app-id>/<filename>`.
-   Use tenant RLS and grant only the runtime access needed. Provider migrations already in
-   the core sequence stay there.
-7. Run `pnpm apps:sync` and `pnpm install`; the catalog generator updates composition
+7. Put app migrations in `packages/apps/<app-id>/migrations/*.sql`. They run after core
+   migrations, in directory and filename order, recorded as `app:<app-id>/<filename>`, and
+   database integration suites apply them the same way. Use tenant RLS and grant only the
+   runtime access needed. Provider migrations already in the core sequence stay there.
+8. Run `pnpm apps:sync` and `pnpm install`; the catalog generator updates composition
    dependencies from the packages on disk.
 
 ## UI slots

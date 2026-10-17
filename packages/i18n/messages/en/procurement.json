@@ -610,6 +610,7 @@
   "procurement_timeline_email": "Email",
   "procurement_timeline_inventory": "Stock owner",
   "procurement_timeline_actor": "Recorded by: {actor}",
+  "procurement_timeline_restricted": "Details of this stock booking, such as quantities, locations and who acted, need “{permission}”.",
   "procurement_list_view_all": "All purchase orders",
   "procurement_list_view_all_suppliers": "All suppliers",
   "procurement_area_order": "Order",

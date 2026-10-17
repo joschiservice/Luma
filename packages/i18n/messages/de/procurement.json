@@ -610,6 +610,7 @@
   "procurement_timeline_email": "E-Mail",
   "procurement_timeline_inventory": "Bestandsführendes System",
   "procurement_timeline_actor": "Erfasst von: {actor}",
+  "procurement_timeline_restricted": "Details dieser Bestandsbuchung wie Mengen, Lagerorte und Beteiligte siehst du nur mit „{permission}“.",
   "procurement_list_view_all": "Alle Lieferantenbestellungen",
   "procurement_list_view_all_suppliers": "Alle Lieferanten",
   "procurement_area_order": "Bestellung",

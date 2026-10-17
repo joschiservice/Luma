@@ -9,6 +9,7 @@ import {
   collectionTimeZoneParameter,
   collectionWhereParameter,
 } from './collections.js';
+import { evidenceReferenceLimit, evidenceSubjectSchema } from './evidence.js';
 import { recordKindSchema } from './records.js';
 
 const timestamp = z.string().datetime({ offset: true });
@@ -193,6 +194,34 @@ export const decisionItemSchema = z.object({
     .object({ kind: recordKindSchema, id: z.string().uuid() })
     .nullable(),
   owner: decisionOwnerSchema,
+  /**
+   * The record whose cited evidence backs this decision, for the evidence resolver; `refs` names
+   * the references this decision relies on when they are a part of what the record cites.
+   * Absent when the decision cites no stored evidence.
+   */
+  citedEvidence: z
+    .object({
+      subject: evidenceSubjectSchema,
+      refs: z
+        .array(z.string().min(1).max(500))
+        .min(1)
+        .max(evidenceReferenceLimit)
+        .optional(),
+      covers: z
+        .enum([
+          'return_creation',
+          'exchange_check',
+          'deadline_wait',
+          'refund_step',
+          'restock_step',
+          'exchange_step',
+        ])
+        .optional()
+        .describe(
+          'Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step.',
+        ),
+    })
+    .optional(),
   /** Items with the same cause share a group; each still needs its own response. */
   group: z.object({ key: z.string(), label: z.string() }),
 });

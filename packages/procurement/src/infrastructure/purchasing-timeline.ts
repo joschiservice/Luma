@@ -9,12 +9,16 @@ import {
   type PurchasingTimelineEntry,
 } from '../domain/purchasing-timeline.js';
 
-/** Reads only this order's stored purchasing actions, policy responses and independent execution proof. */
+/**
+ * Reads only this order's stored purchasing actions, policy responses and independent execution
+ * proof. Stock bookings of the order's receipts are always read so the timeline can show that
+ * they happened; with `stockDetails` false their quantity, unit and requester are not read.
+ */
 export async function readPurchasingActionTimeline(
   tx: SqlTransaction,
   tenantId: string,
   orderId: string,
-  includeStock: boolean,
+  stockDetails: boolean,
 ) {
   const entries: PurchasingTimelineEntry[] = [];
   const add = (
@@ -136,40 +140,44 @@ export async function readPurchasingActionTimeline(
       quantity: null,
       channel: submission.channel,
     });
-  if (includeStock) {
-    const corrections = (
-      await tx.query<{
-        id: string;
-        created_at: Date;
-        action_id: string;
-        actor_id: string | null;
-        quantity: string;
-        unit: string | null;
-      }>(
-        `SELECT r.id,r.created_at,r.document->'action'->>'id' AS action_id,r.document->'action'->'proposedBy'->>'id' AS actor_id,r.document->'target'->'receipt'->>'quantity' AS quantity,s.document->'data'->>'unit' AS unit FROM shopify_inventory_corrections r LEFT JOIN inventory_projections p ON p.tenant_id=r.tenant_id AND p.entity_id=r.position_id AND p.connection_id=r.connection_id LEFT JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE r.tenant_id=$1 AND r.document->'target'->'receipt'->>'purchaseOrderId'=$2 ORDER BY r.created_at DESC LIMIT 501`,
-        [tenantId, orderId],
-      )
-    ).rows;
-    for (const correction of corrections) {
-      const quantity = Number(correction.quantity);
-      actions.set(correction.action_id, {
-        kind: 'stock_booking',
-        id: correction.id,
-        revision: null,
-        quantity: Number.isFinite(quantity) ? quantity : null,
-      });
-      add({
-        id: `stock:${correction.id}:requested`,
-        kind: 'stock_booking',
-        stage: 'recorded',
-        at: correction.created_at.toISOString(),
-        source: 'inventory',
-        actorId: correction.actor_id,
-        evidenceRefs: [correction.id],
-        quantity: Number.isFinite(quantity) ? quantity : null,
-        unit: correction.unit,
-      });
-    }
+  // Every reader learns that the order's receipts were booked. The booked quantity, its unit
+  // from inventory snapshots and the requester are read only for readers with inventory access.
+  const corrections = (
+    await tx.query<{
+      id: string;
+      created_at: Date;
+      action_id: string;
+      actor_id: string | null;
+      quantity: string | null;
+      unit: string | null;
+    }>(
+      stockDetails
+        ? `SELECT r.id,r.created_at,r.document->'action'->>'id' AS action_id,r.document->'action'->'proposedBy'->>'id' AS actor_id,r.document->'target'->'receipt'->>'quantity' AS quantity,s.document->'data'->>'unit' AS unit FROM shopify_inventory_corrections r LEFT JOIN inventory_projections p ON p.tenant_id=r.tenant_id AND p.entity_id=r.position_id AND p.connection_id=r.connection_id LEFT JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE r.tenant_id=$1 AND r.document->'target'->'receipt'->>'purchaseOrderId'=$2 ORDER BY r.created_at DESC LIMIT 501`
+        : `SELECT r.id,r.created_at,r.document->'action'->>'id' AS action_id,NULL AS actor_id,NULL AS quantity,NULL AS unit FROM shopify_inventory_corrections r WHERE r.tenant_id=$1 AND r.document->'target'->'receipt'->>'purchaseOrderId'=$2 ORDER BY r.created_at DESC LIMIT 501`,
+      [tenantId, orderId],
+    )
+  ).rows;
+  for (const correction of corrections) {
+    const booked =
+      correction.quantity === null ? Number.NaN : Number(correction.quantity);
+    const quantity = Number.isFinite(booked) ? booked : null;
+    actions.set(correction.action_id, {
+      kind: 'stock_booking',
+      id: correction.id,
+      revision: null,
+      quantity,
+    });
+    add({
+      id: `stock:${correction.id}:requested`,
+      kind: 'stock_booking',
+      stage: 'recorded',
+      at: correction.created_at.toISOString(),
+      source: 'inventory',
+      actorId: correction.actor_id,
+      evidenceRefs: [correction.id],
+      quantity,
+      unit: correction.unit,
+    });
   }
   const ids = [...actions.keys()];
   if (ids.length) {

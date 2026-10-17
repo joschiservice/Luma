@@ -116890,6 +116890,16 @@
                                   "inventory"
                                 ],
                                 "type": "string"
+                              },
+                              "restricted": {
+                                "type": "object",
+                                "properties": {
+                                  "permission": {
+                                    "const": "inventory.read"
+                                  }
+                                },
+                                "required": ["permission"],
+                                "description": "Present when the entry is a stock booking step and the reader lacks the named permission. The entry then keeps only its kind, stage, time, source and evidence references; actor, reason, quantity, unit, revision and detail are null."
                               }
                             },
                             "required": [
@@ -119394,6 +119404,16 @@
                                   "inventory"
                                 ],
                                 "type": "string"
+                              },
+                              "restricted": {
+                                "type": "object",
+                                "properties": {
+                                  "permission": {
+                                    "const": "inventory.read"
+                                  }
+                                },
+                                "required": ["permission"],
+                                "description": "Present when the entry is a stock booking step and the reader lacks the named permission. The entry then keeps only its kind, stage, time, source and evidence references; actor, reason, quantity, unit, revision and detail are null."
                               }
                             },
                             "required": [
@@ -134970,6 +134990,206 @@
                             }
                           ]
                         },
+                        "citedEvidence": {
+                          "type": "object",
+                          "properties": {
+                            "subject": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "purchase_order"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "purchasing_plan"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "replenishment_run"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "native_receipt"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "app_decision"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_creation"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_settlement"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_exchange"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_exchange_step"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_wait"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "reply"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "case"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "refs": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 100,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "covers": {
+                              "enum": [
+                                "return_creation",
+                                "exchange_check",
+                                "deadline_wait",
+                                "refund_step",
+                                "restock_step",
+                                "exchange_step"
+                              ],
+                              "type": "string",
+                              "description": "Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step."
+                            }
+                          },
+                          "required": ["subject"]
+                        },
                         "group": {
                           "type": "object",
                           "properties": {
@@ -136189,6 +136409,206 @@
                               }
                             ]
                           },
+                          "citedEvidence": {
+                            "type": "object",
+                            "properties": {
+                              "subject": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "purchase_order"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "purchasing_plan"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "replenishment_run"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "native_receipt"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "app_decision"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_creation"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_settlement"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_exchange"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_exchange_step"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_wait"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "reply"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "case"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "refs": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 100,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                }
+                              },
+                              "covers": {
+                                "enum": [
+                                  "return_creation",
+                                  "exchange_check",
+                                  "deadline_wait",
+                                  "refund_step",
+                                  "restock_step",
+                                  "exchange_step"
+                                ],
+                                "type": "string",
+                                "description": "Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step."
+                              }
+                            },
+                            "required": ["subject"]
+                          },
                           "group": {
                             "type": "object",
                             "properties": {
@@ -136706,7 +137126,7 @@
       "post": {
         "operationId": "evidence.resolve",
         "summary": "Resolve the evidence a record cites",
-        "description": "Resolves the references a purchase order, return write, reply or case cites. Each reference is a stored provider read (source, record, read time, source update time and revision, completeness, adapter version and a normalized summary), a provider write receipt (capability, accepted time, provider records and request ID), a Luma record, `not_retained` when it was cited before Luma stored that kind of evidence, or `unresolved`. Without `refs`, resolves every reference the subject cites, up to 100. Needs the read permission of the subject: `procurement.read`, `returns.read`, `messages.read` or `issues.read`. Provider payloads and credentials are never returned.",
+        "description": "Resolves the references a purchase order, purchasing plan, native stock receipt, return write, reply, case or app decision cites. Each reference is a stored provider read (source, record, read time, source update time and revision, completeness, adapter version and a normalized summary), a provider write receipt (capability, accepted time, provider records, request ID and adapter version when recorded), a stored mailbox message (sender, received time, subject and whether the sender was authenticated, never its text), a Luma record (some with their time, actor and recorded facts, such as a purchase order's lifecycle events and stock ledger entries with their postings), `restricted` when another area guards it and the reader lacks that permission, `not_retained` when it was cited before Luma stored that kind of evidence, or `unresolved`. Without `refs`, resolves every reference the subject cites, up to 100. Needs the read permission of the subject: `procurement.read` for purchase orders and plans, `inventory.read` for native receipts, `returns.read`, `messages.read`, `issues.read`, and for app decisions the read permission of the change's area. Provider payloads, message text and credentials are never returned.",
         "tags": ["evidence"],
         "parameters": [
           {
@@ -136733,6 +137153,62 @@
                         "properties": {
                           "kind": {
                             "const": "purchase_order"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "purchasing_plan"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "replenishment_run"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "native_receipt"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "app_decision"
                           },
                           "id": {
                             "type": "string",
@@ -136774,7 +137250,35 @@
                         "type": "object",
                         "properties": {
                           "kind": {
+                            "const": "return_exchange"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
                             "const": "return_exchange_step"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "return_wait"
                           },
                           "id": {
                             "type": "string",
@@ -136859,6 +137363,62 @@
                           "type": "object",
                           "properties": {
                             "kind": {
+                              "const": "purchasing_plan"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "replenishment_run"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "native_receipt"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "app_decision"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
                               "const": "return_creation"
                             },
                             "id": {
@@ -136887,7 +137447,35 @@
                           "type": "object",
                           "properties": {
                             "kind": {
+                              "const": "return_exchange"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
                               "const": "return_exchange_step"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "return_wait"
                             },
                             "id": {
                               "type": "string",
@@ -137072,11 +137660,11 @@
                                             "requestedDeliveryDate",
                                             "available",
                                             "onHand",
+                                            "reserved",
                                             "quantity",
                                             "amount",
                                             "currency",
-                                            "lines",
-                                            "complete"
+                                            "lines"
                                           ],
                                           "type": "string"
                                         },
@@ -137170,6 +137758,16 @@
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "adapterVersion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -137179,7 +137777,8 @@
                                   "capability",
                                   "acceptedAt",
                                   "records",
-                                  "providerRequestId"
+                                  "providerRequestId",
+                                  "adapterVersion"
                                 ]
                               },
                               {
@@ -137207,15 +137806,387 @@
                                       "thread",
                                       "reply",
                                       "case",
-                                      "case_proposal"
+                                      "case_proposal",
+                                      "procurement_event",
+                                      "stock_receipt_review",
+                                      "ledger_entry",
+                                      "stock_ownership_change",
+                                      "stock_booking",
+                                      "receipt_note",
+                                      "replenishment_rule",
+                                      "replenishment_proposal",
+                                      "supplier"
                                     ],
                                     "type": "string"
                                   },
                                   "id": {
                                     "type": "string"
+                                  },
+                                  "at": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "actor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "enum": [
+                                              "member",
+                                              "former_member",
+                                              "luma",
+                                              "support",
+                                              "service",
+                                              "unrecorded"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "id": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 300
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "name": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 200
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "email": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 320
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "workflow": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "id": {
+                                                    "type": "string",
+                                                    "maxLength": 200
+                                                  },
+                                                  "name": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string",
+                                                        "maxLength": 200
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": ["id", "name"]
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "id",
+                                          "name",
+                                          "email",
+                                          "workflow"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "detail": {
+                                    "anyOf": [
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "const": "procurement_event"
+                                              },
+                                              "event": {
+                                                "enum": [
+                                                  "created",
+                                                  "status_changed",
+                                                  "revised"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "from": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "maxLength": 40
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "to": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "maxLength": 40
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "revision": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "integer",
+                                                    "minimum": -9007199254740991,
+                                                    "maximum": 9007199254740991
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "event",
+                                              "from",
+                                              "to",
+                                              "revision"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "const": "stock_receipt_review"
+                                              },
+                                              "state": {
+                                                "enum": [
+                                                  "pending",
+                                                  "approved",
+                                                  "rejected"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "quantity": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "maxLength": 40
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "unit": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "maxLength": 40
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "state",
+                                              "quantity",
+                                              "unit"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "const": "ledger_entry"
+                                              },
+                                              "purpose": {
+                                                "type": "string",
+                                                "maxLength": 40
+                                              },
+                                              "reversed": {
+                                                "type": "boolean"
+                                              },
+                                              "postings": {
+                                                "type": "array",
+                                                "maxItems": 20,
+                                                "items": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "state": {
+                                                      "type": "string",
+                                                      "maxLength": 40
+                                                    },
+                                                    "unit": {
+                                                      "type": "string",
+                                                      "maxLength": 40
+                                                    },
+                                                    "quantity": {
+                                                      "type": "string",
+                                                      "maxLength": 40
+                                                    },
+                                                    "balanceAfter": {
+                                                      "type": "string",
+                                                      "maxLength": 40
+                                                    },
+                                                    "version": {
+                                                      "type": "integer",
+                                                      "minimum": -9007199254740991,
+                                                      "maximum": 9007199254740991
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "state",
+                                                    "unit",
+                                                    "quantity",
+                                                    "balanceAfter",
+                                                    "version"
+                                                  ]
+                                                }
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "purpose",
+                                              "reversed",
+                                              "postings"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": ["kind", "record", "id"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "message"
+                                  },
+                                  "provider": {
+                                    "type": "string"
+                                  },
+                                  "connection": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "label": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "label"]
+                                  },
+                                  "direction": {
+                                    "enum": ["inbound", "outbound"],
+                                    "type": "string"
+                                  },
+                                  "sender": {
+                                    "type": "object",
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "maxLength": 320
+                                      },
+                                      "name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["address", "name"]
+                                  },
+                                  "receivedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "subject": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  "senderAuthentication": {
+                                    "enum": ["aligned", "unaligned", "unknown"],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "provider",
+                                  "connection",
+                                  "direction",
+                                  "sender",
+                                  "receivedAt",
+                                  "subject",
+                                  "senderAuthentication"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "restricted"
+                                  },
+                                  "permission": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  }
+                                },
+                                "required": ["kind", "permission"]
                               },
                               {
                                 "type": "object",
@@ -137243,6 +138214,24 @@
                           }
                         },
                         "required": ["ref", "citedAs", "citedAt", "resolution"]
+                      }
+                    },
+                    "notRetained": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "evidence": {
+                            "enum": ["demand_reads"],
+                            "type": "string"
+                          },
+                          "retentionStartedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["evidence", "retentionStartedAt"]
                       }
                     },
                     "truncated": {

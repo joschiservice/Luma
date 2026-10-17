@@ -194,10 +194,14 @@ export interface CommitmentTransaction {
   suppliers(ids: string[]): Promise<Supplier[]>;
   updateSupplier(supplier: Supplier): Promise<void>;
   history(orderId: string): Promise<ProcurementEvent[]>;
-  /** Reads admitted plans, revisions and stock-action proof without provider calls. */
+  /**
+   * Reads admitted plans, revisions and stock-action proof without provider calls. Without
+   * `stockDetails`, stock bookings are read without their quantity, unit and requester; the
+   * caller still restricts them for readers without inventory access.
+   */
   timeline?(
     orderId: string,
-    includeStock: boolean,
+    stockDetails: boolean,
   ): Promise<PurchasingTimelineEntry[]>;
   /** Newest first. Without IDs, returns every submission. */
   submissions(orderIds?: string[]): Promise<Submission[]>;

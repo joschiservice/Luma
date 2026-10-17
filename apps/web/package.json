@@ -33,6 +33,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@luma/app-cin7": "workspace:*",
+    "@luma/app-gmail": "workspace:*",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*",
+    "@luma/app-starshipit": "workspace:*",
     "@luma/typescript-config": "workspace:*",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/vite": "catalog:",

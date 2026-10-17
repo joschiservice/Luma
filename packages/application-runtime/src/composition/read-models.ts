@@ -11,30 +11,54 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
-import type { IdentityService } from '@luma/identity';
-import { replyCitations, replyEvidence } from '@luma/messaging/composition';
+import {
+  admittedActionCitations,
+  admittedActionRecords,
+} from '@luma/execution/composition';
+import type { IdentityService, Permission } from '@luma/identity';
+import {
+  ledgerEvidence,
+  purchaseReceiptCitations,
+  purchaseReceiptEvidence,
+  stockReadEvidence,
+} from '@luma/inventory/composition';
+import {
+  messageEvidence,
+  replyCitations,
+  replyEvidence,
+} from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
+  orderReadEvidence,
   orderStateQueries,
-  returnWriteCitations,
-  returnWriteEvidence,
-  type ReturnWriteKind,
+  returnCitations,
+  returnEvidence,
+  type ReturnEvidenceKind,
 } from '@luma/orders/composition';
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 import {
   type createProcurement,
   createProcurementMetricReader,
   createStockRiskReader,
   purchaseOrderCitations,
   purchaseOrderEvidence,
+  purchaseOrderMessageRefs,
+  purchaseOrderStockRefs,
+  purchasingPlanCitations,
+  purchasingPlanEvidence,
+  replenishmentRunCitations,
+  replenishmentRunEvidence,
   type SupplierCommitments,
 } from '@luma/procurement/composition';
 import type {
+  EvidenceAccess,
   EvidenceOwners,
   EvidenceSubjectOwner,
   StoredEvidence,
 } from '@luma/read-models';
 import {
+  capabilityReadPermission,
   createCustomerWorkspace,
   createEvidenceReader,
   createFulfillmentWorkspace,
@@ -74,62 +98,224 @@ export interface ReadModelServices {
 }
 
 /**
+ * Keeps evidence another area guards from a reader without that area's read permission: each
+ * item becomes `restricted`, naming the permission, so the reference is not silently dropped.
+ */
+function guarded(
+  permission: Permission,
+  access: EvidenceAccess,
+  found: readonly StoredEvidence[],
+): StoredEvidence[] {
+  return access.can(permission)
+    ? [...found]
+    : found.map((evidence) => ({
+        kind: 'restricted',
+        id: evidence.id,
+        permission,
+      }));
+}
+
+/**
+ * The provider reads purchasing plans cite among `cited`: stock positions and native ledger
+ * balances for inventory readers, and order demand for order readers.
+ */
+async function planInputs(
+  tx: SqlTransaction,
+  tenantId: string,
+  cited: string[],
+  access: EvidenceAccess,
+): Promise<StoredEvidence[]> {
+  if (!cited.length) return [];
+
+  return [
+    ...guarded('inventory.read', access, [
+      ...(await stockReadEvidence(tx, tenantId, cited)),
+      ...(await ledgerEvidence(tx, tenantId, cited)),
+    ]),
+    ...guarded(
+      'orders.read',
+      access,
+      await orderReadEvidence(tx, tenantId, cited),
+    ),
+  ];
+}
+
+/**
  * The owner that reports what each kind of subject cites and finds its stored evidence. Reads
  * and receipts each carry the retention start of the table their owner began storing them in;
- * messages were always stored, so reply reads have none. A case's provider evidence belongs to
- * the apps that made its writes.
+ * messages, inventory and order snapshots and ledger records were always stored, so their reads
+ * have none. A case's and an app decision's provider evidence belongs to the apps that made the
+ * writes. Evidence of another area is `restricted` for readers without its read permission.
  */
 export function createEvidenceOwners(
   apps: ReturnType<AppRegistry['evidenceSources']>,
 ): EvidenceOwners {
-  const returnWrite = (kind: ReturnWriteKind): EvidenceSubjectOwner => ({
+  const returnRecord = (kind: ReturnEvidenceKind): EvidenceSubjectOwner => ({
     permission: 'returns.read',
     retention: { read: 'return_reads', write_receipt: 'write_receipts' },
-    citations: (tx, tenantId, id) =>
-      returnWriteCitations(tx, tenantId, kind, id),
+    citations: (tx, tenantId, id) => returnCitations(tx, tenantId, kind, id),
     lookup: (tx, tenantId, id, refs) =>
-      returnWriteEvidence(tx, tenantId, kind, id, refs),
+      returnEvidence(tx, tenantId, kind, id, refs),
   });
+  const appEvidence = async (
+    tx: SqlTransaction,
+    tenantId: string,
+    cited: string[],
+  ) => {
+    const found: StoredEvidence[] = [];
+    if (cited.length)
+      for (const app of apps)
+        found.push(...(await app.read(tx, tenantId, cited)));
+
+    return found;
+  };
 
   return {
+    app_decision: {
+      // The change's area decides; `citations` checks it once the proposal is read.
+      permission: null,
+      retention: { read: null, write_receipt: 'write_receipts' },
+      async citations(tx, tenantId, id, access) {
+        const action = await admittedActionCitations(tx, tenantId, id);
+        if (!action) return null;
+        const permission = capabilityReadPermission(action.capability);
+        if (!permission || !access.can(permission))
+          throw forbidden('You do not have access to this evidence');
+
+        return { actionIds: action.actionIds, citations: action.citations };
+      },
+      async lookup(tx, tenantId, id, refs) {
+        return [
+          ...(await admittedActionRecords(tx, tenantId, id, refs.uuids)),
+          ...(await appEvidence(tx, tenantId, refs.cited)),
+        ];
+      },
+    },
     case: {
       permission: 'issues.read',
       retention: { read: null, write_receipt: null },
       citations: caseCitations,
       async lookup(tx, tenantId, id, refs) {
-        const found: StoredEvidence[] = await caseRecords(
-          tx,
-          tenantId,
-          id,
-          refs,
-        );
-        if (refs.cited.length)
-          for (const app of apps)
-            found.push(...(await app.read(tx, tenantId, refs.cited)));
+        return [
+          ...(await caseRecords(tx, tenantId, id, refs)),
+          ...(await appEvidence(tx, tenantId, refs.cited)),
+        ];
+      },
+    },
+    native_receipt: {
+      permission: 'inventory.read',
+      retention: { read: null, write_receipt: null },
+      async citations(tx, tenantId, id) {
+        const receipt = await purchaseReceiptCitations(tx, tenantId, id);
 
-        return found;
+        return receipt ? { actionIds: [], citations: receipt.citations } : null;
+      },
+      async lookup(tx, tenantId, id, refs, access) {
+        const receipt = await purchaseReceiptCitations(tx, tenantId, id);
+        if (!receipt) return [];
+        // The supplier commitments the receipt books are procurement's records.
+        const cited = new Set(receipt.citations.map((c) => c.ref));
+        const commitments = (
+          await purchaseOrderEvidence(tx, tenantId, receipt.purchaseOrderId, {
+            all: [],
+            uuids: refs.uuids.filter((ref) => cited.has(ref)),
+          })
+        ).filter(
+          (evidence) =>
+            evidence.kind === 'luma_record' && evidence.record === 'commitment',
+        );
+
+        return [
+          ...(await purchaseReceiptEvidence(
+            tx,
+            tenantId,
+            { reviewId: id },
+            refs.uuids,
+          )),
+          ...guarded('procurement.read', access, commitments),
+        ];
       },
     },
     purchase_order: {
       permission: 'procurement.read',
       retention: { read: 'procurement_reads', write_receipt: 'write_receipts' },
-      // Stock booking proof of the order's receipts is the inventory area's evidence.
-      citations: (tx, tenantId, id, access) =>
-        purchaseOrderCitations(tx, tenantId, id, {
-          stock: access.can('inventory.read'),
-        }),
-      async lookup(tx, tenantId, id, refs, access) {
-        const found: StoredEvidence[] = await purchaseOrderEvidence(
+      citations: (tx, tenantId, id) => purchaseOrderCitations(tx, tenantId, id),
+      async lookup(tx, tenantId, id, requested, access) {
+        const stock = access.can('inventory.read');
+        // Stock booking proof of the order's receipts is the inventory area's evidence: without
+        // inventory access it is listed as restricted, never resolved or left out.
+        const bookings = new Set(
+          stock
+            ? []
+            : await purchaseOrderStockRefs(tx, tenantId, id, requested.uuids),
+        );
+        const open = (ref: string) => !bookings.has(ref);
+        const refs = {
+          all: requested.all.filter(open),
+          uuids: requested.uuids.filter(open),
+          cited: requested.cited.filter(open),
+        };
+        const messages = await purchaseOrderMessageRefs(
           tx,
           tenantId,
           id,
-          refs,
+          refs.uuids,
         );
-        if (access.can('inventory.read') && refs.cited.length)
-          for (const app of apps)
-            found.push(...(await app.read(tx, tenantId, refs.cited)));
 
-        return found;
+        return [
+          ...[...bookings].map((ref): StoredEvidence => ({
+            kind: 'restricted',
+            id: ref,
+            permission: 'inventory.read',
+          })),
+          ...(await purchaseOrderEvidence(tx, tenantId, id, refs, { stock })),
+          ...(stock ? await appEvidence(tx, tenantId, refs.cited) : []),
+          ...(await planInputs(tx, tenantId, refs.cited, access)),
+          // Native receipt reviews and the ledger entries that booked them.
+          ...guarded(
+            'inventory.read',
+            access,
+            await purchaseReceiptEvidence(
+              tx,
+              tenantId,
+              { purchaseOrderId: id },
+              refs.uuids,
+            ),
+          ),
+          // The order emails its email submissions sent.
+          ...(access.can('messages.read')
+            ? await messageEvidence(tx, tenantId, messages)
+            : messages.map((message): StoredEvidence => ({
+                kind: 'restricted',
+                id: message,
+                permission: 'messages.read',
+              }))),
+        ];
+      },
+    },
+    purchasing_plan: {
+      permission: 'procurement.read',
+      retention: { read: null, write_receipt: 'write_receipts' },
+      citations: purchasingPlanCitations,
+      async lookup(tx, tenantId, id, refs, access) {
+        return [
+          ...(await purchasingPlanEvidence(tx, tenantId, id, refs)),
+          ...(await planInputs(tx, tenantId, refs.cited, access)),
+        ];
+      },
+    },
+    replenishment_run: {
+      permission: 'procurement.read',
+      // Stock and order snapshots were always stored, and the draft's receipt is the Luma order
+      // it created, so nothing the run cites predates storage.
+      retention: { read: null, write_receipt: null },
+      citations: replenishmentRunCitations,
+      async lookup(tx, tenantId, id, refs, access) {
+        return [
+          ...(await replenishmentRunEvidence(tx, tenantId, id, refs)),
+          // The stock read the proposal rests on and the order reads behind its demand.
+          ...(await planInputs(tx, tenantId, refs.cited, access)),
+        ];
       },
     },
     reply: {
@@ -138,9 +324,11 @@ export function createEvidenceOwners(
       citations: replyCitations,
       lookup: replyEvidence,
     },
-    return_creation: returnWrite('creation'),
-    return_exchange_step: returnWrite('exchange_step'),
-    return_settlement: returnWrite('settlement'),
+    return_creation: returnRecord('creation'),
+    return_exchange: returnRecord('exchange'),
+    return_exchange_step: returnRecord('exchange_step'),
+    return_settlement: returnRecord('settlement'),
+    return_wait: returnRecord('wait'),
   };
 }
 

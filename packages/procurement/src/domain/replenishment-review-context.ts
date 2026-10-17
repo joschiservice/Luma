@@ -22,6 +22,11 @@ export interface ReplenishmentApprovalContext {
   termsSource: string | null;
   termsObservedAt: string | null;
   demandObservedAt: string | null;
+  /**
+   * The order reads behind `dailySales`, at most 100; empty when demand is unknown. Contexts
+   * frozen before Luma recorded them have none.
+   */
+  demandEvidenceRefs?: string[];
   recordedAt: string;
   unavailable: string[];
 }
@@ -111,6 +116,10 @@ export function replenishmentReviewContext(input: {
         ? (terms?.override?.observedAt ?? readAt)
         : readAt,
     demandObservedAt: demand?.observedAt ?? null,
+    demandEvidenceRefs:
+      dailySales === null
+        ? []
+        : [...new Set(demand?.evidenceRefs ?? [])].slice(0, 100),
     recordedAt: now,
     unavailable: [
       ...(!unitPrice ? ['unit_price'] : []),

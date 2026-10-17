@@ -259,3 +259,29 @@ export function nextStockVersion(value: string): string {
 
   return String(BigInt(value) + 1n);
 }
+
+/**
+ * Whether a booking still reads back exactly as committed: the receipt recorded a ledger entry
+ * and every account it posted to still has the version and balance the receipt recorded. A later
+ * stock change to one of those accounts makes the check inconclusive, not failed.
+ */
+export function bookingReadsBack(
+  receipt: {
+    entryId: string | null;
+    accounts: Pick<LedgerAccount, 'id' | 'version' | 'balance'>[];
+  },
+  current: Pick<LedgerAccount, 'id' | 'version' | 'balance'>[],
+): boolean {
+  return (
+    !!receipt.entryId &&
+    current.length === receipt.accounts.length &&
+    receipt.accounts.every((expected) =>
+      current.some(
+        (account) =>
+          account.id === expected.id &&
+          account.version === expected.version &&
+          account.balance === expected.balance,
+      ),
+    )
+  );
+}

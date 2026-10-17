@@ -46,6 +46,17 @@
       // Journey servers start the web and staff apps with each app's own Vite.
       "ignoreDependencies": ["vite"],
     },
+    // The web tsconfig compiles every app's web sources, so the web typecheck and build need the
+    // apps and their connectors built first; knip does not follow tsconfig includes.
+    "apps/web": {
+      "ignoreDependencies": [
+        "@luma/app-cin7",
+        "@luma/app-gmail",
+        "@luma/app-jtl",
+        "@luma/app-shopify",
+        "@luma/app-starshipit",
+      ],
+    },
     "apps/simulator": { "entry": ["src/server.ts"] },
     "apps/simulator-web": { "entry": ["src/main.tsx"] },
     "apps/staff": { "entry": ["src/main.tsx"] },

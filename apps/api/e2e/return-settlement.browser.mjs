@@ -2,7 +2,10 @@
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { returnBrowserCommand } from './return-browser-commands.mjs';
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  providerWrites,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
 
 test('independently approves a refund, distinguishes pending payment, and checks actual settlement on a narrow case', async ({
   resources: t,
@@ -90,6 +93,14 @@ test('independently approves a refund, distinguishes pending payment, and checks
   await expect(
     section.getByText('Refund processing', { exact: true }),
   ).toBeVisible();
+  // The approved send consumed the armed loss, so its acceptance never reached Luma.
+  expect((await f.call('runs/operations')).faults).toEqual([
+    expect.objectContaining({
+      operation: 'returns.refund',
+      kind: 'response-loss',
+      status: 'triggered',
+    }),
+  ]);
   await expect(
     section.getByText('Independently verified', { exact: true }),
   ).toHaveCount(0);
@@ -125,10 +136,32 @@ test('independently approves a refund, distinguishes pending payment, and checks
   await expect(
     section.getByText('Refund processing', { exact: true }),
   ).toHaveCount(0);
+  // Needs you: with no wait or exchange check, the case cites its latest step, the refund. It
+  // opens the provider reads that verified the refund. Its response was lost, so Shopify's
+  // acceptance was never received and no write receipt is shown in its place.
+  await approver.goto(
+    `/app/${f.org}/needs-you?item=${encodeURIComponent(`return-case:${f.detail.case.id}`)}`,
+  );
+  await approver.getByText('Evidence: refund step', { exact: true }).click();
+  const refundEvidence = approver.getByRole('list', { name: 'Cited evidence' });
+  await expect(refundEvidence.getByText(/^Read from /).first()).toBeVisible();
+  await expect(
+    refundEvidence.getByText('Write receipt', { exact: true }),
+  ).toHaveCount(0);
+  await expect(refundEvidence.getByText('Not found')).toHaveCount(0);
+  expect(
+    await approver.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   const items = (
     await f.call('runs/operations/records/shopify?kind=Refund&limit=100')
   ).items;
   expect(items.filter((r) => r.data.note?.startsWith('luma-rs:'))).toHaveLength(
     1,
   );
+  // Shopify received exactly one refund request, the one whose response was lost.
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.refund'))
+    .toEqual(['response-loss']);
 });

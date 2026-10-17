@@ -113,14 +113,16 @@ If progress can’t load, you see **Progress couldn’t be confirmed**. Select *
 
 ## Read the evidence
 
-Wherever Luma shows a sent change and how it was checked, open **Evidence** to see what Luma relied on. You find it in a case's change details, on purchasing timeline events, on a sent purchase order and its revisions, on a return's creation, refund, restock and exchange steps, and on sent replies in the inbox. Each item has a label:
+Wherever Luma shows a sent change and how it was checked, open **Evidence** to see what Luma relied on. You find it in a case's change details, on purchasing timeline events, on a sent purchase order and its revisions, on a return's creation, refund, restock and exchange steps, and on sent replies in the inbox. In [Needs you](/docs/needs-you), open **What this decision cites** on a decision; a return names the record it cites instead, such as **Evidence: refund step**. Luma reads the evidence only when you open it. Each item has a label:
 
 - **Provider read**: what Luma read from a connected system, when it read it, and when the system last changed the record. **Complete** means the read covered everything the check needs. A **Partial** read can’t confirm an outcome. **What Luma read** lists the main values, such as the status or the units on hand.
 - **Write receipt**: the system accepted the request. Acceptance alone doesn’t prove the outcome; a later read does.
-- **Luma record**: a record in Luma, such as an approval or the return case.
-- **Not retained**: this was recorded before Luma kept evidence, so the read or receipt itself isn’t available. Check the connected system if you need it.
+- **Luma record**: a record in Luma, such as an approval or the return case. Some records show when they were recorded, who recorded them and what they recorded: a purchase order event names its status change, a stock receipt review its state and quantity, and a stock ledger entry what it booked to each stock state with the balance afterwards.
+- **Message**: an email Luma stored from a connected inbox, such as the order email sent to a supplier. It shows the sender, when it arrived, the subject and whether the receiving system authenticated the sender. Open the inbox thread to read the text.
+- **No access**: the evidence belongs to an area your role can't view, such as inventory or the inbox. It names the permission someone needs to open it.
+- **Not retained**: this was recorded before Luma kept evidence, so the read or receipt itself isn’t available. Check the connected system if you need it. A replenishment proposal made before Luma kept the sales reads behind its demand estimate shows **Demand reads not kept** with the date Luma started keeping them.
 - **Not found**: Luma can’t find a read or receipt the record relies on. Treat the outcome as unconfirmed and check the connected system.
 
-You need permission to view the area the record belongs to, such as procurement, returns, the inbox or issues.
+You need permission to view the area the record belongs to, such as procurement, returns, the inbox or issues. The stock reads of a purchasing plan or replenishment proposal also need **View inventory**, their sales reads **View orders**, and a stock receipt and a purchase order's stock bookings **View inventory**.
 
 To see how many issues were resolved and confirmed over time, open [Insights](/docs/insights).

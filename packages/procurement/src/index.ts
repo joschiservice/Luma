@@ -45,6 +45,13 @@ export type { PurchaseOrder } from './domain/procurement.js';
 
 export type { PurchasingTimelineEntry } from './domain/purchasing-timeline.js';
 
+export {
+  nativeReceiptEntryId,
+  nativeReceiptProofStage,
+  nativeReceiptReviewStage,
+  restrictedNativeReceiptBookings,
+} from './domain/purchasing-timeline.js';
+
 export { createGovernedFollowUps } from './application/governed-follow-up.js';
 
 export type {

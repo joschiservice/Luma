@@ -114,6 +114,22 @@ export interface LedgerAgingCandidate {
   kind: 'transit' | 'inspection' | 'drift';
 }
 
+/**
+ * Where one native purchase receipt review stands, without what it books: no quantities,
+ * accounts, locations, people, reasons or provider IDs. `at` is the review time, or the time it
+ * was prepared while it waits. `verification` is the ledger readback of an approved, posted
+ * review, read when the stages are listed; it is null otherwise.
+ */
+export interface PurchaseReceiptStage {
+  reviewId: string;
+  state: 'pending' | 'approved' | 'rejected';
+  at: string;
+  verification: {
+    outcome: 'verified' | 'inconclusive';
+    observedAt: string;
+  } | null;
+}
+
 /** A procurement fact read under the owner transaction; it does not itself establish native stock. */
 export interface PurchaseReceiptEvidence {
   purchaseOrderId: string;

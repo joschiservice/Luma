@@ -693,6 +693,21 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@luma/app-cin7':
+        specifier: workspace:*
+        version: link:../../packages/apps/cin7
+      '@luma/app-gmail':
+        specifier: workspace:*
+        version: link:../../packages/apps/gmail
+      '@luma/app-jtl':
+        specifier: workspace:*
+        version: link:../../packages/apps/jtl
+      '@luma/app-shopify':
+        specifier: workspace:*
+        version: link:../../packages/apps/shopify
+      '@luma/app-starshipit':
+        specifier: workspace:*
+        version: link:../../packages/apps/starshipit
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -1160,6 +1175,9 @@ importers:
       '@luma/orders':
         specifier: workspace:*
         version: link:../../orders
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../../platform
       '@luma/ui':
         specifier: workspace:*
         version: link:../../ui

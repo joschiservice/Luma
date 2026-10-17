@@ -79,8 +79,11 @@ reconciles the bound action under its recorded approval.
 Provider runtimes record no capability telemetry and keep no read observations, so a read's
 ID resolves only where its owner stored it. Owners that cite reads as verification evidence
 store them in their own tables, in the tenant's transaction, before returning the result:
-Shopify corrections and fulfillment recovery, Starshipit updates, procurement's submission
-and revision reads, and orders' return creation, settlement, exchange and completion reads.
+Shopify corrections and fulfillment recovery, Starshipit updates, JTL shipping-method
+corrections, procurement's submission and revision reads, and orders' return creation,
+settlement, exchange and completion reads. A stored read keeps its adapter version and its
+completeness, and its source revision and update time where the provider reports them; a read
+whose page or scan was cut short is `partial`.
 Mailbox verification cites the messages and outgoing send it stored. Provider results that
 aggregate several reads, such as a refund quote or an exchange proof, return the reads their
 evidence references name, so the citing owner can store them.
@@ -90,12 +93,14 @@ effect stores the receipt in the tenant's transaction before execution sees it, 
 attempt and its completion audit cite only that receipt's ID, never the adapter's own
 references. Procurement (submissions and order revisions) and orders (return creations,
 settlements and exchange steps) store receipts beside their cited reads with kind
-`write_receipt`; messaging stores reply send receipts beside the reply. Shopify corrections,
-stock protection, order edits, fulfillment recovery and shipment publishing, and Starshipit
-updates store their acceptances in their own evidence tables. A receipt keeps the provider,
-connection, the provider records the response named, the provider request ID, the attempt's
-idempotency key and dispatch identity, the adapter version and the time; never the payload,
-credentials or message content. A lost or unreadable response has no receipt, so nothing is
+`write_receipt`; messaging stores reply send receipts beside the reply; JTL shipping-method
+corrections store receipts beside their verification reads in the JTL app's table. Shopify
+corrections, stock protection, order edits, fulfillment recovery and shipment publishing, and
+Starshipit updates store their acceptances in their own evidence tables; the capability
+runtime tells such adapters the adapter version and dispatch identity it pinned for the write.
+A receipt keeps the provider, connection, the provider records the response named, the provider
+request ID, the attempt's idempotency key and dispatch identity, the adapter version and the
+time; never the payload, credentials or message content. A lost or unreadable response has no receipt, so nothing is
 cited. If the receipt cannot be stored, the attempt records the write as dispatched with an
 unknown outcome, cites nothing and reconciles by reading. Internal effects, such as adaptive
 fields, Luma purchase orders and supplier follow-ups, cite the Luma record they changed.
@@ -103,26 +108,69 @@ fields, Luma purchase orders and supplier follow-ups, cite the Luma record they 
 ### Reading cited evidence
 
 `@luma/read-models` resolves the references a record cites, so people see the evidence rather
-than IDs. A request names a subject (a purchase order, a return creation, settlement or exchange
-step, a reply, or a case) and optionally its references; without them it resolves everything the
-subject cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
-`returns.read`, `messages.read` or `issues.read`); a subject the tenant doesn't have is not found.
+than IDs. A request names a subject (a purchase order, a purchasing plan, a replenishment run by
+its workflow run ID, a native stock receipt review, a return creation, settlement, exchange or
+exchange step, a return deadline wait by its occurrence ID, a reply, a case, or an app decision by
+its proposal ID) and optionally its references; without them it resolves everything the subject
+cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
+`inventory.read`, `returns.read`, `messages.read` or `issues.read`); an app decision needs the
+read permission of its capability's area (`inventory.*` needs `inventory.read`, `orders.*`
+`orders.read`, `fulfillment.*` `fulfillment.read`). A subject the tenant doesn't have is not found.
 
 The subject's owner reports what the subject cites and looks up stored evidence only through the
-subject: procurement's reads and receipts of that order, orders' evidence of that return case,
-messaging's send receipts and the messages of that reply's thread. App evidence tables are not
-linked to a record, so Shopify and Starshipit evidence is read only for references the case's
-execution attempts cite. Each reference resolves to a read (source, record, read and source-update
-times, revision, completeness, adapter version and an allowlisted summary of the normalized
-read), a write receipt, a Luma record, `not_retained` or `unresolved`. Provider payloads, message
-content and addresses never leave the owner.
+subject: procurement's reads and receipts of that order, its lifecycle events, plans and the
+notes people recorded with manual receipts; a replenishment run's rule, admitted proposal with
+its policy records, the rule's supplier, the orders it counted or drafted and the drafted order's
+events; inventory's receipt reviews and the ledger entries that booked them; orders' evidence of
+that return case; messaging's send receipts and the messages of that reply's thread. Tables that
+are not linked to the subject are read only for references the subject cites as reads or
+receipts: the inventory and order snapshots and ledger entries behind a plan's suggestions or a
+replenishment run's stock check and demand estimate, and the Shopify, Starshipit and JTL shipping-method
+evidence that execution attempts or an app proposal's preconditions cite, through each app's
+`evidence` hook. App rows written before an app recorded adapter versions, completeness or
+accepted records return those fields as null, which the view shows as not recorded. An order's
+email submission names the message it sent, which messaging resolves.
+
+A replenishment run cites what its steps recorded: the stock read of its inventory check, the
+supplier and existing orders its proposal step counted, the policy decision its approval waits
+on, and the drafted order's events its verification found, plus the rule, the admitted proposal,
+and the order reads behind the demand estimate and the orders its approval context froze.
+Contexts frozen before Luma recorded demand reads cite none; when their demand estimate was known,
+the list's `notRetained` names the demand reads with the day storage began, so the run doesn't
+read as if demand was never considered. It never stands in for a read, and a request for
+specific references omits it. A return wait cites the money reads
+or case revision its last check found, and an exchange the reads behind its availability and its
+completion check.
+
+Each reference resolves to a read (source, record, read and source-update times, revision,
+completeness, adapter version and an allowlisted summary of the normalized read), a write
+receipt (capability, accepted time, provider records, request ID and, where recorded, the adapter
+version), a stored message (sender, received time, subject and whether the receiving system
+authenticated the sender), a Luma record, `restricted`, `not_retained` or `unresolved`. Records
+that keep them carry their time, actor and facts: a purchase order event its status change or
+revision, a receipt review its state and quantity, a ledger entry its postings with the balance
+and version after each. Provider payloads, message text, recipients and attachments never leave
+the owner.
+
+Evidence another area guards is `restricted` for a reader without that area's read permission,
+naming the permission, rather than left out: plan and replenishment stock reads and ledger
+entries, native receipts and their proof need `inventory.read`, plan and replenishment demand
+reads `orders.read`, order emails
+`messages.read`, the commitments a receipt books `procurement.read`, and an order's Shopify stock
+bookings with their policy records, receipts and verification reads `inventory.read`. The
+order's timeline agrees: it lists those Shopify stock booking entries and native receipt reviews
+with their ledger readback as restricted, with only their stage and time, and their evidence as
+restricted, so the reader knows the booking and its proof exist. A reference that
+belongs to another subject or tenant is `unresolved`, never `restricted`, so a restricted entry
+reveals nothing the subject does not cite.
 
 Records written before an owner stored a kind of evidence cite IDs that were never kept and
 cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return
-reads, write receipts); a read or receipt cited before that date is `not_retained`. Everything
-else without stored evidence stays `unresolved`, including citations without a time and message
-reads, which were always stored: a missing read after storage began is a defect, not history.
-Busy views resolve evidence only when a person opens it.
+reads, write receipts, replenishment demand reads); a read or receipt cited before that date is `not_retained`. Everything
+else without stored evidence stays `unresolved`, including citations without a time and reads
+that were always stored: messages, inventory and order snapshots and ledger entries. A missing
+read after storage began is a defect, not history. Busy views, including Needs you, resolve
+evidence only when a person opens it.
 
 ## Observe-only
 

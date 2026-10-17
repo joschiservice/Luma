@@ -1,6 +1,11 @@
-import type { DecisionItem, DecisionList } from '@luma/api-contract';
+import type {
+  DecisionItem,
+  DecisionList,
+  EvidenceList,
+} from '@luma/api-contract';
 import { Button } from '@luma/ui/components/primitives/button';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -11,6 +16,7 @@ import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { groupId } from '../../kit/collections/groups';
+import { evidenceOptions } from '../../shared/evidence/evidence';
 import appStyles from '../../styles.css?inline';
 import type { NeedsYouSearch } from './data';
 import { DecisionInspector, type Member } from './inspector';
@@ -128,6 +134,12 @@ const correction: DecisionItem = {
     appId: 'shopify',
     positionId: '2c1d0e9f-8a7b-4c6d-9e5f-4a3b2c1d0e9f',
   },
+  citedEvidence: {
+    subject: {
+      kind: 'app_decision',
+      id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+    },
+  },
   group: {
     key: 'shopify:inventory_correction:approval',
     label: 'Stock corrections awaiting approval',
@@ -219,17 +231,52 @@ const manual: DecisionItem = {
   },
 };
 
+/** A return case cites one of several records; here its latest step, a refund. */
+const returnCase: DecisionItem = {
+  ...base,
+  id: 'return-case:1b0f8a4e-2c3d-4e5f-8a9b-0c1d2e3f4a5b',
+  kind: 'return_case',
+  reason: 'manual_intervention',
+  domain: 'orders',
+  title: '#1001',
+  why: 'The return needs receipt, inspection or settlement by its owner.',
+  change: [
+    { label: 'Units', value: '2' },
+    { label: 'Stage', value: 'received' },
+  ],
+  requestedAt: '2026-09-30T07:00:00.000Z',
+  evidence: {
+    observedAt: '2026-09-30T08:40:00.000Z',
+    validUntil: null,
+    state: 'fresh',
+  },
+  response: 'investigate',
+  subject: { label: '#1001', detail: null },
+  owner: {
+    kind: 'return_case',
+    caseId: '1b0f8a4e-2c3d-4e5f-8a9b-0c1d2e3f4a5b',
+  },
+  citedEvidence: {
+    subject: {
+      kind: 'return_settlement',
+      id: '5f4b2e8c-6071-4293-8e3f-4a5b6c7d8e9f',
+    },
+    covers: 'refund_step',
+  },
+  group: { key: 'return-cases', label: 'Returns' },
+};
+
 const list: DecisionList = {
   schemaVersion: 1,
   asOf: '2026-09-30T09:00:00.000Z',
-  items: [replenishment, correction, recovery, manual],
+  items: [replenishment, correction, recovery, manual, returnCase],
   nextCursor: null,
-  totalCount: 4,
+  totalCount: 5,
   offset: 0,
   counts: {
-    views: { all: 4, mine: 1, unassigned: 3 },
+    views: { all: 5, mine: 1, unassigned: 4 },
     domains: {
-      orders: 0,
+      orders: 1,
       fulfillment: 1,
       inventory: 2,
       procurement: 1,
@@ -239,14 +286,107 @@ const list: DecisionList = {
       approval: 2,
       run: 0,
       recovery: 1,
-      manual_intervention: 1,
+      manual_intervention: 2,
       uncertainty: 0,
     },
   },
   sources: [
     { id: 'cases', label: 'Issues', state: 'available' },
+    { id: 'return-cases', label: 'Returns', state: 'available' },
     { id: 'replenishment', label: 'Replenishment', state: 'available' },
     { id: 'app:shopify', label: 'Shopify', state: 'available' },
+  ],
+};
+
+/** What the stock correction cites: the Shopify read its preconditions rest on. */
+const correctionEvidence: EvidenceList = {
+  subject: {
+    kind: 'app_decision',
+    id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+  },
+  truncated: false,
+  asOf: '2026-09-30T09:00:00.000Z',
+  items: [
+    {
+      ref: '7e6d5c4b-3a2f-4e1d-8c0b-9a8f7e6d5c4b',
+      citedAs: 'read',
+      citedAt: '2026-09-30T08:57:00.000Z',
+      resolution: {
+        kind: 'read',
+        provider: 'shopify',
+        connection: {
+          id: '8f7e6d5c-4b3a-4f2e-9d1c-0b9a8f7e6d5c',
+          label: 'Berlin store',
+        },
+        record: {
+          resource: 'inventory_level',
+          externalId: 'gid://shopify/InventoryLevel/1',
+        },
+        observedAt: '2026-09-30T08:56:30.000Z',
+        sourceUpdatedAt: null,
+        sourceRevision: null,
+        completeness: 'complete',
+        adapterVersion: 'shopify-inventory/3',
+        summary: [{ field: 'available', value: '12' }],
+      },
+    },
+    {
+      ref: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+      citedAs: 'record',
+      citedAt: '2026-09-30T08:57:00.000Z',
+      resolution: {
+        kind: 'luma_record',
+        record: 'case_proposal',
+        id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+      },
+    },
+  ],
+};
+
+/** What the refund step cites: the payment read its proof rests on and Shopify's receipt. */
+const refundEvidence: EvidenceList = {
+  subject: returnCase.citedEvidence!.subject,
+  truncated: false,
+  asOf: '2026-09-30T09:00:00.000Z',
+  items: [
+    {
+      ref: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
+      citedAs: 'write_receipt',
+      citedAt: '2026-09-30T08:30:00.000Z',
+      resolution: {
+        kind: 'write_receipt',
+        provider: 'shopify',
+        connection: {
+          id: '8f7e6d5c-4b3a-4f2e-9d1c-0b9a8f7e6d5c',
+          label: 'Berlin store',
+        },
+        capability: 'returns.refund',
+        acceptedAt: '2026-09-30T08:30:00.000Z',
+        records: [{ resource: 'refund', externalId: 'gid://shopify/Refund/7' }],
+        providerRequestId: null,
+        adapterVersion: 'shopify-returns/2',
+      },
+    },
+    {
+      ref: '0b9a8f7e-6d5c-4b3a-9f2e-1d0c9b8a7f6e',
+      citedAs: 'read',
+      citedAt: '2026-09-30T08:40:00.000Z',
+      resolution: {
+        kind: 'read',
+        provider: 'shopify',
+        connection: {
+          id: '8f7e6d5c-4b3a-4f2e-9d1c-0b9a8f7e6d5c',
+          label: 'Berlin store',
+        },
+        record: { resource: 'order', externalId: 'gid://shopify/Order/1001' },
+        observedAt: '2026-09-30T08:40:00.000Z',
+        sourceUpdatedAt: null,
+        sourceRevision: null,
+        completeness: 'complete',
+        adapterVersion: 'shopify-returns/2',
+        summary: [{ field: 'payment', value: 'paid' }],
+      },
+    },
   ],
 };
 
@@ -398,8 +538,26 @@ function Preview({
       }),
     }),
   );
+  // Evidence loads only when opened; the story answers it from this cache.
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      evidenceOptions(org, correctionEvidence.subject).queryKey,
+      correctionEvidence,
+    );
+    queryClient.setQueryData(
+      evidenceOptions(org, refundEvidence.subject).queryKey,
+      refundEvidence,
+    );
 
-  return <RouterProvider router={router} />;
+    return queryClient;
+  });
+
+  return (
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 const meta = {
@@ -460,6 +618,58 @@ export const Selected: Story = {
       ).toBeNull(),
     );
   },
+};
+
+export const SelectedEvidence: Story = {
+  args: { initial: { item: correction.id } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const summary = await canvas.findByText('What this decision cites');
+    // Closed until asked for: nothing is read while the reader only scans the decision.
+    await expect(
+      canvas.queryByRole('list', { name: 'Cited evidence' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(summary);
+    const evidence = await canvas.findByRole('list', {
+      name: 'Cited evidence',
+    });
+    await expect(
+      within(evidence).getByText('Provider read', { exact: true }),
+    ).toBeVisible();
+    await expect(within(evidence).getByText('Proposed change')).toBeVisible();
+  },
+};
+
+export const SelectedEvidenceNarrow: Story = {
+  ...SelectedEvidence,
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+/** A return case names the record it cites, here its latest refund, instead of the case. */
+export const SelectedReturnEvidence: Story = {
+  args: { initial: { item: returnCase.id } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const summary = await canvas.findByText('Evidence: refund step');
+    await expect(
+      canvas.queryByText('What this decision cites'),
+    ).not.toBeInTheDocument();
+    await userEvent.click(summary);
+    const evidence = await canvas.findByRole('list', {
+      name: 'Cited evidence',
+    });
+    await expect(
+      within(evidence).getByText('Write receipt', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      within(evidence).getByText('Provider read', { exact: true }),
+    ).toBeVisible();
+  },
+};
+
+export const SelectedReturnEvidenceNarrow: Story = {
+  ...SelectedReturnEvidence,
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const SelectedDark: Story = {

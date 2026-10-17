@@ -21,6 +21,16 @@ import {
   orderEditMarker,
   type OrderEditSnapshot,
 } from '../domain/order-edits.js';
+import {
+  acceptanceProvenance,
+  type ReadProvenance,
+  settledDispatch,
+  sourceTime,
+  storeAcceptance,
+} from './evidence-provenance.js';
+
+/** Identifies the normalization of order edit reads; edits dispatch under it too. */
+export const orderEditAdapterVersion = 'shopify-order-edit/1';
 
 const id = (kind: string) =>
   z.string().regex(new RegExp(`^gid://shopify/${kind}/[0-9]+$`));
@@ -103,6 +113,7 @@ const proofSchema = z.object({
   currentAppInstallation: z.object({ app: z.object({ id: z.string() }) }),
   node: z.object({
     id: id('Order'),
+    updatedAt: z.string().nullish(),
     cancelledAt: z.string().nullable(),
     lineItems: z.object({
       nodes: z.array(
@@ -280,11 +291,18 @@ export function createOrderEditProvider(
           (work) => !work.lineItems.pageInfo.hasNextPage,
         ),
     };
+    const provenance: ReadProvenance = {
+      adapterVersion: orderEditAdapterVersion,
+      completeness: snapshot.complete ? 'complete' : 'partial',
+      sourceRevision: snapshot.revision,
+      sourceUpdatedAt: sourceTime(value.updatedAt),
+      record: { resource: 'order', externalId: orderId },
+    };
     await options.record({
       id: snapshot.id,
       kind: 'observation',
       observedAt,
-      document: snapshot,
+      document: { ...snapshot, ...provenance },
     });
 
     return snapshot;
@@ -364,11 +382,19 @@ export function createOrderEditProvider(
           ?.quantity !== line.quantity
       )
         throw withheld();
+    // A calculation whose line page was cut short was withheld above, so a stored one is complete.
+    const provenance: ReadProvenance = {
+      adapterVersion: orderEditAdapterVersion,
+      completeness: 'complete',
+      sourceRevision: calculationDigest(calculation),
+      sourceUpdatedAt: null,
+      record: { resource: 'calculated_order', externalId: sessionId },
+    };
     await options.record({
       id: calculation.id,
       kind: 'calculation',
       observedAt: calculation.observedAt,
-      document: calculation,
+      document: { ...calculation, ...provenance },
     });
 
     return { calculation, sessionId };
@@ -436,11 +462,22 @@ export function createOrderEditProvider(
       cancelled: data.node.cancelledAt !== null,
       lines: data.node.lineItems.nodes,
     };
+    // An agreement with a cut-short or unreadable sale page could change the proof, so it is partial.
+    const provenance: ReadProvenance = {
+      adapterVersion: orderEditAdapterVersion,
+      completeness:
+        evidence.complete && agreements.every((agreement) => agreement.complete)
+          ? 'complete'
+          : 'partial',
+      sourceRevision: null,
+      sourceUpdatedAt: sourceTime(data.node.updatedAt),
+      record: { resource: 'order', externalId: orderId },
+    };
     await options.record({
       id: randomUUID(),
       kind: 'observation',
       observedAt,
-      document: evidence,
+      document: { ...evidence, ...provenance },
     });
 
     return evidence;
@@ -560,18 +597,23 @@ export function createOrderEditProvider(
           throw new Error('Invalid commit receipt');
         await options.fence.finish(input.operationId, 'accepted');
         const evidenceId = randomUUID();
-        await options.record({
-          id: evidenceId,
-          kind: 'acceptance',
-          observedAt: now().toISOString(),
-          document: {
-            operationId: input.operationId,
-            idempotencyKey: context.idempotencyKey,
-            orderId: input.orderId,
-            orderUpdatedAt: result.order.updatedAt,
-            marker: orderEditMarker(input.operationId),
-          },
-        });
+        const order = result.order;
+        await storeAcceptance(() =>
+          options.record({
+            id: evidenceId,
+            kind: 'acceptance',
+            observedAt: now().toISOString(),
+            document: {
+              operationId: input.operationId,
+              orderId: input.orderId,
+              orderUpdatedAt: order.updatedAt,
+              marker: orderEditMarker(input.operationId),
+              ...acceptanceProvenance(context, [
+                { resource: 'order', externalId: order.id },
+              ]),
+            },
+          }),
+        );
 
         return {
           status: 'accepted',
@@ -579,10 +621,7 @@ export function createOrderEditProvider(
           providerRequestId: null,
         };
       } catch (error) {
-        if (
-          error instanceof ConnectorError &&
-          error.failure.dispatch === 'not_dispatched'
-        ) {
+        if (settledDispatch(error)) {
           if (!commitSent)
             await options.fence.finish(input.operationId, 'withheld');
           throw error;

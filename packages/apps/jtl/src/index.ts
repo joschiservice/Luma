@@ -20,9 +20,15 @@ import {
 import { jtlPermissions } from './domain/permissions.js';
 import { createJtlConnector } from './infrastructure/adapter.js';
 import { approvedJtlFetch } from './infrastructure/approved-jtl-fetch.js';
+import {
+  createShippingMethodEvidenceStore,
+  readShippingMethodEvidence,
+} from './infrastructure/shipping-method-evidence.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export { createJtlConnector };
+
+export { createShippingMethodEvidenceStore, readShippingMethodEvidence };
 
 export { createInstallationVerifier };
 
@@ -261,5 +267,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         context.featureEnabled?.(tenantId, 'supplier-purchasing-terms') ??
         Promise.resolve(false),
     }),
+    evidence: readShippingMethodEvidence,
   };
 }

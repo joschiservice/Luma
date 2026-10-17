@@ -69,6 +69,17 @@ export function appDecisionProvider(app: {
       (await app.decisions(context)).map((item) => ({
         ...item,
         owner: { ...item.owner, appId: app.appId },
+        // The proposal's preconditions and execution cite the app's stored evidence.
+        ...(item.actionReference && 'proposalId' in item.actionReference
+          ? {
+              citedEvidence: {
+                subject: {
+                  kind: 'app_decision' as const,
+                  id: item.actionReference.proposalId,
+                },
+              },
+            }
+          : {}),
       })),
   };
 }

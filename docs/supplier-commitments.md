@@ -166,13 +166,37 @@ same admitted operation and independent verification path.
 The purchasing timeline combines saved plans and approvals, submission, supplier messages,
 append-only commitment and receipt facts, buyer follow-ups, revisions and stock booking proof.
 A recorded manual receipt, an email sent and a supplier observation retain separate labels;
-only independent verification establishes the action's result. Stock proof is visible only
-to readers with inventory access. The history is tenant-scoped and shows at most the latest
+only independent verification establishes the action's result. The history is tenant-scoped
+and shows at most the latest
 500 events, with truncation reported rather than treated as complete evidence.
 Verified submissions and revisions cite their verifying reads and the stored write receipt
 together. Each entry's evidence resolves through the
 [evidence reader](execution.md#reading-cited-evidence) when opened. Purchasing-system
 observations behind commitment facts resolve as reads that record no completeness; plans,
-approvals, policy decisions, supplier messages and follow-ups show as Luma records. Shopify stock
-booking proof resolves only for readers with inventory access, like its timeline entries. Native
-stock receipt reviews and ledger proof are inventory records the evidence view does not show.
+approvals, policy decisions, supplier messages and follow-ups show as Luma records. The stock and
+demand reads a plan relied on resolve through the inventory and orders owners, lifecycle events
+as purchase order events with their status change, actor and time, an email submission's order
+email as a stored message, and notes recorded with a manual receipt as written. Native stock
+receipt reviews and the ledger entries that booked them resolve as inventory records with their
+state, quantity and postings. Readers without the guarding area's access see these as restricted.
+Shopify stock booking proof resolves only for readers with inventory access. The order number
+a purchasing system assigned is shown on the order, not cited.
+
+Shopify stock bookings of the order's receipts are inventory evidence: the booking, its policy
+decision and approval, and the execution that cites the write receipt and verification read.
+For a reader without `inventory.read` the API returns each of these entries as `restricted`,
+naming the permission, so the timeline and the evidence view agree that the booking exists.
+A restricted entry keeps only its kind, stage, time, source and evidence references; actor,
+reason, quantity, unit, revision and detail are null and no actor or workflow is attributed.
+The API strips them after actor attribution, and the reader skips the booked quantity and its
+inventory snapshot entirely.
+
+Native stock receipt reviews follow the same rules. Inventory's ledger serves full reviews only
+to inventory readers, so other procurement readers get their entries from Inventory's
+stage-only query instead: each review waiting for approval, approved or rejected, and the
+ledger readback of a posted review as verified or uncertain, with the entry IDs inventory
+readers see. The query returns no quantities, accounts, locations, people, reasons or provider
+IDs. The readback compares the stored receipt with current native ledger balances and reads no
+provider. A restricted native entry cites only its review, which the order's evidence lists as
+restricted. It leaves out the supplier commitments the full entry cites, because a procurement
+reader could open them and read the booked quantity.

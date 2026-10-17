@@ -153,6 +153,95 @@ it('validates pinned GraphQL queries and sends exact CAS with provider idempoten
     },
   });
 });
+it('stores reads and the acceptance with their adapter version, completeness and dispatch identity', async () => {
+  const f = fixture();
+  const context = {
+    ...f.context,
+    adapterVersion: 'shopify-inventory/1',
+    dispatchIdentity: '["shopify","shopify-inventory/1"]',
+  };
+  await f.handler.run(context, await f.input());
+  const [read, , acceptance] = f.record.mock.calls.map(([call]) => call);
+  expect(read).toMatchObject({
+    kind: 'observation',
+    document: {
+      adapterVersion: 'shopify-inventory/1',
+      completeness: 'complete',
+      sourceRevision: expect.stringMatching(/^[a-f0-9]{64}$/),
+      sourceUpdatedAt: f.node.inventoryLevel.updatedAt,
+      record: {
+        resource: 'inventory_level',
+        externalId: 'gid://shopify/InventoryLevel/1',
+      },
+    },
+  });
+  expect(acceptance).toMatchObject({
+    kind: 'acceptance',
+    document: {
+      adapterVersion: 'shopify-inventory/1',
+      dispatchIdentity: context.dispatchIdentity,
+      idempotencyKey: context.idempotencyKey,
+      records: [
+        {
+          resource: 'inventory_adjustment_group',
+          externalId: 'gid://shopify/InventoryAdjustmentGroup/1',
+        },
+      ],
+    },
+  });
+});
+it('marks a read partial when the collection page was cut short', async () => {
+  const record = vi.fn<(evidence: CorrectionEvidence) => Promise<void>>(
+    async () => {},
+  );
+  const provider = createInventoryCorrectionProvider({
+    tenantId: randomUUID(),
+    connectionId: randomUUID(),
+    shop: 'stock.myshopify.com',
+    accessToken: async () => 'test',
+    includeCollections: true,
+    record,
+    fetch: async () =>
+      Response.json({
+        data: {
+          node: {
+            id: inventoryItemId,
+            tracked: true,
+            variant: {
+              requiresComponents: false,
+              productVariantComponents: { nodes: [] },
+              product: {
+                status: 'ACTIVE',
+                tags: [],
+                collections: {
+                  nodes: [{ id: 'gid://shopify/Collection/1' }],
+                  pageInfo: { hasNextPage: true },
+                },
+              },
+            },
+            inventoryLevel: null,
+          },
+        },
+      }),
+  });
+  await provider.read(inventoryItemId, locationId);
+  expect(record.mock.calls[0]?.[0].document).toMatchObject({
+    completeness: 'partial',
+    sourceUpdatedAt: null,
+    record: { resource: 'inventory_item', externalId: inventoryItemId },
+  });
+});
+it('counts an accepted correction whose receipt cannot be stored as sent with an unknown outcome', async () => {
+  const f = fixture();
+  const input = await f.input();
+  f.record.mockImplementation(async (evidence) => {
+    if (evidence.kind === 'acceptance') throw new Error('Database unavailable');
+  });
+  await expect(f.handler.run(f.context, input)).rejects.toMatchObject({
+    failure: { effect: 'unknown', retry: 'reconcile', dispatch: 'dispatched' },
+  });
+  expect(f.mutations).toHaveLength(1);
+});
 it('withholds incomplete, untracked, concurrent or revoked-authority stock before dispatch', async () => {
   for (const change of [
     'quantity',

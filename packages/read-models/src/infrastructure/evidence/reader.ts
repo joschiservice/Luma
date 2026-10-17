@@ -9,7 +9,9 @@ import type {
 } from '../../application/evidence.js';
 import {
   type Citation,
+  type EvidencePerson,
   evidenceReferenceLimit,
+  notRetainedEvidence,
   resolveEvidence,
   type RetentionKind,
 } from '../../domain/evidence.js';
@@ -84,7 +86,7 @@ export function createEvidenceReader(
       const { subject } = request;
       const owner = owners[subject.kind];
       if (!owner) throw unavailable('This evidence is unavailable');
-      if (!hasPermission(context, owner.permission))
+      if (owner.permission && !hasPermission(context, owner.permission))
         throw forbidden('You do not have access to this evidence');
       if (request.refs && request.refs.length > evidenceReferenceLimit)
         throw invalid(
@@ -127,7 +129,9 @@ export function createEvidenceReader(
           );
           const connectionIds = uuidRefs(
             found.flatMap((e) =>
-              e.kind === 'luma_record' ? [] : [e.connectionId],
+              e.kind === 'luma_record' || e.kind === 'restricted'
+                ? []
+                : [e.connectionId],
             ),
           );
           const labels = new Map<string, string | null>(
@@ -139,6 +143,22 @@ export function createEvidenceReader(
                     [tenantId, connectionIds],
                   )
                 ).rows.map((row) => [row.id, row.label])
+              : [],
+          );
+          const actorIds = uuidRefs(
+            found.flatMap((e) =>
+              e.kind === 'luma_record' && e.actorId ? [e.actorId] : [],
+            ),
+          );
+          const people = new Map<string, EvidencePerson>(
+            actorIds.length
+              ? (
+                  await tx.query<EvidencePerson>(
+                    `SELECT user_id::text AS id,name,email,is_member AS member FROM workspace_people
+                     WHERE tenant_id=$1 AND user_id=ANY($2::uuid[])`,
+                    [tenantId, actorIds],
+                  )
+                ).rows.map((person) => [person.id.toLowerCase(), person])
               : [],
           );
           const starts = new Map(
@@ -156,6 +176,7 @@ export function createEvidenceReader(
               citations,
               found,
               labels,
+              people,
               start: (citedAs) => {
                 const kind =
                   citedAs === 'record' ? null : owner.retention[citedAs];
@@ -163,6 +184,12 @@ export function createEvidenceReader(
                 return kind ? (starts.get(kind) ?? null) : null;
               },
             }),
+            notRetained: request.refs
+              ? []
+              : notRetainedEvidence(
+                  own.uncited ?? [],
+                  (kind) => starts.get(kind) ?? null,
+                ),
             truncated: !request.refs && all.length > refs.length,
             asOf: now().toISOString(),
           };

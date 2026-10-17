@@ -187,6 +187,21 @@ it.each(['revoked', 'disconnected', 'pending', 'degraded'] as const)(
   },
 );
 
+it('tells write handlers the adapter version and dispatch identity, and reads neither', async () => {
+  const { connection, runtime } = fixture();
+  const writer = vi.spyOn(connection.capabilities['inventory.write']!, 'run');
+  const reader = vi.spyOn(connection.capabilities['inventory.read']!, 'run');
+  await runtime.write(context, write);
+  await runtime.read(context, read);
+  expect(writer.mock.calls[0]?.[0]).toMatchObject({
+    idempotencyKey: write.idempotencyKey,
+    adapterVersion: connection.adapterVersion,
+    dispatchIdentity: expect.stringContaining(connection.adapterVersion),
+  });
+  expect(reader.mock.calls[0]?.[0]).not.toHaveProperty('dispatchIdentity');
+  expect(reader.mock.calls[0]?.[0]).not.toHaveProperty('adapterVersion');
+});
+
 it('rejects mismatched tenant and connection identities before dispatch', async () => {
   const { connection, runtime, record } = fixture();
   connection.tenantId = 'tenant-b';

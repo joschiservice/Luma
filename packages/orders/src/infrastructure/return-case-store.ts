@@ -77,12 +77,20 @@ export function createReturnCaseStore(
               creation: ReturnCreation | null;
               assignment: ReturnCaseEvent | null;
               completion: ExchangeConsistencyReport | null;
+              exchange_id: string | null;
+              settlement_kind: 'refund' | 'restock' | 'exchange_step' | null;
+              settlement_id: string | null;
             }>(
-              `SELECT c.document,ex.document->'completion' AS completion,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber"
+              `SELECT c.document,ex.document->'completion' AS completion,ex.id::text AS exchange_id,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber",
+                st.kind AS settlement_kind,st.id AS settlement_id
               FROM orders_return_cases c
               LEFT JOIN orders_return_exchanges ex ON ex.tenant_id=c.tenant_id AND ex.case_id=c.id
               LEFT JOIN orders_entity_redirects red ON red.tenant_id=c.tenant_id AND red.entity_id=c.order_id
               LEFT JOIN LATERAL (SELECT document FROM orders_return_creations WHERE tenant_id=c.tenant_id AND case_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) cr ON true
+              LEFT JOIN LATERAL (SELECT kind,id FROM (
+                SELECT kind,id::text AS id,requested_at FROM orders_return_actions WHERE tenant_id=c.tenant_id AND case_id=c.id
+                UNION ALL SELECT 'exchange_step',id::text,requested_at FROM orders_return_exchange_steps WHERE tenant_id=c.tenant_id AND case_id=c.id
+              ) w ORDER BY requested_at DESC,id DESC LIMIT 1) st ON true
               LEFT JOIN LATERAL (SELECT document FROM orders_return_case_events WHERE tenant_id=c.tenant_id AND case_id=c.id AND kind='assigned' ORDER BY occurred_at DESC,revision DESC LIMIT 1) ce ON true
               LEFT JOIN orders_projections p ON p.tenant_id=c.tenant_id AND p.entity_id=COALESCE(red.target_entity_id,c.order_id) AND p.connection_id=c.connection_id
               LEFT JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
@@ -114,6 +122,11 @@ export function createReturnCaseStore(
               creation: row.creation,
               assignment: row.assignment,
               completion: row.completion,
+              exchangeId: row.exchange_id,
+              settlement:
+                row.settlement_kind && row.settlement_id
+                  ? { kind: row.settlement_kind, id: row.settlement_id }
+                  : null,
             }));
           },
           lockOrder: async (orderId) => {

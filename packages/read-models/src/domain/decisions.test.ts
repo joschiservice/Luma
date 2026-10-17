@@ -182,6 +182,10 @@ describe('replenishment decisions', () => {
       impact: { level: 'unknown' },
       record: { kind: 'position', id: proposal.positionId },
       owner: { kind: 'workflow_run', runId: proposal.runId },
+      // The run's stock and demand reads, orders and policy decision resolve through the run.
+      citedEvidence: {
+        subject: { kind: 'replenishment_run', id: proposal.runId },
+      },
     });
     expect(item.why).toContain('20-unit approval threshold');
     expect(item.change).toContainEqual({ label: 'Quantity', value: '50 each' });

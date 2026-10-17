@@ -1,6 +1,42 @@
 /** The most references one request resolves. */
 export const evidenceReferenceLimit = 100;
 
+/** The kinds of record whose cited evidence can be read, each resolved by its owner. */
+export type EvidenceSubjectKind =
+  | 'purchase_order'
+  | 'purchasing_plan'
+  | 'replenishment_run'
+  | 'native_receipt'
+  | 'app_decision'
+  | 'return_creation'
+  | 'return_settlement'
+  | 'return_exchange'
+  | 'return_exchange_step'
+  | 'return_wait'
+  | 'reply'
+  | 'case';
+
+const areaPermissions = {
+  inventory: 'inventory.read',
+  orders: 'orders.read',
+  fulfillment: 'fulfillment.read',
+} as const;
+
+/**
+ * The read permission that guards the evidence of a write through `capability`, such as
+ * `inventory.read` for `inventory.available.reconcile`: the capability's area decides. Null for
+ * capabilities outside those areas, whose evidence no app decision shows.
+ */
+export function capabilityReadPermission(capability: string) {
+  const area = capability.split('.')[0] ?? '';
+
+  return isArea(area) ? areaPermissions[area] : null;
+}
+
+function isArea(area: string): area is keyof typeof areaPermissions {
+  return Object.hasOwn(areaPermissions, area);
+}
+
 /**
  * Normalized read fields the evidence view shows, in display order. Everything else in a read,
  * such as names, addresses and message text, stays on the server.
@@ -16,11 +52,11 @@ export const evidenceSummaryFields = [
   'requestedDeliveryDate',
   'available',
   'onHand',
+  'reserved',
   'quantity',
   'amount',
   'currency',
   'lines',
-  'complete',
 ] as const;
 
 export type EvidenceSummaryField = (typeof evidenceSummaryFields)[number];
@@ -45,9 +81,63 @@ export const evidenceRecordKinds = [
   'reply',
   'case',
   'case_proposal',
+  'procurement_event',
+  'stock_receipt_review',
+  'ledger_entry',
+  'stock_ownership_change',
+  'stock_booking',
+  'receipt_note',
+  'replenishment_rule',
+  'replenishment_proposal',
+  'supplier',
 ] as const;
 
 type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];
+
+/** Facts a Luma record carries for the evidence view. */
+type EvidenceRecordDetail =
+  | {
+      kind: 'procurement_event';
+      event: 'created' | 'status_changed' | 'revised';
+      from: string | null;
+      to: string | null;
+      revision: number | null;
+    }
+  | {
+      kind: 'stock_receipt_review';
+      state: 'pending' | 'approved' | 'rejected';
+      quantity: string | null;
+      unit: string | null;
+    }
+  | {
+      kind: 'ledger_entry';
+      purpose: string;
+      reversed: boolean;
+      postings: {
+        state: string;
+        unit: string;
+        quantity: string;
+        balanceAfter: string;
+        version: number;
+      }[];
+    };
+
+/** Who wrote a record, as the evidence view names them. */
+export interface EvidenceActor {
+  kind: 'member' | 'former_member' | 'luma' | 'service' | 'unrecorded';
+  id: string | null;
+  name: string | null;
+  email: string | null;
+  workflow: null;
+}
+
+/** A workspace person a recorded user ID names, including people who left. */
+export type EvidencePerson = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  member: boolean;
+};
 
 /** A connection by ID, with its workspace name; null once removed. */
 interface EvidenceConnection {
@@ -77,8 +167,27 @@ export type EvidenceResolution =
       acceptedAt: string;
       records: { resource: string; externalId: string }[];
       providerRequestId: string | null;
+      adapterVersion: string | null;
     }
-  | { kind: 'luma_record'; record: EvidenceRecordKind; id: string }
+  | {
+      kind: 'luma_record';
+      record: EvidenceRecordKind;
+      id: string;
+      at?: string | null;
+      actor?: EvidenceActor | null;
+      detail?: EvidenceRecordDetail | null;
+    }
+  | {
+      kind: 'message';
+      provider: string;
+      connection: EvidenceConnection;
+      direction: 'inbound' | 'outbound';
+      sender: { address: string; name: string | null };
+      receivedAt: string;
+      subject: string;
+      senderAuthentication: 'aligned' | 'unaligned' | 'unknown';
+    }
+  | { kind: 'restricted'; permission: string }
   | { kind: 'not_retained'; retentionStartedAt: string }
   | { kind: 'unresolved' };
 
@@ -92,7 +201,49 @@ export interface EvidenceItem {
 
 /** The kinds of provider evidence whose storage began at a recorded time. */
 export type RetentionKind =
-  'procurement_reads' | 'return_reads' | 'write_receipts';
+  | 'procurement_reads'
+  | 'return_reads'
+  | 'write_receipts'
+  | 'replenishment_demand_reads';
+
+/**
+ * Evidence a subject relied on but cites no references for, because the subject was recorded
+ * before Luma kept them: a replenishment run's order reads behind a known demand estimate.
+ */
+export interface UncitedEvidence {
+  evidence: 'demand_reads';
+  /** When the subject recorded what it relied on. */
+  recordedAt: string;
+}
+
+/** Evidence a subject relied on that was never kept, and when Luma began keeping it. */
+export interface NotRetainedEvidence {
+  evidence: UncitedEvidence['evidence'];
+  retentionStartedAt: string;
+}
+
+const uncitedRetention = {
+  demand_reads: 'replenishment_demand_reads',
+} as const satisfies Record<UncitedEvidence['evidence'], RetentionKind>;
+
+/**
+ * Explains evidence a subject relied on without citing it. Only what was recorded before Luma
+ * began keeping that kind is not retained; anything recorded later, or whose start is unknown,
+ * is left out rather than explained away, because a missing citation after storage began is a
+ * defect, not history.
+ */
+export function notRetainedEvidence(
+  uncited: readonly UncitedEvidence[],
+  start: (kind: RetentionKind) => string | null,
+): NotRetainedEvidence[] {
+  return uncited.flatMap((entry) => {
+    const startedAt = start(uncitedRetention[entry.evidence]);
+
+    return startedAt && Date.parse(entry.recordedAt) < Date.parse(startedAt)
+      ? [{ evidence: entry.evidence, retentionStartedAt: startedAt }]
+      : [];
+  });
+}
 
 /** How a record cites a reference, and when that record was written. */
 export interface Citation {
@@ -130,17 +281,75 @@ interface StoredReceipt {
   acceptedAt: string;
   records: { resource: string; externalId: string }[];
   providerRequestId: string | null;
+  /** The adapter that made the write; absent or null when the owner did not record it. */
+  adapterVersion?: string | null | undefined;
 }
 
-/** A Luma record that a reference names. */
+/**
+ * A Luma record that a reference names. `id` is the reference; `recordId` names the record when
+ * the reference is not its ID, such as a note a person recorded with a receipt.
+ */
 interface NamedRecord {
   kind: 'luma_record';
   id: string;
   record: EvidenceRecordKind;
+  recordId?: string;
+  /** When the record was written. */
+  at?: string | null;
+  /** The recorded actor: a user ID, another principal, or null when none was recorded. */
+  actorId?: string | null;
+  detail?: EvidenceRecordDetail | null;
+}
+
+/** A message a mailbox owner stored, without its text. */
+interface StoredMessage {
+  kind: 'message';
+  id: string;
+  provider: string;
+  connectionId: string;
+  direction: 'inbound' | 'outbound';
+  sender: { address: string; name: string | null };
+  receivedAt: string;
+  subject: string;
+  senderAuthentication: 'aligned' | 'unaligned' | 'unknown';
+}
+
+/** Evidence another area guards, found for a reader who lacks its read permission. */
+interface RestrictedEvidence {
+  kind: 'restricted';
+  id: string;
+  permission: string;
 }
 
 /** What an owner found for a reference. */
-export type StoredEvidence = StoredRead | StoredReceipt | NamedRecord;
+export type StoredEvidence =
+  StoredRead | StoredReceipt | NamedRecord | StoredMessage | RestrictedEvidence;
+
+const nilUser = '00000000-0000-0000-0000-000000000000';
+const userId =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Names who wrote a record: a current or former workspace member, Luma for the nil user ID, a
+ * service for other recorded principals, or `unrecorded`. Email is kept only for current
+ * members. Undefined when the record does not keep an actor.
+ */
+export function evidenceActor(
+  actorId: string | null | undefined,
+  people: ReadonlyMap<string, EvidencePerson>,
+): EvidenceActor | undefined {
+  if (actorId === undefined) return undefined;
+  const base = { id: actorId, name: null, email: null, workflow: null };
+  if (actorId === null) return { ...base, kind: 'unrecorded' };
+  if (actorId === nilUser) return { ...base, kind: 'luma' };
+  if (!userId.test(actorId))
+    return { ...base, kind: 'service', name: actorId.slice(0, 200) };
+  const person = people.get(actorId.toLowerCase());
+
+  return person?.member
+    ? { ...base, kind: 'member', name: person.name, email: person.email }
+    : { ...base, kind: 'former_member', name: person?.name ?? null };
+}
 
 const summaryFields = new Set<string>(evidenceSummaryFields);
 
@@ -174,6 +383,23 @@ export function summarizeRead(data: unknown) {
   );
 }
 
+/** Presents a Luma record with the time, actor and facts its owner recorded. */
+function lumaRecord(
+  evidence: NamedRecord,
+  people: ReadonlyMap<string, EvidencePerson>,
+): EvidenceResolution {
+  const actor = evidenceActor(evidence.actorId, people);
+
+  return {
+    kind: 'luma_record',
+    record: evidence.record,
+    id: evidence.recordId ?? evidence.id,
+    ...(evidence.at !== undefined ? { at: evidence.at } : {}),
+    ...(actor ? { actor } : {}),
+    ...(evidence.detail !== undefined ? { detail: evidence.detail } : {}),
+  };
+}
+
 /**
  * Decides what a reference without stored evidence or a Luma record means. A read or receipt
  * cited before its owner began storing that kind was never captured, so it is not retained.
@@ -205,6 +431,8 @@ export function resolveEvidence(input: {
   found: readonly StoredEvidence[];
   /** Connection names by ID; removed connections have none. */
   labels: ReadonlyMap<string, string | null>;
+  /** Workspace people by lowercase user ID, for record actors. */
+  people?: ReadonlyMap<string, EvidencePerson>;
   /** When storage began for each kind a citation of this subject needs. */
   start: (citedAs: Citation['citedAs']) => string | null;
 }): EvidenceItem[] {
@@ -220,12 +448,20 @@ export function resolveEvidence(input: {
     )
       cited.set(citation.ref, citation);
   }
+  // Stored evidence wins over a Luma record, and both over a restricted placeholder.
+  const weight = (evidence: StoredEvidence) =>
+    evidence.kind === 'restricted'
+      ? 0
+      : evidence.kind === 'luma_record'
+        ? 1
+        : 2;
   const found = new Map<string, StoredEvidence>();
   for (const evidence of input.found) {
     const known = found.get(evidence.id);
-    if (!known || known.kind === 'luma_record')
+    if (!known || weight(known) < weight(evidence))
       found.set(evidence.id, evidence);
   }
+  const people = input.people ?? new Map<string, EvidencePerson>();
   const connection = (id: string) => ({
     id,
     label: input.labels.get(id) ?? null,
@@ -261,8 +497,22 @@ export function resolveEvidence(input: {
               acceptedAt: evidence.acceptedAt,
               records: evidence.records.slice(0, 20),
               providerRequestId: evidence.providerRequestId,
+              adapterVersion: evidence.adapterVersion ?? null,
             }
-          : { kind: 'luma_record', record: evidence.record, id: evidence.id };
+          : evidence.kind === 'message'
+            ? {
+                kind: 'message',
+                provider: evidence.provider,
+                connection: connection(evidence.connectionId),
+                direction: evidence.direction,
+                sender: evidence.sender,
+                receivedAt: evidence.receivedAt,
+                subject: evidence.subject.slice(0, 300),
+                senderAuthentication: evidence.senderAuthentication,
+              }
+            : evidence.kind === 'restricted'
+              ? { kind: 'restricted', permission: evidence.permission }
+              : lumaRecord(evidence, people);
 
     return {
       ref,

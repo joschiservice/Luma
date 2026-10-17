@@ -301,4 +301,13 @@ export {
 export {
   purchaseOrderCitations,
   purchaseOrderEvidence,
+  purchaseOrderMessageRefs,
+  purchaseOrderStockRefs,
+  purchasingPlanCitations,
+  purchasingPlanEvidence,
 } from './infrastructure/purchase-order-evidence.js';
+
+export {
+  replenishmentRunCitations,
+  replenishmentRunEvidence,
+} from './infrastructure/replenishment-evidence.js';

@@ -96,7 +96,7 @@ test('an approved Shopify quantity edit is calculated, committed once and verifi
   assert.equal(fixture.commits(), 1);
 
   const evidence = await f.db.owner.query(
-    'SELECT kind FROM shopify_order_edit_evidence WHERE tenant_id=$1',
+    'SELECT kind,document FROM shopify_order_edit_evidence WHERE tenant_id=$1',
     [f.org.id],
   );
   for (const kind of ['observation', 'calculation', 'acceptance'])
@@ -104,6 +104,12 @@ test('an approved Shopify quantity edit is calculated, committed once and verifi
       evidence.rows.some((row) => row.kind === kind),
       kind,
     );
+  for (const { kind, document } of evidence.rows) {
+    assert.equal(document.adapterVersion, 'shopify-order-edit/1', kind);
+    if (kind === 'acceptance')
+      assert.match(document.dispatchIdentity, /shopify-order-edit\/1/);
+    else assert.ok(['complete', 'partial'].includes(document.completeness));
+  }
   const audit = await f.db.owner.query(
     "SELECT document->>'eventType' AS event FROM audit_entries WHERE tenant_id=$1 AND document->>'proposalId'=$2",
     [f.org.id, preview.id],

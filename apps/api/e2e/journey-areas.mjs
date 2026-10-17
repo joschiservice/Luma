@@ -169,12 +169,14 @@ const evidence = [
   'packages/read-models/src/{api,application,domain}/evidence.ts',
   'packages/read-models/src/infrastructure/evidence/**',
   'packages/api-contract/src/{evidence,contracts/evidence}.ts',
-  'packages/procurement/src/infrastructure/purchase-order-evidence.ts',
-  'packages/orders/src/infrastructure/return-evidence.ts',
+  'packages/procurement/src/infrastructure/{purchase-order-evidence,replenishment-evidence}.ts',
+  'packages/inventory/src/infrastructure/evidence.ts',
+  'packages/execution/src/infrastructure/action-evidence.ts',
+  'packages/orders/src/infrastructure/{return-evidence,order-read-evidence}.ts',
   'packages/messaging/src/infrastructure/reply-evidence.ts',
   'packages/resolution/src/infrastructure/persistence/case-evidence.ts',
   'packages/apps/{shopify,starshipit}/src/infrastructure/evidence-reader.ts',
-  'packages/application-runtime/migrations/0159_evidence_retention_starts.sql',
+  'packages/application-runtime/migrations/{0159_evidence_retention_starts,0162_replenishment_demand_retention}.sql',
 ];
 const connections = [
   'packages/connections/**',
@@ -314,8 +316,8 @@ const caseWorkflows = [
 const procurement = [
   ...rmProcurementContext,
   'packages/procurement/**',
-  'packages/api-contract/src/**/{procurement,procurement-context}.ts',
-  'packages/application-runtime/src/composition/{procurement-effects,procurement-submissions}.ts',
+  'packages/api-contract/src/**/{procurement,procurement-context,purchasing-timeline}.ts',
+  'packages/application-runtime/src/composition/{procurement-effects,procurement-submissions,purchase-receipt-timeline}.ts',
 ];
 const replenishment = [
   'apps/web/src/shared/procurement/approval-context.tsx',
@@ -813,6 +815,7 @@ export const journeyAreas = {
   'purchasing-cycle.e2e.mjs': [
     'apps/api/e2e/purchasing-reconciliation-worker.mjs',
     ...simulator,
+    ...evidence,
     ...procurement,
     ...decisions,
     ...inventory,
@@ -1142,7 +1145,28 @@ export const journeyAreas = {
     ...inventory,
     ...webShell,
     ...webProcurement,
+    ...webEvidence,
+    ...webNeedsYou,
     'packages/api-contract/src/**/{supplier-terms,purchasing,incoming-stock}.ts',
+  ],
+  'purchasing-stock-booking.browser.mjs': [
+    ...simulator,
+    ...procurement,
+    ...inventory,
+    ...shopify,
+    ...webShell,
+    ...webProcurement,
+    ...webEvidence,
+    ...ordersFixture,
+    ...appHost,
+    'apps/web/src/kit/identity/permission-text.ts',
+    'packages/api-contract/src/**/{supplier-terms,purchasing}.ts',
+    // The native receipt journey books a receipt at a native-owned location.
+    'apps/api/e2e/native-stock-fixture.mjs',
+    'apps/api/e2e/stock-ledger-fixture.mjs',
+    'packages/application-runtime/src/composition/{native-stock,inventory-ledger,sales,read-models}.ts',
+    'packages/sales/**',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-receipts.ts',
   ],
   'procurement.e2e.mjs': [...procurement, ...activity],
   'products.browser.mjs': [
@@ -1186,6 +1210,8 @@ export const journeyAreas = {
     ...webProcurement,
     ...webInventory,
     ...webExtensions,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'replenishment.e2e.mjs': [
     ...simulator,
@@ -1248,6 +1274,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-exchange.browser.mjs': [
     'apps/api/e2e/return-browser-commands.mjs',
@@ -1275,6 +1303,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-deadlines.e2e.mjs': [
     ...simulator,
@@ -1291,6 +1321,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-exchange.e2e.mjs': [
     ...simulator,

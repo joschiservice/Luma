@@ -9,6 +9,7 @@ import { canonicalJson, forbidden, notFound } from '@luma/platform';
 import {
   type AccountAddress,
   accountKey,
+  bookingReadsBack,
   decimalQuantity,
   LedgerError,
   physicalStockStates,
@@ -438,18 +439,7 @@ export function createLedgerService(deps: LedgerDependencies) {
               false,
             )
           : [];
-        const verified =
-          !!receipt &&
-          !!receipt.entryId &&
-          accounts.length === receipt.accounts.length &&
-          receipt.accounts.every((expected) =>
-            accounts.some(
-              (a) =>
-                a.id === expected.id &&
-                a.version === expected.version &&
-                a.balance === expected.balance,
-            ),
-          );
+        const verified = !!receipt && bookingReadsBack(receipt, accounts);
 
         return {
           outcome: verified ? ('verified' as const) : ('inconclusive' as const),

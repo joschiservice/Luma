@@ -49,6 +49,15 @@ flowchart TD
   a reserved mutation. Reconciliation and verification only read Shopify.
 - Previews, claims, allowlisted evidence and acceptance receipts are stored under forced
   tenant RLS.
+- Each stored read records its adapter version, whether it is complete or `partial` (a page
+  it needed was cut short), Luma's fingerprint of the read as its revision (Shopify exposes
+  none), Shopify's update time and the record it read. Each acceptance records the adapter
+  version and dispatch identity of the attempt, its idempotency key and the Shopify records
+  the response named. Stock protection holds read through the correction reads and dispatch
+  under their own adapter version. Rows stored before these fields existed show them as not
+  recorded.
+- An accepted mutation whose receipt cannot be stored counts as sent with an unknown outcome;
+  it cites nothing and is reconciled by reading.
 
 **Acceptance is not resolution.** A mutation receipt means Shopify accepted the request.
 Verification needs a fresh, complete read showing the expected outcome; anything else

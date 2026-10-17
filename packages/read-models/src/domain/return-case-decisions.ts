@@ -1,4 +1,49 @@
-import type { DecisionCandidate } from './decision-item.js';
+import type { DecisionCandidate, DecisionEvidence } from './decision-item.js';
+
+/**
+ * The record whose evidence backs what the case item asks for: a creation in flight, an
+ * unresolved exchange completion check, the wait that is due, then the latest refund, restock or
+ * exchange step, and otherwise the case's last creation.
+ */
+function citedEvidence(
+  item: Parameters<typeof presentReturnCase>[0],
+  creationPending: boolean,
+): DecisionEvidence | undefined {
+  const creation = item.creation?.id;
+  const settlement = item.settlement;
+  if (creation && creationPending)
+    return {
+      subject: { kind: 'return_creation', id: creation },
+      covers: 'return_creation',
+    };
+  if (item.completion?.state === 'unresolved' && item.completion.exchangeId)
+    return {
+      subject: { kind: 'return_exchange', id: item.completion.exchangeId },
+      covers: 'exchange_check',
+    };
+  if (item.waiting?.id)
+    return {
+      subject: { kind: 'return_wait', id: item.waiting.id },
+      covers: 'deadline_wait',
+    };
+  if (settlement?.kind === 'exchange_step')
+    return {
+      subject: { kind: 'return_exchange_step', id: settlement.id },
+      covers: 'exchange_step',
+    };
+  if (settlement)
+    return {
+      subject: { kind: 'return_settlement', id: settlement.id },
+      covers: settlement.kind === 'refund' ? 'refund_step' : 'restock_step',
+    };
+  if (creation)
+    return {
+      subject: { kind: 'return_creation', id: creation },
+      covers: 'return_creation',
+    };
+
+  return undefined;
+}
 
 /** Presents owned return work without turning a proposal or provider acceptance into completion. */
 export function presentReturnCase(item: {
@@ -30,23 +75,33 @@ export function presentReturnCase(item: {
   } | null;
   canManage: boolean;
   completion?: {
+    /** The exchange whose completion check this is. */
+    exchangeId?: string;
     state: string;
     ownerId: string;
     checkedAt: string;
     checks: { id: string; verified: boolean }[];
   };
   waiting?: {
+    /** The wait occurrence. */
+    id?: string;
     dueAt: string;
     reason: string;
     observedAt: string | null;
     ownerId: string;
   };
+  /** The case's latest refund, restock or exchange step. */
+  settlement?: {
+    kind: 'refund' | 'restock' | 'exchange_step';
+    id: string;
+  } | null;
 }): DecisionCandidate {
   const { case: value, creation } = item;
   const approval = creation?.state === 'approval_required';
   const uncertain =
     creation?.state === 'uncertain' || creation?.state === 'sending';
   const run = creation?.state === 'approved';
+  const evidence = citedEvidence(item, approval || uncertain || run);
 
   return {
     id: `return-case:${value.id}`,
@@ -136,6 +191,7 @@ export function presentReturnCase(item: {
     subject: { label: value.orderNumber ?? value.id, detail: null },
     record: { kind: 'order', id: value.orderId },
     owner: { kind: 'return_case', caseId: value.id },
+    ...(evidence ? { citedEvidence: evidence } : {}),
     group: { key: 'return-cases', label: 'Returns' },
     ...(creation?.observeOnly ? { observeOnly: true } : {}),
   };

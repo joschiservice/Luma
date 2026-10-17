@@ -259,8 +259,8 @@ export function createCommitmentStore(
               [tenantId, supplier.id, supplier],
             );
           },
-          timeline: (id, includeStock) =>
-            readPurchasingActionTimeline(tx, tenantId, id, includeStock),
+          timeline: (id, stockDetails) =>
+            readPurchasingActionTimeline(tx, tenantId, id, stockDetails),
           history: async (id) =>
             (await log.list(tenantId, id))
               .filter((e) =>

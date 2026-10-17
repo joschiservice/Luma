@@ -207,6 +207,7 @@ export function presentCase(
     subject: { label: subject, detail: summary },
     record: null,
     owner: { kind: 'case' as const, exceptionId: facts.exception_id },
+    citedEvidence: { subject: { kind: 'case', id: facts.exception_id } },
     impact: { level: impactLevel, text: exposed },
   } satisfies Partial<DecisionCandidate>;
 
@@ -424,6 +425,8 @@ export function presentReplenishment(
       definitionId: item.definitionId,
       runId: item.runId,
     },
+    // The stock and demand reads, existing orders and policy decision the proposal rests on.
+    citedEvidence: { subject: { kind: 'replenishment_run', id: item.runId } },
     group: {
       key: 'replenishment:approval',
       label: 'Purchase-order drafts awaiting approval',
@@ -467,6 +470,11 @@ export interface SupplierCommitmentDecision {
     text: string | null;
     reasons: string[];
   } | null;
+  /**
+   * What the item relies on among the order's citations: the submission and its policy
+   * decision, or the commitment fact and the read or message it came from.
+   */
+  evidenceRefs?: string[] | undefined;
 }
 
 const reasonText: Record<string, string> = {
@@ -515,6 +523,17 @@ export function presentSupplierCommitment(
       kind: 'purchase_order' as const,
       purchaseOrderId: item.purchaseOrderId,
     },
+    ...(item.evidenceRefs?.length
+      ? {
+          citedEvidence: {
+            subject: {
+              kind: 'purchase_order' as const,
+              id: item.purchaseOrderId,
+            },
+            refs: item.evidenceRefs.slice(0, 100),
+          },
+        }
+      : {}),
   };
   const respond = item.canRespond
     ? ('decide' as const)

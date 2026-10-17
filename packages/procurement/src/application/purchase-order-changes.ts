@@ -374,6 +374,11 @@ export function createPurchaseOrderChangeService(deps: {
               (total, line) => total + line.quantity,
               0,
             ),
+            // The policy decision and the reads that verified the change, once there are any.
+            evidenceRefs: [
+              ...(change.decisionId ? [change.decisionId] : []),
+              ...change.observationRefs,
+            ],
           };
         }),
       );

@@ -42,6 +42,9 @@ export function presentReplySend(item: ReplySendDecision): DecisionCandidate {
     subject: { label: subject, detail: item.to },
     record: null,
     owner: { kind: 'message_thread' as const, threadId: item.threadId },
+    citedEvidence: {
+      subject: { kind: 'reply' as const, id: item.outboundId },
+    },
     response: item.response,
   };
   const change = [

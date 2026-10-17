@@ -47,6 +47,8 @@ export interface PurchasingTimelineEntry {
   revision: number | null;
   detail: string | null;
   source: 'luma' | 'manual' | 'purchasing_system' | 'email' | 'inventory';
+  /** Set when the entry's details need a read permission the reader lacks. */
+  restricted?: { permission: 'inventory.read' } | undefined;
 }
 
 /** Combines append-only supplier facts and recorded lifecycle events with independently sourced action history. */
@@ -154,7 +156,8 @@ export function purchasingTimeline(input: {
         stage: 'verified',
         at: submission.submittedAt,
         source,
-        evidenceRefs: [submission.id, submission.externalOrder.externalId],
+        // The purchasing system's order number is shown on the order, not cited as evidence.
+        evidenceRefs: [submission.id],
       });
     else if (
       ['submitting', 'uncertain', 'failed', 'not_executed', 'expired'].includes(
@@ -257,6 +260,133 @@ export function purchasingTimeline(input: {
   ].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
 
   return { entries: unique.slice(-500), complete: unique.length <= 500 };
+}
+
+/**
+ * Keeps stock booking entries in the timeline for a reader without inventory access while
+ * removing what only inventory readers may see. Stock bookings, their policy decisions and
+ * approvals, and the execution that cites their receipt and verification read are inventory
+ * evidence. A procurement reader still learns that each step happened for the order, its stage
+ * (requested, waiting for approval, approved or rejected, verified, uncertain or failed) and its
+ * time, because those facts say where the booking of the order's receipt stands without
+ * revealing stock. Quantities, units, locations, reasons, requesters and approvers stay out, and
+ * so does the workflow that acted. Evidence references stay: the evidence view lists each as
+ * restricted, naming the permission. Other entries are unchanged, and nothing changes with
+ * `canReadInventory`.
+ */
+export function restrictStockBookings(
+  entries: PurchasingTimelineEntry[],
+  canReadInventory: boolean,
+): PurchasingTimelineEntry[] {
+  if (canReadInventory) return entries;
+
+  return entries.map((entry) =>
+    entry.kind === 'stock_booking'
+      ? {
+          id: entry.id,
+          kind: entry.kind,
+          stage: entry.stage,
+          at: entry.at,
+          actorId: null,
+          reason: null,
+          evidenceRefs: entry.evidenceRefs,
+          quantity: null,
+          unit: null,
+          revision: null,
+          detail: null,
+          source: entry.source,
+          restricted: { permission: 'inventory.read' },
+        }
+      : entry,
+  );
+}
+
+/** Where a native stock receipt review of the order stands, as Inventory reports it without what it books. */
+export interface NativeReceiptStage {
+  reviewId: string;
+  state: 'pending' | 'approved' | 'rejected';
+  at: string;
+  verification: {
+    outcome: 'verified' | 'inconclusive';
+    observedAt: string;
+  } | null;
+}
+
+/** The timeline entry ID of a native receipt review's decision or of its ledger readback. */
+export function nativeReceiptEntryId(
+  reviewId: string,
+  step: 'review' | 'proof',
+) {
+  return `native-receipt:${reviewId}:${step}`;
+}
+
+/** The timeline stage of a native receipt review: a pending review waits for approval. */
+export function nativeReceiptReviewStage(
+  state: NativeReceiptStage['state'],
+): PurchasingTimelineEntry['stage'] {
+  return state === 'pending' ? 'approval_required' : state;
+}
+
+/** The timeline stage of a native receipt's ledger readback; a changed account makes it uncertain. */
+export function nativeReceiptProofStage(
+  outcome: 'verified' | 'inconclusive',
+): PurchasingTimelineEntry['stage'] {
+  return outcome === 'verified' ? 'verified' : 'uncertain';
+}
+
+/**
+ * The native stock receipt bookings of an order for a reader without inventory access, under
+ * the same rules as `restrictStockBookings`: each review's decision and, once approved and
+ * posted, its ledger readback, with the entry IDs inventory readers see, the stage and the time.
+ * Each entry cites only its review, which the order's evidence lists as restricted for this
+ * reader; the supplier commitments and ledger entry an inventory reader's row cites are left
+ * out, because a procurement reader could open the commitments and so learn the booked
+ * quantities.
+ */
+export function restrictedNativeReceiptBookings(
+  stages: NativeReceiptStage[],
+): PurchasingTimelineEntry[] {
+  const entry = (
+    id: string,
+    stage: PurchasingTimelineEntry['stage'],
+    at: string,
+    reviewId: string,
+  ): PurchasingTimelineEntry => ({
+    id,
+    kind: 'stock_booking',
+    stage,
+    at,
+    actorId: null,
+    reason: null,
+    evidenceRefs: [reviewId],
+    quantity: null,
+    unit: null,
+    revision: null,
+    detail: null,
+    source: 'inventory',
+  });
+
+  return restrictStockBookings(
+    stages.flatMap((review) => [
+      entry(
+        nativeReceiptEntryId(review.reviewId, 'review'),
+        nativeReceiptReviewStage(review.state),
+        review.at,
+        review.reviewId,
+      ),
+      ...(review.state === 'approved' && review.verification
+        ? [
+            entry(
+              nativeReceiptEntryId(review.reviewId, 'proof'),
+              nativeReceiptProofStage(review.verification.outcome),
+              review.verification.observedAt,
+              review.reviewId,
+            ),
+          ]
+        : []),
+    ]),
+    false,
+  );
 }
 
 /** A successful dispatch is insufficient; verification must independently pass with concrete observations. */
