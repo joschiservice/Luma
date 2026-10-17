@@ -1229,6 +1229,16 @@ export const journeyAreas = {
     ...webHome,
     ...webCases,
   ],
+  'evidence.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...supplierCommitments,
+    ...commerce,
+    ...webShell,
+    ...webProcurement,
+    ...webReturns,
+  ],
   'return-settlement.browser.mjs': [
     'apps/api/e2e/return-browser-commands.mjs',
     ...simulator,
