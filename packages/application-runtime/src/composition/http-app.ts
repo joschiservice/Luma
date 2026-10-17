@@ -16,14 +16,13 @@ import type {
   RolesService,
   SettingsService,
 } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import {
   registerContractRoutes,
   registerIdentityGuards,
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
-import { describeError } from '@luma/platform';
+import { describeError, ServiceError } from '@luma/platform';
 import type { MetricEvents } from '@luma/resolution';
 import {
   registerDeskEvents,
@@ -202,7 +201,7 @@ export function buildApp(
     else done();
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof IdentityError) {
+    if (error instanceof ServiceError) {
       return reply.status(error.statusCode).send({
         code: error.code,
         message:
@@ -328,7 +327,7 @@ export function buildApp(
             clearTimeout(timeout);
           }
 
-          throw new IdentityError(503, 'NOT_READY', 'Service is not ready');
+          throw new ServiceError(503, 'NOT_READY', 'Service is not ready');
         }),
       },
     }),
@@ -339,7 +338,7 @@ export function buildApp(
     dependencies.identity,
     async (context, operation) => {
       if (!apps)
-        throw new IdentityError(
+        throw new ServiceError(
           503,
           'SERVICE_UNAVAILABLE',
           'App management is unavailable',
