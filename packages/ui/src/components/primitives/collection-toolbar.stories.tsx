@@ -491,5 +491,7 @@ export const OverflowingIntoMore: Story = {
         canvas.getByRole('tab', { name: 'Returns this week' }),
       ).toHaveAttribute('aria-selected', 'true'),
     );
+    // The accessibility check runs after play; let the menu and its focus guards close first.
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
   },
 };
