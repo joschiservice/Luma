@@ -47,6 +47,8 @@ export interface PurchasingTimelineEntry {
   revision: number | null;
   detail: string | null;
   source: 'luma' | 'manual' | 'purchasing_system' | 'email' | 'inventory';
+  /** Set when the entry's details need a read permission the reader lacks. */
+  restricted?: { permission: 'inventory.read' } | undefined;
 }
 
 /** Combines append-only supplier facts and recorded lifecycle events with independently sourced action history. */
@@ -258,6 +260,45 @@ export function purchasingTimeline(input: {
   ].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
 
   return { entries: unique.slice(-500), complete: unique.length <= 500 };
+}
+
+/**
+ * Keeps stock booking entries in the timeline for a reader without inventory access while
+ * removing what only inventory readers may see. Stock bookings, their policy decisions and
+ * approvals, and the execution that cites their receipt and verification read are inventory
+ * evidence. A procurement reader still learns that each step happened for the order, its stage
+ * (requested, waiting for approval, approved or rejected, verified, uncertain or failed) and its
+ * time, because those facts say where the booking of the order's receipt stands without
+ * revealing stock. Quantities, units, locations, reasons, requesters and approvers stay out, and
+ * so does the workflow that acted. Evidence references stay: the evidence view lists each as
+ * restricted, naming the permission. Other entries are unchanged, and nothing changes with
+ * `canReadInventory`.
+ */
+export function restrictStockBookings(
+  entries: PurchasingTimelineEntry[],
+  canReadInventory: boolean,
+): PurchasingTimelineEntry[] {
+  if (canReadInventory) return entries;
+
+  return entries.map((entry) =>
+    entry.kind === 'stock_booking'
+      ? {
+          id: entry.id,
+          kind: entry.kind,
+          stage: entry.stage,
+          at: entry.at,
+          actorId: null,
+          reason: null,
+          evidenceRefs: entry.evidenceRefs,
+          quantity: null,
+          unit: null,
+          revision: null,
+          detail: null,
+          source: entry.source,
+          restricted: { permission: 'inventory.read' },
+        }
+      : entry,
+  );
 }
 
 /** A successful dispatch is insufficient; verification must independently pass with concrete observations. */

@@ -6,7 +6,10 @@ import type { Attention, Commitment } from '../domain/commitments.js';
 import { orderStage } from '../domain/commitments.js';
 import { orderValue } from '../domain/order-value.js';
 import type { PurchaseOrder } from '../domain/procurement.js';
-import { purchasingTimeline } from '../domain/purchasing-timeline.js';
+import {
+  purchasingTimeline,
+  restrictStockBookings,
+} from '../domain/purchasing-timeline.js';
 import { isLiveSubmission } from '../domain/submissions.js';
 import type { CommitmentContext } from './commitment-context.js';
 import type { createSubmissionExecution } from './commitment-execution.js';
@@ -102,6 +105,12 @@ export function createCommitmentRecords(
           timeline.entries,
           data.order.origin.workflowRunId,
         );
+      // After actor attribution, so a booking's requester, approver or workflow never reaches
+      // a reader without inventory access.
+      timeline.entries = restrictStockBookings(
+        timeline.entries,
+        hasPermission(context, 'inventory.read'),
+      );
 
       return {
         ...recordData,

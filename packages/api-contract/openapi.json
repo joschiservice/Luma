@@ -116448,6 +116448,16 @@
                                   "inventory"
                                 ],
                                 "type": "string"
+                              },
+                              "restricted": {
+                                "type": "object",
+                                "properties": {
+                                  "permission": {
+                                    "const": "inventory.read"
+                                  }
+                                },
+                                "required": ["permission"],
+                                "description": "Present when the entry is a stock booking step and the reader lacks the named permission. The entry then keeps only its kind, stage, time, source and evidence references; actor, reason, quantity, unit, revision and detail are null."
                               }
                             },
                             "required": [
@@ -118952,6 +118962,16 @@
                                   "inventory"
                                 ],
                                 "type": "string"
+                              },
+                              "restricted": {
+                                "type": "object",
+                                "properties": {
+                                  "permission": {
+                                    "const": "inventory.read"
+                                  }
+                                },
+                                "required": ["permission"],
+                                "description": "Present when the entry is a stock booking step and the reader lacks the named permission. The entry then keeps only its kind, stage, time, source and evidence references; actor, reason, quantity, unit, revision and detail are null."
                               }
                             },
                             "required": [
