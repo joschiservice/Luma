@@ -10,6 +10,9 @@ export type { ReturnWorkspace } from './application/returns.js';
 
 export type { CustomerWorkspace } from './application/customers.js';
 
-export type { DecisionQueue } from './application/decisions.js';
+export type {
+  DecisionAssignments,
+  DecisionQueue,
+} from './application/decisions.js';
 
 export type { Insights } from './application/insights.js';

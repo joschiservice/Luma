@@ -26,6 +26,8 @@ export { createInsights } from './infrastructure/insights/workspace.js';
 
 export {
   appDecisionProvider,
+  customFieldDecisionProvider,
+  humanTaskDecisionProvider,
   messageReplyDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,

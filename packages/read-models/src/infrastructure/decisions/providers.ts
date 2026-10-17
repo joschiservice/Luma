@@ -20,6 +20,12 @@ import {
   type ReplySendDecision,
 } from '../../domain/reply-decisions.js';
 import { presentReturnCase } from '../../domain/return-case-decisions.js';
+import {
+  type CustomFieldDecision,
+  type HumanTaskDecision,
+  presentCustomFieldChange,
+  presentHumanTask,
+} from '../../domain/workflow-step-decisions.js';
 
 /** Contributes persisted return work and creation approvals without provider reads. */
 export function returnCaseDecisionProvider(
@@ -116,5 +122,35 @@ export function replySendDecisionProvider(
     label: 'Replies',
     permission: 'messages.read',
     pending: async (context) => (await pending(context)).map(presentReplySend),
+  };
+}
+
+/** Adapts the adaptive owner's custom field changes that wait for approval to the queue. */
+export function customFieldDecisionProvider(
+  pending: (context: TenantContext) => Promise<CustomFieldDecision[]>,
+): DecisionProvider {
+  return {
+    id: 'custom-field-workflows',
+    label: 'Custom field changes',
+    permission: 'adaptive.fields.read',
+    pending: async (context) =>
+      (await pending(context)).map((item) =>
+        presentCustomFieldChange(item, context.actor.id),
+      ),
+  };
+}
+
+/** Adapts the workflow owner's open human tasks for the reader to the queue. */
+export function humanTaskDecisionProvider(
+  pending: (context: TenantContext) => Promise<HumanTaskDecision[]>,
+): DecisionProvider {
+  return {
+    id: 'human-tasks',
+    label: 'Human tasks',
+    permission: 'workflows.read',
+    pending: async (context) =>
+      (await pending(context)).map((task) =>
+        presentHumanTask(task, context.actor.id),
+      ),
   };
 }

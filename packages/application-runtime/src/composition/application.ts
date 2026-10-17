@@ -27,7 +27,6 @@ import {
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
-  caseDecisionQuery,
   caseTimelineQuery,
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
@@ -37,7 +36,6 @@ import {
 import type { BoundActionStep } from '@luma/execution';
 import {
   hasPermission,
-  IdentityError,
   type IdentityService,
   type TenantContext,
 } from '@luma/identity';
@@ -91,7 +89,6 @@ import {
   appDecisionProvider,
   createActionDiffReader,
   createCustomerWorkspace,
-  createDecisionQueue,
   createFulfillmentWorkspace,
   createInsights,
   createInventoryWorkspace,
@@ -103,14 +100,6 @@ import {
   createRecordExplorer,
   createReturnWorkspace,
   createSourceOrderLines,
-  governedFollowUpDecisionProvider,
-  messageReplyDecisionProvider,
-  procurementActionDecisionProvider,
-  replenishmentDecisionProvider,
-  replySendDecisionProvider,
-  returnCaseDecisionProvider,
-  supplierCommitmentDecisionProvider,
-  workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
 import {
   createReturnStepFollowUp,
@@ -121,7 +110,6 @@ import {
 } from '@luma/resolution';
 import {
   createActivityStore,
-  createDecisionAssignments,
   createOperationsOverview,
   createRefundFollowUpCursor,
   createResolutionImprovementDiscovery,
@@ -159,6 +147,7 @@ import {
   createFollowUpWorkflows,
   type FollowUpTiming,
 } from './case-workflows.js';
+import { createDecisionServices } from './decisions.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createInventoryLedgerRuntime } from './inventory-ledger.js';
 import {
@@ -263,8 +252,10 @@ export interface ApplicationServices {
     commitments: SupplierCommitments;
     connectionCoverage: import('@luma/connections').CoverageReader;
     customers: ReturnType<typeof createCustomerWorkspace>;
-    decisionAssignments: ReturnType<typeof createDecisionAssignments>;
-    decisions: ReturnType<typeof createDecisionQueue>;
+    decisionAssignments: ReturnType<
+      typeof createDecisionServices
+    >['assignments'];
+    decisions: ReturnType<typeof createDecisionServices>['decisions'];
     desk: ReturnType<typeof createDeskServices>;
     draftTests: ReturnType<typeof createDraftTestRuns>;
     fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
@@ -1237,314 +1228,28 @@ export function createApplicationServices(
     (context) =>
       purchasingRelease(context.tenantId, 'purchasing-stock-booking'),
   );
-  const decisions = createDecisionQueue(database, {
-    diffEnabled: (tenantId) =>
-      purchasingRelease(tenantId, 'action-review-diffs'),
-    cases: caseDecisionQuery,
-    providers: [
-      governedFollowUpDecisionProvider(
-        database,
-        scopedFollowUp.service.pending,
-      ),
+  const { assignments: decisionAssignments, decisions } =
+    createDecisionServices(
+      database,
+      identity,
       {
-        id: 'custom-field-workflows',
-        label: 'Custom field changes',
-        permission: 'adaptive.fields.read',
-        pending: async (context) =>
-          (await adaptiveFieldWorkflows.pending(context)).map((item) => ({
-            id: `custom-field:${item.runId}:${item.stepId}`,
-            actionReference: { runId: item.runId, stepId: item.stepId },
-            kind: 'custom_field' as const,
-            reason: 'approval' as const,
-            domain:
-              item.recordType === 'order'
-                ? ('orders' as const)
-                : item.recordType === 'product'
-                  ? ('inventory' as const)
-                  : ('procurement' as const),
-            title: `Change ${item.field.label.en}`,
-            why: item.stale
-              ? 'The field or value changed after this proposal. Review the workflow again.'
-              : 'A workflow proposes a typed custom field change.',
-            consequences: [
-              {
-                response: 'Approve',
-                text: 'The workflow may execute this exact change after current permissions and policy are checked.',
-              },
-              {
-                response: 'Reject',
-                text: 'The workflow cannot execute this proposed change.',
-              },
-            ],
-            change: [
-              { label: 'Before', value: JSON.stringify(item.beforeValue) },
-              { label: 'After', value: JSON.stringify(item.proposedValue) },
-            ],
-            impact: { level: 'medium' as const, text: null },
-            requestedAt: item.requestedAt,
-            deadline: item.expiresAt,
-            requesterId: item.requesterId,
-            evidence: {
-              observedAt: item.requestedAt,
-              validUntil: item.expiresAt,
-            },
-            response:
-              item.canRespond && !item.stale
-                ? ('decide' as const)
-                : item.requireIndependentApproval &&
-                    item.requesterId === context.actor.id
-                  ? ('awaiting_other' as const)
-                  : ('view_only' as const),
-            subject: { label: item.field.label.en, detail: item.recordId },
-            record:
-              item.recordType === 'order'
-                ? { kind: 'order' as const, id: item.recordId }
-                : item.recordType === 'product'
-                  ? { kind: 'sku' as const, id: item.recordId }
-                  : null,
-            owner: {
-              kind: 'custom_field' as const,
-              runId: item.runId,
-              stepId: item.stepId,
-            },
-            group: {
-              key: `custom-field:${item.field.id}`,
-              label: item.field.label.en,
-            },
-          })),
+        adaptiveFieldWorkflows,
+        apps: options.decisionSources ?? [],
+        cases: detection.cases,
+        caseWorkflows,
+        commitments,
+        coordination,
+        messaging,
+        nativeStock,
+        orderChanges,
+        purchasing,
+        replenishment,
+        returnCases,
+        returnDeadlines,
+        scopedFollowUp,
       },
-      {
-        id: 'human-tasks',
-        label: 'Human tasks',
-        permission: 'workflows.read',
-        pending: async (context) =>
-          (await coordination.pending(context)).map((task) => ({
-            id: `human-task:${task.runId}:${task.stepId}`,
-            kind: 'human_task' as const,
-            reason: 'manual_intervention' as const,
-            domain: 'operations' as const,
-            title: task.instructions,
-            why: task.escalatedAt
-              ? 'The task is overdue and has been assigned to its fallback.'
-              : 'A workflow needs your answer and evidence to continue.',
-            consequences: [
-              {
-                response: 'Answer',
-                text: 'Record your answer and resume the workflow. Provider changes still require policy admission.',
-              },
-            ],
-            change: [{ label: 'Evidence', value: task.evidence }],
-            impact: { level: 'unknown' as const, text: null },
-            requestedAt: task.createdAt,
-            deadline: task.dueAt,
-            requesterId: null,
-            evidence: { observedAt: null, validUntil: null },
-            response: 'investigate' as const,
-            ownerAssignment: {
-              assigneeId: context.actor.id,
-              assignedBy: context.actor.id,
-              assignedAt: task.createdAt,
-              revision: 0,
-            },
-            subject: { label: task.subject.kind, detail: task.subject.id },
-            // An order task links to the order, where its change plan shows what to do.
-            record:
-              task.subject.kind === 'order'
-                ? { kind: 'order' as const, id: task.subject.id }
-                : null,
-            owner: {
-              kind: 'human_task' as const,
-              definitionId: task.definitionId,
-              runId: task.runId,
-              stepId: task.stepId,
-            },
-            group: {
-              key: `human-task:${task.definitionId}`,
-              label: task.definitionId,
-            },
-          })),
-      },
-      replenishmentDecisionProvider(replenishment.pending),
-      procurementActionDecisionProvider(async (context) => {
-        const plans = (await purchasing.plans(context)).items.filter((p) =>
-          ['approval_required', 'approved', 'uncertain'].includes(p.state),
-        );
-        const revisions = await orderChanges.pending(context);
-        const receipts = hasPermission(context, 'inventory.read')
-          ? await nativeStock.ledger.pendingPurchaseReceipts(context)
-          : [];
-
-        return [
-          ...plans.map((p) => ({
-            id: p.id,
-            kind: 'plan' as const,
-            orderId: null,
-            reference: p.order.reference,
-            state: p.state as 'approval_required' | 'approved' | 'uncertain',
-            requestedBy: p.requestedBy,
-            requestedAt: p.createdAt,
-            expiresAt: p.expiresAt,
-            canApprove: p.canApprove ?? false,
-            quantity: p.order.lines.reduce((sum, l) => sum + l.quantity, 0),
-          })),
-          ...revisions,
-          ...receipts.map((r) => ({
-            id: r.id,
-            kind: 'native_receipt' as const,
-            orderId: r.command.purchaseReceipt!.purchaseOrderId,
-            reference: 'Received native stock',
-            state:
-              r.state === 'approved'
-                ? ('approved' as const)
-                : ('approval_required' as const),
-            requestedBy: r.preparedBy,
-            requestedAt: r.createdAt,
-            expiresAt: null,
-            canApprove:
-              r.preparedBy !== context.actor.id &&
-              hasPermission(context, 'inventory.approve') &&
-              hasPermission(context, 'procurement.manage'),
-            quantity: Number(r.command.purchaseReceipt!.cumulativeGood),
-          })),
-        ];
-      }),
-      returnCaseDecisionProvider(async (context) => {
-        const [cases, waits] = await Promise.all([
-          returnCases.pending(context),
-          returnDeadlines.pending(context),
-        ]);
-
-        return cases.map((value) => {
-          const waiting = waits.find((w) => w.caseId === value.case.id);
-
-          return waiting ? { ...value, waiting } : value;
-        });
-      }),
-      supplierCommitmentDecisionProvider(async (context) =>
-        (await commitments.pending(context)).map((item) => ({
-          key: item.attention.key,
-          submissionId: item.submission?.id,
-          kind: item.attention.kind,
-          purchaseOrderId: item.order.id,
-          reference: item.order.reference,
-          supplierName: item.supplierName,
-          summary: item.attention.summary,
-          dueAt: item.attention.dueAt,
-          expiresAt:
-            item.attention.kind === 'submission_approval'
-              ? (item.submission?.expiresAt ?? null)
-              : null,
-          requesterId: item.submission?.requestedBy ?? null,
-          canRespond: item.canRespond,
-          observeOnly: item.submission?.observeOnly ?? false,
-          requestedDeliveryDate: item.submission?.requestedDeliveryDate ?? null,
-          // Descriptions read better than canonical SKU keys in a decision.
-          lines: item.order.lines.map((l) => ({
-            sku: l.description,
-            quantity: l.quantity,
-            unit: l.unit,
-          })),
-          line: item.line
-            ? {
-                sku: item.line.description,
-                quantity: item.line.quantity,
-                unit: item.line.unit,
-              }
-            : null,
-          commitment: item.commitment
-            ? {
-                kind: item.commitment.kind,
-                quantity: item.commitment.quantity,
-                date: item.commitment.date,
-                text: item.commitment.text,
-                reasons: item.commitment.reviewReasons,
-              }
-            : null,
-        })),
-      ),
-      workflowHandoverDecisionProvider(async (context) =>
-        (await caseWorkflows.handovers(context)).map((item) => ({
-          definitionId: item.definitionId,
-          name: item.name,
-          runId: item.runId,
-          handedOverAt: item.handedOverAt,
-          title: item.signal.title,
-          detail: item.signal.detail,
-          domain: item.signal.domain,
-          record: item.signal.record,
-        })),
-      ),
-      messageReplyDecisionProvider(async (context) =>
-        (await messaging.service.dueReplies(context)).map((item) => ({
-          threadId: item.threadId,
-          subject: item.subject,
-          correspondent: item.correspondent?.name
-            ? `${item.correspondent.name} <${item.correspondent.address}>`
-            : (item.correspondent?.address ?? null),
-          mailboxLabel: item.mailboxLabel,
-          replyDueAt: item.replyDueAt,
-          receivedAt: item.lastInboundAt ?? item.lastMessageAt,
-          canRespond: item.canRespond,
-        })),
-      ),
-      replySendDecisionProvider((context) =>
-        messaging.replies.pending(context),
-      ),
-      ...(options.decisionSources ?? []).map(appDecisionProvider),
-    ],
-    refreshContext: identity.refreshContext,
-  });
-  const queueAssignments = createDecisionAssignments(database, {
-    refreshContext: identity.refreshContext,
-    members: async (context) =>
-      (await identity.listMembers(context)).map((member) => member.userId),
-    pending: async (context, id) => {
-      const item = await decisions.find(context, id);
-      if (item?.outcome) return false;
-
-      // Return case assignments belong to the case's revision-checked command.
-      return (
-        !!item &&
-        item.owner.kind !== 'return_case' &&
-        item.owner.kind !== 'case'
-      );
-    },
-  });
-  const decisionAssignments = {
-    async assign(
-      context: TenantContext,
-      input: {
-        decisionId: string;
-        assigneeId: string | null;
-        revision: number;
-      },
-    ) {
-      if (!input.decisionId.startsWith('case:'))
-        return queueAssignments.assign(context, input);
-      const item = await decisions.find(context, input.decisionId);
-      if (!item || item.outcome || item.owner.kind !== 'case')
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'This decision no longer needs a person.',
-        );
-      const owner = await detection.cases.assignOwner(
-        context,
-        item.owner.exceptionId,
-        { userId: input.assigneeId, revision: input.revision },
-      );
-
-      return {
-        decisionId: input.decisionId,
-        assignment: {
-          assigneeId: owner.userId,
-          assignedBy: owner.assignedBy,
-          assignedAt: owner.assignedAt,
-          revision: owner.revision,
-        },
-      };
-    },
-  };
+      (tenantId) => purchasingRelease(tenantId, 'action-review-diffs'),
+    );
   const orderQueries = {
     state: orderStateQueries,
     attention: orderAttentionQuery,
