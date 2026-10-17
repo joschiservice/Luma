@@ -124,6 +124,7 @@ it('lists every route with a request body that support views may call', () => {
     'adaptiveFields.readMany',
     'adaptivePackages.preview',
     'adaptiveViews.preview',
+    'evidence.resolve',
     'metrics.operationalQuery',
     'metrics.query',
     'metrics.summary',

@@ -1,7 +1,7 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import { hasPermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { forbidden, notFound, unavailable } from '@luma/platform';
+import { forbidden, invalid, notFound, unavailable } from '@luma/platform';
 
 import type {
   EvidenceOwners,
@@ -86,6 +86,10 @@ export function createEvidenceReader(
       if (!owner) throw unavailable('This evidence is unavailable');
       if (!hasPermission(context, owner.permission))
         throw forbidden('You do not have access to this evidence');
+      if (request.refs && request.refs.length > evidenceReferenceLimit)
+        throw invalid(
+          `Resolve at most ${evidenceReferenceLimit} references at once`,
+        );
 
       return db.transaction(
         context.tenantId,

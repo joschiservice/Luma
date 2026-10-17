@@ -708,6 +708,13 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         { kind: 'luma_record', record: 'case_proposal', id: caseAction },
       ]);
 
+      // One request resolves at most 100 references.
+      await expect(
+        reader.resolve(reading, {
+          subject: { kind: 'purchase_order', id: orderId },
+          refs: Array.from({ length: 101 }, () => randomUUID()),
+        }),
+      ).rejects.toMatchObject({ statusCode: 422 });
       // The subject area's read permission is required.
       await expect(
         reader.resolve(readerContext(tenantId, ['issues.read']), {

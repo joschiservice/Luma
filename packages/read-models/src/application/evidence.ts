@@ -9,7 +9,7 @@ import type {
 } from '../domain/evidence.js';
 
 /** The record whose cited evidence is read. */
-export interface EvidenceSubject {
+interface EvidenceSubject {
   kind:
     | 'purchase_order'
     | 'return_creation'
@@ -21,14 +21,14 @@ export interface EvidenceSubject {
 }
 
 /** The subject and, optionally, the cited references to resolve. */
-export interface EvidenceRequest {
+interface EvidenceRequest {
   subject: EvidenceSubject;
   /** Without references, every reference the subject cites, up to the limit. */
   refs?: string[] | undefined;
 }
 
 /** The resolved references of one subject. */
-export interface EvidenceList {
+interface EvidenceList {
   subject: EvidenceSubject;
   items: EvidenceItem[];
   /** The subject cites more references than one response returns. */
@@ -37,7 +37,7 @@ export interface EvidenceList {
 }
 
 /** What a subject cites: the actions it executed and the references its own records name. */
-export interface SubjectCitations {
+interface SubjectCitations {
   /** Proposals whose execution attempts belong to the subject. */
   actionIds: string[];
   citations: Citation[];
@@ -81,12 +81,12 @@ export interface EvidenceSubjectOwner {
 }
 
 /** The reader's read permissions, for evidence another area guards. */
-export interface EvidenceAccess {
+interface EvidenceAccess {
   can(permission: Permission): boolean;
 }
 
 /** The references one request resolves. */
-export interface EvidenceLookup {
+interface EvidenceLookup {
   all: string[];
   /** The references that can name a row: stored evidence and records have UUID IDs. */
   uuids: string[];

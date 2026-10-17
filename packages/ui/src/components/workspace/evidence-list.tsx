@@ -65,8 +65,11 @@ const summaryLabels: Record<EvidenceSummaryField, () => string> = {
   complete: m.evidence_summary_complete,
 };
 
-/** Text labels and tones for each resolution; tone never carries meaning on its own. */
-function kindBadge(resolution: EvidenceItem['resolution']) {
+/**
+ * Text labels and tones for each resolution; tone never carries meaning on its own. Only a
+ * missing read or receipt the record relies on is a warning.
+ */
+function kindBadge(resolution: EvidenceItem['resolution'], cited: boolean) {
   switch (resolution.kind) {
     case 'read':
       return {
@@ -83,7 +86,10 @@ function kindBadge(resolution: EvidenceItem['resolution']) {
         label: m.evidence_kind_not_retained(),
       } as const;
     case 'unresolved':
-      return { tone: 'warning', label: m.evidence_kind_unresolved() } as const;
+      return {
+        tone: cited ? 'warning' : 'neutral',
+        label: m.evidence_kind_unresolved(),
+      } as const;
   }
 }
 
@@ -117,10 +123,10 @@ function EvidenceEntry({
   capabilityName: (capability: string) => string;
 }) {
   const { resolution } = item;
-  const badge = kindBadge(resolution);
   // A missing read or receipt the record relies on is a gap; an unknown reference is not.
   const citedEvidence =
     item.citedAs === 'read' || item.citedAs === 'write_receipt';
+  const badge = kindBadge(resolution, citedEvidence);
 
   return (
     <li className="evidence-entry" data-kind={resolution.kind}>

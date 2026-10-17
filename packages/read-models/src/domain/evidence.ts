@@ -47,7 +47,7 @@ export const evidenceRecordKinds = [
   'case_proposal',
 ] as const;
 
-export type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];
+type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];
 
 /** A connection by ID, with its workspace name; null once removed. */
 interface EvidenceConnection {
@@ -104,7 +104,7 @@ export interface Citation {
 }
 
 /** A stored provider read as its owner keeps it, before presentation. */
-export interface StoredRead {
+interface StoredRead {
   kind: 'read';
   id: string;
   provider: string;
@@ -120,7 +120,7 @@ export interface StoredRead {
 }
 
 /** A stored provider write receipt as its owner keeps it. */
-export interface StoredReceipt {
+interface StoredReceipt {
   kind: 'write_receipt';
   id: string;
   provider: string;
@@ -133,7 +133,7 @@ export interface StoredReceipt {
 }
 
 /** A Luma record that a reference names. */
-export interface NamedRecord {
+interface NamedRecord {
   kind: 'luma_record';
   id: string;
   record: EvidenceRecordKind;

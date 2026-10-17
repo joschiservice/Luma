@@ -8,7 +8,7 @@ const instant = z.string().datetime();
  * `procurement.read` for purchase orders, `returns.read` for return writes, `messages.read` for
  * replies and `issues.read` for cases.
  */
-export const evidenceSubjectSchema = z.discriminatedUnion('kind', [
+const evidenceSubjectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('purchase_order'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_creation'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_settlement'), id: uuid }).strict(),
@@ -85,7 +85,7 @@ const providerRecordSchema = z.object({
 });
 
 /** What a cited reference resolves to. */
-export const evidenceResolutionSchema = z.discriminatedUnion('kind', [
+const evidenceResolutionSchema = z.discriminatedUnion('kind', [
   z.object({
     /** A stored provider read: what Luma saw, from which system, when and how completely. */
     kind: z.literal('read'),
@@ -137,7 +137,7 @@ export const evidenceResolutionSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const evidenceItemSchema = z.object({
+const evidenceItemSchema = z.object({
   ref: z.string(),
   /** How the subject cites the reference; null when the subject's records don't cite it. */
   citedAs: z.enum(['read', 'write_receipt', 'record']).nullable(),
@@ -155,10 +155,6 @@ export const evidenceListSchema = z.object({
 });
 
 export type EvidenceSubject = z.infer<typeof evidenceSubjectSchema>;
-
-export type EvidenceRequest = z.infer<typeof evidenceRequestSchema>;
-
-export type EvidenceResolution = z.infer<typeof evidenceResolutionSchema>;
 
 export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
 

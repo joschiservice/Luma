@@ -17,7 +17,6 @@ export type {
 
 export type {
   EvidenceOwners,
-  EvidenceReader,
   EvidenceSubjectOwner,
 } from './application/evidence.js';
 

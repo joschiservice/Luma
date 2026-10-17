@@ -22,7 +22,7 @@ const client = createWebApiClient();
  * Resolves what a record cites. With `refs`, only those references; without, every reference
  * the record cites, up to the API's limit.
  */
-export const evidenceOptions = (
+const evidenceOptions = (
   organizationId: string,
   subject: EvidenceSubject,
   refs?: readonly string[],
@@ -62,7 +62,7 @@ function capabilityName(capability: string) {
 }
 
 /** Shows the state of one evidence read: loading, failed, without access, gone or resolved. */
-export function Evidence({
+function Evidence({
   organizationId,
   subject,
   refs,
