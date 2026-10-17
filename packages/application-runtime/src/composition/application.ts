@@ -352,6 +352,45 @@ export interface ApplicationOptions {
   };
 }
 
+/** Kinds of action a runtime's effect registry can resolve, grouped by the owner that binds them. */
+export type EffectFamily =
+  | 'adaptive_fields'
+  | 'procurement'
+  | 'supplier_follow_up'
+  | 'purchase_order_submission'
+  | 'purchase_order_change'
+  | 'reply'
+  | 'return_creation'
+  | 'return_settlement'
+  | 'return_exchange';
+
+/**
+ * Lists the effect families a runtime composed with these options can resolve. Disabled execution
+ * resolves none. Purchase orders, replies and returns also need their installed provider runtime;
+ * every runtime that has one resolves the same adapter, so an attempt reserved in one process can
+ * be reconciled in another.
+ */
+export function resolvableEffects(
+  options: Pick<
+    ApplicationOptions,
+    'execution' | 'purchasing' | 'returns' | 'messaging'
+  >,
+): ReadonlySet<EffectFamily> {
+  if (options.execution.kind !== 'enabled') return new Set();
+  const families: EffectFamily[] = [
+    'adaptive_fields',
+    'procurement',
+    'supplier_follow_up',
+  ];
+  if (options.purchasing)
+    families.push('purchase_order_submission', 'purchase_order_change');
+  if (options.messaging?.sender) families.push('reply');
+  if (options.returns)
+    families.push('return_creation', 'return_settlement', 'return_exchange');
+
+  return new Set(families);
+}
+
 /**
  * Reads another connection's stored line quantities for a source order, so app hosts can let
  * apps propagate an authoritative source's values. See `AppFactoryContext.sourceOrderLines`.
@@ -475,57 +514,57 @@ export function createApplicationServices(
   // one another. These references are closures that run only once requests arrive, so an owner
   // may be named before it is composed. Keep these owners in this function, where that order
   // stays visible; services that only read composed owners have their own modules.
-  const procurementEffects =
-    options.execution.kind === 'enabled'
-      ? createProcurementEffects(procurement)
-      : { resolve: async () => null };
-  // Sending purchase orders is an external effect, so it needs enabled execution.
+  const resolvable = resolvableEffects(options);
+  const none: EffectRegistry = { resolve: async () => null };
+  const procurementEffects = resolvable.has('procurement')
+    ? createProcurementEffects(procurement)
+    : none;
+  // Sending purchase orders, replies and returns are external effects; they need enabled
+  // execution and the installed provider runtime.
   const submissionEffects =
-    options.execution.kind === 'enabled' && options.purchasing
+    resolvable.has('purchase_order_submission') && options.purchasing
       ? createSubmissionEffects(options.purchasing.runtime, () => commitments)
-      : { resolve: async () => null };
+      : none;
   const orderChangeEffects =
-    options.execution.kind === 'enabled' && options.purchasing
+    resolvable.has('purchase_order_change') && options.purchasing
       ? createPurchaseOrderChangeEffects(
           options.purchasing.runtime,
           () => orderChanges,
         )
-      : { resolve: async () => null };
-  // Sending replies is an external effect too; replies are composed below.
+      : none;
+  // Replies are composed below.
   const sender = options.messaging?.sender;
   const replyEffects =
-    options.execution.kind === 'enabled' && sender
+    resolvable.has('reply') && sender
       ? createReplyEffects(sender, () => messaging.replies)
-      : { resolve: async () => null };
-  // Creating a return in the order's system is an external effect, so it needs enabled execution.
+      : none;
   const returnCreationEffects =
-    options.execution.kind === 'enabled' && options.returns
+    resolvable.has('return_creation') && options.returns
       ? createReturnCreationEffects(options.returns.runtime, () => returnCases)
-      : { resolve: async () => null };
+      : none;
   const settlementEffects =
-    options.execution.kind === 'enabled' && options.returns
+    resolvable.has('return_settlement') && options.returns
       ? createReturnSettlementEffects(
           options.returns.runtime,
           () => returnActions,
         )
-      : { resolve: async () => null };
+      : none;
   const exchangeEffects =
-    options.execution.kind === 'enabled' && options.returns
+    resolvable.has('return_exchange') && options.returns
       ? createReturnExchangeEffects(
           options.returns.runtime,
           () => returnExchanges,
         )
-      : { resolve: async () => null };
+      : none;
   const adaptiveFieldService = createAdaptiveFields(database, {
     audit: createAuditLog,
     refreshContext: identity.refreshContext,
     released: (context) =>
       purchasingRelease(context.tenantId, 'adaptive-custom-fields'),
   });
-  const adaptiveFieldEffects: EffectRegistry =
-    options.execution.kind === 'enabled'
-      ? createAdaptiveFieldEffects(adaptiveFieldService)
-      : { resolve: async () => null };
+  const adaptiveFieldEffects: EffectRegistry = resolvable.has('adaptive_fields')
+    ? createAdaptiveFieldEffects(adaptiveFieldService)
+    : none;
   let adaptiveFieldEligibility: (
     context: TenantContext,
     step: BoundActionStep,
@@ -540,7 +579,7 @@ export function createApplicationServices(
       (await returnCreationEffects.resolve(context, intent)) ??
       (await settlementEffects.resolve(context, intent)) ??
       (await exchangeEffects.resolve(context, intent)) ??
-      (options.execution.kind === 'enabled'
+      (resolvable.has('supplier_follow_up')
         ? await scopedFollowUp?.effects.resolve(context, intent)
         : null) ??
       effects.resolve(context, intent),
@@ -595,10 +634,9 @@ export function createApplicationServices(
     principal: (tenantId, actorId, requestId) =>
       identity.resolveWorkflowContext(actorId, tenantId, requestId),
     released: (context, key) => purchasingRelease(context.tenantId, key),
-    admission:
-      options.execution.kind === 'enabled'
-        ? createPurchasingAdmission(safety, combinedEffects)
-        : null,
+    admission: resolvable.has('procurement')
+      ? createPurchasingAdmission(safety, combinedEffects)
+      : null,
     shortfall: (context, orderId, key) =>
       commitments.shortfall(context, orderId, key),
     acknowledgeShortfall: createShortfallAcknowledgement(() => commitments),
@@ -646,10 +684,9 @@ export function createApplicationServices(
             options.purchasing.installations,
           )
         : null,
-      admission:
-        options.execution.kind === 'enabled' && options.purchasing
-          ? createSubmissionAdmission(safety, combinedEffects)
-          : null,
+      admission: resolvable.has('purchase_order_submission')
+        ? createSubmissionAdmission(safety, combinedEffects)
+        : null,
       refreshContext: identity.refreshContext,
       principal: identity.resolveWorkflowContext,
       openOrder: async (context, order, commandId, reason) => {
@@ -680,10 +717,9 @@ export function createApplicationServices(
           options.purchasing.installations,
         )
       : null,
-    admission:
-      options.execution.kind === 'enabled' && options.purchasing
-        ? createPurchaseOrderChangeAdmission(safety, combinedEffects)
-        : null,
+    admission: resolvable.has('purchase_order_change')
+      ? createPurchaseOrderChangeAdmission(safety, combinedEffects)
+      : null,
     refreshContext: identity.refreshContext,
     principal: (actorId, tenantId) =>
       identity.resolveWorkflowContext(
@@ -725,10 +761,9 @@ export function createApplicationServices(
       commitments: () => commitments,
       directory,
     }),
-    replyAdmission:
-      options.execution.kind === 'enabled' && sender
-        ? createReplyAdmission(safety, combinedEffects)
-        : null,
+    replyAdmission: resolvable.has('reply')
+      ? createReplyAdmission(safety, combinedEffects)
+      : null,
     // Attachments are read through the same installed runtime as messages.
     documents: {
       attachments: options.messaging?.reader
@@ -784,10 +819,9 @@ export function createApplicationServices(
             options.returns.installations,
           )
         : null,
-      admission:
-        options.execution.kind === 'enabled' && options.returns
-          ? createReturnCreationAdmission(safety, combinedEffects)
-          : null,
+      admission: resolvable.has('return_creation')
+        ? createReturnCreationAdmission(safety, combinedEffects)
+        : null,
       refreshContext: identity.refreshContext,
       principal: identity.resolveWorkflowContext,
     },
@@ -796,10 +830,9 @@ export function createApplicationServices(
     system: options.returns
       ? createReturnSettlementSystem(options.returns.runtime)
       : null,
-    admission:
-      options.execution.kind === 'enabled' && options.returns
-        ? createReturnSettlementAdmission(safety, combinedEffects)
-        : null,
+    admission: resolvable.has('return_settlement')
+      ? createReturnSettlementAdmission(safety, combinedEffects)
+      : null,
     describeDiff: async (context, action, observedAt, plan) =>
       (await purchasingRelease(context.tenantId, 'action-review-diffs'))
         ? describeActionDiff(action, observedAt, { plan })
@@ -814,10 +847,9 @@ export function createApplicationServices(
       system: options.returns
         ? createReturnConsistencySystem(options.returns.runtime)
         : null,
-      admission:
-        options.execution.kind === 'enabled' && options.returns
-          ? createReturnExchangeAdmission(safety, combinedEffects)
-          : null,
+      admission: resolvable.has('return_exchange')
+        ? createReturnExchangeAdmission(safety, combinedEffects)
+        : null,
       describeDiff: async (context, action, observedAt, plan) =>
         (await purchasingRelease(context.tenantId, 'action-review-diffs'))
           ? describeActionDiff(action, observedAt, { plan })
