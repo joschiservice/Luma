@@ -63,6 +63,8 @@ export const returnActionSchema = z.object({
       payment: z.enum(['pending', 'failed', 'partial', 'paid']).nullable(),
       observedAt: z.string(),
       evidenceRefs: z.array(z.string()),
+      // Every cited read was complete; proofs recorded before reads were stored omit it.
+      complete: z.boolean().optional(),
     })
     .nullable(),
   canApprove: z.boolean(),

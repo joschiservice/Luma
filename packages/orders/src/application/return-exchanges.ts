@@ -23,6 +23,14 @@ import type {
   ExchangeStepPlan,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
+import {
+  citedReads,
+  completeReads,
+  type ReturnRead,
+  type ReturnReadEvidence,
+  returnReadEvidence,
+  type ReturnReadPurpose,
+} from '../domain/return-reads.js';
 import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type {
   CreationExecution,
@@ -59,20 +67,30 @@ export interface ReturnExchangeStore {
       stockActions(caseId: string): Promise<ReturnAction[]>;
       finishCase(value: ReturnCase, event: ReturnCaseEvent): Promise<void>;
       audit(entry: AuditEntry): Promise<void>;
+      /** Stores a cited provider read; an already stored read is kept unchanged. */
+      recordRead(evidence: ReturnReadEvidence): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
 }
 
+/** A fresh exchange proof with the provider reads its `evidenceRefs` name. */
+export type ExchangeProofRead = Omit<ExchangeProof, 'complete'> & {
+  reads: ReturnRead[];
+};
+
 /** Source reads provide replacement identities, current availability and native financial outcomes. */
 export interface ReturnExchangeSystem {
-  /** Rereads each leg without a provider write. Missing evidence remains unresolved. */
+  /**
+   * Rereads each leg without a provider write. Missing evidence remains unresolved. `reads`
+   * holds the provider reads that the legs' `evidenceRefs` name.
+   */
   consistency?(
     context: TenantContext,
     value: ReturnCase,
     root: ReturnExchange,
     process: ExchangeStep | null,
     actions: ReturnAction[],
-  ): Promise<ExchangeConsistencyEvidence>;
+  ): Promise<ExchangeConsistencyEvidence & { reads: ReturnRead[] }>;
   choices(
     context: TenantContext,
     connectionId: string,
@@ -89,6 +107,8 @@ export interface ReturnExchangeSystem {
     available: boolean | null;
     observedAt: string;
     evidenceRefs: string[];
+    /** The reads `evidenceRefs` names. */
+    reads: ReturnRead[];
   }>;
   quote(
     context: TenantContext,
@@ -99,8 +119,13 @@ export interface ReturnExchangeSystem {
     available: boolean;
     observedAt: string;
     evidenceRefs: string[];
+    /** The reads `evidenceRefs` names. */
+    reads: ReturnRead[];
   }>;
-  proof(context: TenantContext, value: ExchangeStep): Promise<ExchangeProof>;
+  proof(
+    context: TenantContext,
+    value: ExchangeStep,
+  ): Promise<ExchangeProofRead>;
 }
 
 /** Each provider step enters shared policy, independent approval and durable one-shot execution. */
@@ -240,6 +265,133 @@ export function createReturnExchanges(deps: Dependencies) {
     );
   }
 
+  /** The stored evidence for a read that an exchange step or its operation cites. */
+  function readEvidence(
+    value: { tenantId: string; caseId: string },
+    subject: { purpose: ReturnReadPurpose; id: string },
+    read: ReturnRead,
+  ) {
+    return returnReadEvidence(value.tenantId, value.caseId, subject, read);
+  }
+
+  /**
+   * Accepts a fresh proof only when every reference names a returned read; a partial read
+   * cannot pass. Returns null when the proof cannot be cited.
+   */
+  function citedProof(value: ExchangeStep, read: ExchangeProofRead) {
+    const { reads: returned, ...rest } = read;
+    const reads = citedReads(read.evidenceRefs, returned);
+    if (!reads || !fresh(read.observedAt, read.evidenceRefs, value.requestedAt))
+      return null;
+    const complete = completeReads(reads);
+    const proof: ExchangeProof = {
+      ...rest,
+      outcome:
+        read.outcome === 'passed' && !complete ? 'inconclusive' : read.outcome,
+      complete,
+    };
+
+    return { proof, reads };
+  }
+
+  /**
+   * A fresh availability report whose references all name complete reads, with those reads.
+   * Anything else is unknown availability.
+   */
+  async function readAvailability(
+    context: TenantContext,
+    replacement: ExchangeReplacement,
+  ) {
+    const read = await deps.system
+      ?.availability(context, replacement)
+      .catch(() => null);
+    const reads = read ? citedReads(read.evidenceRefs, read.reads) : null;
+    if (
+      !read ||
+      !reads ||
+      !completeReads(reads) ||
+      !fresh(read.observedAt, read.evidenceRefs)
+    )
+      return null;
+
+    return {
+      availability: {
+        available: read.available,
+        observedAt: read.observedAt,
+        evidenceRefs: read.evidenceRefs,
+      },
+      reads,
+    };
+  }
+
+  /**
+   * Keeps only the consistency legs whose references all name returned reads, and lets no
+   * partial read establish a leg. Returns the legs with the reads they cite.
+   */
+  function citedConsistency(
+    read: ExchangeConsistencyEvidence & { reads: ReturnRead[] },
+  ) {
+    const cited: ReturnRead[] = [];
+    const cite = (refs: string[]) => {
+      const found = citedReads(refs, read.reads);
+      if (found) cited.push(...found);
+
+      return found;
+    };
+    const proven = <
+      T extends {
+        outcome: 'passed' | 'failed' | 'inconclusive';
+        evidenceRefs: string[];
+        complete?: boolean;
+      },
+    >(
+      proof: T | null,
+    ): T | null => {
+      const reads = proof && cite(proof.evidenceRefs);
+      if (!proof || !reads) return null;
+      const complete = completeReads(reads);
+
+      return {
+        ...proof,
+        outcome:
+          proof.outcome === 'passed' && !complete
+            ? 'inconclusive'
+            : proof.outcome,
+        complete,
+      };
+    };
+    const priceReads = read.price && cite(read.price.evidenceRefs);
+    const returnsReads = read.returns && cite(read.returns.evidenceRefs);
+    const wawiReads = read.wawi && cite(read.wawi.evidenceRefs);
+    const evidence: ExchangeConsistencyEvidence = {
+      shopify: proven(read.shopify),
+      price:
+        read.price && priceReads && completeReads(priceReads)
+          ? read.price
+          : null,
+      returns:
+        read.returns && returnsReads
+          ? {
+              ...read.returns,
+              complete: read.returns.complete && completeReads(returnsReads),
+            }
+          : null,
+      wawi:
+        read.wawi && wawiReads
+          ? {
+              ...read.wawi,
+              complete: read.wawi.complete && completeReads(wawiReads),
+            }
+          : null,
+      stock: read.stock.map((s) => ({
+        action: s.action,
+        proof: proven(s.proof),
+      })),
+    };
+
+    return { evidence, reads: cited };
+  }
+
   function audit(
     context: TenantContext,
     value: ExchangeStep,
@@ -263,11 +415,16 @@ export function createReturnExchanges(deps: Dependencies) {
     };
   }
 
+  /**
+   * Applies a patch unless a newer proof or send fence supersedes it. `reads` are the provider
+   * reads the patch cites; they are stored in the same transaction.
+   */
   async function save(
     context: TenantContext,
     value: ExchangeStep,
     patch: Partial<ExchangeStep>,
     event?: string,
+    reads: ReturnRead[] = [],
   ) {
     return deps.store.transaction(context.tenantId, async (tx) => {
       await tx.lock(value.caseId);
@@ -292,6 +449,10 @@ export function createReturnExchanges(deps: Dependencies) {
         ...patch,
         updatedAt: deps.now().toISOString(),
       };
+      for (const read of reads)
+        await tx.recordRead(
+          readEvidence(next, { purpose: 'exchange', id: next.id }, read),
+        );
       await tx.save(next);
       if (patch.sent === false && current.plan.kind === 'process') {
         const root = await tx.root(current.caseId);
@@ -381,20 +542,22 @@ export function createReturnExchanges(deps: Dependencies) {
 
   async function check(context: TenantContext, value: ExchangeStep) {
     if (!value.sent || !deps.system) return value;
-    let proof: ExchangeProof;
+    let read: ExchangeProofRead;
     try {
-      proof = await deps.system.proof(context, value);
+      read = await deps.system.proof(context, value);
     } catch {
       return save(context, value, {
         state: 'uncertain',
         failure: 'source_unavailable',
       });
     }
-    if (!fresh(proof.observedAt, proof.evidenceRefs, value.requestedAt))
+    const cited = citedProof(value, read);
+    if (!cited)
       return save(context, value, {
         state: 'uncertain',
         failure: 'stale_evidence',
       });
+    const { proof } = cited;
     const state =
       proof.outcome === 'passed'
         ? 'verified'
@@ -406,6 +569,7 @@ export function createReturnExchanges(deps: Dependencies) {
       value,
       { proof, state, failure: state === 'failed' ? 'provider_failed' : null },
       `return.exchange.${state}`,
+      cited.reads,
     );
     await deps.admission?.reconcile(context, saved).catch(() => undefined);
 
@@ -430,14 +594,10 @@ export function createReturnExchanges(deps: Dependencies) {
         failure: 'observe_only',
       });
     if (value.plan.kind === 'process') {
-      const availability = await deps.system
-        .availability(context, value.plan.replacement)
-        .catch(() => null);
-      if (
-        !availability ||
-        availability.available !== true ||
-        !fresh(availability.observedAt, availability.evidenceRefs)
-      )
+      const availability = (
+        await readAvailability(context, value.plan.replacement)
+      )?.availability;
+      if (!availability || availability.available !== true)
         return save(context, value, {
           state: 'not_executed',
           failure:
@@ -651,6 +811,8 @@ export function createReturnExchanges(deps: Dependencies) {
       const { c } = data;
       let root = data.root,
         plan: ExchangeStepPlan;
+      // Reads the operation cites, stored with it when the step is recorded.
+      const rootReads: ReturnRead[] = [];
       if (root && root.id !== input.operationId)
         fail(409, 'This case already has a tracked exchange');
       if (input.kind === 'request') {
@@ -788,39 +950,40 @@ export function createReturnExchanges(deps: Dependencies) {
               409,
               'Fresh processable lines and a financial quote are required',
             );
-          const availability = await deps.system
-            .availability(context, root.request.replacement)
-            .catch(() => null);
-          if (
-            !availability ||
-            availability.available !== true ||
-            !fresh(availability.observedAt, availability.evidenceRefs)
-          )
+          const read = await readAvailability(
+            context,
+            root.request.replacement,
+          );
+          const availability = read?.availability;
+          if (!availability || availability.available !== true)
             await deps.store.transaction(context.tenantId, async (tx) => {
               await tx.lock(caseId);
               const current = await tx.root(caseId);
               if (!current || current.revision !== root!.revision)
                 fail(409, 'The exchange changed while reading availability');
-              if (
-                availability &&
-                fresh(availability.observedAt, availability.evidenceRefs)
-              )
+              if (read) {
+                for (const r of read.reads)
+                  await tx.recordRead(
+                    readEvidence(
+                      current,
+                      { purpose: 'exchange', id: current.id },
+                      r,
+                    ),
+                  );
                 await tx.saveRoot({
                   ...current,
-                  availability,
+                  availability: read.availability,
                   revision: current.revision + 1,
                   updatedAt: deps.now().toISOString(),
                 });
+              }
             });
-          if (
-            !availability ||
-            availability.available !== true ||
-            !fresh(availability.observedAt, availability.evidenceRefs)
-          )
+          if (!read || !availability || availability.available !== true)
             fail(
               409,
               'Replacement unavailable or unknown; record wait, different item or refund',
             );
+          rootReads.push(...read.reads);
           root = {
             ...root,
             availability,
@@ -895,9 +1058,12 @@ export function createReturnExchanges(deps: Dependencies) {
             'Fresh source exchange evidence is unavailable; nothing was sent',
           ),
         );
+      const quoteReads = citedReads(quoted.evidenceRefs, quoted.reads);
       if (
         plan.kind === 'process' &&
         !quoted.available &&
+        quoteReads &&
+        completeReads(quoteReads) &&
         fresh(quoted.observedAt, quoted.evidenceRefs)
       ) {
         await deps.store.transaction(context.tenantId, async (tx) => {
@@ -905,6 +1071,10 @@ export function createReturnExchanges(deps: Dependencies) {
           const current = await tx.root(caseId);
           if (!current || current.revision !== data.root?.revision)
             fail(409, 'The exchange changed while checking stock');
+          for (const r of quoteReads)
+            await tx.recordRead(
+              readEvidence(current, { purpose: 'exchange', id: current.id }, r),
+            );
           await tx.saveRoot({
             ...current,
             availability: {
@@ -922,6 +1092,8 @@ export function createReturnExchanges(deps: Dependencies) {
         );
       }
       if (
+        !quoteReads ||
+        !completeReads(quoteReads) ||
         !fresh(quoted.observedAt, quoted.evidenceRefs) ||
         quoted.plan.kind !== plan.kind ||
         canonicalJson(quoted.plan) !== canonicalJson(plan)
@@ -992,7 +1164,19 @@ export function createReturnExchanges(deps: Dependencies) {
               });
           }
         await tx.saveRoot(preparedRoot);
+        for (const r of rootReads)
+          await tx.recordRead(
+            readEvidence(
+              preparedRoot,
+              { purpose: 'exchange', id: preparedRoot.id },
+              r,
+            ),
+          );
         await tx.insert(value);
+        for (const r of quoteReads)
+          await tx.recordRead(
+            readEvidence(value, { purpose: 'exchange', id: value.id }, r),
+          );
         await tx.audit(audit(context, value, 'return.exchange.quoted'));
       });
 
@@ -1067,12 +1251,14 @@ export function createReturnExchanges(deps: Dependencies) {
       );
       if (!deps.system?.consistency)
         fail(503, 'Exchange consistency unavailable');
-      const evidence = await deps.system.consistency(
-        context,
-        data.value,
-        data.root,
-        data.process,
-        data.actions,
+      const { evidence, reads } = citedConsistency(
+        await deps.system.consistency(
+          context,
+          data.value,
+          data.root,
+          data.process,
+          data.actions,
+        ),
       );
       context = await authorize(context, true);
 
@@ -1122,6 +1308,13 @@ export function createReturnExchanges(deps: Dependencies) {
           revision: root.revision + 1,
           updatedAt: at.toISOString(),
         };
+        // Refs that a stored step proof supplied were stored with that proof.
+        for (const read of reads.filter((r) =>
+          report.evidenceRefs.includes(r.id),
+        ))
+          await tx.recordRead(
+            readEvidence(next, { purpose: 'completion', id: next.id }, read),
+          );
         await tx.saveRoot(next);
         if (
           data.process &&
@@ -1432,15 +1625,10 @@ export function createReturnExchanges(deps: Dependencies) {
         tx.get(step.subject!.id),
       );
       if (candidate?.plan.kind === 'process') {
-        const availability = await deps.system
-          ?.availability(context, candidate.plan.replacement)
-          .catch(() => null);
-        if (
-          !availability ||
-          availability.available !== true ||
-          !fresh(availability.observedAt, availability.evidenceRefs)
-        )
-          return false;
+        const availability = (
+          await readAvailability(context, candidate.plan.replacement)
+        )?.availability;
+        if (availability?.available !== true) return false;
       }
 
       return deps.store.transaction(context.tenantId, async (tx) => {
@@ -1510,23 +1698,31 @@ export function createReturnExchanges(deps: Dependencies) {
         return mapped;
       });
     },
-    /** Supplies fresh independent evidence to the execution engine without altering business state. */
+    /**
+     * Supplies fresh independent evidence to the execution engine without altering business
+     * state. Every read it cites is stored first, so its observation IDs resolve to orders
+     * evidence. A partial read cannot pass; a storage failure throws, which execution treats as
+     * unknown.
+     */
     async verify(context: TenantContext, id: string) {
       const value = await deps.store.transaction(context.tenantId, (tx) =>
         tx.get(id),
       );
       if (!value || !deps.system)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const proof = await deps.system.proof(context, value);
-      const current = fresh(
-        proof.observedAt,
-        proof.evidenceRefs,
-        value.requestedAt,
-      );
+      const cited = citedProof(value, await deps.system.proof(context, value));
+      if (!cited)
+        return { outcome: 'inconclusive' as const, observationRefs: [] };
+      await deps.store.transaction(context.tenantId, async (tx) => {
+        for (const read of cited.reads)
+          await tx.recordRead(
+            readEvidence(value, { purpose: 'exchange', id: value.id }, read),
+          );
+      });
 
       return {
-        outcome: current ? proof.outcome : ('inconclusive' as const),
-        observationRefs: current ? proof.evidenceRefs : [],
+        outcome: cited.proof.outcome,
+        observationRefs: cited.proof.evidenceRefs,
       };
     },
   };

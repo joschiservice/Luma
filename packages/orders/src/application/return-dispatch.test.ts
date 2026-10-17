@@ -7,6 +7,7 @@ import type {
   ExchangeStep,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
+import type { ReturnRead, ReturnReadEvidence } from '../domain/return-reads.js';
 import {
   createReturnActions,
   type ReturnActionStore,
@@ -42,6 +43,25 @@ const decided = {
   at: now.toISOString(),
   evidence: { note: 'Counted', link: null },
 };
+const read = (
+  id: string,
+  completeness: ReturnRead['completeness'] = 'complete',
+): ReturnRead => ({
+  id,
+  source: {
+    provider: 'shopify',
+    connectionId: 'shopify',
+    resource: 'order',
+    externalId: 'order',
+    scopeKey: '',
+  },
+  observedAt: now.toISOString(),
+  sourceUpdatedAt: null,
+  sourceRevision: 'r1',
+  adapterVersion: 'shopify-returns/1',
+  completeness,
+  data: { operationId: 'effect' },
+});
 
 function fixture(kind: 'settlement' | 'exchange') {
   const c: ReturnCase = {
@@ -171,6 +191,12 @@ function fixture(kind: 'settlement' | 'exchange') {
       },
     },
   };
+  const stored: ReturnReadEvidence[] = [];
+  let storage: 'ok' | 'failing' = 'ok';
+  const recordRead = async (evidence: ReturnReadEvidence) => {
+    if (storage === 'failing') throw new Error('storage unavailable');
+    if (!stored.some((s) => s.id === evidence.id)) stored.push(evidence);
+  };
   const actionStore: ReturnActionStore = {
     transaction: async (_tenant, fn) =>
       fn({
@@ -184,6 +210,7 @@ function fixture(kind: 'settlement' | 'exchange') {
         insert: unavailable,
         targets: async () => [],
         audit: async () => {},
+        recordRead,
       }),
   };
   const exchangeStore: ReturnExchangeStore = {
@@ -206,6 +233,7 @@ function fixture(kind: 'settlement' | 'exchange') {
         stockActions: async () => [],
         finishCase: unavailable,
         audit: async () => {},
+        recordRead,
       }),
   };
   let execute = async (): Promise<{
@@ -249,6 +277,7 @@ function fixture(kind: 'settlement' | 'exchange') {
     admission,
   };
   let outcome: 'passed' | 'inconclusive' = 'passed';
+  let proofReads: ReturnRead[] = [read('source-proof')];
   const service =
     kind === 'settlement'
       ? createReturnActions({
@@ -262,6 +291,7 @@ function fixture(kind: 'settlement' | 'exchange') {
               payment: null,
               observedAt: now.toISOString(),
               evidenceRefs: ['source-proof'],
+              reads: proofReads,
             }),
           },
         })
@@ -275,6 +305,7 @@ function fixture(kind: 'settlement' | 'exchange') {
               available: true,
               observedAt: now.toISOString(),
               evidenceRefs: ['stock'],
+              reads: [read('stock')],
             }),
             proof: async () => ({
               outcome,
@@ -287,6 +318,7 @@ function fixture(kind: 'settlement' | 'exchange') {
               fulfillmentReady: true,
               payment: 'not_required',
               financial: null,
+              reads: proofReads,
             }),
           },
         });
@@ -315,6 +347,14 @@ function fixture(kind: 'settlement' | 'exchange') {
     },
     current: () => (kind === 'settlement' ? action : step),
     root: () => root,
+    verify: () => service.verify(context, 'effect'),
+    stored,
+    setStorage: (next: typeof storage) => {
+      storage = next;
+    },
+    setProofReads: (next: ReturnRead[]) => {
+      proofReads = next;
+    },
   };
 }
 
@@ -480,6 +520,83 @@ describe.each(['settlement', 'exchange'] as const)(
       await f.recover();
       expect(f.current()).toMatchObject({ sent: true, state: 'sending' });
       expect(f.executions()).toBe(0);
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s verification evidence',
+  (kind) => {
+    const purpose = kind === 'settlement' ? 'settlement' : 'exchange';
+
+    it('stores every cited read with its source identity before citing it', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      expect(await f.verify()).toEqual({
+        outcome: 'passed',
+        observationRefs: ['source-proof'],
+      });
+      expect(f.stored).toEqual([
+        {
+          ...read('source-proof'),
+          tenantId: 'tenant',
+          caseId: 'case',
+          purpose,
+          subjectId: 'effect',
+        },
+      ]);
+
+      await f.check();
+      expect(f.current()).toMatchObject({
+        state: 'verified',
+        proof: { evidenceRefs: ['source-proof'], complete: true },
+      });
+      // The same read cited again is stored once.
+      expect(f.stored.map((s) => s.id)).toEqual(['source-proof']);
+    });
+
+    it('never passes on a partial read, and records the proof as incomplete', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setProofReads([read('source-proof', 'partial')]);
+      expect(await f.verify()).toEqual({
+        outcome: 'inconclusive',
+        observationRefs: ['source-proof'],
+      });
+      expect(f.stored[0]).toMatchObject({ completeness: 'partial' });
+
+      await f.check();
+      expect(f.current().state).not.toBe('verified');
+      expect(f.current().proof).toMatchObject({
+        outcome: 'inconclusive',
+        complete: false,
+      });
+    });
+
+    it('cites nothing when a reference has no read to store', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setProofReads([]);
+      expect(await f.verify()).toEqual({
+        outcome: 'inconclusive',
+        observationRefs: [],
+      });
+      await f.check();
+      expect(f.current()).toMatchObject({
+        state: 'uncertain',
+        failure: 'stale_evidence',
+        proof: null,
+      });
+      expect(f.stored).toEqual([]);
+    });
+
+    it('leaves the outcome unknown when the read cannot be stored', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setStorage('failing');
+      await expect(f.verify()).rejects.toThrow('storage unavailable');
+      await expect(f.check()).rejects.toThrow('storage unavailable');
+      expect(f.current()).toMatchObject({ state: 'uncertain', proof: null });
     });
   },
 );

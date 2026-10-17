@@ -1,8 +1,10 @@
+import type { AuditEntry } from '@luma/audit';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { describe, expect, it } from 'vitest';
 
 import type { ReturnCase } from '../domain/return-cases.js';
 import type { ReturnCreation } from '../domain/return-creations.js';
+import type { ReturnRead, ReturnReadEvidence } from '../domain/return-reads.js';
 import {
   createReturnCases,
   type CreationAdmission,
@@ -32,6 +34,25 @@ const unused = async (): Promise<never> => {
   throw new Error('Not used by the background pass');
 };
 const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+const read = (
+  id: string,
+  completeness: ReturnRead['completeness'] = 'complete',
+): ReturnRead => ({
+  id,
+  source: {
+    provider: 'shopify',
+    connectionId: 'shopify',
+    resource: 'return',
+    externalId: 'return',
+    scopeKey: '',
+  },
+  observedAt: now.toISOString(),
+  sourceUpdatedAt: now.toISOString(),
+  sourceRevision: null,
+  adapterVersion: 'shopify-returns/1',
+  completeness,
+  data: { lumaCaseId: 'case', number: 'R1' },
+});
 
 function fixture() {
   const value: ReturnCase = {
@@ -84,6 +105,11 @@ function fixture() {
     updatedAt: later(60 * 60_000),
   };
   const events: ReturnCaseEvent[] = [];
+  const audits: AuditEntry[] = [];
+  const stored: ReturnReadEvidence[] = [];
+  let storage: 'ok' | 'failing' = 'ok';
+  let found = [read('observation')];
+  let complete = true;
   let executions = 0;
   let reserved = false;
   let approval: {
@@ -102,7 +128,13 @@ function fixture() {
     insertEvent: async (event: ReturnCaseEvent) => {
       events.push(event);
     },
-    audit: async () => {},
+    audit: async (entry: AuditEntry) => {
+      audits.push(entry);
+    },
+    recordRead: async (evidence: ReturnReadEvidence) => {
+      if (storage === 'failing') throw new Error('storage unavailable');
+      if (!stored.some((s) => s.id === evidence.id)) stored.push(evidence);
+    },
   } as Partial<ReturnCaseTransaction>;
   const store = {
     transaction: async <T>(
@@ -145,16 +177,15 @@ function fixture() {
       created: async () => ({
         ok: true,
         value: {
-          complete: true,
-          items: [
-            {
-              observationId: 'observation',
-              observedAt: now.toISOString(),
-              externalId: 'return',
-              number: 'R1',
-              lines: [{ orderLine: ref('line'), quantity: '1' }],
-            },
-          ],
+          complete,
+          items: found.map((r) => ({
+            observationId: r.id,
+            observedAt: now.toISOString(),
+            externalId: 'return',
+            number: 'R1',
+            lines: [{ orderLine: ref('line'), quantity: '1' }],
+          })),
+          reads: found.filter((r) => r.id !== 'unstored'),
         },
       }),
     },
@@ -167,8 +198,18 @@ function fixture() {
 
   return {
     recover: () => service.recover(context),
+    verify: () => service.verify(context, 'creation'),
     current: () => creation,
     events,
+    audits,
+    stored,
+    setRead: (next: ReturnRead[], scan = true) => {
+      found = next;
+      complete = scan;
+    },
+    setStorage: (next: typeof storage) => {
+      storage = next;
+    },
     executions: () => executions,
     patch: (next: Partial<ReturnCreation>) => {
       creation = { ...creation, ...next };
@@ -247,5 +288,82 @@ describe('return creation background follow-up', () => {
       'approver',
     );
     expect(f.executions()).toBe(1);
+  });
+});
+
+describe('return creation verification evidence', () => {
+  it('stores the read it cites with its source identity, and the audit cites the same read', async () => {
+    const f = fixture();
+    expect(await f.verify()).toEqual({
+      outcome: 'passed',
+      observationRefs: ['observation'],
+    });
+    expect(f.stored).toEqual([
+      {
+        ...read('observation'),
+        tenantId: 'tenant',
+        caseId: 'case',
+        purpose: 'creation',
+        subjectId: 'creation',
+      },
+    ]);
+
+    await f.recover();
+    expect(f.current().state).toBe('created');
+    const created = f.audits.find(
+      (a) => a.eventType === 'return_case.creation_created',
+    );
+    expect(created?.evidenceRefs).toContain('observation');
+    // Citing the same read again keeps one stored read.
+    expect(f.stored.map((s) => s.id)).toEqual(['observation']);
+  });
+
+  it('fails a duplicate creation and stores every read it cites', async () => {
+    const f = fixture();
+    f.setRead([read('first'), read('second')]);
+    expect(await f.verify()).toEqual({
+      outcome: 'failed',
+      observationRefs: ['first', 'second'],
+    });
+    expect(f.stored.map((s) => s.id)).toEqual(['first', 'second']);
+  });
+
+  it('neither passes nor records a creation from a partial read', async () => {
+    const f = fixture();
+    f.setRead([read('observation', 'partial')]);
+    expect(await f.verify()).toEqual({
+      outcome: 'inconclusive',
+      observationRefs: [],
+    });
+    f.reserve();
+    f.patch({ state: 'uncertain', updatedAt: later(60_000) });
+    await f.recover();
+    expect(f.current().state).toBe('uncertain');
+    expect(f.stored).toEqual([]);
+  });
+
+  it('cites nothing when the found return has no read to store', async () => {
+    const f = fixture();
+    f.setRead([read('unstored')]);
+    expect(await f.verify()).toEqual({
+      outcome: 'inconclusive',
+      observationRefs: [],
+    });
+    expect(f.stored).toEqual([]);
+  });
+
+  it('leaves the outcome unknown and the creation unrecorded when the read cannot be stored', async () => {
+    const f = fixture();
+    f.setStorage('failing');
+    await expect(f.verify()).rejects.toThrow('storage unavailable');
+    f.reserve();
+    f.patch({ state: 'uncertain', updatedAt: later(60_000) });
+    await expect(f.recover()).rejects.toThrow(
+      'Some return creations could not be followed up',
+    );
+    expect(f.current().state).toBe('uncertain');
+    expect(
+      f.audits.some((a) => a.eventType === 'return_case.creation_created'),
+    ).toBe(false);
   });
 });

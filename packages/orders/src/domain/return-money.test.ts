@@ -56,6 +56,7 @@ describe('observedReturnMoney', () => {
     payment: 'paid' as const,
     observedAt: '2026-10-12T11:00:00Z',
     evidenceRefs: ['provider:refund'],
+    complete: true,
   };
 
   it('is complete only for a known payment state with evidence', () => {
@@ -77,6 +78,18 @@ describe('observedReturnMoney', () => {
     expect(
       observedReturnMoney({ ...read, payment: 'unknown' }, 'r').complete,
     ).toBe(false);
+  });
+
+  it('stays incomplete when a cited read was partial or its completeness is unknown', () => {
+    expect(
+      observedReturnMoney({ ...read, complete: false }, 'r').complete,
+    ).toBe(false);
+    const legacy = {
+      payment: read.payment,
+      observedAt: read.observedAt,
+      evidenceRefs: read.evidenceRefs,
+    };
+    expect(observedReturnMoney(legacy, 'r').complete).toBe(false);
   });
 
   it('stays incomplete without a read', () => {

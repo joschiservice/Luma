@@ -18,6 +18,7 @@ import type {
 } from '@luma/orders/composition';
 import { canonicalJson } from '@luma/platform';
 
+import { returnRead } from './return-reads.js';
 import type { createSafetyServices } from './services.js';
 
 const failureReason = (
@@ -97,29 +98,31 @@ export function createReturnSystem(
         },
       });
       if (!result.ok) return { ok: false, reason: failureReason(result.error) };
-      const items: FoundReturn[] = result.value.items
-        .filter(
-          (o) =>
-            o.kind === 'snapshot' && o.data.lumaCaseId === query.lumaCaseId,
-        )
-        .map((o) => ({
-          observationId: o.id,
-          observedAt: o.observedAt,
-          externalId: o.source.externalId,
-          number: o.data.number,
-          lines: o.data.lines.map((line) => ({
-            orderLine: line.orderLine,
-            quantity: line.quantity.amount,
-          })),
-        }));
+      const complete =
+        result.value.completeness === 'complete' && !result.value.nextCursor;
+      const found = result.value.items.filter(
+        (o) => o.kind === 'snapshot' && o.data.lumaCaseId === query.lumaCaseId,
+      );
+      const items: FoundReturn[] = found.map((o) => ({
+        observationId: o.id,
+        observedAt: o.observedAt,
+        externalId: o.source.externalId,
+        number: o.data.number,
+        lines: o.data.lines.map((line) => ({
+          orderLine: line.orderLine,
+          quantity: line.quantity.amount,
+        })),
+      }));
 
       return {
         ok: true,
         value: {
           items,
-          complete:
-            result.value.completeness === 'complete' &&
-            !result.value.nextCursor,
+          complete,
+          // A cut-short scan cannot rule out another return for the case.
+          reads: found.map((o) =>
+            returnRead(o, complete ? 'complete' : 'partial'),
+          ),
         },
       };
     },

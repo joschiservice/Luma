@@ -73,7 +73,10 @@ export type ExchangeStepPlan =
 export interface ExchangeProof {
   outcome: 'passed' | 'failed' | 'inconclusive';
   observedAt: string;
+  /** Observation IDs of stored reads. */
   evidenceRefs: string[];
+  /** Every cited read was complete. Proofs stored before reads were kept lack it. */
+  complete?: boolean;
   returnId: string | null;
   processLines: {
     returnLines: { id: string; quantity: number }[];

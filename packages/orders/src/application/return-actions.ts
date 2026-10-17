@@ -17,6 +17,13 @@ import type {
 } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
 import type { SourceRef } from '../domain/return-creations.js';
+import {
+  citedReads,
+  completeReads,
+  type ReturnRead,
+  type ReturnReadEvidence,
+  returnReadEvidence,
+} from '../domain/return-reads.js';
 import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type {
   CreationExecution,
@@ -51,9 +58,16 @@ export interface ReturnActionStore {
         value: ReturnCase,
       ): Promise<Omit<ReturnStockTarget, 'warehouse'>[]>;
       audit(entry: AuditEntry): Promise<void>;
+      /** Stores a cited provider read; an already stored read is kept unchanged. */
+      recordRead(evidence: ReturnReadEvidence): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
 }
+
+/** A fresh settlement proof with the provider reads its `evidenceRefs` name. */
+export type ReturnActionProofRead = Omit<ReturnActionProof, 'complete'> & {
+  reads: ReturnRead[];
+};
 
 /** Installed source reads; quoting and verification never write to providers. */
 export interface ReturnSettlementSystem {
@@ -80,11 +94,13 @@ export interface ReturnSettlementSystem {
     plan: ReturnActionPlan;
     observedAt: string;
     evidenceRefs: string[];
+    /** The reads `evidenceRefs` names. */
+    reads: ReturnRead[];
   }>;
   proof(
     context: TenantContext,
     action: ReturnAction,
-  ): Promise<ReturnActionProof>;
+  ): Promise<ReturnActionProofRead>;
 }
 
 /** Binds a settlement to shared policy, independent approval, admission and execution. */
@@ -326,11 +342,26 @@ export function createReturnActions(deps: Dependencies) {
     };
   }
 
+  /** The stored evidence for a read a settlement cites. */
+  function evidence(value: ReturnAction, read: ReturnRead) {
+    return returnReadEvidence(
+      value.tenantId,
+      value.caseId,
+      { purpose: 'settlement', id: value.id },
+      read,
+    );
+  }
+
+  /**
+   * Applies a patch unless a newer proof or send fence supersedes it. `reads` are the provider
+   * reads the patch cites; they are stored in the same transaction.
+   */
   async function save(
     context: TenantContext,
     value: ReturnAction,
     patch: Partial<ReturnAction>,
     event?: string,
+    reads: ReturnRead[] = [],
   ) {
     return deps.store.transaction(context.tenantId, async (tx) => {
       await tx.lock(value.caseId);
@@ -355,11 +386,41 @@ export function createReturnActions(deps: Dependencies) {
         ...patch,
         updatedAt: deps.now().toISOString(),
       };
+      for (const read of reads) await tx.recordRead(evidence(next, read));
       await tx.save(next);
       if (event) await tx.audit(auditEntry(context, next, event));
 
       return next;
     });
+  }
+
+  /**
+   * Accepts a fresh proof only when every reference names a returned read; a partial read
+   * cannot pass. Returns null when the proof cannot be cited.
+   */
+  function citedProof(value: ReturnAction, read: ReturnActionProofRead) {
+    const time = Date.parse(read.observedAt);
+    const reads = citedReads(read.evidenceRefs, read.reads);
+    if (
+      !reads ||
+      !read.evidenceRefs.length ||
+      !Number.isFinite(time) ||
+      time < Date.parse(value.requestedAt) ||
+      time > deps.now().getTime() ||
+      deps.now().getTime() - time > 300_000
+    )
+      return null;
+    const complete = completeReads(reads);
+    const proof: ReturnActionProof = {
+      outcome:
+        read.outcome === 'passed' && !complete ? 'inconclusive' : read.outcome,
+      payment: read.payment,
+      observedAt: read.observedAt,
+      evidenceRefs: read.evidenceRefs,
+      complete,
+    };
+
+    return { proof, reads };
   }
 
   function auditEntry(
@@ -389,27 +450,22 @@ export function createReturnActions(deps: Dependencies) {
 
   async function check(context: TenantContext, value: ReturnAction) {
     if (!value.sent || !deps.system) return value;
-    let proof: ReturnActionProof;
+    let read: ReturnActionProofRead;
     try {
-      proof = await deps.system.proof(context, value);
+      read = await deps.system.proof(context, value);
     } catch {
       return save(context, value, {
         state: 'uncertain',
         failure: 'source_unavailable',
       });
     }
-    const time = Date.parse(proof.observedAt);
-    if (
-      !Number.isFinite(time) ||
-      time < Date.parse(value.requestedAt) ||
-      time > deps.now().getTime() ||
-      deps.now().getTime() - time > 300_000 ||
-      !proof.evidenceRefs.length
-    )
+    const cited = citedProof(value, read);
+    if (!cited)
       return save(context, value, {
         state: 'uncertain',
         failure: 'stale_evidence',
       });
+    const { proof } = cited;
     const state =
       proof.outcome === 'passed'
         ? 'verified'
@@ -427,6 +483,7 @@ export function createReturnActions(deps: Dependencies) {
         failure: proof.outcome === 'failed' ? 'provider_failed' : null,
       },
       state === 'verified' ? 'return.settlement.verified' : undefined,
+      cited.reads,
     );
     await deps.admission?.reconcile(context, result).catch(() => undefined);
 
@@ -688,6 +745,9 @@ export function createReturnActions(deps: Dependencies) {
         deps.now().getTime() - Date.parse(quoted.observedAt) > 300_000
       )
         fail(409, 'Read fresh settlement evidence first');
+      const quoteReads = citedReads(quoted.evidenceRefs, quoted.reads);
+      if (!quoteReads || !completeReads(quoteReads))
+        fail(409, 'Read fresh settlement evidence first');
       const now = deps.now();
       const value: ReturnAction = {
         id: input.id,
@@ -744,6 +804,8 @@ export function createReturnActions(deps: Dependencies) {
               });
           }
         await tx.insert(value);
+        for (const read of quoteReads)
+          await tx.recordRead(evidence(value, read));
         await tx.audit(auditEntry(context, value, 'return.settlement.quoted'));
       });
 
@@ -970,26 +1032,28 @@ export function createReturnActions(deps: Dependencies) {
         );
       });
     },
-    /** Supplies fresh business verification to the execution engine. */
+    /**
+     * Supplies fresh business verification to the execution engine. Every read it cites is
+     * stored first, so its observation IDs resolve to orders evidence. A partial read cannot
+     * pass; a storage failure throws, which execution treats as unknown.
+     */
     async verify(context: TenantContext, id: string) {
       const value = await deps.store.transaction(context.tenantId, (tx) =>
         tx.get(id),
       );
       if (!value || !deps.system)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const proof = await deps.system.proof(context, value);
-
-      const time = Date.parse(proof.observedAt);
-      const fresh =
-        Number.isFinite(time) &&
-        time >= Date.parse(value.requestedAt) &&
-        time <= deps.now().getTime() &&
-        deps.now().getTime() - time <= 300_000 &&
-        proof.evidenceRefs.length > 0;
+      const cited = citedProof(value, await deps.system.proof(context, value));
+      if (!cited)
+        return { outcome: 'inconclusive' as const, observationRefs: [] };
+      await deps.store.transaction(context.tenantId, async (tx) => {
+        for (const read of cited.reads)
+          await tx.recordRead(evidence(value, read));
+      });
 
       return {
-        outcome: fresh ? proof.outcome : ('inconclusive' as const),
-        observationRefs: fresh ? proof.evidenceRefs : [],
+        outcome: cited.proof.outcome,
+        observationRefs: cited.proof.evidenceRefs,
       };
     },
   };

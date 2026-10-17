@@ -69,6 +69,8 @@ export type {
 
 export type { FoundReturn } from './domain/return-creations.js';
 
+export type { ReturnRead } from './domain/return-reads.js';
+
 /** Composes governed settlement with orders-owned storage and audited provider ports. */
 export function createReturnActionService(
   db: TenantDatabase,

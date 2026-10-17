@@ -11,6 +11,7 @@ import type {
 } from '@luma/orders/composition';
 import { canonicalJson } from '@luma/platform';
 
+import { citedReturnReads } from './return-reads.js';
 import type { createSafetyServices } from './services.js';
 
 /** Routes settlement reads through the current installation and records independent source evidence. */
@@ -45,7 +46,7 @@ export function createReturnSettlementSystem(
       });
       if (!result.ok) throw new Error('Settlement quote unavailable');
 
-      return result.value;
+      return { ...result.value, reads: citedReturnReads(result.value.reads) };
     },
     async proof(context, value) {
       const result = await runtime.read(context, {
@@ -56,7 +57,7 @@ export function createReturnSettlementSystem(
       });
       if (!result.ok) throw new Error('Settlement verification unavailable');
 
-      return result.value;
+      return { ...result.value, reads: citedReturnReads(result.value.reads) };
     },
   };
 }

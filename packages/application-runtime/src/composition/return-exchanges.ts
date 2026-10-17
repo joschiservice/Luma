@@ -11,6 +11,7 @@ import type {
 } from '@luma/orders/composition';
 import { canonicalJson } from '@luma/platform';
 
+import { citedReturnReads, returnRead } from './return-reads.js';
 import type { createSafetyServices } from './services.js';
 
 /** Reads both installed systems without interpreting reported availability as a reservation. */
@@ -94,6 +95,8 @@ export function createReturnExchangeSystem(
         available: quantity >= replacement.quantity,
         observedAt: row.observedAt,
         evidenceRefs: [row.id],
+        // Only a complete scan reaches this point.
+        reads: [returnRead(row, 'complete')],
       };
     },
     async quote(context, connectionId, input) {
@@ -105,7 +108,7 @@ export function createReturnExchangeSystem(
       });
       if (!result.ok) throw new Error('Exchange quote unavailable');
 
-      return result.value;
+      return { ...result.value, reads: citedReturnReads(result.value.reads) };
     },
     async proof(context, value) {
       const result = await runtime.read(context, {
@@ -116,7 +119,7 @@ export function createReturnExchangeSystem(
       });
       if (!result.ok) throw new Error('Exchange proof unavailable');
 
-      return result.value;
+      return { ...result.value, reads: citedReturnReads(result.value.reads) };
     },
   };
 }

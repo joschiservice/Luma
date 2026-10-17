@@ -73708,6 +73708,9 @@
                                       "format": "uuid"
                                     }
                                   },
+                                  "complete": {
+                                    "type": "boolean"
+                                  },
                                   "returnId": {
                                     "anyOf": [
                                       {
@@ -75639,6 +75642,9 @@
                                 "type": "string",
                                 "format": "uuid"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             },
                             "returnId": {
                               "anyOf": [
@@ -78512,6 +78518,9 @@
                                 "format": "uuid"
                               }
                             },
+                            "complete": {
+                              "type": "boolean"
+                            },
                             "returnId": {
                               "anyOf": [
                                 {
@@ -80058,6 +80067,9 @@
                                 "type": "string",
                                 "format": "uuid"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             },
                             "returnId": {
                               "anyOf": [
@@ -81606,6 +81618,9 @@
                                 "format": "uuid"
                               }
                             },
+                            "complete": {
+                              "type": "boolean"
+                            },
                             "returnId": {
                               "anyOf": [
                                 {
@@ -82537,6 +82552,9 @@
                                     "items": {
                                       "type": "string"
                                     }
+                                  },
+                                  "complete": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -83363,6 +83381,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -84131,6 +84152,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -84888,6 +84912,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -85645,6 +85672,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [

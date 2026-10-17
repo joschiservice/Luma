@@ -46,6 +46,13 @@ import {
   type ReturnCreation,
   type SourceRef,
 } from '../domain/return-creations.js';
+import {
+  citedReads,
+  completeReads,
+  type ReturnRead,
+  type ReturnReadEvidence,
+  returnReadEvidence,
+} from '../domain/return-reads.js';
 import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type { ReturnData } from '../domain/returns.js';
 
@@ -165,6 +172,8 @@ export interface ReturnCaseTransaction {
   ): Promise<{ order: SourceRef | null; lines: Map<string, SourceRef> }>;
   people(ids: string[]): Promise<Map<string, Person>>;
   audit(entry: AuditEntry): Promise<void>;
+  /** Stores a cited provider read; an already stored read is kept unchanged. */
+  recordRead(evidence: ReturnReadEvidence): Promise<void>;
 }
 
 export interface ReturnCaseStore {
@@ -204,7 +213,10 @@ export interface ReturnSystem {
   ): Promise<
     ReturnSystemResult<{ warehouses: ReturnOption[]; reasons: ReturnOption[] }>
   >;
-  /** Fresh read of the returns created for a case; `complete` is false when the scan was cut short. */
+  /**
+   * Fresh read of the returns created for a case; `complete` is false when the scan was cut
+   * short. `reads` holds the provider read behind each item, named by its observation ID.
+   */
   created(
     context: TenantContext,
     connectionId: string,
@@ -213,7 +225,13 @@ export interface ReturnSystem {
       lumaCaseId: string;
       requestedReturn?: SourceRef;
     },
-  ): Promise<ReturnSystemResult<{ items: FoundReturn[]; complete: boolean }>>;
+  ): Promise<
+    ReturnSystemResult<{
+      items: FoundReturn[];
+      complete: boolean;
+      reads: ReturnRead[];
+    }>
+  >;
 }
 
 /** Execution state of a creation action, as Action Admission recorded it. */
@@ -1019,9 +1037,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     await tx.audit(audit(context, entry, value, evidenceRefs));
   }
 
-  /** A fresh read of the system; exactly one return carrying the case marker identifies it. */
+  /**
+   * A fresh read of the system; exactly one return carrying the case marker identifies it.
+   * `reads` holds the read behind every found return, or is null when one is missing, so none
+   * of them can be cited.
+   */
   async function locate(context: TenantContext, creation: ReturnCreation) {
-    if (!deps.system) return { found: [], complete: false };
+    const none = { found: [], complete: false, reads: null };
+    if (!deps.system) return none;
     const result = await deps.system.created(context, creation.connectionId, {
       order: creation.order,
       lumaCaseId: creation.caseId,
@@ -1029,10 +1052,35 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         ? { requestedReturn: creation.requestedReturn }
         : {}),
     });
+    if (!result.ok) return none;
+    const { items, reads } = result.value;
 
-    return result.ok
-      ? { found: result.value.items, complete: result.value.complete }
-      : { found: [], complete: false };
+    return {
+      found: items,
+      reads: citedReads(
+        items.map((f) => f.observationId),
+        reads,
+      ),
+      complete: result.value.complete && completeReads(reads),
+    };
+  }
+
+  /** Stores the reads a creation cites in the citing transaction. */
+  async function recordReads(
+    context: TenantContext,
+    tx: ReturnCaseTransaction,
+    creation: ReturnCreation,
+    reads: ReturnRead[],
+  ) {
+    for (const read of reads)
+      await tx.recordRead(
+        returnReadEvidence(
+          context.tenantId,
+          creation.caseId,
+          { purpose: 'creation', id: creation.id },
+          read,
+        ),
+      );
   }
 
   /** Applies an execution result; a verified creation is located again and recorded. */
@@ -1058,10 +1106,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     if (execution.state === 'withheld' || execution.state === 'failed')
       return save({ state: 'failed', failure: execution.failure });
     if (execution.state !== 'verified') return save({ state: 'uncertain' });
-    const { found, complete } = await locate(context, creation);
+    const { found, complete, reads } = await locate(context, creation);
     const match = found.length === 1 ? found[0]! : null;
     if (
       !complete ||
+      !reads ||
       !match ||
       !Number.isFinite(Date.parse(match.observedAt)) ||
       Date.parse(match.observedAt) < Date.parse(creation.requestedAt) ||
@@ -1072,6 +1121,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     await deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = (await tx.creation(creationId))!;
       if (current.state === 'created') return;
+      await recordReads(context, tx, current, reads);
       const saved = await saveCreation(tx, current, {
         state: 'created',
         createdAt: match.observedAt,
@@ -2134,7 +2184,12 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       });
     },
 
-    /** Verification for the execution adapter: a fresh read must find exactly this return. */
+    /**
+     * Verification for the execution adapter: a fresh read must find exactly this return. Every
+     * read it cites is stored first, so its observation IDs resolve to orders evidence. Only a
+     * complete read can pass or fail it; a storage failure throws, which execution treats as
+     * unknown.
+     */
     async verify(context: TenantContext, creationId: string) {
       const creation = await deps.store.transaction(
         context.tenantId,
@@ -2143,9 +2198,10 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (!creation)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const { found, complete } = await locate(context, creation);
+      const { found, complete, reads } = await locate(context, creation);
       if (
         !complete ||
+        !reads ||
         found.length === 0 ||
         found.some(
           (f) =>
@@ -2155,6 +2211,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         )
       )
         return { outcome: 'inconclusive' as const, observationRefs: [] };
+      await deps.store.transaction(context.tenantId, true, (tx) =>
+        recordReads(context, tx, creation, reads),
+      );
       if (found.length > 1)
         return {
           outcome: 'failed' as const,
