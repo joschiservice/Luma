@@ -11,11 +11,11 @@ import {
 } from '@luma/connector-jtl';
 import { z } from 'zod';
 
+import { installationTarget } from '../domain/installation-validation.js';
 import {
   type ApprovedJtlEndpoint,
   approvedJtlFetch,
 } from './approved-jtl-fetch.js';
-import { installationTarget } from './installation-validation.js';
 import * as jtl from './schemas.js';
 
 /** Verifies account identity and grants using app-owned provider probes. */

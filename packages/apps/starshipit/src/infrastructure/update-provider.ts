@@ -8,7 +8,7 @@ import * as s from '@luma/connector-starshipit/schemas';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 
-import { installationCredentials } from './installation-validation.js';
+import { installationCredentials } from '../domain/installation-validation.js';
 import { revision } from './mapping.js';
 import type { createUpdateStore } from './update-store.js';
 

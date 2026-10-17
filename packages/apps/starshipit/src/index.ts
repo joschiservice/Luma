@@ -16,12 +16,12 @@ import { createClient, parse } from '@luma/connector-starshipit';
 import * as s from '@luma/connector-starshipit/schemas';
 import type { TenantContext } from '@luma/identity';
 
-import { createStarshipitConnector } from './infrastructure/adapter.js';
 import {
   installationCredentials,
   installationInput,
   installationTarget,
-} from './infrastructure/installation-validation.js';
+} from './domain/installation-validation.js';
+import { createStarshipitConnector } from './infrastructure/adapter.js';
 import { registerStarshipitRoutes } from './routes.js';
 import { createStarshipitUpdates } from './updates.js';
 

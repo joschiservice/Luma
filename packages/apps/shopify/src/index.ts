@@ -36,14 +36,14 @@ import {
 import type { ShopifyOAuth } from './application/oauth.js';
 import { createRecordService } from './application/records.js';
 import { readShopifyConfig } from './config.js';
-import { recordPermission } from './domain/records.js';
-import { createShopifyRecovery } from './fulfillment-recovery.js';
-import { createShopifyConnector } from './infrastructure/adapter.js';
 import {
   installationCredentials,
   installationInput,
   installationTarget,
-} from './infrastructure/installation-validation.js';
+} from './domain/installation-validation.js';
+import { recordPermission } from './domain/records.js';
+import { createShopifyRecovery } from './fulfillment-recovery.js';
+import { createShopifyConnector } from './infrastructure/adapter.js';
 import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
 import { createShopifyOAuth } from './infrastructure/oauth.js';
 import { createPrivacyIntake } from './infrastructure/privacy.js';

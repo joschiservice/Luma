@@ -10,7 +10,7 @@ import {
   gmailReads,
   installationTarget,
   storedCredentials,
-} from './installation-validation.js';
+} from '../domain/installation-validation.js';
 
 /**
  * Verifies that the token reads the expected mailbox and grants only what the recorded Google

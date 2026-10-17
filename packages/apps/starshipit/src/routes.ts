@@ -11,7 +11,7 @@ import { canonicalJson } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import { installationCredentials } from './infrastructure/installation-validation.js';
+import { installationCredentials } from './domain/installation-validation.js';
 import { type createStarshipitUpdates, updatePermission } from './updates.js';
 
 /** Registers governed private commands and authenticated refresh-only shipping wakeups. */

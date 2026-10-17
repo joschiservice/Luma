@@ -31,7 +31,7 @@ import {
   gmailReads,
   type StoredCredentials,
   storedCredentials,
-} from './installation-validation.js';
+} from '../domain/installation-validation.js';
 
 const invalid = () =>
   new IdentityError(

@@ -103,5 +103,3 @@ export function createPushIntake(
     });
   };
 }
-
-export type PushIntake = ReturnType<typeof createPushIntake>;

@@ -8,12 +8,12 @@ import type { SimulationTransport } from '@luma/connections/composition';
 import { createRequestPacer, type RequestPacer } from '@luma/connector-cin7';
 import { hasPermission } from '@luma/identity';
 
-import { createCin7Connector } from './infrastructure/adapter.js';
 import {
   installationCredentials,
   installationInput,
   installationTarget,
-} from './infrastructure/installation-validation.js';
+} from './domain/installation-validation.js';
+import { createCin7Connector } from './infrastructure/adapter.js';
 import {
   createSaleCache,
   type SaleCache,

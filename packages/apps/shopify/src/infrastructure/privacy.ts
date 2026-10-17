@@ -121,6 +121,3 @@ export function createPrivacyIntake(
     });
   };
 }
-
-/** Accepts the original JSON bytes and verified-delivery headers; resolves only after durable intake. */
-export type PrivacyIntake = ReturnType<typeof createPrivacyIntake>;
