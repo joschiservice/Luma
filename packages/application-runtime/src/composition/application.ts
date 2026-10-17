@@ -106,7 +106,10 @@ import {
 
 import { createActiveDiagnosisRereader } from './active-diagnosis.js';
 import { createAdaptiveWorkspaceRuntime } from './adaptive.js';
-import { createAdmissionEligibility } from './admission.js';
+import {
+  createAdmissionEligibility,
+  routeAdmissionEligibility,
+} from './admission.js';
 import {
   createCaseWorkflowServices,
   createFollowUpWorkflows,
@@ -553,29 +556,32 @@ export function createApplicationServices(
       : {}),
     responsibilityFacts: async (context, action) =>
       (await scopedFollowUp?.facts(context, action)) ?? null,
-    eligible: (context, step) =>
-      isFieldWriteCapability(step.action.capability)
-        ? adaptiveFieldEligibility(context, step)
-        : step.subject?.kind === 'purchase_order_change'
-          ? orderChanges.eligible(context, step)
-          : step.subject?.kind === 'purchasing_plan'
-            ? purchasing.eligible(context, step)
-            : step.subject?.kind === 'purchase_order_submission'
-              ? commitments.eligible(context, step)
-              : step.subject?.kind === 'message_outbound'
-                ? messaging.replies.eligible(context, step)
-                : step.subject?.kind === 'return_case_creation'
-                  ? returnCases.eligible(context, step)
-                  : step.subject?.kind === 'return_case_settlement'
-                    ? returnActions.eligible(context, step)
-                    : step.subject?.kind === 'return_case_exchange'
-                      ? returnExchanges.eligible(context, step)
-                      : step.subject?.kind === 'supplier_follow_up'
-                        ? (scopedFollowUp?.eligible(context, step) ??
-                          Promise.resolve(false))
-                        : step.subject
-                          ? replenishment.eligible(context, step)
-                          : resolutionEligible(context, step),
+    // Owners are composed below; each route reads its owner only when a step is checked.
+    eligible: routeAdmissionEligibility({
+      fieldWrite: {
+        matches: isFieldWriteCapability,
+        eligible: (context, step) => adaptiveFieldEligibility(context, step),
+      },
+      subjects: {
+        purchase_order_change: (context, step) =>
+          orderChanges.eligible(context, step),
+        purchasing_plan: (context, step) => purchasing.eligible(context, step),
+        purchase_order_submission: (context, step) =>
+          commitments.eligible(context, step),
+        message_outbound: (context, step) =>
+          messaging.replies.eligible(context, step),
+        return_case_creation: (context, step) =>
+          returnCases.eligible(context, step),
+        return_case_settlement: (context, step) =>
+          returnActions.eligible(context, step),
+        return_case_exchange: (context, step) =>
+          returnExchanges.eligible(context, step),
+        supplier_follow_up: (context, step) =>
+          scopedFollowUp?.eligible(context, step) ?? Promise.resolve(false),
+      },
+      otherSubject: (context, step) => replenishment.eligible(context, step),
+      noSubject: resolutionEligible,
+    }),
   });
   const purchasing = createPurchasing({
     store: createPurchasingStore(database, createAuditLog),
