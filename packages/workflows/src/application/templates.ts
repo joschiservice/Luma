@@ -1,9 +1,6 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { forbidden, notFound } from '@luma/platform';
 
 import type { WorkflowDraftContent } from '../domain/draft.js';
 import type { WorkflowTemplate } from '../domain/template.js';
@@ -29,15 +26,14 @@ export function createWorkflowTemplates(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function source(id: string) {
     const found = deps.sources.find((item) => item.id === id);
-    if (!found)
-      throw new IdentityError(404, 'NOT_FOUND', 'Template not found.');
+    if (!found) throw notFound('Template not found.');
 
     return found;
   }

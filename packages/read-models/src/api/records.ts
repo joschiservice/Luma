@@ -5,8 +5,8 @@ import {
   recordDetailSchema,
   recordListSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { RecordExplorer } from '../application/records.js';
@@ -19,17 +19,8 @@ export function recordRoutes(service?: RecordExplorer) {
     resolve: os.resolve.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Record mapping is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Record mapping is unavailable');
 
         return await service.resolve(request.tenantContext, query);
       },
@@ -37,17 +28,8 @@ export function recordRoutes(service?: RecordExplorer) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Record search is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Record search is unavailable');
 
         return recordListSchema.parse(
           await service.list(request.tenantContext, query),
@@ -56,20 +38,14 @@ export function recordRoutes(service?: RecordExplorer) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Record details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Record details are unavailable');
       const detail = await service.get(
         request.tenantContext,
         params.kind,
         params.recordId,
       );
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+      if (!detail) throw notFound('Record not found');
 
       return recordDetailSchema.parse(detail);
     }),

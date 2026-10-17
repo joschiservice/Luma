@@ -1,12 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 import { z } from 'zod';
 
 import { canReadRecord } from '../application/access.js';
@@ -379,9 +376,7 @@ export function createRecordExplorer(
     ): Promise<RecordDetail | null> {
       requireTenant(context, context.tenantId);
       if (!canReadRecord(context, kind))
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
+        throw forbidden(
           'Your role does not allow this. Ask a workspace admin for access.',
         );
 

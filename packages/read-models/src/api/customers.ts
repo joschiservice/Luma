@@ -6,8 +6,8 @@ import {
   customerListSchema,
   customersCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { CustomerWorkspace } from '../application/customers.js';
@@ -21,17 +21,8 @@ export function customerRoutes(service?: CustomerWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Customers are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Customers are unavailable');
         validateCollectionQuery(customersCatalog, query, {
           customFields: true,
         });
@@ -43,19 +34,13 @@ export function customerRoutes(service?: CustomerWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Customer details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Customer details are unavailable');
       const detail = await service.get(
         request.tenantContext,
         params.customerId,
       );
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Customer not found');
+      if (!detail) throw notFound('Customer not found');
 
       return customerDetailSchema.parse(detail);
     }),

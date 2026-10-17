@@ -6,8 +6,8 @@ import {
   measurementHistorySchema,
   operationsOverviewSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { OperationsOverviewService } from '../application/overview.js';
@@ -23,17 +23,8 @@ export function operationsRoutes(
     recordMeasurement: os.recordMeasurement.handler(
       async ({ context: { request }, input: { params, body } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!measurements)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Measurements are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!measurements) throw unavailable('Measurements are unavailable');
 
         return measurementEventSchema.parse(
           await measurements.append(
@@ -47,17 +38,8 @@ export function operationsRoutes(
     measurementHistory: os.measurementHistory.handler(
       async ({ context: { request }, input: { params, query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!measurements)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Measurements are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!measurements) throw unavailable('Measurements are unavailable');
 
         return measurementHistorySchema.parse(
           await measurements.history(
@@ -71,17 +53,8 @@ export function operationsRoutes(
     overview: os.overview.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Operations overview is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Operations overview is unavailable');
 
         return operationsOverviewSchema.parse(
           await service(

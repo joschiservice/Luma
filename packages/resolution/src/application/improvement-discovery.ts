@@ -1,9 +1,9 @@
 import {
-  IdentityError,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
+import { forbidden, notFound } from '@luma/platform';
 
 import {
   discoverImprovements,
@@ -28,13 +28,9 @@ export function createImprovementDiscovery(deps: {
       requirePermission(fresh, 'issues.manage');
       requirePermission(fresh, 'workflows.author');
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Your access changed.');
+        throw forbidden('Your access changed.');
       if (!(await deps.enabled(fresh.tenantId)))
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Workflow improvement discovery is unavailable.',
-        );
+        throw notFound('Workflow improvement discovery is unavailable.');
       const asOf = deps.now().toISOString();
 
       return {

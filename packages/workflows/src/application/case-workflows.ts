@@ -5,12 +5,18 @@ import type {
 } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson, conflict } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
 import {
@@ -299,15 +305,14 @@ export function createCaseWorkflows(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function adapter(id: string) {
     const found = adapters.get(id);
-    if (!found)
-      throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found.');
+    if (!found) throw notFound('Workflow not found.');
 
     return found;
   }
@@ -713,7 +718,7 @@ export function createCaseWorkflows(deps: {
         } catch (error) {
           // People without assignment access, or a closed case, keep the case as it is.
           if (
-            !(error instanceof IdentityError) ||
+            !(error instanceof ServiceError) ||
             ![403, 404, 409, 422].includes(error.statusCode)
           )
             throw error;
@@ -1027,9 +1032,7 @@ export function createCaseWorkflows(deps: {
         return view(existing);
       }
       if (!available)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'The workflow worker isn’t connected. Ask whoever runs Luma to start it.',
         );
       if (
@@ -1084,8 +1087,7 @@ export function createCaseWorkflows(deps: {
       const current = (await deps.store.list(context)).find(
         (item) => item.id === activationId && item.definitionId === id,
       );
-      if (!current)
-        throw new IdentityError(404, 'NOT_FOUND', 'Activation not found.');
+      if (!current) throw notFound('Activation not found.');
       if (current.artifactDigest !== digest)
         throw conflict(
           'The reviewed activation changed. Refresh before turning it off.',
@@ -1097,8 +1099,7 @@ export function createCaseWorkflows(deps: {
         context.actor.id,
         deps.now().toISOString(),
       );
-      if (!revoked)
-        throw new IdentityError(404, 'NOT_FOUND', 'Activation not found.');
+      if (!revoked) throw notFound('Activation not found.');
       await recordAudit(context, revoked, true);
 
       return view(revoked);

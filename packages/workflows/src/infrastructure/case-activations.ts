@@ -1,7 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict } from '@luma/platform';
 
 import type { CaseActivationStore } from '../application/case-workflows.js';
 import type { CaseActivation } from '../domain/case-workflow.js';
@@ -56,11 +55,7 @@ export function createCaseActivationStore(
               revokedBy: null,
             })
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This activation ID belongs to another request.',
-            );
+            throw conflict('This activation ID belongs to another request.');
 
           return present(existing);
         }
@@ -69,9 +64,7 @@ export function createCaseActivationStore(
           [context.tenantId, activation.definitionId],
         );
         if (overlap.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This workflow is already on. Turn it off before turning it on for someone else.',
           );
         const document = {

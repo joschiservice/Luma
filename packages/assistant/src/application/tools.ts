@@ -1,10 +1,7 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  hasPermission,
-  IdentityError,
-  requireChangesAllowed,
-} from '@luma/identity';
+import { hasPermission, requireChangesAllowed } from '@luma/identity';
 import type { JsonValue, ModelTool } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 
 import {
   boundResult,
@@ -186,11 +183,11 @@ export function createToolRegistry(
         };
       } catch (error) {
         if (
-          error instanceof IdentityError &&
+          error instanceof ServiceError &&
           (error.statusCode === 401 || error.statusCode === 403)
         )
           throw error;
-        if (error instanceof IdentityError && error.statusCode === 404)
+        if (error instanceof ServiceError && error.statusCode === 404)
           return result(tool.name, summary, 'not_found', {
             error: 'not_found',
             message: 'No record with this ID exists in this workspace.',

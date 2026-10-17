@@ -13,8 +13,8 @@ import {
   syncRunHistorySchema,
   syncStreamSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -24,13 +24,9 @@ import type { SyncService } from '../application/service.js';
 export function syncRoutes(service?: SyncService) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Data sync is unavailable. Try again later.',
-      );
+      throw unavailable('Data sync is unavailable. Try again later.');
 
     return { context: request.tenantContext, service };
   }

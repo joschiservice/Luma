@@ -1,10 +1,7 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, ServiceError } from '@luma/platform';
 
 import type { AutoLinkStore } from '../application/automatic-links.js';
 import type { AutoLinkRule } from '../domain/automatic-links.js';
@@ -96,18 +93,14 @@ export function createAutoLinkStore(
             )
           ).rows[0];
           if ((current?.revision ?? 0) !== input.revision)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This rule changed. Refresh before saving it.',
-            );
+            throw conflict('This rule changed. Refresh before saving it.');
           if (
             current &&
             (current.kind !== input.kind ||
               current.target_connection_id !== input.targetConnectionId ||
               current.source_connection_id !== input.sourceConnectionId)
           )
-            throw new IdentityError(
+            throw new ServiceError(
               422,
               'CONFLICT',
               'A rule’s record type and connections cannot change. Disable it and create another rule.',
@@ -153,9 +146,7 @@ export function createAutoLinkStore(
           'code' in error &&
           error.code === '23505'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A rule already exists for these connections and this record type. Refresh to use it.',
           );
         throw error;

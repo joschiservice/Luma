@@ -5,7 +5,7 @@ import type {
   DiagnosisService,
 } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { conflict, unavailable } from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 
 import type { DeskService } from './desk.js';
@@ -61,22 +61,12 @@ export function createProposalRefresher(deps: ProposalRefreshDependencies) {
       result.value.completeness !== 'complete' ||
       result.value.items.length !== 1
     )
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'The order could not be checked. Try again shortly.',
-      );
+      throw unavailable('The order could not be checked. Try again shortly.');
     const observation = result.value.items[0];
     if (!observation)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'The order could not be checked. Try again shortly.',
-      );
+      throw unavailable('The order could not be checked. Try again shortly.');
     if (observation.data.orderStatus !== 'open')
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         observation.data.orderStatus === 'shipped'
           ? 'The order has already shipped. Its shipping method can no longer be corrected.'
           : observation.data.orderStatus === 'cancelled'
@@ -87,9 +77,7 @@ export function createProposalRefresher(deps: ProposalRefreshDependencies) {
       observation.data.isCancelled ||
       observation.data.shippingMethod.externalId !== deps.expectedShippingMethod
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         observation.data.isCancelled
           ? 'The order was cancelled. Review the case before choosing another action.'
           : 'The shipping method changed. Review the order before choosing another action.',
@@ -119,18 +107,9 @@ export function createProposalRefresher(deps: ProposalRefreshDependencies) {
     await deps.exceptions.ingest(actor, request);
     const diagnosis = await deps.diagnoses.run(actor, id);
     if (!diagnosis || diagnosis.status !== 'ready' || diagnosis.superseded)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'The investigation changed. Review the current findings.',
-      );
+      throw conflict('The investigation changed. Review the current findings.');
     const proposal = await deps.propose(actor, id, diagnosis.revision);
-    if (!proposal)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'No current proposal is available.',
-      );
+    if (!proposal) throw conflict('No current proposal is available.');
     // Policy evaluation records the independent approval requirement; this path never approves.
     const action = (await deps.desk.proposal(actor, proposal.id))?.action;
     if (!action) return null;

@@ -1,5 +1,6 @@
-import { IdentityError, type TenantContext } from '@luma/identity';
+import { type TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { unavailable } from '@luma/platform';
 
 import type { ImprovementDiscoverySource } from '../../domain/improvement-discovery.js';
 import type {
@@ -75,9 +76,7 @@ export function createImprovementDiscoveryReader(db: TenantDatabase) {
           )
         ).rows;
         if (rows.length > 500)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
+          throw unavailable(
             'This discovery cohort exceeds 500 verified issues. Inspect individual issues in Insights and choose a verified resolution directly.',
           );
 

@@ -6,8 +6,8 @@ import {
   insightRecordListSchema,
 } from '@luma/api-contract';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { Insights } from '../application/insights.js';
@@ -16,13 +16,8 @@ import type { Insights } from '../application/insights.js';
 export function insightRoutes(service?: Insights) {
   const ready = (context: TenantContext | null | undefined) => {
     if (!context)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Insights are unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Insights are unavailable');
 
     return { service, context };
   };

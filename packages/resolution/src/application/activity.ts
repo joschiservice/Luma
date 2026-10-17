@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { forbidden, unavailable } from '@luma/platform';
 
 import type {
   ActivityCounts,
@@ -80,8 +80,7 @@ export function createActivityService(
   const reader = async (context: TenantContext) => {
     const fresh = await refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'activity.read');
 
     return fresh;
@@ -121,12 +120,7 @@ export function createActivityService(
       const fresh = await reader(context);
       requireChangesAllowed(fresh);
       requirePermission(fresh, 'lists.export');
-      if (!exports)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Activity export is unavailable',
-        );
+      if (!exports) throw unavailable('Activity export is unavailable');
       const page = await store.list(fresh, {
         ...resolved(query, fresh),
         view: 'events',

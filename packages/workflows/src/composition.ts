@@ -1,12 +1,12 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type {
   ModelGateway,
   TenantDatabase,
   TraceContext,
 } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
 import {
@@ -262,9 +262,7 @@ export function createCaseWorkflowRuntime(
             activation.definitionId !== run.definitionId ||
             activation.principalId !== context.actor.id
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'The workflow was turned off or changed. No run was started.',
             );
 
@@ -367,8 +365,7 @@ export function createDrafts(
     fromVersion: draftFromVersion,
     template: (id) => {
       const found = templates.find((item) => item.id === id);
-      if (!found)
-        throw new IdentityError(404, 'NOT_FOUND', 'Template not found.');
+      if (!found) throw notFound('Template not found.');
 
       return found.content();
     },
@@ -489,9 +486,7 @@ export function createDraftGenerations(
                     evidenceRefs: ['trusted-synthetic-fixture'],
                   });
                   if (!checked.version)
-                    throw new IdentityError(
-                      409,
-                      'CONFLICT',
+                    throw conflict(
                       'The improvement cannot compile for trusted evaluation.',
                     );
 
@@ -505,9 +500,7 @@ export function createDraftGenerations(
                 evidenceRefs: evidence.evidenceRefs,
               }).version;
               if (!compiled)
-                throw new IdentityError(
-                  409,
-                  'CONFLICT',
+                throw conflict(
                   'The candidate cannot compile for historical comparison.',
                 );
               if (deps.improvements?.controls) {
@@ -518,9 +511,7 @@ export function createDraftGenerations(
                   evidenceRefs: evidence.evidenceRefs,
                 }).version;
                 if (!original)
-                  throw new IdentityError(
-                    409,
-                    'CONFLICT',
+                  throw conflict(
                     'The baseline cannot compile for control evaluation.',
                   );
                 report.controls = await deps.improvements.controls.evaluate(

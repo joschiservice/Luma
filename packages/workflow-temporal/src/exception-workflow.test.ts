@@ -3,11 +3,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   AccountDisabledError,
   builtInMembership,
-  IdentityError,
   makeTenantContext,
   MembershipSuspendedError,
   WorkspaceInactiveError,
 } from '@luma/identity';
+import { forbidden, ServiceError } from '@luma/platform';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -389,11 +389,11 @@ it.each([
     nonRetryable: false,
   },
   {
-    error: new IdentityError(503, 'SERVICE_UNAVAILABLE', 'private outage'),
+    error: new ServiceError(503, 'SERVICE_UNAVAILABLE', 'private outage'),
     nonRetryable: false,
   },
   {
-    error: new IdentityError(403, 'FORBIDDEN', 'private authorization details'),
+    error: forbidden('private authorization details'),
     nonRetryable: true,
   },
   {

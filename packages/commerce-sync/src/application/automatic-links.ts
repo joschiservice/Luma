@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  WorkspaceInactiveError,
-} from '@luma/identity';
+import { requirePermission, WorkspaceInactiveError } from '@luma/identity';
+import { notFound, ServiceError } from '@luma/platform';
 
 import type {
   AutoLinkInput,
@@ -51,10 +48,9 @@ export function createAutoLinkService(deps: {
     const source = connections.find(
       (item) => item.id === pair.sourceConnectionId,
     );
-    if (!target || !source)
-      throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+    if (!target || !source) throw notFound('Connection not found');
     if (target.id === source.id)
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'CONFLICT',
         'Choose two different connections',
@@ -64,7 +60,7 @@ export function createAutoLinkService(deps: {
       pair.kind === 'order' &&
       (target.provider !== 'shopify' || source.provider === 'shopify')
     )
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'CONFLICT',
         'Order rules match an ERP order’s marketplace reference to an order in one Shopify store',
@@ -146,7 +142,7 @@ export function createAutoLinkRunner(deps: {
           } catch (error) {
             if (error instanceof WorkspaceInactiveError) return;
             // A concurrent worker may have created the pair. Never replace an operator's rule.
-            if (!(error instanceof IdentityError))
+            if (!(error instanceof ServiceError))
               deps.log('Automatic linking setup failed; retrying.', error);
           }
         }
@@ -163,7 +159,7 @@ export function createAutoLinkRunner(deps: {
         } catch (error) {
           // A suspended workspace leaves its rules due; they run once it is active again.
           if (error instanceof WorkspaceInactiveError) return;
-          const denied = error instanceof IdentityError;
+          const denied = error instanceof ServiceError;
           if (!denied) deps.log('Automatic linking failed; retrying.', error);
           await deps.store.block(
             tenantId,

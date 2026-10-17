@@ -1,10 +1,6 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
-import { conflict } from '@luma/platform';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 
 import {
   type AuthoringMode,
@@ -186,7 +182,7 @@ export function createWorkflowDrafts(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -490,7 +486,7 @@ export function createWorkflowDrafts(deps: {
   async function open(context: TenantContext, id: string) {
     const draft = await deps.store.get(context, id);
     if (!draft || draft.state === 'discarded')
-      throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+      throw notFound('Draft not found.');
 
     return draft;
   }
@@ -543,12 +539,7 @@ export function createWorkflowDrafts(deps: {
         const published = (await deps.versions(context, definitionId)).find(
           (item) => item.version === version,
         );
-        if (!published)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Workflow version not found.',
-          );
+        if (!published) throw notFound('Workflow version not found.');
         if (published.format !== 'workflow/2')
           throw conflict(
             'This version uses an older format. Start a new workflow instead.',
@@ -565,8 +556,7 @@ export function createWorkflowDrafts(deps: {
           version: nextVersion(all.map((item) => item.version)),
         };
       } else if (input.start.kind === 'template') {
-        if (!deps.template)
-          throw new IdentityError(404, 'NOT_FOUND', 'Template not found.');
+        if (!deps.template) throw notFound('Template not found.');
         const template = deps.template(input.start.templateId);
         const suffix = deps.id().replaceAll('-', '').slice(0, 6);
         // A customized copy is a new workflow; the published template is never changed.
@@ -652,7 +642,7 @@ export function createWorkflowDrafts(deps: {
       return deps.store.transaction(context, async (tx) => {
         const current = await tx.lock(id);
         if (!current || current.state === 'discarded')
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+          throw notFound('Draft not found.');
         if (current.lastSave?.id === input.saveId) {
           if (current.lastSave.digest !== digest)
             throw conflict(
@@ -720,7 +710,7 @@ export function createWorkflowDrafts(deps: {
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);
         if (!draft || draft.state === 'discarded')
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+          throw notFound('Draft not found.');
         if (draft.revision !== input.revision)
           throw conflict(
             'This draft changed after you reviewed it. Review the latest revision before publishing.',
@@ -778,8 +768,7 @@ export function createWorkflowDrafts(deps: {
 
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);
-        if (!draft)
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+        if (!draft) throw notFound('Draft not found.');
         if (draft.state === 'discarded') return { discarded: true as const };
         if (draft.state === 'published')
           throw conflict('Published drafts are kept as provenance.');

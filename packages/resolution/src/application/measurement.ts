@@ -1,10 +1,7 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { OperationalMetricRead } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type { ActivityActor } from '../domain/activity.js';
 import type {
@@ -75,8 +72,7 @@ export function createMeasurementService(deps: {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, write ? 'issues.manage' : 'issues.read');
 
     return fresh;

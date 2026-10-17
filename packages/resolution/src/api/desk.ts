@@ -12,8 +12,8 @@ import {
   decisionReceiptSchema,
 } from '@luma/api-contract';
 import type { IdentityService } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
@@ -21,13 +21,8 @@ import type { DeskService } from '../application/desk.js';
 
 function use(request: FastifyRequest, service?: DeskService) {
   if (!request.tenantContext)
-    throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-  if (!service)
-    throw new IdentityError(
-      503,
-      'SERVICE_UNAVAILABLE',
-      'Case decisions are unavailable',
-    );
+    throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+  if (!service) throw unavailable('Case decisions are unavailable');
 
   return { context: request.tenantContext, service };
 }
@@ -127,18 +122,8 @@ export function registerDeskEvents(
     { config: { access: { permission: 'issues.read' } } },
     async (request, reply) => {
       const s = use(request, service);
-      if (draining)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Service is shutting down',
-        );
-      if (!identity)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Identity is unavailable',
-        );
+      if (draining) throw unavailable('Service is shutting down');
+      if (!identity) throw unavailable('Identity is unavailable');
       const parsed = caseEventsContract.events.pathParams.safeParse(
         request.params,
       );

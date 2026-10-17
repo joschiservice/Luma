@@ -2,11 +2,11 @@ import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type {
   OrderActivityReader,
@@ -48,8 +48,7 @@ export function createOrderWorkspace(
   ) {
     const fresh = await refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'orders.read');
     const asOf = now().toISOString();
     const hidden = await excludedSources(fresh);

@@ -1,7 +1,8 @@
 import type { CoverageReader } from '@luma/connections';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
 import type { OrderMetricReader } from '@luma/orders';
 import type { TenantDatabase } from '@luma/platform';
+import { notFound } from '@luma/platform';
 
 import {
   createMetricService,
@@ -45,7 +46,7 @@ export function createOperationalMetrics(
             request.scope.connectionId &&
             !connections.some((c) => c.id === request.scope.connectionId)
           )
-            throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+            throw notFound('Connection not found');
           const result = await readers.orders(scoped)(context, {
             scope: request.scope,
             asOf,

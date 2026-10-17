@@ -5,11 +5,10 @@ import type {
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict, notFound } from '@luma/platform';
+import { conflict, forbidden, notFound } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -264,7 +263,7 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -437,8 +436,7 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
         const connection = view.connections.find(
           (c) => c.id === request.connectionId,
         );
-        if (!connection)
-          throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+        if (!connection) throw notFound('Connection not found');
         if (connection.version !== request.connectionVersion)
           throw conflict(
             'Connection grants changed. Reload and review the current scope.',

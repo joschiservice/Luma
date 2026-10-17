@@ -1,9 +1,5 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type {
   ModelErrorCode,
   ModelGateway,
@@ -15,7 +11,11 @@ import type {
 import {
   authoringModelProfile,
   conflict,
+  forbidden,
   ModelGatewayError,
+  notFound,
+  ServiceError,
+  unavailable,
 } from '@luma/platform';
 
 import {
@@ -462,16 +462,14 @@ export function createDraftGeneration(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function available(): ModelGateway {
     if (!deps.availability.available || !deps.gateway)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
+      throw unavailable(
         deps.availability.reason ??
           'Describing workflows isn’t available on this server.',
       );
@@ -599,7 +597,7 @@ export function createDraftGeneration(deps: {
                 ? `The EU model route isn’t available right now. ${unchanged} Whoever runs this Luma server needs to check the authoring route.`
                 : `The model couldn’t answer. ${unchanged} Try again.`;
 
-    throw new IdentityError(503, 'SERVICE_UNAVAILABLE', reason);
+    throw unavailable(reason);
   }
 
   async function draftExists(context: TenantContext, id: string) {
@@ -608,7 +606,7 @@ export function createDraftGeneration(deps: {
 
       return true;
     } catch (error) {
-      if (error instanceof IdentityError && error.statusCode === 404)
+      if (error instanceof ServiceError && error.statusCode === 404)
         return false;
       throw error;
     }
@@ -673,7 +671,7 @@ export function createDraftGeneration(deps: {
       found.kind !== 'refine' ||
       found.draftId !== draftId
     )
-      throw new IdentityError(404, 'NOT_FOUND', 'Proposed change not found.');
+      throw notFound('Proposed change not found.');
 
     return found;
   }
@@ -717,11 +715,7 @@ export function createDraftGeneration(deps: {
         !deps.improvements?.discover ||
         !(await deps.improvements.discoveryEnabled?.(context))
       )
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Workflow improvement discovery is unavailable.',
-        );
+        throw notFound('Workflow improvement discovery is unavailable.');
 
       return deps.improvements.discover(context);
     },
@@ -860,11 +854,7 @@ export function createDraftGeneration(deps: {
       let evidence: ImprovementEvidence | null = null;
       if (input.improvement) {
         if (!deps.improvements || !(await deps.improvements.enabled(context)))
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Workflow improvements are unavailable.',
-          );
+          throw notFound('Workflow improvements are unavailable.');
         evidence = await deps.improvements.evidence(context, input.improvement);
       }
       const previous = await replay(
@@ -1021,11 +1011,7 @@ export function createDraftGeneration(deps: {
       const candidate = found.result as ProposalResult;
       if (candidate.improvement) {
         if (!deps.improvements || !(await deps.improvements.enabled(context)))
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Workflow improvements are unavailable.',
-          );
+          throw notFound('Workflow improvements are unavailable.');
         await deps.improvements.evidence(
           context,
           candidate.improvement.evidence,

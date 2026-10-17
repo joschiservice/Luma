@@ -1,10 +1,13 @@
 import type { ConnectionManagement } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
+import { hasPermission, requirePermission } from '@luma/identity';
 import {
-  hasPermission,
-  IdentityError,
-  requirePermission,
-} from '@luma/identity';
+  conflict,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import {
   historyWindow,
@@ -90,9 +93,7 @@ function readRecordCursor(cursor: string): Record<keyof ItemKey, string> {
   } catch {
     // Reported below like any other unreadable cursor.
   }
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
+  throw invalid(
     'This page link is no longer valid. Start from the first page.',
   );
 }
@@ -227,11 +228,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   function automaticLinks() {
     if (!deps.automaticLinks)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Automatic linking is unavailable.',
-      );
+      throw unavailable('Automatic linking is unavailable.');
 
     return deps.automaticLinks;
   }
@@ -260,7 +257,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
       policy.hidden.includes(result.connectionId) ||
       !connections.some((connection) => connection.id === result.connectionId)
     )
-      throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
+      throw notFound('Sync not found');
 
     return result;
   }
@@ -438,7 +435,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
           connection.recordTypes.some((item) => item.stream?.id === streamId),
         )
       )
-        throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
+        throw notFound('Sync not found');
       if (
         !(await deps.store.command(
           fresh.tenantId,
@@ -447,12 +444,12 @@ export function createSyncService(deps: SyncServiceDependencies) {
           fresh.actor.id,
         ))
       )
-        throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
+        throw notFound('Sync not found');
       const result = await overview(fresh);
       const view = result.connections
         .flatMap((connection) => connection.recordTypes)
         .find((item) => item.stream?.id === streamId)?.stream;
-      if (!view) throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
+      if (!view) throw notFound('Sync not found');
 
       return view;
     },
@@ -470,8 +467,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
       const listed = (await overview(fresh)).connections.some(
         (connection) => connection.connectionId === connectionId,
       );
-      if (!listed)
-        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+      if (!listed) throw notFound('Connection not found');
       const updated = await deps.store.commandConnection(
         fresh.tenantId,
         connectionId,
@@ -481,8 +477,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
       const connection = (await overview(fresh)).connections.find(
         (item) => item.connectionId === connectionId,
       );
-      if (!connection)
-        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+      if (!connection) throw notFound('Connection not found');
 
       return { updated: updated.length, connection };
     },
@@ -498,8 +493,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
         deps.store.linkRequests(fresh.tenantId, entityId),
         sourcePolicy(fresh),
       ]);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+      if (!detail) throw notFound('Record not found');
 
       return {
         ...detail,
@@ -539,39 +533,34 @@ export function createSyncService(deps: SyncServiceDependencies) {
         input.kind,
         input.entityId,
       );
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+      if (!detail) throw notFound('Record not found');
       const policy = await sourcePolicy(fresh);
       if (
         detail.sources.some((source) =>
           policy.fixed.includes(source.connectionId),
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This identity is anchored to an owned record',
-        );
+        throw conflict('This identity is anchored to an owned record');
       if (
         input.operation === 'unlink' &&
         policy.hidden.includes(input.connectionId)
       )
-        throw new IdentityError(404, 'NOT_FOUND', 'Source not found');
+        throw notFound('Source not found');
       if (!input.reason.trim() || input.reason.trim().length > 2000)
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'Give a reason of 1 to 2000 characters',
         );
       if (!detail.sources.length)
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'This record has no current source',
         );
       if (input.operation === 'link') {
         if (input.otherId === input.entityId)
-          throw new IdentityError(
+          throw new ServiceError(
             422,
             'CONFLICT',
             'Choose a different record to link',
@@ -581,8 +570,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
           input.kind,
           input.otherId,
         );
-        if (!other || !other.sources.length)
-          throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+        if (!other || !other.sources.length) throw notFound('Record not found');
         if (
           input.kind === 'order_line' &&
           (!detail.entity.orderId ||
@@ -590,7 +578,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
             !detail.entity.unit ||
             detail.entity.unit !== other.entity.unit)
         )
-          throw new IdentityError(
+          throw new ServiceError(
             422,
             'CONFLICT',
             'Match current lines with the same units after linking their parent orders',
@@ -600,11 +588,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
             [...policy.hidden, ...policy.fixed].includes(source.connectionId),
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This identity cannot be relinked',
-          );
+          throw conflict('This identity cannot be relinked');
         if (
           other.sources.some((source) =>
             detail.sources.some(
@@ -612,7 +596,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
             ),
           )
         )
-          throw new IdentityError(
+          throw new ServiceError(
             422,
             'CONFLICT',
             'Both records come from the same connection, so they cannot be the same record',
@@ -623,7 +607,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
         ) ||
         detail.sources.length < 2
       )
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'CONFLICT',
           'This source is not linked to another source',
@@ -650,8 +634,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
     ): Promise<LinkRequestView> {
       const fresh = await deps.refreshContext(context);
       const request = await deps.store.linkRequest(fresh.tenantId, requestId);
-      if (!request)
-        throw new IdentityError(404, 'NOT_FOUND', 'Link request not found');
+      if (!request) throw notFound('Link request not found');
 
       return linkView(request);
     },

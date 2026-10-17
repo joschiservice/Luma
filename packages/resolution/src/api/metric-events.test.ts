@@ -1,5 +1,5 @@
 import type { IdentityService } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { notFound } from '@luma/platform';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 
@@ -232,7 +232,7 @@ it('rechecks access on the heartbeat and closes once membership is gone', async 
     let reads = 0;
     const stream = streamFrames(context, async () => {
       reads++;
-      if (reads > 1) throw new IdentityError(404, 'NOT_FOUND', 'Not found');
+      if (reads > 1) throw notFound('Not found');
 
       return context;
     });

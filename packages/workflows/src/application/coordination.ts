@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { forbidden, invalid, notFound } from '@luma/platform';
 
 import type { HumanTask, WorkflowEvent } from '../domain/coordination.js';
 import { validateHumanTaskAnswer } from '../domain/coordination.js';
@@ -54,7 +54,7 @@ export function createWorkflowCoordination(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, 'workflows.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     if (change) requireChangesAllowed(fresh);
 
     return fresh;
@@ -113,7 +113,7 @@ export function createWorkflowCoordination(deps: {
         (!matches(context, task.assignee) &&
           !matches(context, task.escalationTarget))
       )
-        throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+        throw notFound('Human task not found.');
 
       return task;
     },
@@ -126,23 +126,18 @@ export function createWorkflowCoordination(deps: {
     ) {
       context = await authorize(context, true);
       const task = await deps.store.task(context, runId, stepId);
-      if (!task)
-        throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+      if (!task) throw notFound('Human task not found.');
       if (
         !matches(context, task.assignee) &&
         !matches(context, task.escalationTarget)
       )
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
+        throw forbidden(
           'Only the assigned person or escalation target can answer.',
         );
       try {
         validateHumanTaskAnswer(task, answer);
       } catch (error) {
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           error instanceof Error ? error.message : 'Invalid answer.',
         );
       }

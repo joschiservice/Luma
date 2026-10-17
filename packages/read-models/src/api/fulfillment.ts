@@ -6,8 +6,8 @@ import {
   fulfillmentDetailSchema,
   fulfillmentListSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { FulfillmentWorkspace } from '../application/fulfillment.js';
@@ -21,17 +21,8 @@ export function fulfillmentRoutes(service?: FulfillmentWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Fulfillment is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Fulfillment is unavailable');
         validateCollectionQuery(fulfillmentCatalog, query);
 
         return fulfillmentListSchema.parse(
@@ -41,19 +32,13 @@ export function fulfillmentRoutes(service?: FulfillmentWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Fulfillment details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Fulfillment details are unavailable');
       const detail = await service.get(
         request.tenantContext,
         params.fulfillmentId,
       );
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Fulfillment not found');
+      if (!detail) throw notFound('Fulfillment not found');
 
       return fulfillmentDetailSchema.parse(detail);
     }),

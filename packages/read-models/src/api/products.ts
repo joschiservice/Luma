@@ -6,8 +6,8 @@ import {
   productListSchema,
   productsCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { ProductWorkspace } from '../application/products.js';
@@ -21,17 +21,8 @@ export function productRoutes(service?: ProductWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Products are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Products are unavailable');
         validateCollectionQuery(productsCatalog, query, { customFields: true });
 
         return productListSchema.parse(
@@ -41,16 +32,10 @@ export function productRoutes(service?: ProductWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Product details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Product details are unavailable');
       const detail = await service.get(request.tenantContext, params.skuId);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Product not found');
+      if (!detail) throw notFound('Product not found');
 
       return productDetailSchema.parse(detail);
     }),
