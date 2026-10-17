@@ -58,7 +58,7 @@ export type DecisionOwner =
  * Which of several records a decision cites, when it could cite more than one: a return case
  * cites its creation, exchange check, deadline wait or latest refund, restock or exchange step.
  */
-export type DecisionEvidenceCovers =
+type DecisionEvidenceCovers =
   | 'return_creation'
   | 'exchange_check'
   | 'deadline_wait'
