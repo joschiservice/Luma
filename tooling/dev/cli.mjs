@@ -29,6 +29,8 @@ try {
         'install',
         'chromium',
       ]);
+    // Code Steps, their journeys and the local API need the runtime; reruns skip a current install.
+    await run('pnpm', ['setup:code', '--optional']);
   }
   if (
     ![

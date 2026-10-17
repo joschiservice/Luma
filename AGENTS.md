@@ -94,7 +94,7 @@ See [shared frontend components](docs/frontend-ui.md) and the [design workflow](
 ## Local development and data
 
 - Use the Node and pnpm versions pinned in `mise.toml`, `.nvmrc` and `package.json`. Prefix commands with `mise exec --` if mise is not activated in the shell.
-- First checkout: `mise trust`, `mise install`, then `pnpm run setup`. Setup requires a Docker-compatible runtime with Compose and provisions dependencies, Chromium and demo data.
+- First checkout: `mise trust`, `mise install`, then `pnpm run setup`. Setup requires a Docker-compatible runtime with Compose and provisions dependencies, Chromium, the Code Step runtime and demo data.
 - `pnpm dev` starts the API and web app. `pnpm dev:workflows` also starts Temporal and the worker. Read actual URLs from command output; do not assume fixed ports.
 - Each worktree owns its Compose project, ports, volumes, credentials and cookie prefix. Keep `.luma/` with its checkout; do not copy it between worktrees or delete its credentials while retaining the database volume.
 - Use `pnpm dev:doctor` to diagnose the environment and `pnpm dev:down` to stop its infrastructure while retaining data. Stop only processes you started or have positively identified as belonging to the task; do not kill processes by broad name or path patterns.
@@ -114,6 +114,7 @@ Start with the smallest meaningful proof. Test observable behavior and important
 - Branch check: `pnpm test:affected` runs the unit tests and backend/browser journeys affected by changes since `main`, including uncommitted files. Prefer it to whole suites while iterating; `TURBO_SCM_BASE=HEAD` limits it to uncommitted changes. It prints the path that forces a run of every journey; map that path in `apps/api/e2e/journey-areas.mjs` when it belongs to specific journeys.
 - Shared UI: `pnpm test:ui`; inspect relevant stories and test the integrated journey when routing, authentication or live data changes.
 - Feature checks: `pnpm verify:feature <simulator|workflows|orders|inbox>`. Extend the explicit test selection when adding scenarios.
+- While iterating, run focused package tests and named journeys. Run `pnpm check` and `pnpm test:affected` once the change is ready, not after each edit: a change to a shared path runs every journey, and journeys from all worktrees on the machine wait for one shared slot.
 - Before review of code changes, run `pnpm check` and `pnpm test:affected`. Package test results are cached; declare files a test reads from outside its package and dependencies in that package's `turbo.json` test `inputs`. Map new journey files in `apps/api/e2e/journey-areas.mjs`. Documentation-only changes need `pnpm format:check` and `pnpm test:architecture`, which checks links and paths.
 - `pnpm test:full` prepares the Code Step runtime and runs all CI gates, including simulator tooling and release evaluations, with a shared disposable PostgreSQL server. Its command coverage is checked against [CI](.github/workflows/ci.yml).
 - `pnpm test:local` does not provision PostgreSQL and can skip database integration tests. Report that limitation when using it.

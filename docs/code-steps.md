@@ -8,9 +8,12 @@ approval and verification path.
 
 ## Install and enable
 
-Run `pnpm setup:code`. It installs the runtime into this checkout's `.luma/code-runtime` and
-compiles the guest ahead of time, so runs do not spend their wall-time budget on
-compilation. Rerun it when an installation reports the runtime as unavailable. `pnpm dev`
+`pnpm run setup` installs the runtime; `pnpm setup:code` installs it alone. It goes into this
+checkout's `.luma/code-runtime`, and the guest is compiled ahead of time so runs do not spend
+their wall-time budget on compilation. A rerun skips an installation whose pinned release,
+compile flags and file hashes still match; `pnpm setup:code --force` reinstalls. Setup reports
+platforms without a pinned runtime (Linux on x64/arm64 and macOS on arm64 are supported) and
+continues with Code Steps unavailable, while `pnpm setup:code` fails on them. `pnpm dev`
 and `pnpm dev:workflows` pass it to the API and the workflow worker; restart them after
 installing. An explicit `LUMA_CODE_RUNTIME_DIR` in `apps/api/.env` takes precedence.
 

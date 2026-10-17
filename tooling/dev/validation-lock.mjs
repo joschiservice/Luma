@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
@@ -96,4 +97,104 @@ export async function acquireValidation(root, { owner, signal, onWait } = {}) {
       })());
     },
   };
+}
+
+/**
+ * Reports whether a command runs backend or browser journeys, which start the API, workers,
+ * simulators and browsers and compete for the machine's CPU across checkouts.
+ * @param {string[]} args pnpm arguments
+ */
+export function runsJourneys(args) {
+  return (
+    args.includes('@luma/api') &&
+    (args.includes('test:e2e') || args.includes('test:browser'))
+  );
+}
+
+/**
+ * Takes one of the machine's journey slots, shared by every checkout of this user. Journeys
+ * from other worktrees wait instead of overloading the CPU and timing each other out. The
+ * slot count comes from `LUMA_JOURNEY_SLOTS` (default 1). A crashed holder's heartbeat expires.
+ * Release before exiting.
+ * @param {string} root checkout directory, shown to waiting runs
+ * @param {{ directory?: string, slots?: number, signal?: AbortSignal, onWait?: (holders: string[]) => void }} options
+ */
+export async function acquireJourneySlot(
+  root,
+  {
+    directory = join(tmpdir(), 'luma-journeys'),
+    slots = journeySlots(process.env.LUMA_JOURNEY_SLOTS),
+    signal,
+    onWait,
+  } = {},
+) {
+  await mkdir(directory, { recursive: true });
+  let waiting = false;
+  for (;;) {
+    signal?.throwIfAborted();
+    for (let slot = 1; slot <= slots; slot++) {
+      const target = join(directory, `slot-${slot}`);
+      let release;
+      try {
+        release = await lockfile.lock(target, {
+          realpath: false,
+          stale,
+          update: 1000,
+        });
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !('code' in error) ||
+          error.code !== 'ELOCKED'
+        )
+          throw error;
+        continue;
+      }
+      const ownerPath = `${target}.owner`;
+      try {
+        await writeFile(ownerPath, root);
+      } catch (error) {
+        await release();
+        throw error;
+      }
+      let closing;
+
+      return {
+        release() {
+          return (closing ??= (async () => {
+            try {
+              await rm(ownerPath, { force: true });
+            } finally {
+              await release();
+            }
+          })());
+        },
+      };
+    }
+    if (!waiting) {
+      waiting = true;
+      const holders = [];
+      for (let slot = 1; slot <= slots; slot++)
+        holders.push(
+          await readFile(join(directory, `slot-${slot}.owner`), 'utf8').catch(
+            () => 'an unknown checkout',
+          ),
+        );
+      onWait?.(holders);
+    }
+    await setTimeout(100, undefined, { signal });
+  }
+}
+
+/**
+ * Parses the journey slot count; rejects values that would disable or misconfigure the queue.
+ * @param {string | undefined} value
+ */
+export function journeySlots(value) {
+  if (value === undefined || value === '') return 1;
+  const slots = Number(value);
+  if (!Number.isInteger(slots) || slots < 1)
+    throw new Error('LUMA_JOURNEY_SLOTS must be a positive integer');
+
+  return slots;
 }
