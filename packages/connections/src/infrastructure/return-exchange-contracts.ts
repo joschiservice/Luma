@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { citedReadsSchema } from './cited-read-contracts.js';
+
 const ref = z
   .object({
     externalId: z.string().min(1).max(200),
@@ -127,6 +129,7 @@ export const returnExchangeQuotedSchema = z
     available: z.boolean(),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    reads: citedReadsSchema,
   })
   .strict();
 
@@ -136,6 +139,7 @@ export const returnExchangeProofSchema = z
     outcome: z.enum(['passed', 'failed', 'inconclusive']),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    reads: citedReadsSchema,
     returnId: z.string().nullable(),
     processLines: z
       .object({
@@ -171,6 +175,7 @@ export const exchangePriceSchema = z
       .nullable(),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    reads: citedReadsSchema,
   })
   .strict();
 
@@ -185,6 +190,7 @@ export const exchangeReservationSchema = z
     complete: z.boolean(),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    reads: citedReadsSchema,
     orders: z
       .array(
         z

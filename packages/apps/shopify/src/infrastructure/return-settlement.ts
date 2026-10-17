@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   CapabilityHandler,
+  CitedRead,
   ConnectorConnection,
   InvocationContext,
   ReturnSettlementPlan,
@@ -94,42 +95,45 @@ export function createShopifySettlementCapabilities(
       withheld();
   }
 
+  /** Records one normalized read and returns it with the evidence reference that names it. */
   async function evidence(
     capability:
       'returns.settlement.quote.read' | 'returns.settlement.proof.read',
     externalId: string,
     data: unknown,
     observedAt: string,
+    completeness: CitedRead['completeness'],
   ) {
-    const observationId = id();
+    const observation = {
+      id: id(),
+      source: {
+        tenantId: options.tenantId,
+        connectionId: options.connectionId,
+        provider: 'shopify',
+        resource: 'refund' as const,
+        externalId,
+        scopeKey: '',
+      },
+      kind: 'snapshot' as const,
+      observedAt,
+      sourceUpdatedAt: null,
+      sourceRevision: null,
+      adapterVersion,
+      schemaVersion: 1 as const,
+      data,
+    };
     await options.recordObservations({
       tenantId: options.tenantId,
       connectionId: options.connectionId,
       apiVersion: API_VERSION,
       capability,
-      observations: [
-        {
-          id: observationId,
-          source: {
-            tenantId: options.tenantId,
-            connectionId: options.connectionId,
-            provider: 'shopify',
-            resource: 'refund',
-            externalId,
-            scopeKey: '',
-          },
-          kind: 'snapshot',
-          observedAt,
-          sourceUpdatedAt: null,
-          sourceRevision: null,
-          adapterVersion,
-          schemaVersion: 1,
-          data,
-        },
-      ],
+      observations: [observation],
     });
 
-    return [observationId];
+    return {
+      evidenceRefs: [observation.id],
+      reads: [{ ...observation, completeness }],
+    };
   }
 
   // Quotes retain only monetary values and source identities, never customer or gateway credentials.
@@ -230,12 +234,14 @@ export function createShopifySettlementCapabilities(
     return {
       plan,
       observedAt,
-      evidenceRefs: await evidence(
+      // Any incomplete calculation is withheld above, so a returned quote read is complete.
+      ...(await evidence(
         'returns.settlement.quote.read',
         input.order.externalId,
         plan,
         observedAt,
-      ),
+        'complete',
+      )),
     };
   }
 
@@ -262,7 +268,8 @@ export function createShopifySettlementCapabilities(
       payment: 'paid' | 'failed' | 'pending' | 'partial' | null = null;
     let details: unknown = null;
     // At the provider bound we cannot prove a complete absence or uniqueness.
-    if (order.refunds.length < 100 && matches.length === 1) {
+    let complete = order.refunds.length < 100;
+    if (complete && matches.length === 1) {
       const selected = matches[0]!;
       const detail = await request(
         `query LumaReturnRefundDetail($id:ID!) { node(id:$id) { ... on Refund { ${refundFields} } } }`,
@@ -271,6 +278,9 @@ export function createShopifySettlementCapabilities(
       const r = parse(refund, detail.node);
       if (r.id !== selected.id || r.note !== marker(input.operationId))
         withheld();
+      complete =
+        !r.refundLineItems.pageInfo.hasNextPage &&
+        !r.transactions.pageInfo.hasNextPage;
       details = {
         id: r.id,
         lines: r.refundLineItems.nodes,
@@ -358,12 +368,13 @@ export function createShopifySettlementCapabilities(
       outcome,
       payment,
       observedAt,
-      evidenceRefs: await evidence(
+      ...(await evidence(
         'returns.settlement.proof.read',
         input.operationId,
         normalized,
         observedAt,
-      ),
+        complete ? 'complete' : 'partial',
+      )),
     };
   }
 
@@ -391,6 +402,7 @@ export function createShopifySettlementCapabilities(
         payment: result.payment,
         observedAt: result.observedAt,
         evidenceRefs: result.evidenceRefs,
+        reads: result.reads,
       };
     },
   };
@@ -484,12 +496,15 @@ export function createShopifySettlementCapabilities(
 
       return {
         status: 'accepted',
-        evidenceRefs: await evidence(
-          'returns.settlement.proof.read',
-          result.data.refund.id,
-          { accepted: true, operationId: input.operationId },
-          now().toISOString(),
-        ),
+        evidenceRefs: (
+          await evidence(
+            'returns.settlement.proof.read',
+            result.data.refund.id,
+            { accepted: true, operationId: input.operationId },
+            now().toISOString(),
+            'complete',
+          )
+        ).evidenceRefs,
         providerRequestId: null,
       };
     },

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   CapabilityHandler,
+  CitedRead,
   ConnectorConnection,
   InvocationContext,
   ReturnSettlementPlan,
@@ -67,42 +68,45 @@ export function createJtlSettlementCapabilities(
       withheld();
   }
 
+  /** Records one normalized read and returns it with the evidence reference that names it. */
   async function evidence(
     capability:
       'returns.settlement.quote.read' | 'returns.settlement.proof.read',
     input: Extract<ReturnSettlementPlan, { kind: 'restock' }>,
     data: unknown,
     observedAt: string,
+    completeness: CitedRead['completeness'],
   ) {
-    const observationId = id();
+    const observation = {
+      id: id(),
+      source: {
+        tenantId: options.tenantId,
+        connectionId: options.connectionId,
+        provider: 'jtl',
+        resource: 'sku' as const,
+        externalId: input.item.externalId,
+        scopeKey: input.warehouse.externalId,
+      },
+      kind: 'snapshot' as const,
+      observedAt,
+      sourceUpdatedAt: null,
+      sourceRevision: null,
+      adapterVersion,
+      schemaVersion: 1 as const,
+      data,
+    };
     await options.recordObservations({
       tenantId: options.tenantId,
       connectionId: options.connectionId,
       apiVersion: API_VERSION,
       capability,
-      observations: [
-        {
-          id: observationId,
-          source: {
-            tenantId: options.tenantId,
-            connectionId: options.connectionId,
-            provider: 'jtl',
-            resource: 'sku',
-            externalId: input.item.externalId,
-            scopeKey: input.warehouse.externalId,
-          },
-          kind: 'snapshot',
-          observedAt,
-          sourceUpdatedAt: null,
-          sourceRevision: null,
-          adapterVersion,
-          schemaVersion: 1,
-          data,
-        },
-      ],
+      observations: [observation],
     });
 
-    return [observationId];
+    return {
+      evidenceRefs: [observation.id],
+      reads: [{ ...observation, completeness }],
+    };
   }
 
   async function stock(
@@ -190,12 +194,13 @@ export function createJtlSettlementCapabilities(
       return {
         plan,
         observedAt,
-        evidenceRefs: await evidence(
+        ...(await evidence(
           'returns.settlement.quote.read',
           plan,
           plan,
           observedAt,
-        ),
+          'complete',
+        )),
       };
     },
   };
@@ -228,7 +233,7 @@ export function createJtlSettlementCapabilities(
         outcome,
         payment: null,
         observedAt,
-        evidenceRefs: await evidence(
+        ...(await evidence(
           'returns.settlement.proof.read',
           plan,
           {
@@ -238,7 +243,8 @@ export function createJtlSettlementCapabilities(
             complete: found.complete,
           },
           observedAt,
-        ),
+          found.complete ? 'complete' : 'partial',
+        )),
       };
     },
   };
@@ -319,16 +325,19 @@ export function createJtlSettlementCapabilities(
 
       return {
         status: 'accepted',
-        evidenceRefs: await evidence(
-          'returns.settlement.proof.read',
-          plan,
-          {
-            operationId: input.operationId,
-            accepted: true,
-            quantity: fromUnits(BigInt(plan.quantity) * 1_000_000n),
-          },
-          now().toISOString(),
-        ),
+        evidenceRefs: (
+          await evidence(
+            'returns.settlement.proof.read',
+            plan,
+            {
+              operationId: input.operationId,
+              accepted: true,
+              quantity: fromUnits(BigInt(plan.quantity) * 1_000_000n),
+            },
+            now().toISOString(),
+            'complete',
+          )
+        ).evidenceRefs,
         providerRequestId,
       };
     },

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { citedReadsSchema } from './cited-read-contracts.js';
+
 const ref = z
   .object({
     externalId: z.string().min(1).max(200),
@@ -63,6 +65,7 @@ export const returnSettlementProofSchema = z
     payment: z.enum(['pending', 'failed', 'partial', 'paid']).nullable(),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()),
+    reads: citedReadsSchema,
   })
   .strict();
 
@@ -72,5 +75,6 @@ export const returnSettlementQuotedSchema = z
     plan: returnSettlementPlanSchema,
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    reads: citedReadsSchema,
   })
   .strict();

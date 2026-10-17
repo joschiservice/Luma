@@ -229,6 +229,34 @@ describe('Shopify settlement boundary', () => {
     });
     expect(f.writes()).toBe(0);
   });
+  it('returns the read each evidence reference names, partial when a page was cut short', async () => {
+    const f = fixture(),
+      quoted = await f.quote();
+    expect(quoted.reads).toEqual([
+      expect.objectContaining({
+        id: quoted.evidenceRefs[0],
+        completeness: 'complete',
+        data: quoted.plan,
+      }),
+    ]);
+    f.setRefunds([refund()]);
+    const complete = await f.proof(quoted.plan);
+    expect(complete.reads).toEqual([
+      expect.objectContaining({
+        id: complete.evidenceRefs[0],
+        source: expect.objectContaining({
+          provider: 'shopify',
+          resource: 'refund',
+          connectionId: 'store',
+        }),
+        completeness: 'complete',
+      }),
+    ]);
+    f.setRefunds([refund('SUCCESS', true)]);
+    expect((await f.proof(quoted.plan)).reads).toEqual([
+      expect.objectContaining({ completeness: 'partial' }),
+    ]);
+  });
   it('rejects tenant or connection changes before making a provider request', async () => {
     const f = fixture(),
       quoted = await f.quote();

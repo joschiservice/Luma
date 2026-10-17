@@ -1,4 +1,5 @@
 import type {
+  CitedRead,
   CreatedReturnSnapshot,
   ExternalId,
   Page,
@@ -60,6 +61,8 @@ export interface ReturnCapabilities {
       plan: ReturnSettlementPlan;
       observedAt: string;
       evidenceRefs: string[];
+      /** The reads `evidenceRefs` names. */
+      reads: CitedRead[];
     };
   };
   /** Independently reconciles the operation's exact marker and approved outcome. */
@@ -99,6 +102,8 @@ export interface ReturnCapabilities {
       total: { amount: string; currency: string } | null;
       observedAt: string;
       evidenceRefs: string[];
+      /** The reads `evidenceRefs` names. */
+      reads: CitedRead[];
     };
   };
   /** Finds exact ERP replacement orders and order-specific native reservations. */
@@ -108,6 +113,8 @@ export interface ReturnCapabilities {
       complete: boolean;
       observedAt: string;
       evidenceRefs: string[];
+      /** The reads `evidenceRefs` names. */
+      reads: CitedRead[];
       orders: {
         id: ExternalId;
         total: { amount: string; currency: string } | null;

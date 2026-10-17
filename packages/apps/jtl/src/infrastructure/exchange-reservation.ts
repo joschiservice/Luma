@@ -141,34 +141,41 @@ export function createExchangeReservation(
         complete,
         orders: selected,
       };
+      const observation = {
+        id: result.evidenceRefs[0]!,
+        source: {
+          tenantId: options.tenantId,
+          connectionId: options.connectionId,
+          provider: 'jtl',
+          resource: 'sku' as const,
+          externalId: input.item.externalId,
+          scopeKey: '',
+        },
+        kind: 'snapshot' as const,
+        observedAt,
+        sourceUpdatedAt: null,
+        sourceRevision: null,
+        adapterVersion,
+        schemaVersion: 1 as const,
+        data: result,
+      };
       await options.recordObservations({
         tenantId: options.tenantId,
         connectionId: options.connectionId,
         apiVersion: API_VERSION,
         capability: 'returns.exchange.reservation.read',
-        observations: [
-          {
-            id: result.evidenceRefs[0]!,
-            source: {
-              tenantId: options.tenantId,
-              connectionId: options.connectionId,
-              provider: 'jtl',
-              resource: 'sku',
-              externalId: input.item.externalId,
-              scopeKey: '',
-            },
-            kind: 'snapshot',
-            observedAt,
-            sourceUpdatedAt: null,
-            sourceRevision: null,
-            adapterVersion,
-            schemaVersion: 1,
-            data: result,
-          },
-        ],
+        observations: [observation],
       });
 
-      return result;
+      return {
+        ...result,
+        reads: [
+          {
+            ...observation,
+            completeness: complete ? 'complete' : 'partial',
+          },
+        ],
+      };
     },
   };
 }

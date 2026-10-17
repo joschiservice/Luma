@@ -38,6 +38,7 @@ export type {
   CapabilityResult,
   ConnectorFailure,
   AttachmentContent,
+  CitedRead,
   CustomerSnapshot,
   ExternalId,
   FulfillmentSnapshot,

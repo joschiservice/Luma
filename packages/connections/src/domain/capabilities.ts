@@ -61,6 +61,15 @@ export interface Observation<T> {
   data: T;
 }
 
+/**
+ * A provider read that an aggregate result cites as evidence. Its ID is one of the result's
+ * evidence references, so the owner that cites it can store the read itself.
+ */
+export interface CitedRead extends Observation<unknown> {
+  /** Partial when the read could not see every record that could change the result. */
+  completeness: 'complete' | 'partial';
+}
+
 export interface PageQuery {
   /** Point lookup to confirm a previously observed record missing from a complete scan. */
   confirmMissing?: ExternalId & { createdAt: string | null };

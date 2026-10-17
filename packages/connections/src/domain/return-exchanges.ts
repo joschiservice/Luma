@@ -1,4 +1,4 @@
-import type { ExternalId } from './capabilities.js';
+import type { CitedRead, ExternalId } from './capabilities.js';
 
 /** One explicitly mapped replacement in the store and Wawi's reported availability pool. */
 interface ReturnExchangeReplacement {
@@ -73,6 +73,8 @@ export interface ReturnExchangeProof {
   outcome: 'passed' | 'failed' | 'inconclusive';
   observedAt: string;
   evidenceRefs: string[];
+  /** The reads `evidenceRefs` names; a partial read cannot establish the outcome. */
+  reads: CitedRead[];
   returnId: string | null;
   processLines: {
     returnLines: { id: string; quantity: number }[];
@@ -98,4 +100,6 @@ export interface ReturnExchangeQuoted {
   available: boolean;
   observedAt: string;
   evidenceRefs: string[];
+  /** The reads `evidenceRefs` names. */
+  reads: CitedRead[];
 }
