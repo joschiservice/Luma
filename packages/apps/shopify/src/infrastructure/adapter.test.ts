@@ -1721,6 +1721,35 @@ describe('Shopify independent deletion confirmation', () => {
     });
     expect(f.recordObservations).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { cursor: 'next' },
+    { updatedSince: '2026-09-01T00:00:00.000Z' },
+    { historyImport: { key: '00000000-0000-4000-8000-000000000001' } },
+  ])(
+    'rejects a deletion confirmation combined with scan input: %j',
+    async (scan) => {
+      const f = confirmationFixture();
+      expect(
+        await f.runtime.read(context, {
+          connectionId: f.connection.id,
+          capability: 'products.read',
+          version: '0',
+          input: {
+            limit: 1,
+            ...scan,
+            confirmMissing: {
+              externalId: 'gid://shopify/Product/1',
+              scopeKey: '',
+              createdAt: null,
+            },
+          },
+        }),
+      ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+      expect(f.fetch).not.toHaveBeenCalled();
+      expect(f.recordObservations).not.toHaveBeenCalled();
+    },
+  );
 });
 
 it('retains an explicit delivery milestone without inventing a shipment occurrence time', async () => {
