@@ -176,7 +176,7 @@ const evidence = [
   'packages/messaging/src/infrastructure/reply-evidence.ts',
   'packages/resolution/src/infrastructure/persistence/case-evidence.ts',
   'packages/apps/{shopify,starshipit}/src/infrastructure/evidence-reader.ts',
-  'packages/application-runtime/migrations/0159_evidence_retention_starts.sql',
+  'packages/application-runtime/migrations/{0159_evidence_retention_starts,0162_replenishment_demand_retention}.sql',
 ];
 const connections = [
   'packages/connections/**',
@@ -1266,6 +1266,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-exchange.browser.mjs': [
     'apps/api/e2e/return-browser-commands.mjs',
@@ -1293,6 +1295,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-deadlines.e2e.mjs': [
     ...simulator,

@@ -245,6 +245,20 @@ const evidenceItemSchema = z.object({
 export const evidenceListSchema = z.object({
   subject: evidenceSubjectSchema,
   items: z.array(evidenceItemSchema).max(evidenceReferenceLimit),
+  /**
+   * Evidence the subject relied on that was recorded before Luma kept it, so no references
+   * name it: a replenishment run's order reads behind its demand estimate. Listed only when the
+   * request names no references; absent from older responses.
+   */
+  notRetained: z
+    .array(
+      z.object({
+        evidence: z.enum(['demand_reads']),
+        retentionStartedAt: instant,
+      }),
+    )
+    .max(10)
+    .optional(),
   /** The subject cites more references than one response returns. */
   truncated: z.boolean(),
   asOf: instant,

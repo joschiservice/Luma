@@ -543,6 +543,71 @@ export const ReplenishmentRun: Story = {
   },
 };
 
+/**
+ * A run proposed before Luma kept the order reads behind its demand estimate: its demand is
+ * listed as not kept, so the run doesn't read as if demand was never considered.
+ */
+export const ReplenishmentRunBeforeDemandReads: Story = {
+  args: {
+    state: {
+      status: 'ready',
+      evidence: {
+        ...replenishment,
+        items: replenishment.items.slice(0, 3),
+        notRetained: [
+          {
+            evidence: 'demand_reads',
+            retentionStartedAt: '2026-10-17T09:00:00Z',
+          },
+        ],
+      },
+    },
+    now,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const list = canvas.getByRole('list', { name: 'Cited evidence' });
+    const entry = within(list)
+      .getAllByRole('listitem')
+      .find((item) => item.dataset.kind === 'not_retained');
+    expect(entry).toBeDefined();
+    expect(
+      within(entry!).getByText('Demand reads not kept'),
+    ).toBeInTheDocument();
+    expect(
+      within(entry!).getByText(
+        /^Demand reads weren't kept for runs before 17 Oct/,
+      ),
+    ).toBeInTheDocument();
+    expect(within(entry!).getByText('Not retained')).toBeInTheDocument();
+  },
+};
+
+/** Only the demand gap: the list still shows it instead of saying nothing is cited. */
+export const OnlyNotRetained: Story = {
+  args: {
+    state: {
+      status: 'ready',
+      evidence: {
+        ...replenishment,
+        items: [],
+        notRetained: [
+          {
+            evidence: 'demand_reads',
+            retentionStartedAt: '2026-10-17T09:00:00Z',
+          },
+        ],
+      },
+    },
+    now,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.queryByText('Nothing is cited here yet.')).toBeNull();
+    expect(canvas.getByText('Demand reads not kept')).toBeInTheDocument();
+  },
+};
+
 export const NotFound: Story = {
   args: { state: { status: 'not_found' } },
 };

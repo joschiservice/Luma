@@ -1530,6 +1530,8 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         activationId = id(),
         runId = id(),
         otherRunId = id(),
+        legacyRunId = id(),
+        unknownDemandRunId = id(),
         proposalId = id(),
         decisionId = id(),
         stockRead = id(),
@@ -1684,6 +1686,8 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         for (const [tenant, run] of [
           [tenantId, runId],
           [otherTenant, otherRunId],
+          [tenantId, legacyRunId],
+          [tenantId, unknownDemandRunId],
         ] as const)
           await seed.query(
             `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state)
@@ -1767,6 +1771,24 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
             },
           ],
         );
+        // Runs reviewed before Luma recorded demand reads: one with a known demand estimate, whose
+        // reads were never kept, and one whose demand was unknown, which relied on none.
+        for (const [run, dailySales] of [
+          [legacyRunId, 2],
+          [unknownDemandRunId, null],
+        ] as const)
+          await seed.query(
+            `INSERT INTO replenishment_approval_contexts(tenant_id,run_id,document) VALUES($1,$2,$3)`,
+            [
+              tenantId,
+              run,
+              {
+                recordedAt: '2020-01-01T00:00:00.000Z',
+                dailySales,
+                openOrders: [],
+              },
+            ],
+          );
         await seed.query(
           `INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document) VALUES($1,$2,'procurement:draft',$3,$4)`,
           [
@@ -1960,6 +1982,39 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
       expect(Object.keys(runItems)).not.toContain(`temporal:${runId}:complete`);
       expect(
         run.items.filter((item) => item.resolution.kind === 'unresolved'),
+      ).toEqual([]);
+      expect(run.notRetained).toEqual([]);
+
+      // An older run's demand reads are listed as not kept, dated by when Luma began keeping
+      // them; no read is invented for them, and a run without known demand relied on none.
+      const demandStart = (
+        await db.owner.query<{ started_at: Date }>(
+          "SELECT started_at FROM evidence_retention_starts WHERE kind='replenishment_demand_reads'",
+        )
+      ).rows[0]!.started_at.toISOString();
+      const legacy = await reader.resolve(reading, {
+        subject: { kind: 'replenishment_run', id: legacyRunId },
+      });
+      expect(legacy.notRetained).toEqual([
+        { evidence: 'demand_reads', retentionStartedAt: demandStart },
+      ]);
+      expect(legacy.items.filter((item) => item.citedAs === 'read')).toEqual(
+        [],
+      );
+      expect(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'replenishment_run', id: legacyRunId },
+            refs: [demandRead],
+          })
+        ).notRetained,
+      ).toEqual([]);
+      expect(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'replenishment_run', id: unknownDemandRunId },
+          })
+        ).notRetained,
       ).toEqual([]);
 
       // Without inventory and order access its reads are restricted, not dropped.

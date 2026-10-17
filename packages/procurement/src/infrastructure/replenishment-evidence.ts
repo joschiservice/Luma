@@ -38,6 +38,7 @@ type RunRow = {
   admitted_at: Date | null;
   context: {
     recordedAt?: unknown;
+    dailySales?: unknown;
     demandEvidenceRefs?: unknown;
     openOrders?: unknown;
   } | null;
@@ -73,14 +74,19 @@ async function run(tx: SqlTransaction, tenantId: string, runId: string) {
  * the inventory step took, the proposal step's stock read, supplier and existing orders, the
  * policy decision the approval waits on, the order reads behind the demand estimate and the
  * orders its review counted, the rule and the admitted proposal, and the drafted order's events
- * that verified it. The proposal's execution belongs to the run. Returns null when the tenant
- * has no such replenishment run.
+ * that verified it. The proposal's execution belongs to the run. A review context frozen with a
+ * known demand estimate before Luma recorded its order reads relies on reads it cannot cite;
+ * those are reported as uncited. Returns null when the tenant has no such replenishment run.
  */
 export async function replenishmentRunCitations(
   tx: SqlTransaction,
   tenantId: string,
   runId: string,
-): Promise<{ actionIds: string[]; citations: RunCitation[] } | null> {
+): Promise<{
+  actionIds: string[];
+  citations: RunCitation[];
+  uncited: { evidence: 'demand_reads'; recordedAt: string }[];
+} | null> {
   if (!uuid.test(runId)) return null;
   const row = await run(tx, tenantId, runId);
   if (!row) return null;
@@ -141,8 +147,18 @@ export async function replenishmentRunCitations(
       )
     : [];
 
+  // Contexts frozen since Luma recorded demand reads always have the field, empty when demand
+  // was unknown, so a known estimate without it rests on reads that weren't kept.
+  const demandUncited =
+    typeof row.context?.dailySales === 'number' &&
+    !Array.isArray(row.context.demandEvidenceRefs);
+
   return {
     actionIds: row.proposal_id ? [row.proposal_id] : [],
+    uncited:
+      demandUncited && reviewedAt
+        ? [{ evidence: 'demand_reads', recordedAt: reviewedAt }]
+        : [],
     citations: [
       ...(row.activation_id ? [cite(row.activation_id, 'record', null)] : []),
       ...(row.proposal_id ? [cite(row.proposal_id, 'record', admittedAt)] : []),

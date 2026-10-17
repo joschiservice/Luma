@@ -474,6 +474,34 @@ function EvidenceEntry({
   );
 }
 
+type NotRetainedEvidence = NonNullable<EvidenceListData['notRetained']>[number];
+
+/**
+ * Evidence the record relied on but recorded before Luma kept it, so no reference names it. It is
+ * listed so its absence doesn't read as if it was never considered.
+ */
+function NotRetainedEntry({ entry }: { entry: NotRetainedEvidence }) {
+  const timeZone = useContext(WorkspaceTimezone);
+
+  return (
+    <li className="evidence-entry" data-kind="not_retained">
+      <div className="evidence-entry-heading">
+        <Badge tone="neutral">{m.evidence_kind_not_retained()}</Badge>
+        <strong>{m.evidence_demand_not_retained_title()}</strong>
+      </div>
+      <p className="evidence-note">
+        {m.evidence_demand_not_retained_detail({
+          date: formatWorkspaceDateTime(
+            entry.retentionStartedAt,
+            timeZone,
+            'day',
+          ),
+        })}
+      </p>
+    </li>
+  );
+}
+
 /** Explains that the cited evidence predates storage, naming the workspace day storage began. */
 function NotRetained({ since }: { since: string }) {
   const timeZone = useContext(WorkspaceTimezone);
@@ -490,8 +518,9 @@ function NotRetained({ since }: { since: string }) {
 /**
  * Shows what a record cites: each provider read with its source, read time, freshness and
  * completeness; each write receipt with what was accepted; stored messages without their text;
- * Luma records with their time, actor and facts; evidence the reader may not see; and references
- * whose evidence was never kept or can't be found. Every state has a text label. Pass names for
+ * Luma records with their time, actor and facts; evidence the reader may not see; references
+ * whose evidence was never kept or can't be found; and evidence the record relied on before Luma
+ * kept it, which no reference names. Every state has a text label. Pass names for
  * providers, capabilities, permissions and domain values when the caller can localize them.
  */
 export function EvidenceList({
@@ -538,7 +567,8 @@ export function EvidenceList({
       </p>
     );
   const { items, truncated } = state.evidence;
-  if (!items.length)
+  const notRetained = state.evidence.notRetained ?? [];
+  if (!items.length && !notRetained.length)
     return <p className="evidence-status">{m.evidence_empty()}</p>;
 
   return (
@@ -554,6 +584,9 @@ export function EvidenceList({
             permissionName={permissionName}
             valueName={valueName}
           />
+        ))}
+        {notRetained.map((entry) => (
+          <NotRetainedEntry key={entry.evidence} entry={entry} />
         ))}
       </ul>
       {truncated ? (

@@ -38,6 +38,8 @@
   "evidence_record_note": "Ein Datensatz in Luma, nicht etwas, das bei einem Anbieter gelesen wurde.",
   "evidence_not_retained_title": "Erfasst, bevor Luma Nachweise aufbewahrt hat",
   "evidence_not_retained_detail": "Luma bewahrt diese Art von Nachweis seit dem {date} auf. Dieser Verweis ist älter, deshalb wurde der Lesevorgang oder die Bestätigung selbst nicht aufbewahrt und kann nicht angezeigt werden.",
+  "evidence_demand_not_retained_title": "Nachfrage-Lesevorgänge nicht aufbewahrt",
+  "evidence_demand_not_retained_detail": "Für Läufe vor dem {date} wurden die Nachfrage-Lesevorgänge nicht aufbewahrt. Die Nachfrageschätzung dieses Laufs beruht auf Bestell-Lesevorgängen, die nicht angezeigt werden können.",
   "evidence_unresolved_title": "Kein gespeicherter Nachweis gefunden",
   "evidence_unresolved_detail": "Luma findet nicht, worauf dieser Verweis zeigt. Behandle das Ergebnis, das er belegen soll, als unbestätigt.",
   "evidence_yes": "Ja",

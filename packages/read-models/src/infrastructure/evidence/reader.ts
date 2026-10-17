@@ -11,6 +11,7 @@ import {
   type Citation,
   type EvidencePerson,
   evidenceReferenceLimit,
+  notRetainedEvidence,
   resolveEvidence,
   type RetentionKind,
 } from '../../domain/evidence.js';
@@ -183,6 +184,12 @@ export function createEvidenceReader(
                 return kind ? (starts.get(kind) ?? null) : null;
               },
             }),
+            notRetained: request.refs
+              ? []
+              : notRetainedEvidence(
+                  own.uncited ?? [],
+                  (kind) => starts.get(kind) ?? null,
+                ),
             truncated: !request.refs && all.length > refs.length,
             asOf: now().toISOString(),
           };

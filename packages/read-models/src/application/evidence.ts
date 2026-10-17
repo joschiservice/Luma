@@ -5,8 +5,10 @@ import type {
   Citation,
   EvidenceItem,
   EvidenceSubjectKind,
+  NotRetainedEvidence,
   RetentionKind,
   StoredEvidence,
+  UncitedEvidence,
 } from '../domain/evidence.js';
 
 /** The record whose cited evidence is read. */
@@ -26,6 +28,11 @@ interface EvidenceRequest {
 interface EvidenceList {
   subject: EvidenceSubject;
   items: EvidenceItem[];
+  /**
+   * Evidence the subject relied on that was recorded before Luma kept it, so it has no
+   * references to resolve. Listed only when the request names no references.
+   */
+  notRetained: NotRetainedEvidence[];
   /** The subject cites more references than one response returns. */
   truncated: boolean;
   asOf: string;
@@ -36,6 +43,8 @@ interface SubjectCitations {
   /** Proposals whose execution attempts belong to the subject. */
   actionIds: string[];
   citations: Citation[];
+  /** Evidence the subject relied on but recorded no references for. */
+  uncited?: UncitedEvidence[];
 }
 
 /**

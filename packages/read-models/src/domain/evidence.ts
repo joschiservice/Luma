@@ -201,7 +201,49 @@ export interface EvidenceItem {
 
 /** The kinds of provider evidence whose storage began at a recorded time. */
 export type RetentionKind =
-  'procurement_reads' | 'return_reads' | 'write_receipts';
+  | 'procurement_reads'
+  | 'return_reads'
+  | 'write_receipts'
+  | 'replenishment_demand_reads';
+
+/**
+ * Evidence a subject relied on but cites no references for, because the subject was recorded
+ * before Luma kept them: a replenishment run's order reads behind a known demand estimate.
+ */
+export interface UncitedEvidence {
+  evidence: 'demand_reads';
+  /** When the subject recorded what it relied on. */
+  recordedAt: string;
+}
+
+/** Evidence a subject relied on that was never kept, and when Luma began keeping it. */
+export interface NotRetainedEvidence {
+  evidence: UncitedEvidence['evidence'];
+  retentionStartedAt: string;
+}
+
+const uncitedRetention = {
+  demand_reads: 'replenishment_demand_reads',
+} as const satisfies Record<UncitedEvidence['evidence'], RetentionKind>;
+
+/**
+ * Explains evidence a subject relied on without citing it. Only what was recorded before Luma
+ * began keeping that kind is not retained; anything recorded later, or whose start is unknown,
+ * is left out rather than explained away, because a missing citation after storage began is a
+ * defect, not history.
+ */
+export function notRetainedEvidence(
+  uncited: readonly UncitedEvidence[],
+  start: (kind: RetentionKind) => string | null,
+): NotRetainedEvidence[] {
+  return uncited.flatMap((entry) => {
+    const startedAt = start(uncitedRetention[entry.evidence]);
+
+    return startedAt && Date.parse(entry.recordedAt) < Date.parse(startedAt)
+      ? [{ evidence: entry.evidence, retentionStartedAt: startedAt }]
+      : [];
+  });
+}
 
 /** How a record cites a reference, and when that record was written. */
 export interface Citation {

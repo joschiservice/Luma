@@ -4,6 +4,7 @@ import {
   capabilityReadPermission,
   evidenceActor,
   missingEvidence,
+  notRetainedEvidence,
   resolveEvidence,
   type StoredEvidence,
   summarizeRead,
@@ -74,6 +75,35 @@ describe('missingEvidence', () => {
         start,
       ),
     ).toEqual({ kind: 'unresolved' });
+  });
+});
+
+describe('notRetainedEvidence', () => {
+  const starts = (kind: string) =>
+    kind === 'replenishment_demand_reads' ? start : null;
+
+  it('lists demand reads a run relied on before Luma kept them, dated by the start', () => {
+    expect(
+      notRetainedEvidence(
+        [{ evidence: 'demand_reads', recordedAt: '2026-09-30T23:59:00.000Z' }],
+        starts,
+      ),
+    ).toEqual([{ evidence: 'demand_reads', retentionStartedAt: start }]);
+  });
+
+  it('never explains away a missing citation after storage began or without a start', () => {
+    expect(
+      notRetainedEvidence(
+        [{ evidence: 'demand_reads', recordedAt: start }],
+        starts,
+      ),
+    ).toEqual([]);
+    expect(
+      notRetainedEvidence(
+        [{ evidence: 'demand_reads', recordedAt: '2026-09-01T00:00:00.000Z' }],
+        () => null,
+      ),
+    ).toEqual([]);
   });
 });
 

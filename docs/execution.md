@@ -135,7 +135,10 @@ A replenishment run cites what its steps recorded: the stock read of its invento
 supplier and existing orders its proposal step counted, the policy decision its approval waits
 on, and the drafted order's events its verification found, plus the rule, the admitted proposal,
 and the order reads behind the demand estimate and the orders its approval context froze.
-Contexts frozen before Luma recorded demand reads cite none. A return wait cites the money reads
+Contexts frozen before Luma recorded demand reads cite none; when their demand estimate was known,
+the list's `notRetained` names the demand reads with the day storage began, so the run doesn't
+read as if demand was never considered. It never stands in for a read, and a request for
+specific references omits it. A return wait cites the money reads
 or case revision its last check found, and an exchange the reads behind its availability and its
 completion check.
 
@@ -163,7 +166,7 @@ reveals nothing the subject does not cite.
 
 Records written before an owner stored a kind of evidence cite IDs that were never kept and
 cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return
-reads, write receipts); a read or receipt cited before that date is `not_retained`. Everything
+reads, write receipts, replenishment demand reads); a read or receipt cited before that date is `not_retained`. Everything
 else without stored evidence stays `unresolved`, including citations without a time and reads
 that were always stored: messages, inventory and order snapshots and ledger entries. A missing
 read after storage began is a defect, not history. Busy views, including Needs you, resolve

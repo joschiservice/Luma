@@ -38,6 +38,8 @@
   "evidence_record_note": "A record in Luma, not something read from a provider.",
   "evidence_not_retained_title": "Recorded before Luma kept evidence",
   "evidence_not_retained_detail": "Luma began keeping this kind of evidence on {date}. This was cited earlier, so the read or receipt itself wasn't kept and can't be shown.",
+  "evidence_demand_not_retained_title": "Demand reads not kept",
+  "evidence_demand_not_retained_detail": "Demand reads weren't kept for runs before {date}. This run's demand estimate rests on order reads that can't be shown.",
   "evidence_unresolved_title": "No stored evidence found",
   "evidence_unresolved_detail": "Luma can't find what this reference names. Treat the outcome it supports as unconfirmed.",
   "evidence_yes": "Yes",
