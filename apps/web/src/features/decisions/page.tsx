@@ -88,7 +88,7 @@ import {
 } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { SignInRedirect } from '../../kit/identity/common';
-import { contextOptions, IdentityError } from '../../kit/identity/data';
+import { ApiError, contextOptions } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { useNow } from '../../kit/live/now';
 import { membersOptions } from '../../kit/settings/data';
@@ -977,9 +977,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
     onMutate: () => setAssignError(undefined),
     onError: (error) =>
       setAssignError(
-        error instanceof IdentityError
-          ? error.message
-          : m.decisions_assign_failed(),
+        error instanceof ApiError ? error.message : m.decisions_assign_failed(),
       ),
     onSettled: () =>
       client.invalidateQueries({ queryKey: decisionsKey(organizationId) }),
@@ -999,7 +997,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
     );
   };
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
   const item = typeof selected === 'object' ? selected : undefined;
   const previousItem = position > 0 ? items[position - 1] : undefined;

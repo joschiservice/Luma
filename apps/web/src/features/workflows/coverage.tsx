@@ -14,7 +14,7 @@ import { Link } from '@tanstack/react-router';
 import { ShieldCheck } from 'lucide-react';
 import { useId } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { workflowCoverageOptions, workflowError } from './data';
 import { readinessHeadline, ReadinessPills, RepairLink } from './readiness';
 
@@ -36,7 +36,7 @@ export function WorkflowCoverageCard({
     refetchInterval: 30000,
   });
   const hidden =
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status);
   if (hidden) return null;
 

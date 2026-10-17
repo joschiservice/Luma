@@ -13,9 +13,9 @@ import { useEffect, useRef, useState } from 'react';
 
 import { EntryFrame, Pending } from '../../kit/identity/common';
 import {
+  ApiError,
   clearPrivate,
   endSupportView,
-  IdentityError,
   redeemSupportView,
   rememberEndedSupportView,
   takeEndedSupportView,
@@ -59,7 +59,7 @@ export function SupportViewEntry() {
         });
       } catch (error) {
         setFailed(
-          error instanceof IdentityError && error.status === 404
+          error instanceof ApiError && error.status === 404
             ? m.identity_support_view_link_used()
             : m.identity_support_view_link_failed(),
         );

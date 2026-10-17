@@ -23,7 +23,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, Plus, Trash2 } from 'lucide-react';
 import { useContext, useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import {
   cancelDraftTest,
@@ -174,7 +174,7 @@ export function DraftTestPanel({
         );
     } catch (failure) {
       setError(
-        failure instanceof IdentityError && failure.status === 409
+        failure instanceof ApiError && failure.status === 409
           ? m.authoring_test_conflict()
           : workflowError(failure),
       );

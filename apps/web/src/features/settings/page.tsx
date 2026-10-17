@@ -29,7 +29,7 @@ import {
 import { useId, useState } from 'react';
 
 import { Failure } from '../../kit/identity/common';
-import { contextOptions, IdentityError } from '../../kit/identity/data';
+import { ApiError, contextOptions } from '../../kit/identity/data';
 import {
   isOwnerRole,
   usePermissionLabel,
@@ -135,7 +135,7 @@ export function SettingsPage({
   const permissions = usePermissions(organizationId);
   const supportView = !!access.data?.supportView;
   const error = access.error ?? query.error;
-  if (error instanceof IdentityError && [401, 403, 404].includes(error.status))
+  if (error instanceof ApiError && [401, 403, 404].includes(error.status))
     return <Failure error={error} retry={() => void query.refetch()} />;
 
   return (

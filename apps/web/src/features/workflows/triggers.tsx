@@ -22,7 +22,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock3, Play, ShieldCheck, Zap } from 'lucide-react';
 import { useContext, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { vocabularyOptions } from './authoring/data';
@@ -228,11 +228,11 @@ export function WorkflowTriggers({
     } catch (error) {
       setError(workflowError(error));
       if (
-        error instanceof IdentityError &&
+        error instanceof ApiError &&
         [400, 403, 404, 409].includes(error.status)
       )
         setRequest(null);
-      if (error instanceof IdentityError && [401, 403].includes(error.status))
+      if (error instanceof ApiError && [401, 403].includes(error.status))
         await accessLost();
     } finally {
       setPending(false);

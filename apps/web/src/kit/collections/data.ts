@@ -11,7 +11,7 @@ import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
+import { ApiError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -112,7 +112,7 @@ export const collectionViewsOptions = (
             .map(savedView),
         };
       } catch (error) {
-        if (error instanceof IdentityError && error.status === 404)
+        if (error instanceof ApiError && error.status === 404)
           return { available: false, items: [] as CollectionSavedView[] };
         throw error;
       }

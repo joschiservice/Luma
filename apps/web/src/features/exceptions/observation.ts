@@ -3,7 +3,7 @@ import type { LiveConnection } from '@luma/ui/components/issues/case-timeline';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { casesKey } from './data';
 import { historyOptions, observationOptions } from './observation-data';
 
@@ -128,7 +128,7 @@ export function useCaseObservation(
 
   const denied = [snapshot.error, history.error].some(
     (error) =>
-      error instanceof IdentityError && [401, 403, 404].includes(error.status),
+      error instanceof ApiError && [401, 403, 404].includes(error.status),
   );
   const confirmed =
     !denied &&

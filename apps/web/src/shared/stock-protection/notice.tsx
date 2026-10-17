@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useContext, useState } from 'react';
 
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { stockProtectionApi, stockProtectionOptions } from './data';
 
 const status = {
@@ -80,7 +80,7 @@ export function StockProtectionNotice({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   if (
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status)
   )
     return null;

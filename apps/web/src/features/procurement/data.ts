@@ -20,12 +20,12 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { collectionSearchShape, groupOf } from '../../kit/collections/state';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
 /** A rejected procurement request, with the server's explanation when it sent one. */
-export class ProcurementError extends IdentityError {
+export class ProcurementError extends ApiError {
   constructor(
     status: number,
     readonly feedback: string,

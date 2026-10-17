@@ -17,8 +17,8 @@ import { useId, useRef, useState } from 'react';
 import { encode } from 'uqr';
 
 import {
+  ApiError,
   auth,
-  IdentityError,
   sessionKey,
   sessionOptions,
   usePasskeySupport,
@@ -40,8 +40,7 @@ const passkeysOptions = () =>
       const result = await auth.passkey.listUserPasskeys({
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.error)
-        throw new IdentityError(result.error.status, result.error);
+      if (result.error) throw new ApiError(result.error.status, result.error);
 
       return result.data.map((passkey) => ({
         id: passkey.id,

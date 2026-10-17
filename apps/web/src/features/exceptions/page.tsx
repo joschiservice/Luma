@@ -65,7 +65,7 @@ import {
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { membersOptions } from '../../kit/settings/data';
 import { overviewOptions } from '../overview/data';
@@ -370,7 +370,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     void overview.refetch();
   };
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const filtered = !!q.trim() || state.where.conditions.length > 0;

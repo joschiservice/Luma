@@ -3,10 +3,10 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
+import { ApiError } from '../identity/data';
 
 /** Keeps server validation messages while preserving access-loss handling. */
-export class SettingsError extends IdentityError {
+export class SettingsError extends ApiError {
   constructor(status: number, message: string) {
     super(status);
     this.message = message;

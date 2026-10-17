@@ -2,7 +2,7 @@ import { type AskAssistant } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
@@ -34,11 +34,11 @@ export async function askAssistant(
  * delivered, untranslated.
  */
 export function assistantError(error: unknown) {
-  if (error instanceof IdentityError && error.status === 401)
+  if (error instanceof ApiError && error.status === 401)
     return m.assistant_error_session_expired();
-  if (error instanceof IdentityError && error.status === 403)
+  if (error instanceof ApiError && error.status === 403)
     return m.assistant_error_access_changed();
-  if (error instanceof IdentityError && error.code)
+  if (error instanceof ApiError && error.code)
     return error.status === 400
       ? m.assistant_error_unreadable_question()
       : error.message;

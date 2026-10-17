@@ -17,7 +17,7 @@ import { contextOptions } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { useNow } from '../../kit/live/now';
 import { createWebApiClient } from '../../lib/api-client';
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { useSettingsOnline } from './command';
 import { SectionHeading } from './section-heading';
@@ -35,7 +35,7 @@ type Review = Awaited<ReturnType<typeof api.sourceEnvironments.inspect>>;
 type Command = Parameters<typeof api.sourceEnvironments.change>[0]['body'];
 
 function errorMessage(error: unknown) {
-  if (error instanceof IdentityError) {
+  if (error instanceof ApiError) {
     if (error.status === 409) return m.settings_source_conflict();
     if ([401, 403, 404].includes(error.status))
       return m.settings_autonomy_change_access();
@@ -126,7 +126,7 @@ function SourceDeclaration({
           : m.settings_source_saved(),
       );
     } catch (error) {
-      if (!(error instanceof IdentityError) || error.status >= 500) {
+      if (!(error instanceof ApiError) || error.status >= 500) {
         // Keep every reviewed input, including the old revision, even if a fresh list finds the saved change.
         setUncertain(command);
         setError(m.settings_source_uncertain());

@@ -62,7 +62,7 @@ import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
 import { CollectionSummaryBand } from '../adaptive/summary-band';
@@ -266,7 +266,7 @@ export function FulfillmentPage() {
   });
   // A 403 for a reader who can read fulfillment means a field the view uses is closed to them.
   const fieldDenied =
-    list.error instanceof IdentityError &&
+    list.error instanceof ApiError &&
     list.error.status === 403 &&
     can('fulfillment.read');
   const issues = [
@@ -406,7 +406,7 @@ export function FulfillmentPage() {
     onShowHelp: () => setHelp(true),
   });
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const link = (item: FulfillmentItem) => (

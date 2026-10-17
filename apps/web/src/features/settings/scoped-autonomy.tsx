@@ -30,7 +30,7 @@ import { useId, useRef, useState } from 'react';
 
 import { usePermissions } from '../../kit/identity/permissions';
 import { createWebApiClient } from '../../lib/api-client';
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import { SectionHeading } from './section-heading';
@@ -53,7 +53,7 @@ const key = (organizationId: string) =>
 type Policy = AutonomyPolicy & { trackRecord: AutonomyTrackRecord };
 
 const errorMessage = (error: unknown) => {
-  if (error instanceof IdentityError) {
+  if (error instanceof ApiError) {
     if (error.status === 409) return m.settings_autonomy_change_conflict();
     if (error.status === 422 || error.status === 400)
       return m.settings_autonomy_change_invalid();

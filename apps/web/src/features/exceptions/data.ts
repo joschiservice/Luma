@@ -14,7 +14,7 @@ import { z } from 'zod';
 
 import { anyOf, withLegacyConditions } from '../../kit/collections/legacy';
 import { collectionSearchShape, groupOf } from '../../kit/collections/state';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
@@ -205,8 +205,7 @@ export function caseOptions(organizationId: string, exceptionId: string) {
     queryKey: [...casesKey(organizationId), 'detail', exceptionId],
     enabled: Boolean(exceptionId),
     queryFn: async ({ signal }) => {
-      if (!z.uuid().safeParse(exceptionId).success)
-        throw new IdentityError(404);
+      if (!z.uuid().safeParse(exceptionId).success) throw new ApiError(404);
 
       return api.exceptions.get(
         { params: { organizationId, exceptionId } },

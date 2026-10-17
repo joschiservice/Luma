@@ -8,7 +8,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
+import { ApiError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -63,7 +63,7 @@ export async function changeConnection(
 
 /** Returns actionable connection feedback without exposing provider responses or credentials. */
 export function connectionError(error: unknown) {
-  const status = error instanceof IdentityError ? error.status : 0;
+  const status = error instanceof ApiError ? error.status : 0;
   if (status === 401) return m.connections_error_session();
   if (status === 403) return m.connections_error_forbidden();
   if (status === 404) return m.connections_error_missing();

@@ -35,7 +35,7 @@ import { Link, useLocation } from '@tanstack/react-router';
 import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { ApprovalContext } from '../../shared/procurement/approval-context';
 import {
   decideReplenishment,
@@ -108,7 +108,7 @@ export function ReplenishmentPanel({
   });
   const uncertain =
     start.isError &&
-    (!(start.error instanceof IdentityError) || start.error.status >= 500);
+    (!(start.error instanceof ApiError) || start.error.status >= 500);
   const data = query.data;
   const hash = useLocation({ select: (location) => location.hash });
   const linkedRuleId = data?.rules.find(
@@ -484,7 +484,7 @@ export function ReplenishmentRunReview({
     },
   });
   const accessLost =
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status);
   const review = accessLost ? undefined : query.data;
   const orderId = review?.purchaseOrder?.id;

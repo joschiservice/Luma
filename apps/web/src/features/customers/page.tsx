@@ -70,7 +70,7 @@ import {
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
 import {
@@ -275,7 +275,7 @@ export function CustomersPage() {
   });
   // A 403 for a reader who can read customers means a field the view uses is closed to them.
   const fieldDenied =
-    list.error instanceof IdentityError &&
+    list.error instanceof ApiError &&
     list.error.status === 403 &&
     can('customers.read');
   const issues = [
@@ -445,7 +445,7 @@ export function CustomersPage() {
 
   if (
     [list.error, resolved.error].some(
-      (failure) => failure instanceof IdentityError && failure.status === 401,
+      (failure) => failure instanceof ApiError && failure.status === 401,
     )
   )
     return <SignInRedirect />;

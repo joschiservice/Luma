@@ -1,7 +1,7 @@
 import { onlineManager } from '@tanstack/react-query';
 import { useCallback, useSyncExternalStore } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { ApiError } from '../identity/data';
 
 const storageKey = (key: string) => `luma:paging:${key}`;
 
@@ -110,7 +110,7 @@ export function collectionError(
   cursor: string | undefined,
 ): CollectionError | undefined {
   if (!error) return undefined;
-  if (!(error instanceof IdentityError)) return { kind: 'unavailable' };
+  if (!(error instanceof ApiError)) return { kind: 'unavailable' };
   if ([403, 404].includes(error.status)) return { kind: 'access' };
   if (error.code === 'VALIDATION_ERROR' || error.status === 400)
     return cursor
@@ -138,8 +138,7 @@ export function useOnline() {
 export function collectionServerIssue(
   error: unknown,
 ): { index: number | null; message: string } | undefined {
-  if (!(error instanceof IdentityError) || error.status !== 400)
-    return undefined;
+  if (!(error instanceof ApiError) || error.status !== 400) return undefined;
   const match = /^Condition (\d+): (.+?)\.?$/.exec(error.message);
 
   return match

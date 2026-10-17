@@ -41,7 +41,7 @@ import type { ReactNode } from 'react';
 
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
@@ -152,7 +152,7 @@ export function WorkflowsPage() {
       // The page never opens another view, so the hook never navigates.
     },
   });
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
 
   return (
@@ -175,7 +175,7 @@ export function WorkflowsPage() {
       drafts={drafts.data}
       canCreate={permissions.can('workflows.author')}
       items={
-        query.error instanceof IdentityError &&
+        query.error instanceof ApiError &&
         [401, 403, 404].includes(query.error.status)
           ? undefined
           : query.data

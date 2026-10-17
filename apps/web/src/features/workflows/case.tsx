@@ -24,7 +24,7 @@ import { Link } from '@tanstack/react-router';
 import { Power } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   activateCaseWorkflow,
   revokeWorkflow,
@@ -86,7 +86,7 @@ export function CaseActivationForm({
     } catch (failure) {
       setError(workflowError(failure));
       if (
-        failure instanceof IdentityError &&
+        failure instanceof ApiError &&
         [400, 403, 404, 409].includes(failure.status)
       )
         setRequest(null);

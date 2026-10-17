@@ -42,7 +42,7 @@ import { type CollectionSearch, groupOf } from '../../kit/collections/state';
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
@@ -218,7 +218,7 @@ export function PurchaseOrdersList({
   // A 403 for a reader who can read purchase orders means a custom field the view uses is
   // closed to them.
   const fieldDenied =
-    list.error instanceof IdentityError &&
+    list.error instanceof ApiError &&
     list.error.status === 403 &&
     can('procurement.read');
   const issues = [
@@ -384,7 +384,7 @@ export function PurchaseOrdersList({
     onShowHelp: () => setHelp(true),
   });
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const link = (order: ListedPurchaseOrder) => (

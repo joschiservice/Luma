@@ -7,8 +7,8 @@ import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
 
 import {
+  ApiError,
   clearPrivate,
-  IdentityError,
   returnPath,
   supportViewJustEnded,
 } from './data';
@@ -95,9 +95,9 @@ export function Failure({
   error: unknown;
   retry: () => void;
 }) {
-  const status = error instanceof IdentityError ? error.status : 503;
+  const status = error instanceof ApiError ? error.status : 503;
   const suspended =
-    error instanceof IdentityError && error.code === 'ACCESS_SUSPENDED';
+    error instanceof ApiError && error.code === 'ACCESS_SUSPENDED';
   if (status === 401) return <SignInRedirect />;
 
   return (

@@ -45,7 +45,7 @@ import {
 } from 'react';
 
 import { SignInRedirect } from '../../../kit/identity/common';
-import { contextOptions, IdentityError } from '../../../kit/identity/data';
+import { ApiError, contextOptions } from '../../../kit/identity/data';
 import { usePermissions } from '../../../kit/identity/permissions';
 import { workflowError, workflowsKey } from '../data';
 import { WorkflowLoading } from '../library';
@@ -163,10 +163,10 @@ function useDraftSession(
       );
     } catch (failure) {
       setError(workflowError(failure));
-      if (failure instanceof IdentityError && failure.status === 409)
+      if (failure instanceof ApiError && failure.status === 409)
         setStatus('conflict');
       else if (
-        failure instanceof IdentityError &&
+        failure instanceof ApiError &&
         [401, 403, 404].includes(failure.status)
       )
         setStatus('forbidden');
@@ -289,7 +289,7 @@ export function DraftEditorPage({
   const context = useQuery(contextOptions(organizationId));
   const permissions = usePermissions(organizationId);
   const failure = draft.error ?? vocabulary.error;
-  if (failure instanceof IdentityError && failure.status === 401)
+  if (failure instanceof ApiError && failure.status === 401)
     return <SignInRedirect />;
 
   return (
@@ -298,7 +298,7 @@ export function DraftEditorPage({
       {failure ? (
         <Alert tone="danger" role="alert" className="workflow-notice">
           <span>
-            {failure instanceof IdentityError && failure.status === 404
+            {failure instanceof ApiError && failure.status === 404
               ? m.authoring_draft_not_found()
               : workflowError(failure)}
           </span>

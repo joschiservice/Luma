@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { returnCasesOptions } from './case-data';
 import {
   caseStageLabels,
@@ -37,7 +37,7 @@ export function CustomerReturnCases({
       ...(cursor ? { cursor } : {}),
     }),
   );
-  if (query.error instanceof IdentityError && query.error.status === 403)
+  if (query.error instanceof ApiError && query.error.status === 403)
     return null;
 
   return (

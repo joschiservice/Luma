@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState } from 'react';
 
-import { contextOptions, IdentityError } from '../../../kit/identity/data';
+import { ApiError, contextOptions } from '../../../kit/identity/data';
 import { useCan } from '../../../kit/identity/permissions';
 import { resolutionWorkflowsOptions } from '../../workflows/data';
 import {
@@ -113,7 +113,7 @@ function ShadowCaseControls({
       await refresh();
     } catch (error) {
       setError(error);
-      if (error instanceof IdentityError && error.status < 500)
+      if (error instanceof ApiError && error.status < 500)
         setRequest(undefined);
     } finally {
       lock.current = false;

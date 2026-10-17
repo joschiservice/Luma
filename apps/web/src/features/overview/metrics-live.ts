@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   changesAny,
   liveRefreshDelay,
@@ -175,8 +175,7 @@ export function useLiveMetricSummary(
       } catch (error) {
         if (!active) return;
         denied =
-          error instanceof IdentityError &&
-          [401, 403, 404].includes(error.status);
+          error instanceof ApiError && [401, 403, 404].includes(error.status);
         update({ ready: true, connection: denied ? 'denied' : 'reconnecting' });
         if (denied) {
           stop();
@@ -271,9 +270,7 @@ export function useLiveMetricSummary(
       : -1;
     const part = index < 0 ? undefined : query.data?.parts[index];
     const failure =
-      part && 'error' in part
-        ? new IdentityError(part.status, part.error)
-        : null;
+      part && 'error' in part ? new ApiError(part.status, part.error) : null;
     const error = query.error ?? failure;
 
     return {

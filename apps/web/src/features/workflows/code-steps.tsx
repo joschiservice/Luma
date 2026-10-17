@@ -28,7 +28,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Braces, Check, Copy, Play, ShieldCheck, Square } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { useCan } from '../../kit/identity/permissions';
 import {
   cancelCodeEvaluation,
@@ -139,11 +139,11 @@ function CodeStepPanel({
   const evaluation = query.data;
   const running = evaluation?.state === 'running';
   const locked = busy || running || (!!request && !evaluationId);
-  const lost = query.error instanceof IdentityError;
+  const lost = query.error instanceof ApiError;
   const output = evaluation?.result;
 
   async function handleError(error: unknown) {
-    if (error instanceof IdentityError) {
+    if (error instanceof ApiError) {
       setRequest(null);
       setEvaluationId('');
       await accessLost();

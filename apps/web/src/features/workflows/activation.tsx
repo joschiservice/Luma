@@ -8,7 +8,7 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { personLabel } from '@luma/ui/lib/actor';
 import { useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { activateWorkflow, workflowError } from './data';
 
 /** Reviews one immutable version and explicit order grants before submitting a retry-safe activation. */
@@ -65,11 +65,11 @@ export function ActivationForm({
     } catch (error) {
       setError(workflowError(error));
       if (
-        error instanceof IdentityError &&
+        error instanceof ApiError &&
         [400, 403, 404, 409].includes(error.status)
       )
         setRequest(null);
-      if (error instanceof IdentityError && [401, 403].includes(error.status))
+      if (error instanceof ApiError && [401, 403].includes(error.status))
         await accessLost();
     } finally {
       setPending(false);

@@ -16,7 +16,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
 import { Failure } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { settingsApi } from '../../kit/settings/data';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { authorityGroupLabels, authorityLabel } from '../orders/authority';
@@ -172,10 +172,9 @@ export function SourceAuthoritySettings({
   });
   const uncertain =
     mutation.isError &&
-    (!(mutation.error instanceof IdentityError) ||
-      mutation.error.status >= 500);
+    (!(mutation.error instanceof ApiError) || mutation.error.status >= 500);
   if (
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status)
   )
     return <Failure error={query.error} retry={() => void query.refetch()} />;

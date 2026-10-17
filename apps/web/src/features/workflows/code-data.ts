@@ -2,7 +2,7 @@ import type { CodeEvaluation, EvaluateCode } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { workflowsKey } from './data';
@@ -12,7 +12,7 @@ export class CodeEvaluationRejected extends Error {}
 
 // Access failures keep their status; rejected inputs can be edited; anything else is uncertain.
 function failure(status: number, body: unknown): Error {
-  if ([401, 403, 404].includes(status)) return new IdentityError(status, body);
+  if ([401, 403, 404].includes(status)) return new ApiError(status, body);
   const Failure = [400, 409, 422].includes(status)
     ? CodeEvaluationRejected
     : Error;

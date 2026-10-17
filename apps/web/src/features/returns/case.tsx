@@ -35,7 +35,7 @@ import { ArrowRight, RefreshCw, Send, Undo2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { useNow } from '../../kit/live/now';
 import { membersOptions } from '../../kit/settings/data';
 import {
@@ -106,9 +106,9 @@ export function ReturnCasePage() {
     refetchOnWindowFocus: 'always',
     enabled: !!sourceId,
   });
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
-  const status = query.error instanceof IdentityError ? query.error.status : 0;
+  const status = query.error instanceof ApiError ? query.error.status : 0;
 
   return (
     <ReturnCaseView

@@ -9,7 +9,7 @@ import { Link } from '@tanstack/react-router';
 import { PackageSearch } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { sortLabels } from '../../shared/orders/presentation';
 import { OrdersTable } from '../orders/list-table';
 import {
@@ -51,8 +51,7 @@ export function CustomerOrders({
     placeholderData: (previous) => previous,
   });
   const position = Math.max(0, trail.indexOf(state.cursor));
-  const status =
-    list.error instanceof IdentityError ? list.error.status : undefined;
+  const status = list.error instanceof ApiError ? list.error.status : undefined;
   const error: CustomerOrdersError | undefined = !list.error
     ? undefined
     : status === 403 || status === 404

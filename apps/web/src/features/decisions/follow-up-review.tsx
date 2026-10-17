@@ -5,7 +5,7 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-import { contextOptions, IdentityError } from '../../kit/identity/data';
+import { ApiError, contextOptions } from '../../kit/identity/data';
 import { requestErrorMessage } from '../../kit/identity/errors';
 import { usePermissions } from '../../kit/identity/permissions';
 import { createWebApiClient } from '../../lib/api-client';
@@ -15,7 +15,7 @@ const api = createWebApiClient();
 
 function failureText(error: unknown) {
   if (
-    error instanceof IdentityError &&
+    error instanceof ApiError &&
     [401, 403, 404, 429, 500, 502, 503].includes(error.status)
   )
     return requestErrorMessage(error);

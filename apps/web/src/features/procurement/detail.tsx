@@ -52,7 +52,7 @@ import {
 } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { formatMoney } from '../../shared/orders/presentation';
 import { RecordFields } from '../adaptive/record-fields';
@@ -173,7 +173,7 @@ export function PurchaseOrderPage() {
     onlineSnapshot,
     serverSnapshot,
   );
-  if (record.error instanceof IdentityError && record.error.status === 401)
+  if (record.error instanceof ApiError && record.error.status === 401)
     return <SignInRedirect />;
 
   return (
@@ -188,7 +188,7 @@ export function PurchaseOrderPage() {
       error={
         !record.error
           ? undefined
-          : record.error instanceof IdentityError && record.error.status === 404
+          : record.error instanceof ApiError && record.error.status === 404
             ? 'missing'
             : procurementError(record.error)
       }
@@ -2062,7 +2062,7 @@ export function PurchaseOrderReview({
   if (!record.data)
     return (
       <p role="alert">
-        {record.error instanceof IdentityError && record.error.status === 404
+        {record.error instanceof ApiError && record.error.status === 404
           ? m.procurement_review_missing()
           : procurementError(record.error)}
       </p>
