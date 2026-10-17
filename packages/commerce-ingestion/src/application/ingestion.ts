@@ -477,6 +477,7 @@ export function createCommerceIngestion(
   }
 }
 
+/** Records a person can link or unlink across sources. */
 export type LinkableKind = 'sku' | 'location' | 'order' | 'order_line';
 
 const linkedMethod = 'Linked by a person as the same record in another source';
