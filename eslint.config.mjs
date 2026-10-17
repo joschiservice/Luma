@@ -26,6 +26,14 @@ const sharedRestrictedSyntax = [
     message:
       'IdentityError no longer exists. Server code throws ServiceError or its helpers (notFound, conflict, invalid, forbidden, unavailable) from @luma/platform; web code uses ApiError from apps/web/src/lib/api-error.ts.',
   },
+  // The ServiceError helpers return the error; called as a statement, the check does nothing.
+  // Only calls of the helpers imported from @luma/platform match; local throwing helpers may share a name.
+  ...['notFound', 'conflict', 'invalid', 'forbidden', 'unavailable'].map(
+    (name) => ({
+      selector: `Program:has(ImportDeclaration[source.value='@luma/platform'] ImportSpecifier[imported.name='${name}'][local.name='${name}']) ExpressionStatement > CallExpression[callee.name='${name}']`,
+      message: `${name}() returns the ServiceError without throwing it. Write \`throw ${name}(...)\`.`,
+    }),
+  ),
 ];
 
 export default defineConfig(
