@@ -2,7 +2,6 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
 import type { ConnectionsConfig, ModelGatewayConfig } from '@luma/config';
-import { createInstalledMessageRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { purgeExpiredMessaging } from '@luma/messaging/composition';
 import type {
@@ -13,10 +12,7 @@ import type {
 import { createFailureLog } from '@luma/platform';
 
 import { createApplicationServices } from './application.js';
-import {
-  documentExtractionAvailability,
-  supplierExtractionAvailability,
-} from './authoring.js';
+import { applicationOptionsFor } from './application-options.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 
 /**
@@ -51,33 +47,18 @@ export function createMailboxSyncWorker(options: {
     ...(options.env ? { env: options.env } : {}),
   });
   // Messages are stored by messaging itself, never as commerce observations.
-  const mailbox = createInstalledMessageRuntime({
-    installations: host.connections,
-    providers: host.registry.providers(),
-    record: async () => undefined,
-    recordObservations: async () => undefined,
+  const shared = applicationOptionsFor(host, {
+    ...(options.model ? { model: options.model } : {}),
+    ...(options.observability ? { observability: options.observability } : {}),
   });
   const { messaging } = createApplicationServices({
     database: options.database,
     identity: options.identity,
-    ...(options.observability ? { observability: options.observability } : {}),
-    providerCatalog: host.providerCatalog,
-    connectionEnvironment: host.connectionEnvironment,
+    ...shared,
     // Approved replies are sent and uncertain sends checked through Action Admission.
     execution: { kind: 'enabled', effects: { resolve: async () => null } },
-    ...(options.model ? { modelGateway: options.model.gateway } : {}),
-    supplierExtraction: supplierExtractionAvailability(
-      options.model?.settings,
-      !!options.model,
-    ),
-    documentExtraction: documentExtractionAvailability(
-      options.model?.settings,
-      !!options.model,
-    ),
     messaging: {
-      installations: host.connections,
-      reader: mailbox,
-      sender: mailbox,
+      ...shared.messaging,
       ...(options.retentionDays
         ? { retentionDays: options.retentionDays }
         : {}),

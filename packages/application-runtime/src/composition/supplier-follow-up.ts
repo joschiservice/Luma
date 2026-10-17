@@ -2,7 +2,6 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
 import type { ConnectionsConfig } from '@luma/config';
-import { createInstalledPurchaseOrderRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
 import type { Observability, TenantDatabase } from '@luma/platform';
@@ -14,6 +13,7 @@ import {
 import type { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
+import { applicationOptionsFor } from './application-options.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 
 /**
@@ -38,22 +38,16 @@ export function createSupplierFollowUpWorker(options: {
     featureEnabled: createTenantFeatureRelease(options.observability),
     ...(options.env ? { env: options.env } : {}),
   });
+  // Supplier follow-up has no model gateway settings, so supplier messages aren't extracted here.
   const { commitments } = createApplicationServices({
     database: options.database,
     identity: options.identity,
-    ...(options.observability ? { observability: options.observability } : {}),
-    providerCatalog: host.providerCatalog,
-    connectionEnvironment: host.connectionEnvironment,
+    ...applicationOptionsFor(host, {
+      ...(options.observability
+        ? { observability: options.observability }
+        : {}),
+    }),
     execution: { kind: 'enabled', effects: { resolve: async () => null } },
-    purchasing: {
-      runtime: createInstalledPurchaseOrderRuntime({
-        installations: host.connections,
-        providers: host.registry.providers(),
-        record: async () => undefined,
-        recordObservations: async () => undefined,
-      }),
-      installations: host.connections,
-    },
   });
   const log = options.log ?? createFailureLog();
   const stop = new AbortController();
