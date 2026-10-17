@@ -404,9 +404,9 @@ export interface ReturnCaseList {
   nextCursor: string | null;
 }
 
-/** A refund, restock or exchange step of a return case, as its evidence names it. */
+/** A refund, restock or exchange step of a return case, by what it does. */
 interface SettlementReference {
-  kind: 'settlement' | 'exchange_step';
+  kind: 'refund' | 'restock' | 'exchange_step';
   id: string;
 }
 

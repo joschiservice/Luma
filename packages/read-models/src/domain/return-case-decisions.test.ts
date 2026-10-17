@@ -50,7 +50,10 @@ describe('return case decision evidence', () => {
         creation: creation('approval_required'),
         waiting,
       }).citedEvidence,
-    ).toEqual({ subject: { kind: 'return_creation', id: creationId } });
+    ).toEqual({
+      subject: { kind: 'return_creation', id: creationId },
+      covers: 'return_creation',
+    });
   });
 
   it('cites the wait that is due, rather than a finished creation', () => {
@@ -58,12 +61,13 @@ describe('return case decision evidence', () => {
       ...base,
       creation: creation('verified'),
       waiting,
-      settlement: { kind: 'settlement', id: settlementId },
+      settlement: { kind: 'refund', id: settlementId },
     });
 
     expect(item.deadline).toBe(waiting.dueAt);
     expect(item.citedEvidence).toEqual({
       subject: { kind: 'return_wait', id: waitId },
+      covers: 'deadline_wait',
     });
   });
 
@@ -80,23 +84,40 @@ describe('return case decision evidence', () => {
           checks: [{ id: 'stock', verified: false }],
         },
       }).citedEvidence,
-    ).toEqual({ subject: { kind: 'return_exchange', id: exchangeId } });
+    ).toEqual({
+      subject: { kind: 'return_exchange', id: exchangeId },
+      covers: 'exchange_check',
+    });
   });
 
   it('falls back to the latest settlement step, then the last creation', () => {
-    expect(
+    const latest = (kind: 'refund' | 'restock' | 'exchange_step') =>
       presentReturnCase({
         ...base,
         creation: creation('verified'),
-        settlement: { kind: 'exchange_step', id: settlementId },
-      }).citedEvidence,
-    ).toEqual({
+        settlement: { kind, id: settlementId },
+      }).citedEvidence;
+
+    expect(latest('exchange_step')).toEqual({
       subject: { kind: 'return_exchange_step', id: settlementId },
+      covers: 'exchange_step',
+    });
+    // A refund and a restock are both settlements; the item names which one it cites.
+    expect(latest('refund')).toEqual({
+      subject: { kind: 'return_settlement', id: settlementId },
+      covers: 'refund_step',
+    });
+    expect(latest('restock')).toEqual({
+      subject: { kind: 'return_settlement', id: settlementId },
+      covers: 'restock_step',
     });
     expect(
       presentReturnCase({ ...base, creation: creation('verified') })
         .citedEvidence,
-    ).toEqual({ subject: { kind: 'return_creation', id: creationId } });
+    ).toEqual({
+      subject: { kind: 'return_creation', id: creationId },
+      covers: 'return_creation',
+    });
     expect(presentReturnCase(base).citedEvidence).toBeUndefined();
   });
 });

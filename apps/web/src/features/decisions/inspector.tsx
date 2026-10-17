@@ -214,8 +214,23 @@ const evidencePermissions: Partial<
   case: 'issues.read',
 };
 
+type EvidenceCovers = NonNullable<
+  NonNullable<DecisionItem['citedEvidence']>['covers']
+>;
+
+/** Names the record a decision cites when it could cite another one, such as a return's step. */
+const coveredLabels: Record<EvidenceCovers, () => string> = {
+  return_creation: m.decisions_cited_evidence_return_creation,
+  exchange_check: m.decisions_cited_evidence_exchange_check,
+  deadline_wait: m.decisions_cited_evidence_deadline_wait,
+  refund_step: m.decisions_cited_evidence_refund_step,
+  restock_step: m.decisions_cited_evidence_restock_step,
+  exchange_step: m.decisions_cited_evidence_exchange_step,
+};
+
 /**
- * Opens what the decision cites, read through the owner's evidence only when opened. Hidden
+ * Opens what the decision cites, read through the owner's evidence only when opened. The label
+ * names the cited record when the decision could cite another one. Hidden
  * when the reader's role can't read the subject's area; the API checks again.
  */
 function DecisionEvidence({
@@ -237,7 +252,11 @@ function DecisionEvidence({
       className="decision-evidence"
       organizationId={organizationId}
       subject={cited.subject}
-      label={m.decisions_cited_evidence()}
+      label={
+        cited.covers
+          ? coveredLabels[cited.covers]()
+          : m.decisions_cited_evidence()
+      }
       {...(cited.refs ? { refs: cited.refs } : {})}
     />
   );

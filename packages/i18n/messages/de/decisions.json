@@ -180,5 +180,11 @@
   "decisions_proposal_changed_help": "Prüfe die geänderten Werte vor deiner Antwort. Die vorherige Genehmigung deckt einen anderen Vorschlag nicht ab.",
   "decisions_waiting_others": "Wartet auf andere",
   "decisions_waiting_empty": "Nichts wartet auf jemand anderen.",
-  "decisions_cited_evidence": "Worauf sich diese Entscheidung stützt"
+  "decisions_cited_evidence": "Worauf sich diese Entscheidung stützt",
+  "decisions_cited_evidence_return_creation": "Nachweise: Retourenanlage",
+  "decisions_cited_evidence_exchange_check": "Nachweise: Umtauschprüfung",
+  "decisions_cited_evidence_deadline_wait": "Nachweise: Wartefrist",
+  "decisions_cited_evidence_refund_step": "Nachweise: Erstattungsschritt",
+  "decisions_cited_evidence_restock_step": "Nachweise: Wiedereinlagerungsschritt",
+  "decisions_cited_evidence_exchange_step": "Nachweise: Umtauschschritt"
 }

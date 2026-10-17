@@ -78,7 +78,7 @@ export function createReturnCaseStore(
               assignment: ReturnCaseEvent | null;
               completion: ExchangeConsistencyReport | null;
               exchange_id: string | null;
-              settlement_kind: 'settlement' | 'exchange_step' | null;
+              settlement_kind: 'refund' | 'restock' | 'exchange_step' | null;
               settlement_id: string | null;
             }>(
               `SELECT c.document,ex.document->'completion' AS completion,ex.id::text AS exchange_id,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber",
@@ -88,7 +88,7 @@ export function createReturnCaseStore(
               LEFT JOIN orders_entity_redirects red ON red.tenant_id=c.tenant_id AND red.entity_id=c.order_id
               LEFT JOIN LATERAL (SELECT document FROM orders_return_creations WHERE tenant_id=c.tenant_id AND case_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) cr ON true
               LEFT JOIN LATERAL (SELECT kind,id FROM (
-                SELECT 'settlement' AS kind,id::text AS id,requested_at FROM orders_return_actions WHERE tenant_id=c.tenant_id AND case_id=c.id
+                SELECT kind,id::text AS id,requested_at FROM orders_return_actions WHERE tenant_id=c.tenant_id AND case_id=c.id
                 UNION ALL SELECT 'exchange_step',id::text,requested_at FROM orders_return_exchange_steps WHERE tenant_id=c.tenant_id AND case_id=c.id
               ) w ORDER BY requested_at DESC,id DESC LIMIT 1) st ON true
               LEFT JOIN LATERAL (SELECT document FROM orders_return_case_events WHERE tenant_id=c.tenant_id AND case_id=c.id AND kind='assigned' ORDER BY occurred_at DESC,revision DESC LIMIT 1) ce ON true

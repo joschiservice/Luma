@@ -207,6 +207,19 @@ export const decisionItemSchema = z.object({
         .min(1)
         .max(evidenceReferenceLimit)
         .optional(),
+      covers: z
+        .enum([
+          'return_creation',
+          'exchange_check',
+          'deadline_wait',
+          'refund_step',
+          'restock_step',
+          'exchange_step',
+        ])
+        .optional()
+        .describe(
+          'Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step.',
+        ),
     })
     .optional(),
   /** Items with the same cause share a group; each still needs its own response. */

@@ -10,22 +10,39 @@ function citedEvidence(
   creationPending: boolean,
 ): DecisionEvidence | undefined {
   const creation = item.creation?.id;
-  const subject: DecisionEvidence['subject'] | null =
-    creation && creationPending
-      ? { kind: 'return_creation', id: creation }
-      : item.completion?.state === 'unresolved' && item.completion.exchangeId
-        ? { kind: 'return_exchange', id: item.completion.exchangeId }
-        : item.waiting?.id
-          ? { kind: 'return_wait', id: item.waiting.id }
-          : item.settlement?.kind === 'settlement'
-            ? { kind: 'return_settlement', id: item.settlement.id }
-            : item.settlement?.kind === 'exchange_step'
-              ? { kind: 'return_exchange_step', id: item.settlement.id }
-              : creation
-                ? { kind: 'return_creation', id: creation }
-                : null;
+  const settlement = item.settlement;
+  if (creation && creationPending)
+    return {
+      subject: { kind: 'return_creation', id: creation },
+      covers: 'return_creation',
+    };
+  if (item.completion?.state === 'unresolved' && item.completion.exchangeId)
+    return {
+      subject: { kind: 'return_exchange', id: item.completion.exchangeId },
+      covers: 'exchange_check',
+    };
+  if (item.waiting?.id)
+    return {
+      subject: { kind: 'return_wait', id: item.waiting.id },
+      covers: 'deadline_wait',
+    };
+  if (settlement?.kind === 'exchange_step')
+    return {
+      subject: { kind: 'return_exchange_step', id: settlement.id },
+      covers: 'exchange_step',
+    };
+  if (settlement)
+    return {
+      subject: { kind: 'return_settlement', id: settlement.id },
+      covers: settlement.kind === 'refund' ? 'refund_step' : 'restock_step',
+    };
+  if (creation)
+    return {
+      subject: { kind: 'return_creation', id: creation },
+      covers: 'return_creation',
+    };
 
-  return subject ? { subject } : undefined;
+  return undefined;
 }
 
 /** Presents owned return work without turning a proposal or provider acceptance into completion. */
@@ -74,7 +91,10 @@ export function presentReturnCase(item: {
     ownerId: string;
   };
   /** The case's latest refund, restock or exchange step. */
-  settlement?: { kind: 'settlement' | 'exchange_step'; id: string } | null;
+  settlement?: {
+    kind: 'refund' | 'restock' | 'exchange_step';
+    id: string;
+  } | null;
 }): DecisionCandidate {
   const { case: value, creation } = item;
   const approval = creation?.state === 'approval_required';

@@ -31,9 +31,13 @@ run, a native stock receipt review, a purchase order with a revision's or suppli
 references, a reply, a case, or an app decision by its proposal. A return case item cites the
 record behind what it asks for, in this order: a creation waiting on a person, an unresolved
 exchange completion check, the deadline wait that is due, the latest refund, restock or exchange
-step, then the last creation. The decision view shows it as a disclosure that reads the evidence
-only when opened, hidden when the reader's role can't read the subject's area; the evidence
-reader checks access again. Other decisions show none.
+step, then the last creation. Because that record could be any of these, the item names it in
+`covers` (`return_creation`, `exchange_check`, `deadline_wait`, `refund_step`, `restock_step` or
+`exchange_step`), and the disclosure is labeled with it, such as "Evidence: refund step".
+Decisions that can cite only their own record keep the generic "What this decision cites". The
+decision view shows it as a disclosure that reads the evidence only when opened, hidden when the
+reader's role can't read the subject's area; the evidence reader checks access again. Decisions
+without stored evidence show none.
 
 Decision sources read persisted state only; they must not call external providers or models. A Shopify
 preview can therefore be listed as approvable and still be refused when its review reads

@@ -227,7 +227,8 @@ verification name and the write receipt, scoped to the case. Exchanges show the 
 their availability and completion check, and deadline waits the money reads or case revision
 their last check found. Proofs recorded before orders stored
 reads show those reads as not retained; money evidence that names a case revision resolves to the
-return case.
+return case. A case's Needs you item cites one of these records and names which one; see
+[cited evidence in Needs you](needs-you.md).
 
 An admission rejection alone does not release a send fence: another caller may already have reserved
 the same execution. Only the durable execution ledger can establish non-dispatch. Concurrent late

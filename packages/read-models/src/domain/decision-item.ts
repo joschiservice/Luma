@@ -55,12 +55,26 @@ export type DecisionOwner =
   | { kind: 'message_thread'; threadId: string };
 
 /**
+ * Which of several records a decision cites, when it could cite more than one: a return case
+ * cites its creation, exchange check, deadline wait or latest refund, restock or exchange step.
+ */
+export type DecisionEvidenceCovers =
+  | 'return_creation'
+  | 'exchange_check'
+  | 'deadline_wait'
+  | 'refund_step'
+  | 'restock_step'
+  | 'exchange_step';
+
+/**
  * The record whose cited evidence backs a decision, as the evidence resolver names it, and the
  * references the decision relies on when they are only part of what that record cites.
+ * `covers` names the record when the decision could cite another one instead.
  */
 export interface DecisionEvidence {
   subject: { kind: EvidenceSubjectKind; id: string };
   refs?: string[] | undefined;
+  covers?: DecisionEvidenceCovers | undefined;
 }
 
 export interface DecisionAssignment {

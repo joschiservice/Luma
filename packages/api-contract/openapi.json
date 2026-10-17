@@ -134732,6 +134732,18 @@
                                 "minLength": 1,
                                 "maxLength": 500
                               }
+                            },
+                            "covers": {
+                              "enum": [
+                                "return_creation",
+                                "exchange_check",
+                                "deadline_wait",
+                                "refund_step",
+                                "restock_step",
+                                "exchange_step"
+                              ],
+                              "type": "string",
+                              "description": "Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step."
                             }
                           },
                           "required": ["subject"]
@@ -136139,6 +136151,18 @@
                                   "minLength": 1,
                                   "maxLength": 500
                                 }
+                              },
+                              "covers": {
+                                "enum": [
+                                  "return_creation",
+                                  "exchange_check",
+                                  "deadline_wait",
+                                  "refund_step",
+                                  "restock_step",
+                                  "exchange_step"
+                                ],
+                                "type": "string",
+                                "description": "Which record the evidence belongs to, when the decision could cite another one: a return case cites its creation, exchange completion check, due deadline wait, or latest refund, restock or exchange step."
                               }
                             },
                             "required": ["subject"]
@@ -137748,6 +137772,24 @@
                           }
                         },
                         "required": ["ref", "citedAs", "citedAt", "resolution"]
+                      }
+                    },
+                    "notRetained": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "evidence": {
+                            "enum": ["demand_reads"],
+                            "type": "string"
+                          },
+                          "retentionStartedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["evidence", "retentionStartedAt"]
                       }
                     },
                     "truncated": {

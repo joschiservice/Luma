@@ -180,5 +180,11 @@
   "decisions_proposal_changed_help": "Review the changed values before answering. The previous approval does not cover a different proposal.",
   "decisions_waiting_others": "Waiting on others",
   "decisions_waiting_empty": "Nothing is waiting on someone else.",
-  "decisions_cited_evidence": "What this decision cites"
+  "decisions_cited_evidence": "What this decision cites",
+  "decisions_cited_evidence_return_creation": "Evidence: return creation",
+  "decisions_cited_evidence_exchange_check": "Evidence: exchange check",
+  "decisions_cited_evidence_deadline_wait": "Evidence: deadline wait",
+  "decisions_cited_evidence_refund_step": "Evidence: refund step",
+  "decisions_cited_evidence_restock_step": "Evidence: restock step",
+  "decisions_cited_evidence_exchange_step": "Evidence: exchange step"
 }
