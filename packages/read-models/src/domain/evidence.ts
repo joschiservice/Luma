@@ -150,6 +150,7 @@ export type EvidenceResolution =
       acceptedAt: string;
       records: { resource: string; externalId: string }[];
       providerRequestId: string | null;
+      adapterVersion: string | null;
     }
   | {
       kind: 'luma_record';
@@ -221,6 +222,8 @@ interface StoredReceipt {
   acceptedAt: string;
   records: { resource: string; externalId: string }[];
   providerRequestId: string | null;
+  /** The adapter that made the write; absent or null when the owner did not record it. */
+  adapterVersion?: string | null | undefined;
 }
 
 /**
@@ -435,6 +438,7 @@ export function resolveEvidence(input: {
               acceptedAt: evidence.acceptedAt,
               records: evidence.records.slice(0, 20),
               providerRequestId: evidence.providerRequestId,
+              adapterVersion: evidence.adapterVersion ?? null,
             }
           : evidence.kind === 'message'
             ? {

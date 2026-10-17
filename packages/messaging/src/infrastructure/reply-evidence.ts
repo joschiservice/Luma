@@ -30,6 +30,7 @@ type ReplyEvidence =
       acceptedAt: string;
       records: { resource: string; externalId: string }[];
       providerRequestId: string | null;
+      adapterVersion: string | null;
     }
   | { kind: 'luma_record'; id: string; record: 'reply' | 'thread' };
 
@@ -107,6 +108,7 @@ export async function replyEvidence(
       acceptedAt: document.observedAt,
       records: document.records,
       providerRequestId: document.providerRequestId,
+      adapterVersion: document.adapterVersion ?? null,
     })),
     ...messages.rows.map((row): ReplyEvidence => ({
       kind: 'read',

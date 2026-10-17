@@ -182,6 +182,8 @@ const evidenceResolutionSchema = z.discriminatedUnion('kind', [
     acceptedAt: instant,
     records: z.array(providerRecordSchema).max(20),
     providerRequestId: z.string().nullable(),
+    /** The adapter version that made the write; null when it was not recorded. */
+    adapterVersion: z.string().nullable(),
   }),
   z.object({
     /** A Luma record, such as the case, approval or reply the entry refers to. */

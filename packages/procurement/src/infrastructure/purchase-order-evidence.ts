@@ -36,6 +36,7 @@ type PurchaseOrderEvidence =
       acceptedAt: string;
       records: { resource: string; externalId: string }[];
       providerRequestId: string | null;
+      adapterVersion: string | null;
     }
   | {
       kind: 'luma_record';
@@ -548,6 +549,7 @@ export async function purchaseOrderEvidence(
           acceptedAt: receipt.observedAt,
           records: receipt.records,
           providerRequestId: receipt.providerRequestId,
+          adapterVersion: receipt.adapterVersion ?? null,
         };
       }
       const read = row.document;

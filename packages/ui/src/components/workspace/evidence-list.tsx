@@ -410,6 +410,8 @@ function EvidenceEntry({
                 m.evidence_not_reported()
               )}
             </dd>
+            <dt>{m.evidence_field_adapter()}</dt>
+            <dd>{resolution.adapterVersion ?? m.evidence_not_recorded()}</dd>
           </dl>
           <p className="evidence-note">{m.evidence_receipt_note()}</p>
         </>

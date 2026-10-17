@@ -52,6 +52,7 @@ const evidence: EvidenceListData = {
         acceptedAt: '2026-10-17T11:54:00Z',
         records: [{ resource: 'purchase_order', externalId: 'B-1007' }],
         providerRequestId: 'req-58c1',
+        adapterVersion: 'jtl-purchasing/2',
       },
     },
     {
@@ -151,6 +152,8 @@ export const Resolved: Story = {
       canvas.getByText('Accepted by JTL, JTL warehouse'),
     ).toBeInTheDocument();
     expect(canvas.getByText('req-58c1')).toBeInTheDocument();
+    // The read and the receipt each name the adapter version that produced them.
+    expect(canvas.getAllByText('jtl-purchasing/2')).toHaveLength(2);
     expect(
       canvas.getByText(/Only a later read confirms the outcome/),
     ).toBeInTheDocument();
