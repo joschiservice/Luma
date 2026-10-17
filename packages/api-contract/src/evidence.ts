@@ -88,11 +88,7 @@ export const evidenceRecordKinds = [
 ] as const;
 
 /** What a purchase order's lifecycle event recorded. */
-const procurementEventKinds = [
-  'created',
-  'status_changed',
-  'revised',
-] as const;
+const procurementEventKinds = ['created', 'status_changed', 'revised'] as const;
 
 const connectionSchema = z.object({
   id: uuid,
