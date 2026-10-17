@@ -112,6 +112,34 @@ async function evidence(f, proposalId) {
   };
 }
 
+/**
+ * Every purchasing-system read the action's verifications and the order's submission audit cite,
+ * with the stored procurement evidence each ID resolves to.
+ */
+async function citedPurchasingReads(f, proposalId, purchaseOrderId) {
+  const org = f.manifest.organizationId;
+  const refs = await f.db.owner.query(
+    `SELECT jsonb_array_elements_text(document->'attempt'->'verification'->'observationRefs') AS id
+       FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2
+     UNION SELECT jsonb_array_elements_text(document->'result'->'observationRefs')
+       FROM execution_verifications WHERE tenant_id=$1 AND proposal_id=$2
+     UNION SELECT jsonb_array_elements_text(document->'evidenceRefs')
+       FROM audit_entries WHERE tenant_id=$1 AND proposal_id=$3
+        AND document->>'eventType'='purchase_order.submitted'`,
+    [org, proposalId, purchaseOrderId],
+  );
+  // Procurement audit entries also name the order itself.
+  const cited = refs.rows
+    .map((row) => row.id)
+    .filter((id) => id !== purchaseOrderId);
+  const stored = await f.db.owner.query(
+    'SELECT id,purpose,subject_id,document FROM procurement_read_evidence WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+    [org, cited],
+  );
+
+  return { cited, stored: stored.rows };
+}
+
 /** Restarts the worker process and runs one pass in the new one. */
 async function restart(t, f, worker, pass) {
   const pid = worker.pid;
@@ -235,6 +263,28 @@ it('places an approved purchase order from the worker once and verifies it after
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+
+  // Every read the verification and submission audit cite resolves to stored evidence.
+  const reads = await citedPurchasingReads(f, requested.actionId, order.id);
+  expect(reads.cited.length).toBeGreaterThan(0);
+  expect(reads.stored.map((row) => row.id).sort()).toEqual(
+    [...reads.cited].sort(),
+  );
+  for (const row of reads.stored)
+    expect(row).toMatchObject({
+      purpose: 'submission',
+      subject_id: requested.id,
+      document: {
+        purchaseOrderId: order.id,
+        source: {
+          provider: 'jtl',
+          connectionId: jtl,
+          resource: 'purchase_order',
+        },
+        completeness: 'complete',
+        data: { lumaOrderId: order.id },
+      },
+    });
 });
 
 it('sends an approved reply from the worker once and confirms it by reading the thread after a restart', async (t) => {
