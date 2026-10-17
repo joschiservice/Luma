@@ -153,8 +153,9 @@ and Luma dispatches once as the requester. Observe-only records `not_executed`.
 Success needs an independent read through `returns.created.read` that finds exactly one
 return for the case with the approved lines and units; more than one, or different lines,
 fails the request and nothing is sent again. An uncertain dispatch only reconciles by
-reading. One request per case can be live or created. Approval requests expire after 24
-hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
+reading, through a manual check or the [background follow-up](#background-follow-up). One request
+per case can be live or created. Approvals expire after 24 hours; an approved request that was
+not sent by then shows as expired. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
 create returns; see [JTL](jtl.md#returns) and [Shopify actions](shopify-actions.md#returns).
 
 For Shopify, a case linked to a requested return approves that exact request instead of
@@ -248,6 +249,24 @@ handoff preserves inspected resale stock quantities and still requires separate 
 Wawi allocation remains owned work: native Shopify intent is not proof of an ERP reservation or
 replacement order. Neither prepared fulfillment nor a paid difference alone closes the case.
 
+### Background follow-up
+
+Approval sends at once from the API, as the requester. If that send never starts, for example
+because the API stopped after recording the approval, the commerce sync worker's return
+follow-up sends the creation, settlement or exchange step as the requester, with the same
+execution identity, while the approval is valid. It also stores an approval or rejection that
+policy recorded but the case did not. The approver never gains execution authority.
+
+- An unsent step whose approval ended is recorded as expired and frees its slot. A new request
+  needs a new approval.
+- A send fence without an execution reservation resumes under its approval. After the approval
+  ends it is released as expired, because execution refuses to dispatch an expired approval.
+- Reserved and uncertain steps are only read, never sent again: at most once a minute, and
+  pending refund money every five minutes. Only fresh independent proof verifies them.
+- Steps changed in the last two minutes are left to the request sending them.
+- Sending and reading need the requester's current `returns.manage` permission. Without it the
+  step waits and then expires. Suspended, disabled and erased requesters are skipped.
+
 ## Owned return deadlines
 
 Merchant deadline configuration is versioned and disabled until reviewed. Receipt waits start
@@ -258,7 +277,7 @@ Unobserved store transitions never supply an inferred timestamp.
 
 The return step follow-up must be activated in Workflows for automatic monitoring. Its bounded
 passes use a persisted cursor and reread each case no more than once per minute. Explicit progress checks use the same service and make no
-provider writes. Reading sent money also reconciles an uncertain refund, restock or exchange
+provider writes. Reading sent money also reconciles an uncertain refund or exchange processing
 attempt; it never sends one again. Each phase has one live occurrence; repeated observations update it rather
 than opening duplicate cases. Policy or anchor changes supersede earlier occurrences. Disabled
 policies and cancelled cases pause their waits without claiming verification.

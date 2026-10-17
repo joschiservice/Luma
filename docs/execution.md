@@ -40,20 +40,22 @@ isolation.
 
 ### Runtimes
 
-The API, the workflow worker, the commerce sync process (mailbox reading and supplier
-follow-up) and the pilot compose the same effect registry from the installed apps. A
+The API, the workflow worker, the commerce sync process (mailbox reading, supplier follow-up
+and return follow-up) and the pilot compose the same effect registry from the installed apps. A
 runtime with enabled execution and the installed purchase-order, return and mailbox runtimes
 resolves the same adapter for an action as every other runtime: the same dispatch identity,
 mechanism and executor. An attempt reserved in one process can therefore be reconciled in
 another. A runtime without execution, or the API without connection settings, resolves none
 of those provider writes.
 
-People's approvals send at once from the API, as the requester. Approved purchase orders and
-replies whose send did not start are sent by the commerce sync passes, also as the
-requester, and those passes reconcile uncertain ones by reading. The workflow worker's
-return step follow-up reconciles sent refunds, restocks and exchange steps by reading while
-it checks return money. No worker activity proposes or approves these writes; it only
-executes or reconciles the bound action under its recorded approval.
+People's approvals send at once from the API, as the requester. Approved purchase orders,
+replies, return creations, return settlements and exchange steps whose send did not start are
+sent by the commerce sync passes, also as the requester and only while the approval is valid.
+Those passes reconcile uncertain writes by reading. A return write whose approval ended before
+execution reserved it is recorded as expired, and a new request is needed. The workflow
+worker's return step follow-up also reads sent refunds and exchange processing while it checks
+return money. No worker activity proposes or approves these writes; it only executes or
+reconciles the bound action under its recorded approval.
 
 Provider runtimes record no capability telemetry and keep no read observations. Each owner
 stores the evidence it uses, such as procurement's purchase-order observations, so
