@@ -42,7 +42,7 @@ test('an enabled development release still requires the approved EU model route,
     (error) =>
       error.code === 1 &&
       error.stderr.includes(
-        'Configure the EU zero-retention authoring route first.',
+        'Configure the regional zero-retention authoring route first.',
       ),
   );
   await assert.rejects(
