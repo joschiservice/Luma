@@ -18,6 +18,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, Clock } from 'lucide-react';
 import { type ReactNode, useContext, useId } from 'react';
 
+import { useNow } from '../../kit/live/now';
 import {
   assigneeOptions,
   decisionStatus,
@@ -49,11 +50,13 @@ export function DecisionDeadline({
   now,
 }: {
   deadline: string | null;
-  now: number;
+  /** A fixed time to count down from; the shared clock by default. */
+  now?: number | undefined;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
+  const clock = useNow();
   if (!deadline) return null;
-  const left = Date.parse(deadline) - now;
+  const left = Date.parse(deadline) - (now ?? clock);
 
   return (
     <span
@@ -67,7 +70,7 @@ export function DecisionDeadline({
     >
       <Clock size={13} aria-hidden="true" />
       <span className="sr-only">{m.decisions_deadline_prefix()} </span>
-      {timeLeft(deadline, now)}
+      {timeLeft(deadline, now ?? clock)}
     </span>
   );
 }
@@ -280,7 +283,8 @@ export function DecisionInspector({
   members: readonly Member[];
   self: string | undefined;
   assignmentAccess: AssignmentAccess;
-  now: number;
+  /** A fixed time for the deadline; the shared clock by default. */
+  now?: number | undefined;
   navigation?: ReactNode;
   onClose: () => void;
   onAssign: (assigneeId: string | null) => void;

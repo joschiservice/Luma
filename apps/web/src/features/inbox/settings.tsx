@@ -61,8 +61,8 @@ export function InboxSettingsPage() {
   const { organizationId } = useParams({
     from: '/app/$organizationId/inbox/settings',
   });
-  useInboxUpdates(organizationId);
-  const query = useQuery(mailboxesOptions(organizationId));
+  const live = useInboxUpdates(organizationId);
+  const query = useQuery(mailboxesOptions(organizationId, live));
   const { can } = usePermissions(organizationId);
   const failure = readFailure(query.error);
   if (failure === 'signin') return <SignInRedirect />;

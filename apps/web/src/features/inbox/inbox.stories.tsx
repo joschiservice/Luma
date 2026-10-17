@@ -149,7 +149,6 @@ function Content({ screen }: { screen: Screen }) {
               detail={screen.detail ?? threadDetailFixture}
               access={{ manage: true, send: true, approve: true }}
               people={people}
-              now={inboxNow}
               onClose={() => setSearch({ ...search, thread: undefined })}
             />
           ) : null

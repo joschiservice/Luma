@@ -64,3 +64,34 @@ it('refreshes inbox reads once per burst of messaging changes and ignores other 
   expect(read).toHaveBeenCalledTimes(1);
   expect(states).toContain('live');
 });
+
+it('refreshes only thread reads for decision changes and every read for messaging changes', async () => {
+  const reads = {
+    threads: vi.fn<() => Promise<number>>().mockResolvedValue(1),
+    thread: vi.fn<() => Promise<number>>().mockResolvedValue(1),
+    mailboxes: vi.fn<() => Promise<number>>().mockResolvedValue(1),
+  };
+  for (const [key, read] of Object.entries(reads)) {
+    const observer = new QueryObserver(client, {
+      queryKey: [...messagingKey('workspace'), key, 'id'],
+      queryFn: read,
+    });
+    cleanup.push(observer.subscribe(() => undefined));
+  }
+  await vi.advanceTimersByTimeAsync(0);
+  cleanup.push(
+    subscribeToMessagingChanges('workspace', client, () => undefined),
+  );
+  for (const read of Object.values(reads)) read.mockClear();
+
+  change(['decisions']);
+  await vi.advanceTimersByTimeAsync(600);
+  expect(reads.threads).toHaveBeenCalledOnce();
+  expect(reads.thread).toHaveBeenCalledOnce();
+  expect(reads.mailboxes).not.toHaveBeenCalled();
+
+  change(['messaging']);
+  await vi.advanceTimersByTimeAsync(600);
+  expect(reads.mailboxes).toHaveBeenCalledOnce();
+  expect(reads.threads).toHaveBeenCalledTimes(2);
+});

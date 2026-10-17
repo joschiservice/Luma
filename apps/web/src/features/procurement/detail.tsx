@@ -43,7 +43,13 @@ import {
   Send,
   Workflow,
 } from 'lucide-react';
-import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
@@ -138,6 +144,18 @@ type Dialog =
   | { kind: 'respond'; attention: Attention }
   | { kind: 'transition'; status: PurchaseOrderStatus };
 
+/**
+ * Polls an order only while approval or sending can change it without anyone acting here. Other
+ * changes arrive through this screen's own mutations, a revisit or, in Needs you, a queue refresh.
+ */
+const recordPollInterval = (query: {
+  state: { data?: PurchaseOrderRecord | undefined };
+}) =>
+  query.state.data &&
+  ['awaiting_approval', 'sending'].includes(query.state.data.stage)
+    ? 5000
+    : false;
+
 /** Loads a purchase order's record and its stock context, and keeps both fresh. */
 export function PurchaseOrderPage() {
   const { organizationId, purchaseOrderId } = useParams({
@@ -145,11 +163,7 @@ export function PurchaseOrderPage() {
   });
   const record = useQuery({
     ...purchaseOrderRecordOptions(organizationId, purchaseOrderId),
-    refetchInterval: (query) =>
-      query.state.data &&
-      ['awaiting_approval', 'sending'].includes(query.state.data.stage)
-        ? 5000
-        : false,
+    refetchInterval: recordPollInterval,
   });
   const context = useQuery(
     purchaseOrderContextOptions(organizationId, purchaseOrderId),
@@ -2007,14 +2021,27 @@ function OrderCard({
 export function PurchaseOrderReview({
   organizationId,
   purchaseOrderId,
+  refreshedAt = 0,
 }: {
   organizationId: string;
   purchaseOrderId: string;
+  /**
+   * When Needs you last read this decision. Supplier replies and follow-ups change the queue
+   * through its stream in any stage, so the record is read again whenever the queue is.
+   */
+  refreshedAt?: number;
 }) {
   const record = useQuery({
     ...purchaseOrderRecordOptions(organizationId, purchaseOrderId),
-    refetchInterval: 5000,
+    refetchInterval: recordPollInterval,
   });
+  const seen = useRef(refreshedAt);
+  const { refetch } = record;
+  useEffect(() => {
+    if (refreshedAt === seen.current) return;
+    seen.current = refreshedAt;
+    void refetch();
+  }, [refreshedAt, refetch]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const client = useQueryClient();
   const review = useMutation({

@@ -91,7 +91,25 @@ export function organizationSlug(name: string) {
   return `${stem}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-/** Cancels and removes private queries, optionally limited to one organization. */
+const privateCleanups = new Set<(organizationId?: string) => void>();
+
+/**
+ * Registers module state that holds private data outside the query cache, so `clearPrivate`
+ * forgets it too. The cleanup receives the workspace being cleared, or nothing when every
+ * workspace is. Returns a function that unregisters it.
+ */
+export function onClearPrivate(cleanup: (organizationId?: string) => void) {
+  privateCleanups.add(cleanup);
+
+  return () => {
+    privateCleanups.delete(cleanup);
+  };
+}
+
+/**
+ * Cancels and removes private queries, optionally limited to one organization, and clears
+ * private module state registered with `onClearPrivate`.
+ */
 export async function clearPrivate(
   client: QueryClient,
   organizationId?: string,
@@ -99,6 +117,7 @@ export async function clearPrivate(
   const queryKey = organizationId
     ? ['private', 'organization', organizationId]
     : ['private'];
+  for (const cleanup of privateCleanups) cleanup(organizationId);
   await client.cancelQueries({ queryKey });
   client.removeQueries({ queryKey });
 }
