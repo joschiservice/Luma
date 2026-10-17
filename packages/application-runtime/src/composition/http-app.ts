@@ -50,6 +50,7 @@ import { readModelsHttp } from './features/read-models.js';
 import { resolutionHttp } from './features/resolution.js';
 import { salesHttp } from './features/sales.js';
 import { workflowsHttp } from './features/workflows.js';
+import { apiSecurityHeaders } from './security-headers.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -69,6 +70,8 @@ interface RuntimeDependencies {
   checkReadiness?: () => Promise<boolean>;
   connections?: ConnectionManagement;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
+  /** Whether the public origin uses HTTPS; enables `Strict-Transport-Security`. */
+  httpsOrigin?: boolean;
   identity?: IdentityService;
   metricEvents?: MetricEvents;
   modelGateway?: ModelGateway;
@@ -132,6 +135,10 @@ export function buildApp(
   });
   app.decorate('modelGateway', dependencies.modelGateway ?? null);
   app.decorateRequest('observation', null);
+  const securityHeaders = apiSecurityHeaders(dependencies.httpsOrigin ?? false);
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.headers(securityHeaders);
+  });
   app.addHook('onResponse', async (request, reply) => {
     const observation = request.observation;
     observation?.end(reply.statusCode >= 500 ? 'error' : 'ok');

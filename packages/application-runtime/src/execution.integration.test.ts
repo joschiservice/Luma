@@ -140,7 +140,21 @@ describe.skipIf(!databaseUrl)(
         },
       });
       expect(response.statusCode, response.body).toBe(200);
-      const raw = response.headers['set-cookie'];
+      // The emailed confirmation link would set this before the first sign-in.
+      await owner.query('UPDATE users SET email_verified=true WHERE email=$1', [
+        `${name}@example.test`,
+      ]);
+      const signedIn = await app.inject({
+        method: 'POST',
+        url: '/auth/sign-in/email',
+        headers: { origin },
+        payload: {
+          email: `${name}@example.test`,
+          password: 'long-test-password',
+        },
+      });
+      expect(signedIn.statusCode, signedIn.body).toBe(200);
+      const raw = signedIn.headers['set-cookie'];
       const cookie = (Array.isArray(raw) ? raw : [raw!])
         .map((value) => value.split(';')[0])
         .join('; ');
@@ -713,14 +727,12 @@ describe.skipIf(!databaseUrl)(
         [b, 'admin'],
         [m, 'member'],
       ] as const) {
-        const response = await app.inject({
-          method: 'POST',
-          url: `/v1/organizations/${tenantId}/members`,
-          headers: { cookie: a.cookie, origin },
-          payload: { userId: user.id, roleId: role },
-        });
-        expect(response.statusCode).toBe(201);
-        if (role === 'admin') bobMembership = response.json().id;
+        const id = randomUUID();
+        await owner.query(
+          'INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,$4,now())',
+          [id, tenantId, user.id, role],
+        );
+        if (role === 'admin') bobMembership = id;
       }
       alice = await context(a.cookie, tenantId);
       bob = await context(b.cookie, tenantId);

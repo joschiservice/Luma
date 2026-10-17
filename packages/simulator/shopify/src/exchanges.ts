@@ -17,6 +17,7 @@ import {
   load,
   moneyBag,
   nextId,
+  notify,
   type OrderData,
   type OrderTransactionData,
   parseGid,
@@ -488,10 +489,8 @@ export async function processExchange(context: RequestContext, args: Args) {
   });
   await touchOrder(context.shop, order.id);
   context.loader.clear();
-  context.shop.notify({
-    topic: 'returns/update',
-    resource: gid('Return', returned.id),
-    payload: { order_id: Number(order.id) },
+  notify(context.shop, 'returns/update', 'Return', returned.id, {
+    order_id: Number(order.id),
   });
 
   return {

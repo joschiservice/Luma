@@ -49,6 +49,8 @@ export function createStarshipitProvider(
     provider: 'starshipit',
     targets: ['starshipit'],
     validate: (value) => installationInput.parse(value),
+    // Replacing the keys drops the webhook secret unless a new one is supplied; the setup form
+    // generates a new one right after saving.
     credentials: (_target, value) => installationCredentials.parse(value),
     async verify(connection, credentials) {
       await enabled(connection.tenantId);

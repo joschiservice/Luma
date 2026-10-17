@@ -5,10 +5,12 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useRouter,
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
 import { themeBootScript, watchTheme } from '../lib/theme';
+import { zodConfigBootScript } from '../lib/zod-config';
 import stylesheet from '../styles.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
@@ -30,13 +32,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function Root() {
+  const nonce = useRouter().options.ssr?.nonce;
   useEffect(() => watchTheme(), []);
 
   return (
     <html lang={getLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: themeBootScript }}
+        />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: zodConfigBootScript }}
+        />
       </head>
       <body>
         <Outlet />

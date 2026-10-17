@@ -95,10 +95,26 @@ interface SupportAccessRequest {
   expiresAt: string;
 }
 
+/**
+ * A Luma support request to inspect a workspace or account, pending or approved and still open.
+ * Emergency access is opened by support without approval and shows no reason.
+ */
+export interface SupportInspection {
+  id: string;
+  status: 'pending' | 'approved';
+  emergency: 'security_incident' | 'legal_request' | null;
+  reason: string | null;
+  requestedAt: string;
+  expiresAt: string;
+  accessExpiresAt: string | null;
+}
+
 /** Whether, and until when, Luma support may open read-only views of the workspace. */
 export interface SupportAccess {
   allowedUntil: string | null;
   changedAt: string | null;
   revision: number;
   requests: SupportAccessRequest[];
+  /** Inspection requests and approved inspections that are still open, newest first. */
+  inspections: SupportInspection[];
 }

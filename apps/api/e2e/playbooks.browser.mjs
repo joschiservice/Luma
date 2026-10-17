@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 import { seedPlaybooks } from './playbooks-fixture.mjs';
 
 test('finds, reviews, activates, reloads and revokes a persisted workflow with workspace and member isolation', async ({
@@ -33,19 +39,11 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   page.setDefaultTimeout(15_000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page
-    .getByLabel('Email', { exact: true })
-    .fill('workflows@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'workflows@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Workflow studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

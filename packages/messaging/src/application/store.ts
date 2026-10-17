@@ -10,6 +10,7 @@ import type {
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
 import type {
   Citation,
+  DeliveryOutcome,
   OutboundState,
   ReplyLanguage,
 } from '../domain/replies.js';
@@ -96,6 +97,7 @@ export type EventType =
   | 'reply_approved'
   | 'reply_rejected'
   | 'reply_withheld'
+  | 'delivery_resolved'
   | 'text_removed'
   | 'fact_reviewed';
 
@@ -158,6 +160,34 @@ interface OutboundDocument {
   contentRetainUntil?: string;
   contentPurgedAt?: string;
   deliveryCheckedAt?: string;
+  /**
+   * A delivery report whose sender was not authenticated. Delivery stays uncertain: reading the
+   * thread again proves only acceptance, so the reply is not settled as sent or failed by it.
+   */
+  unverifiedDeliveryReport?: {
+    messageId: string;
+    recipient: string;
+    status: string;
+    /** Whether the send itself was already recorded when the report arrived. */
+    sendRecorded: boolean;
+  };
+  /**
+   * How an uncertain send was settled without a read of the send itself: a person's decision
+   * after checking with the recipient, or an authenticated reply from the recipient.
+   */
+  deliveryResolution?: {
+    /** The person's command ID, or an ID derived from the reply message. */
+    id: string;
+    outcome: DeliveryOutcome;
+    source: 'person' | 'reply';
+    /** The deciding member; null for a reply. */
+    by: string | null;
+    at: string;
+    /** The person's internal note; never sent. */
+    note: string | null;
+    /** The stored reply that proved delivery. */
+    messageId: string | null;
+  };
   /** Supplier work metadata is bound with the exact approved content. */
   procurement?: {
     purchaseOrderId: string;

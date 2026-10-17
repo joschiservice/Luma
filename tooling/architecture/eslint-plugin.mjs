@@ -171,6 +171,7 @@ export function violation(from, to) {
         'apps/api/src/staff.integration.test.ts',
         'apps/api/src/membership-suspension.integration.test.ts',
         'apps/api/src/account-deletion.integration.test.ts',
+        'apps/api/src/account-mail-outbox.integration.test.ts',
         'apps/api/src/support-view.integration.test.ts',
         'apps/api/src/support-view.test.ts',
         'apps/api/src/shopify-oauth.integration.test.ts',

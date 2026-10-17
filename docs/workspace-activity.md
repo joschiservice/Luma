@@ -134,7 +134,12 @@ execution failures and human or verified issue resolution.
 
 People with `activity.read_restricted` also see connection lifecycle events and access changes
 (`type: 'access'`): member, invitation, role, approval-policy and app-permission changes,
-summarized without emails, permission lists or tokens.
+summarized without emails, permission lists or tokens. Access changes also show Luma support's
+work in the workspace: inspection requests (by Luma support), their approval, decline or
+revocation (by the member who answered), lapses (by Luma) and emergency inspection with its
+category, as well as support views and support access consent. Request reasons appear in
+Settings › Luma support for approvers, not in Activity; emergency reasons and references and the
+staff identity are never shown.
 
 Playbooks persist activation reviews and current revocation state, not an immutable
 activation/revocation history. Activity does not invent timestamps or actors for those

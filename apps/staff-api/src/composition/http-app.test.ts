@@ -22,6 +22,8 @@ function fixture(trustedProxy: string[] = []) {
     service: {
       workspacePlacement: unused,
       directory: unused,
+      requestAccess: unused,
+      accessRequest: unused,
       grant: unused,
       workspace: unused,
       revoke: unused,
@@ -31,6 +33,8 @@ function fixture(trustedProxy: string[] = []) {
       health: unused,
       accessHistory: unused,
       audit: unused,
+      requestAccountAccess: unused,
+      accountAccessRequest: unused,
       accountGrant: unused,
       account: unused,
       accountSecurityEvents: unused,

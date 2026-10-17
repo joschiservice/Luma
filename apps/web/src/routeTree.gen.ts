@@ -18,6 +18,7 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignOutRouteImport } from './routes/sign-out'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SupportViewRouteImport } from './routes/support-view'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppOrganizationIdRouteImport } from './routes/app.$organizationId'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
@@ -117,6 +118,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SupportViewRoute = SupportViewRouteImport.update({
   id: '/support-view',
   path: '/support-view',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -452,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/support-view': typeof SupportViewRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
@@ -517,6 +524,7 @@ export interface FileRoutesByTo {
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/support-view': typeof SupportViewRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app': typeof AppIndexRoute
@@ -584,6 +592,7 @@ export interface FileRoutesById {
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/support-view': typeof SupportViewRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
@@ -652,6 +661,7 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/sign-up'
     | '/support-view'
+    | '/verify-email'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app/'
@@ -717,6 +727,7 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/sign-up'
     | '/support-view'
+    | '/verify-email'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app'
@@ -783,6 +794,7 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/sign-up'
     | '/support-view'
+    | '/verify-email'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app/'
@@ -850,6 +862,7 @@ export interface RootRouteChildren {
   SignOutRoute: typeof SignOutRoute
   SignUpRoute: typeof SignUpRoute
   SupportViewRoute: typeof SupportViewRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsIndexRoute: typeof DocsIndexRoute
 }
@@ -917,6 +930,13 @@ declare module '@tanstack/react-router' {
       path: '/support-view'
       fullPath: '/support-view'
       preLoaderRoute: typeof SupportViewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -1472,6 +1492,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignOutRoute: SignOutRoute,
   SignUpRoute: SignUpRoute,
   SupportViewRoute: SupportViewRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsIndexRoute: DocsIndexRoute,
 }

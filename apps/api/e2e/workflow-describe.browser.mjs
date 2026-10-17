@@ -2,7 +2,13 @@
 import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 const screenshots = '/tmp/luma88-browser';
 
@@ -34,19 +40,11 @@ test('drafts a workflow from a description and applies a reviewed change', async
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir(screenshots, { recursive: true });
 
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Grace');
-  await page
-    .getByLabel('Email', { exact: true })
-    .fill('describer@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Grace',
+    email: 'describer@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Describing studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

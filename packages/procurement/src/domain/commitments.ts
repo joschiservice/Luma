@@ -75,7 +75,8 @@ export type ReviewReason =
   | 'quantity_changed'
   | 'date_later'
   | 'unmatched_line'
-  | 'supplier_condition';
+  | 'supplier_condition'
+  | 'sender_unverified';
 
 type SubmissionState =
   | 'not_executed'
@@ -285,15 +286,21 @@ function effective(
 
 /**
  * Explains why a proposed commitment must be reviewed before it counts. Changes against the
- * order and anything uncertain need a person; matching confirmations do not.
+ * order and anything uncertain need a person; matching confirmations do not. A message whose
+ * sender was not authenticated could come from anyone, so none of its facts count unreviewed.
  */
 export function reviewReasons(
   fact: Pick<Commitment, 'kind' | 'quantity' | 'date' | 'lineId'>,
   line: PurchaseOrderLine | null,
   requestedDate: string | null,
-  options: { confident: boolean; lineRequired: boolean },
+  options: {
+    confident: boolean;
+    lineRequired: boolean;
+    senderVerified?: boolean | undefined;
+  },
 ): ReviewReason[] {
   const reasons: ReviewReason[] = [];
+  if (options.senderVerified === false) reasons.push('sender_unverified');
   if (!options.confident) reasons.push('low_confidence');
   if (options.lineRequired && !line) reasons.push('unmatched_line');
   if (
@@ -505,7 +512,10 @@ export function orderProgress(input: {
       commitmentId: null,
       submissionId: submission.id,
       dueAt: submission.updatedAt,
-      summary: `Check whether ${order.reference} reached the purchasing system`,
+      summary:
+        submission.channel === 'email'
+          ? `Confirm whether the order email for ${order.reference} reached the supplier`
+          : `Check whether ${order.reference} reached the purchasing system`,
     });
   if (submission?.state === 'failed')
     attention.push({
@@ -657,7 +667,9 @@ export function orderProgress(input: {
     expired: 'The approval request expired before it was sent.',
     submitting: 'Luma is placing it in the purchasing system.',
     uncertain:
-      'The purchasing system did not confirm the request. Luma is checking whether it was created.',
+      submission?.channel === 'email'
+        ? 'Delivery of the order email is uncertain. Confirm with the supplier.'
+        : 'The purchasing system did not confirm the request. Luma is checking whether it was created.',
     submitted:
       submission?.channel === 'email'
         ? 'The mail provider independently verified the sent message. This does not confirm supplier acceptance.'
@@ -915,6 +927,13 @@ function nextAction(input: {
       detail:
         'Someone else who can approve changes must approve before Luma places it in the purchasing system.',
     };
+  if (first?.kind === 'submission_uncertain' && submission?.channel === 'email')
+    return {
+      owner: 'buyer',
+      title: 'Confirm the order email reached the supplier',
+      detail:
+        'Luma can’t tell whether the supplier received it and will not send it again on its own. Ask the supplier, then mark the email as delivered or not delivered.',
+    };
   if (first?.kind === 'submission_uncertain')
     return {
       owner: 'luma',
@@ -1020,6 +1039,11 @@ export interface Communication {
   receivedAt: string;
   /** The sender's message ID, when the channel provides one. */
   messageId: string | null;
+  /**
+   * Set for messages the inbox handed over: whether the receiving mail system authenticated
+   * the sender's domain. Absent when a person recorded the message.
+   */
+  senderVerified?: boolean | undefined;
   /** SHA-256 of sender, subject and text; retained after the text is removed. */
   digest: string;
   capturedBy: string;

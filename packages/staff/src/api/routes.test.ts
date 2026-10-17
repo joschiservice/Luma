@@ -38,6 +38,18 @@ function fixture(
         throw new Error('Unused');
       },
       directory,
+      requestAccess: async () => {
+        throw new Error('Unused');
+      },
+      accessRequest: async () => {
+        throw new Error('Unused');
+      },
+      requestAccountAccess: async () => {
+        throw new Error('Unused');
+      },
+      accountAccessRequest: async () => {
+        throw new Error('Unused');
+      },
       grant: async () => {
         throw new Error('Unused');
       },
@@ -286,9 +298,19 @@ describe('staff HTTP security boundary', () => {
         (
           await app.inject({
             method: 'POST',
-            url: `/v1/staff/accounts/${userId}/access`,
+            url: `/v1/staff/accounts/${userId}/access-requests`,
             headers: { cookie: 'staff', origin },
             payload: { reason: 'Investigating a sign-in ticket' },
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/v1/staff/accounts/${userId}/access`,
+            headers: { cookie: 'staff', origin },
+            payload: { requestId: userId },
           })
         ).statusCode,
       ).toBe(403);

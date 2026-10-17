@@ -1,5 +1,8 @@
+import type { AuthProtectionConfig } from './auth-protection.js';
+import { readAuthProtectionConfig } from './auth-protection.js';
 import type { DataRegion } from './regions.js';
 import { assertRegionalServiceEndpoint, readRegionConfig } from './regions.js';
+import { isWeakSecret } from './secrets.js';
 
 const levels = [
   'fatal',
@@ -54,6 +57,8 @@ export interface IdentityConfig {
   baseURL: string;
   trustedOrigins: string[];
   cookiePrefix?: string;
+  rateLimit: AuthProtectionConfig['rateLimit'];
+  clientIpHeader?: string;
 }
 
 /**
@@ -73,6 +78,10 @@ export function readIdentityConfig(
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 32)
     throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
+  if (env.NODE_ENV === 'production' && isWeakSecret(secret))
+    throw new Error(
+      'BETTER_AUTH_SECRET must be a random value, not a placeholder',
+    );
   const rawURL = env.BETTER_AUTH_URL;
   if (!rawURL) throw new Error('BETTER_AUTH_URL is required');
   const base = new URL(rawURL);
@@ -220,6 +229,7 @@ export function readIdentityConfig(
     baseURL: base.origin,
     trustedOrigins,
     ...(cookiePrefix === undefined ? {} : { cookiePrefix }),
+    ...readAuthProtectionConfig(env),
   };
 }
 

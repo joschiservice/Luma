@@ -9,19 +9,20 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useForm } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { AccessDialog } from './access';
 import { Failure, Loading } from './feedback';
+import { InspectionRequestDialog } from './inspection';
 import { directoryOptions } from './queries';
 import { staffPath, type StaffRegion, staffRegion } from './regions';
 import { directoryRoute } from './router';
 
-/** Searches the minimal customer directory and opens an explicit support access request. */
+/** Searches the minimal customer directory and asks a workspace to approve inspection. */
 export function DirectoryPage() {
   const { query = '' } = directoryRoute.useSearch();
   const navigate = directoryRoute.useNavigate();
+  const workspaceNavigate = useNavigate();
   const [target, setTarget] = useState<{
     id: string;
     name: string;
@@ -241,12 +242,19 @@ export function DirectoryPage() {
         </div>
       )}
       {target ? (
-        <AccessDialog
+        <InspectionRequestDialog
           key={target.id}
-          workspaceId={target.id}
+          target={{ kind: 'workspace', id: target.id }}
           region={target.region}
           name={target.name}
           onClose={() => setTarget(null)}
+          afterRequest={async () => {
+            await workspaceNavigate({
+              to: '/workspaces/$workspaceId',
+              params: { workspaceId: target.id },
+              search: { region: target.region },
+            });
+          }}
         />
       ) : null}
     </>

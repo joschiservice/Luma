@@ -2,7 +2,13 @@
 import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 const screenshots = '/tmp/luma88-browser';
 
@@ -33,17 +39,11 @@ test('creates workflows from templates and from scratch, then publishes without 
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir(screenshots, { recursive: true });
 
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('author@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'author@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Authoring studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

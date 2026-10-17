@@ -51,6 +51,9 @@ export const supplierEmailDraftSchema = outboundSchema.pick({
   stateReason: true,
   sentMessageId: true,
   attachments: true,
+  delivery: true,
+  canResolveDelivery: true,
+  revision: true,
 });
 
 export const supplierEmailStatusSchema = z.object({

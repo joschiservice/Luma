@@ -36,8 +36,10 @@ updating them.
 
 Setup creates `demo@example.test` with a generated password in `.luma/demo.json`, one AU
 workspace and two synthetic exceptions taken from the golden corpus. Seeding uses the real
-services and is idempotent. For the other exception classes and safe execution, use the
-pilot.
+services and is idempotent, and marks its accounts' email addresses confirmed. Local
+development has no mail provider, so an account created through the sign-up page can't be
+confirmed or signed in to; use the seeded accounts. For the other exception classes and safe
+execution, use the pilot.
 
 `pnpm db:reset` also drops the simulator database and archives pilot and simulator
 manifests under `.luma/backups/`; the next launch seeds fresh state. Temporal history is

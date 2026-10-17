@@ -14,7 +14,13 @@ export type SecurityEventType =
   | 'account.disabled'
   | 'account.enabled'
   | 'account.deletion-scheduled'
-  | 'account.restored';
+  | 'account.restored'
+  | 'support-inspection.requested'
+  | 'support-inspection.approved'
+  | 'support-inspection.declined'
+  | 'support-inspection.expired'
+  | 'support-inspection.revoked'
+  | 'support-inspection.emergency-opened';
 
 type SecurityEventOutcome = 'succeeded' | 'failed';
 
@@ -36,7 +42,9 @@ export type SecurityEventReason =
   | 'backup-code'
   | 'one'
   | 'others'
-  | 'all';
+  | 'all'
+  | 'security-incident'
+  | 'legal-request';
 
 /** A security event as written by identity. Either the user or the email hash may be known. */
 export interface SecurityEventRecord {

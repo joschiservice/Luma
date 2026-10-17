@@ -1,0 +1,34 @@
+.delivery-decision,
+.delivery-decision-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.delivery-decision-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin: 0;
+}
+
+.delivery-decision-facts dt {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.delivery-decision-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.delivery-decision-hint {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  margin: 0;
+}

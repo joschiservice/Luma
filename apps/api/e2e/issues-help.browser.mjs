@@ -10,7 +10,13 @@ import {
 } from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  database,
+  startApi,
+  startProcess,
+  verifyEmail,
+} from './helpers.mjs';
 
 test('opens contextual issue guides and preserves the investigation across help navigation', async ({
   resources: t,
@@ -46,6 +52,12 @@ test('opens contextual issue guides and preserves the investigation across help 
   });
   expect(signup.status()).toBe(200);
   const user = (await signup.json()).user;
+  await verifyEmail(db.owner, 'help@example.test');
+  const signIn = await context.request.post('/api/auth/sign-in/email', {
+    headers: { origin },
+    data: { email: 'help@example.test', password: 'help-browser-password-123' },
+  });
+  expect(signIn.status()).toBe(200);
   const creation = await context.request.post('/api/v1/organizations', {
     headers: { origin },
     data: {

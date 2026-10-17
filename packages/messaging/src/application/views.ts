@@ -90,7 +90,9 @@ export interface LinkView {
   record: RecordView;
   method: LinkMethod;
   state: 'active' | 'suggested';
-  evidence: LinkEvidence;
+  evidence: Omit<LinkEvidence, 'senderUnverified'> & {
+    senderUnverified: boolean;
+  };
   createdBy: string;
   createdAt: string;
 }
@@ -100,6 +102,8 @@ export interface MessageView {
   threadId: string;
   direction: 'inbound' | 'outbound';
   from: Address;
+  /** Inbound only: whether the mailbox provider authenticated the From domain. */
+  senderAuthentication: 'aligned' | 'unaligned' | 'unknown' | null;
   to: Address[];
   cc: Address[];
   subject: string;
@@ -162,11 +166,23 @@ export interface OutboundView {
   decisionId: string | null;
   approverId: string | null;
   sentMessageId: string | null;
+  /** Delivery evidence beyond the send itself: an unverified report and how it was settled. */
+  delivery: {
+    report: { recipient: string; status: string } | null;
+    resolution: {
+      outcome: 'delivered' | 'not_delivered';
+      source: 'person' | 'reply';
+      by: string | null;
+      at: string;
+      note: string | null;
+    } | null;
+  };
   canEdit: boolean;
   canRequest: boolean;
   canApprove: boolean;
   canSend: boolean;
   canCheck: boolean;
+  canResolveDelivery: boolean;
   revision: number;
   createdAt: string;
   updatedAt: string;
@@ -272,6 +288,12 @@ export function eventView(
           ...(details.kind ? { kind: details.kind } : {}),
           ...(details.outcome ? { outcome: details.outcome } : {}),
         };
+      case 'delivery_resolved':
+        return {
+          ...(details.outboundId ? { outboundId: details.outboundId } : {}),
+          ...(details.outcome ? { outcome: details.outcome } : {}),
+          ...(details.source ? { source: details.source } : {}),
+        };
       default:
         return details.reason ? { reason: details.reason } : {};
     }
@@ -344,6 +366,10 @@ export function messageView(
     threadId: message.threadId,
     direction: message.direction,
     from: document.from,
+    senderAuthentication:
+      message.direction === 'inbound'
+        ? (document.senderAuthentication ?? 'unknown')
+        : null,
     to: document.to,
     cc: document.cc,
     subject: document.subject,
@@ -384,7 +410,13 @@ export function linkView(
     record: recordView(context, link.kind, link.recordId, labels),
     method: link.method,
     state: link.state === 'suggested' ? 'suggested' : 'active',
-    evidence: link.evidence,
+    evidence: {
+      messageId: link.evidence.messageId,
+      ruleId: link.evidence.ruleId,
+      text: link.evidence.text,
+      span: link.evidence.span,
+      senderUnverified: link.evidence.senderUnverified === true,
+    },
     createdBy: link.createdBy,
     createdAt: link.createdAt,
   };
@@ -499,6 +531,23 @@ export function outboundView(
     decisionId: document.decisionId ?? null,
     approverId: document.approverId ?? null,
     sentMessageId: document.sentMessageId ?? null,
+    delivery: {
+      report: document.unverifiedDeliveryReport
+        ? {
+            recipient: document.unverifiedDeliveryReport.recipient,
+            status: document.unverifiedDeliveryReport.status,
+          }
+        : null,
+      resolution: document.deliveryResolution
+        ? {
+            outcome: document.deliveryResolution.outcome,
+            source: document.deliveryResolution.source,
+            by: document.deliveryResolution.by,
+            at: document.deliveryResolution.at,
+            note: document.deliveryResolution.note,
+          }
+        : null,
+    },
     canEdit: actions.canEdit,
     canRequest: actions.canRequest,
     canApprove:
@@ -506,6 +555,11 @@ export function outboundView(
       (!document.procurement || hasPermission(context, 'procurement.manage')),
     canSend: actions.canSend,
     canCheck: actions.canCheck,
+    canResolveDelivery:
+      outbound.state === 'uncertain' &&
+      !!document.procurement &&
+      hasPermission(context, 'messages.send') &&
+      hasPermission(context, 'procurement.manage'),
     revision: outbound.revision,
     createdAt: outbound.createdAt,
     updatedAt: outbound.updatedAt,

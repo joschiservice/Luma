@@ -618,4 +618,38 @@ describe('supplier order delivery failures', () => {
       }),
     ).rejects.toThrow();
   });
+  it('records Gmail authentication results for delivered mail, not for its own sends', async () => {
+    const context = createContext();
+    const call = client(context);
+    const results = async (id: string) =>
+      (await call(`messages/${id}?format=full`)).body.payload.headers
+        .filter((h) => h.name === 'Authentication-Results')
+        .map((h) => h.value);
+    const deliver = async (
+      from: string,
+      authentication?: 'pass' | 'fail' | 'none',
+    ) => {
+      const result = await gmail.command(context, {
+        kind: 'deliver',
+        from: { address: from },
+        text: 'Confirmed',
+        ...(authentication ? { authentication } : {}),
+      });
+      if (result.kind !== 'message') throw new Error('Expected message');
+
+      return result.id;
+    };
+    expect(await results(await deliver('sales@supplier.example'))).toEqual([
+      expect.stringMatching(
+        /^mx\.google\.com; .*dmarc=pass .*header\.from=supplier\.example$/,
+      ),
+    ]);
+    expect(
+      await results(await deliver('sales@supplier.example', 'fail')),
+    ).toEqual([expect.stringContaining('dmarc=fail')]);
+    expect(
+      await results(await deliver('sales@supplier.example', 'none')),
+    ).toEqual([]);
+    expect(await results(await deliver(context.config.address))).toEqual([]);
+  });
 });

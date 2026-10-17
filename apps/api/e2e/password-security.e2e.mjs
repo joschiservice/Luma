@@ -2,16 +2,19 @@ import { createHmac } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
-import { settingsFixture } from './settings-fixture.mjs';
+import { invitationProof, settingsFixture } from './settings-fixture.mjs';
 
 const password = 'settings-test-password-123';
 const newPassword = 'replacement-password-123';
 const origin = 'http://localhost:3000';
-let nextIp = 1;
 
-async function fixture(t) {
-  const f = await settingsFixture(t);
-  const authHeaders = { origin, 'x-forwarded-for': `192.0.2.${nextIp++}` };
+/**
+ * Rate limits count per client address, which is the inject socket address here; each fixture
+ * has its own counters. Tests that make many sign-in attempts turn limits off.
+ */
+async function fixture(t, { rateLimit = true } = {}) {
+  const f = await settingsFixture(t, origin, { rateLimit });
+  const authHeaders = { origin };
 
   return {
     ...f,
@@ -89,17 +92,26 @@ function totp(uri) {
 }
 
 it('changes passwords with current proof, isolates session controls and rejects revoked sessions', async (t) => {
-  const f = await fixture(t);
+  // Password changes repeat faster than their per-address limit allows.
+  const f = await fixture(t, { rateLimit: false });
   const other = await login(f, f.owner);
   const third = await login(f, f.owner);
   const list = await f.request(f.owner, '/auth/list-sessions');
   expect(list).toHaveLength(3);
   expect(list.filter((s) => s.current)).toHaveLength(1);
   expect(list[0].lastActiveAt).toBeTruthy();
+  expect(list.every((s) => !('token' in s))).toBe(true);
   const outsiderSessions = await f.request(f.outsider, '/auth/list-sessions');
-  await f.request(f.owner, '/auth/revoke-session', 'POST', {
-    token: outsiderSessions[0].token,
+  await f.request(f.owner, '/auth/revoke-session-by-id', 'POST', {
+    sessionId: outsiderSessions[0].id,
   });
+  await f.request(
+    f.owner,
+    '/auth/revoke-session',
+    'POST',
+    { token: 'any' },
+    404,
+  );
   await f.request(f.outsider, '/v1/organizations');
   await f.request(
     f.owner,
@@ -120,8 +132,8 @@ it('changes passwords with current proof, isolates session controls and rejects 
     newPassword,
   });
   await f.request(other, '/v1/organizations');
-  await f.request(f.owner, '/auth/revoke-session', 'POST', {
-    token: list.find((s) => !s.current).token,
+  await f.request(f.owner, '/auth/revoke-session-by-id', 'POST', {
+    sessionId: list.find((s) => !s.current).id,
   });
   expect((await f.request(f.owner, '/auth/list-sessions')).length).toBe(2);
   const remaining = await f.request(f.owner, '/auth/list-sessions');
@@ -129,8 +141,8 @@ it('changes passwords with current proof, isolates session controls and rejects 
   await f.request(other, '/v1/organizations', 'GET', undefined, 401);
   await f.request(third, '/v1/organizations', 'GET', undefined, 401);
   expect((await f.request(f.owner, '/auth/list-sessions')).length).toBe(1);
-  await f.request(f.owner, '/auth/revoke-session', 'POST', {
-    token: remaining.find((s) => s.current).token,
+  await f.request(f.owner, '/auth/revoke-session-by-id', 'POST', {
+    sessionId: remaining.find((s) => s.current).id,
   });
   await f.request(f.owner, '/v1/organizations', 'GET', undefined, 401);
   const fresh = await login(f, f.owner, newPassword);
@@ -345,4 +357,234 @@ it('localizes security email and refuses disabled-account reset links', async (t
     { token, newPassword },
     400,
   );
+});
+
+it('creates no session until the email address is confirmed through the emailed link', async (t) => {
+  const f = await fixture(t, { rateLimit: false });
+  const email = 'dana@example.test';
+  const registered = await f.app.inject({
+    method: 'POST',
+    url: '/auth/sign-up/email',
+    headers: f.authHeaders,
+    payload: { name: 'Dana', email, password, dataRegion: 'AU' },
+  });
+  expect(registered.statusCode, registered.body).toBe(200);
+  expect(cookies(registered)).toBe('');
+  const refused = await f.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: f.authHeaders,
+    payload: { email, password },
+  });
+  expect(refused.statusCode, refused.body).toBe(403);
+  expect(refused.json().code).toBe('EMAIL_NOT_VERIFIED');
+  expect(cookies(refused)).toBe('');
+  // Signing up again with a taken address looks the same and sends nothing new.
+  const duplicate = await f.app.inject({
+    method: 'POST',
+    url: '/auth/sign-up/email',
+    headers: f.authHeaders,
+    payload: {
+      name: 'Owner',
+      email: f.owner.email,
+      password,
+      dataRegion: 'AU',
+    },
+  });
+  expect(duplicate.statusCode, duplicate.body).toBe(200);
+  expect(cookies(duplicate)).toBe('');
+  await f.drain();
+  const confirmations = [...f.messages.values()].filter(
+    (m) => m.subject === 'Confirm your email for Luma',
+  );
+  expect(confirmations.map((m) => m.to)).toEqual([email]);
+  const link = new URL(confirmations[0].text.match(/https?:\/\/\S+/)[0]);
+  expect(link.pathname).toBe('/verify-email');
+  expect(link.search).toBe('');
+  await f.request(
+    null,
+    `/auth/verify-email?token=${encodeURIComponent('not-a-token')}`,
+    'GET',
+    undefined,
+    401,
+  );
+  const confirmed = await f.app.inject({
+    method: 'GET',
+    url: `/auth/verify-email?token=${encodeURIComponent(link.hash.slice(1))}`,
+    headers: f.authHeaders,
+  });
+  expect(confirmed.statusCode, confirmed.body).toBe(200);
+  // Confirming never signs in, so it can't skip a second factor.
+  expect(cookies(confirmed)).toBe('');
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT email_verified FROM users WHERE email=$1',
+        [email],
+      )
+    ).rows[0].email_verified,
+  ).toBe(true);
+  await login(f, { email });
+});
+
+it('refuses invitations for an account whose email address is not confirmed', async (t) => {
+  const f = await fixture(t, { rateLimit: false });
+  await f.request(
+    f.owner,
+    `${f.base}/settings/invitations`,
+    'POST',
+    f.command({ email: f.outsider.email, roleId: 'member' }),
+  );
+  await f.drain();
+  const proof = invitationProof(
+    [...f.messages.values()].findLast((m) => m.to === f.outsider.email),
+  );
+  // Accounts created before confirmation was required keep their sessions but are unconfirmed.
+  await f.db.owner.query('UPDATE users SET email_verified=false WHERE id=$1', [
+    f.outsider.id,
+  ]);
+  const refused = await f.request(
+    f.outsider,
+    '/v1/invitations/accept',
+    'POST',
+    proof,
+    403,
+  );
+  expect(refused.code).toBe('EMAIL_NOT_VERIFIED');
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT 1 FROM memberships WHERE tenant_id=$1 AND user_id=$2',
+        [f.org.id, f.outsider.id],
+      )
+    ).rowCount,
+  ).toBe(0);
+  await f.db.owner.query('UPDATE users SET email_verified=true WHERE id=$1', [
+    f.outsider.id,
+  ]);
+  await f.request(f.outsider, '/v1/invitations/accept', 'POST', proof);
+});
+
+it('announces new factors and removes them when an unconfirmed account is recovered', async (t) => {
+  const f = await fixture(t, { rateLimit: false });
+  const setup = await f.request(f.owner, '/auth/two-factor/enable', 'POST', {
+    password,
+  });
+  const confirm = await f.app.inject({
+    method: 'POST',
+    url: '/auth/two-factor/verify-totp',
+    headers: { ...f.authHeaders, cookie: f.owner.cookie },
+    payload: { code: totp(setup.totpURI) },
+  });
+  expect(confirm.statusCode, confirm.body).toBe(200);
+  await f.drain();
+  expect(
+    [...f.messages.values()].filter(
+      (m) =>
+        m.to === f.owner.email &&
+        m.subject ===
+          'Two-factor authentication was turned on for your Luma account',
+    ),
+  ).toHaveLength(1);
+  await f.db.owner.query(
+    "INSERT INTO passkeys(id,user_id,name,credential_id,public_key,counter,device_type,backed_up,created_at) VALUES(gen_random_uuid(),$1,'Unknown','credential-1','key',0,'singleDevice',false,now())",
+    [f.owner.id],
+  );
+  // Someone else may have created an unconfirmed account and added these factors.
+  await f.db.owner.query('UPDATE users SET email_verified=false WHERE id=$1', [
+    f.owner.id,
+  ]);
+  await f.request(null, '/auth/request-password-reset', 'POST', {
+    email: f.owner.email,
+  });
+  await f.drain();
+  await f.request(null, '/auth/reset-password', 'POST', {
+    token: resetToken(f),
+    newPassword,
+  });
+  const account = (
+    await f.db.owner.query(
+      `SELECT u.email_verified,u.two_factor_enabled,
+        (SELECT count(*)::int FROM passkeys WHERE user_id=u.id) AS passkeys,
+        (SELECT count(*)::int FROM two_factors WHERE user_id=u.id) AS two_factors,
+        (SELECT count(*)::int FROM sessions WHERE user_id=u.id) AS sessions
+       FROM users u WHERE u.id=$1`,
+      [f.owner.id],
+    )
+  ).rows[0];
+  expect(account).toEqual({
+    email_verified: true,
+    two_factor_enabled: false,
+    passkeys: 0,
+    two_factors: 0,
+    sessions: 0,
+  });
+  const events = (
+    await f.db.owner.query(
+      "SELECT event_type FROM account_security_events WHERE user_id=$1 AND event_type IN ('passkey.removed','two-factor.disabled')",
+      [f.owner.id],
+    )
+  ).rows.map((row) => row.event_type);
+  expect(events.sort()).toEqual(['passkey.removed', 'two-factor.disabled']);
+  const signIn = await f.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: f.authHeaders,
+    payload: { email: f.owner.email, password: newPassword },
+  });
+  expect(signIn.statusCode, signIn.body).toBe(200);
+  expect(signIn.json().twoFactorRedirect).toBeUndefined();
+});
+
+it('locks password sign-in for an address after repeated wrong passwords, known or not', async (t) => {
+  const f = await fixture(t, { rateLimit: false });
+  const attempt = (email, attemptPassword) =>
+    f.app.inject({
+      method: 'POST',
+      url: '/auth/sign-in/email',
+      headers: f.authHeaders,
+      payload: { email, password: attemptPassword },
+    });
+  const refusals = [];
+  for (const email of [f.member.email, 'nobody@example.test']) {
+    for (let i = 0; i < 10; i++)
+      expect((await attempt(email, 'wrong-password-123')).statusCode).toBe(401);
+    const locked = await attempt(email, password);
+    expect(locked.statusCode, locked.body).toBe(429);
+    expect(cookies(locked)).toBe('');
+    refusals.push(locked.json());
+  }
+  expect(refusals[0].code).toBe('SIGN_IN_LOCKED');
+  // The refusal doesn't reveal whether an account uses the address.
+  expect(refusals[1]).toEqual(refusals[0]);
+  // Other addresses are unaffected.
+  await login(f, f.outsider);
+  // The lock ends once the failures leave the window.
+  await f.db.owner.query(
+    "UPDATE account_security_events SET created_at=now()-interval '16 minutes' WHERE user_id=$1",
+    [f.member.id],
+  );
+  await login(f, f.member);
+});
+
+it('limits sign-in attempts per client address', async (t) => {
+  const f = await fixture(t);
+  const statuses = [];
+  for (let i = 0; i < 12; i++)
+    statuses.push(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url: '/auth/sign-in/email',
+          headers: f.authHeaders,
+          payload: {
+            email: `person-${i}@example.test`,
+            password: 'wrong-password-123',
+          },
+        })
+      ).statusCode,
+    );
+  // The fixture's three sign-ins already counted against this address.
+  expect(statuses.filter((status) => status === 429).length).toBeGreaterThan(0);
+  expect(statuses.at(-1)).toBe(429);
 });

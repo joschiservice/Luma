@@ -41,6 +41,34 @@ export interface WorkspaceAccess {
   expiresAt: string;
 }
 
+/**
+ * The calling staff member's latest request to inspect a workspace or account. `expired` covers
+ * a lapsed request and approved access whose thirty minutes passed.
+ *
+ * @public Declaration emit names it in the inferred type of `createStaff`.
+ */
+export interface InspectionRequest {
+  id: string;
+  mode: 'consent' | 'emergency';
+  status: 'pending' | 'approved' | 'declined' | 'expired' | 'revoked';
+  requestedAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+  accessExpiresAt: string | null;
+  revokedAt: string | null;
+}
+
+/** Opens a grant under an approved request, or emergency access without approval. */
+export type OpenAccessInput =
+  | { requestId: string }
+  | {
+      reason: string;
+      emergency: {
+        category: 'security_incident' | 'legal_request';
+        reference: string;
+      };
+    };
+
 /** @public Declaration emit names it in the inferred type of `createStaff`. */
 export interface WorkspaceDetail {
   membersTruncated: boolean;
@@ -208,10 +236,28 @@ export interface StaffRepository {
     users: DirectoryUser[];
     workspaces: DirectoryWorkspace[];
   }>;
-  grant(
+  /**
+   * Asks the workspace to approve inspection. The request, its Activity record, the owners' email
+   * and the staff audit commit together.
+   */
+  requestAccess(
     context: StaffContext,
     workspaceId: string,
     reason: string,
+  ): Promise<InspectionRequest>;
+  /** Reads the calling staff member's latest inspection request for the workspace. */
+  accessRequest(
+    context: StaffContext,
+    workspaceId: string,
+  ): Promise<InspectionRequest | null>;
+  /**
+   * Opens a workspace grant for the current staff session under an approved request, or as
+   * emergency access, which records, emails and audits its request in the same transaction.
+   */
+  grant(
+    context: StaffContext,
+    workspaceId: string,
+    input: OpenAccessInput,
   ): Promise<WorkspaceAccess>;
   workspace(
     context: StaffContext,
@@ -263,10 +309,25 @@ export interface StaffRepository {
       durationHours: 24 | 72 | 168;
     },
   ): Promise<SupportAccessRequest>;
-  accountGrant(
+  /**
+   * Asks the person to approve inspection of their account. The request, their security event,
+   * their email and the staff audit commit together.
+   */
+  requestAccountAccess(
     context: StaffContext,
     userId: string,
     reason: string,
+  ): Promise<InspectionRequest>;
+  /** Reads the calling staff member's latest inspection request for the account. */
+  accountAccessRequest(
+    context: StaffContext,
+    userId: string,
+  ): Promise<InspectionRequest | null>;
+  /** Opens an account grant for the current staff session, as for workspace grants. */
+  accountGrant(
+    context: StaffContext,
+    userId: string,
+    input: OpenAccessInput,
   ): Promise<AccountAccess>;
   account(
     context: StaffContext,
@@ -287,6 +348,17 @@ export interface StaffRepository {
     context: StaffContext,
     input: AccountDeletionInput,
   ): Promise<SupportAccountDeletion>;
+}
+
+/** Emergency access needs its own permission and a staff sign-in within fifteen minutes. */
+function requireEmergencyAuthority(
+  context: StaffContext,
+  input: OpenAccessInput,
+) {
+  if (!('emergency' in input)) return;
+  requireStaffPermission(context, 'staff.directory.read');
+  requireStaffPermission(context, 'staff.inspect.emergency');
+  requireRecentStaffSession(context);
 }
 
 /**
@@ -310,11 +382,32 @@ export function createStaffService(
 
       return repository.directory(context, query);
     },
-    /** Opens thirty minutes of workspace inspection for the current session and records its reason. */
-    grant(context: StaffContext, workspaceId: string, reason: string) {
+    /**
+     * Asks the workspace's people with `support_access.manage` to approve thirty minutes of
+     * inspection. They see the reason; one request can be pending and lapses after 24 hours.
+     */
+    requestAccess(context: StaffContext, workspaceId: string, reason: string) {
+      requireStaffPermission(context, 'staff.directory.read');
       requireStaffPermission(context, 'staff.workspace.inspect');
 
-      return repository.grant(context, workspaceId, reason);
+      return repository.requestAccess(context, workspaceId, reason);
+    },
+    /** Reads the caller's latest inspection request for the workspace, or null. */
+    accessRequest(context: StaffContext, workspaceId: string) {
+      requireStaffPermission(context, 'staff.workspace.inspect');
+
+      return repository.accessRequest(context, workspaceId);
+    },
+    /**
+     * Opens workspace inspection for the current session under an approved request, until its
+     * thirty minutes end. Emergency access needs `staff.inspect.emergency` and a sign-in within
+     * fifteen minutes; the workspace can't revoke it and its owners are emailed.
+     */
+    grant(context: StaffContext, workspaceId: string, input: OpenAccessInput) {
+      requireStaffPermission(context, 'staff.workspace.inspect');
+      requireEmergencyAuthority(context, input);
+
+      return repository.grant(context, workspaceId, input);
     },
     /** Reads limited connection and member metadata after rechecking the support grant. */
     workspace(context: StaffContext, workspaceId: string, grantId: string) {
@@ -411,11 +504,39 @@ export function createStaffService(
 
       return repository.audit(context, query);
     },
-    /** Opens thirty minutes of account inspection for the current session and records its reason. */
-    accountGrant(context: StaffContext, userId: string, reason: string) {
+    /**
+     * Asks the person to approve thirty minutes of account inspection in Settings › Security.
+     * They see the reason; one request can be pending and lapses after 24 hours.
+     */
+    requestAccountAccess(
+      context: StaffContext,
+      userId: string,
+      reason: string,
+    ) {
+      requireStaffPermission(context, 'staff.directory.read');
       requireStaffPermission(context, 'staff.accounts.inspect');
 
-      return repository.accountGrant(context, userId, reason);
+      return repository.requestAccountAccess(context, userId, reason);
+    },
+    /** Reads the caller's latest inspection request for the account, or null. */
+    accountAccessRequest(context: StaffContext, userId: string) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+
+      return repository.accountAccessRequest(context, userId);
+    },
+    /**
+     * Opens account inspection for the current session under an approved request, or as
+     * emergency access, as for workspaces. The person is emailed about emergency access.
+     */
+    accountGrant(
+      context: StaffContext,
+      userId: string,
+      input: OpenAccessInput,
+    ) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+      requireEmergencyAuthority(context, input);
+
+      return repository.accountGrant(context, userId, input);
     },
     /** Reads account, membership, factor and session metadata after rechecking the account grant. */
     account(context: StaffContext, userId: string, grantId: string) {

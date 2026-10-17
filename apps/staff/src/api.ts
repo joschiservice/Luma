@@ -13,6 +13,7 @@ import {
   staffAuditPageSchema,
   staffConfigSchema,
   staffDirectorySchema,
+  staffInspectionRequestSchema,
   staffMembershipChangeSchema,
   staffRevokeSessionsResultSchema,
   staffSessionSchema,
@@ -23,7 +24,7 @@ import {
   staffWorkspacePlacementSchema,
 } from '@luma/api-contract/staff';
 import { useSearch } from '@tanstack/react-router';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { staffActivity } from './activity';
 import {
@@ -32,6 +33,21 @@ import {
   type StaffRegion,
   staffRegion,
 } from './regions';
+
+/** Opens a grant under an approved request, or emergency access without approval. */
+export type OpenAccessBody =
+  | { requestId: string }
+  | {
+      reason: string;
+      emergency: {
+        category: 'security_incident' | 'legal_request';
+        reference: string;
+      };
+    };
+
+const latestRequestSchema = z.object({
+  request: staffInspectionRequestSchema.nullable(),
+});
 
 /** A rejected staff request. Status zero means no response arrived. */
 export class StaffApiError extends Error {
@@ -170,9 +186,24 @@ export function createStaffApi(
       staffWorkspacePlacementSchema.parse(
         await request(`${workspace(workspaceId)}/placement`, undefined, signal),
       ),
-    grant: async (workspaceId: string, reason: string) =>
+    /** Asks the workspace to approve inspection; the reason is shown to its approvers. */
+    requestAccess: async (workspaceId: string, reason: string) =>
+      staffInspectionRequestSchema.parse(
+        await request(`${workspace(workspaceId)}/access-requests`, { reason }),
+      ),
+    /** Reads your latest inspection request for the workspace, or null. */
+    accessRequest: async (workspaceId: string, signal?: AbortSignal) =>
+      latestRequestSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/access-requests/latest`,
+          undefined,
+          signal,
+        ),
+      ).request,
+    /** Opens a grant for this session under an approved request, or as emergency access. */
+    openAccess: async (workspaceId: string, body: OpenAccessBody) =>
       staffAccessGrantSchema.parse(
-        await request(`${workspace(workspaceId)}/access`, { reason }),
+        await request(`${workspace(workspaceId)}/access`, body),
       ),
     workspace: async (
       workspaceId: string,
@@ -342,9 +373,24 @@ export function createStaffApi(
         ),
       );
     },
-    grantAccount: async (userId: string, reason: string) =>
+    /** Asks the person to approve inspection of their account. */
+    requestAccountAccess: async (userId: string, reason: string) =>
+      staffInspectionRequestSchema.parse(
+        await request(`${account(userId)}/access-requests`, { reason }),
+      ),
+    /** Reads your latest inspection request for the account, or null. */
+    accountAccessRequest: async (userId: string, signal?: AbortSignal) =>
+      latestRequestSchema.parse(
+        await request(
+          `${account(userId)}/access-requests/latest`,
+          undefined,
+          signal,
+        ),
+      ).request,
+    /** Opens an account grant for this session, as for workspaces. */
+    openAccountAccess: async (userId: string, body: OpenAccessBody) =>
       staffAccountAccessSchema.parse(
-        await request(`${account(userId)}/access`, { reason }),
+        await request(`${account(userId)}/access`, body),
       ),
     account: async (userId: string, grantId: string, signal?: AbortSignal) =>
       staffAccountDetailSchema.parse(

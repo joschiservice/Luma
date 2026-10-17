@@ -30,7 +30,7 @@
   "permissions_roles_manage_label": "Manage roles",
   "permissions_roles_manage_description": "Create, edit, and archive custom roles, and see their change history. People can only grant permissions they hold.",
   "permissions_support_access_manage_label": "Manage Luma support access",
-  "permissions_support_access_manage_description": "Allow or revoke read-only access for Luma support, and approve or decline their requests.",
+  "permissions_support_access_manage_description": "Allow or revoke read-only access for Luma support, approve or decline their access and inspection requests, and end inspections early.",
   "permissions_orders_read_label": "View orders",
   "permissions_orders_read_description": "See orders, their lines, payments, and links to the source systems.",
   "permissions_fulfillment_read_label": "View fulfillment",

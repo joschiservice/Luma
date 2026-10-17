@@ -50,6 +50,10 @@ Authenticated routes declare 401, 403, 404 and the regional errors where they ap
 
 Responses include a server-generated `x-request-id` and, when observability is wired, an `x-trace-id`. Clients send a UUIDv4 `x-luma-action-id` to correlate the requests of one user action; invalid values are ignored. These IDs are diagnostics, never authentication or tenant access. See [observability](observability.md).
 
+## Browser security headers
+
+Every API response, including errors, missing routes and redirects, forbids framing, MIME sniffing, referrers and all subresource loading. The API serves no HTML; adding a page or document response requires its own policy. The web app's pages carry a separate, nonce-based policy described in the [identity guide](identity.md#production-proxy). `Strict-Transport-Security` is sent only when `BETTER_AUTH_URL` uses HTTPS. Hijacked event streams write their own headers and do not carry these.
+
 ## Dependency trap
 
 oRPC is pinned to 1.x. Version 2 changes routing metadata, error status handling and client options, so upgrading is a deliberate migration of the contract package, the Fastify bridge in `@luma/identity/http` and the client.

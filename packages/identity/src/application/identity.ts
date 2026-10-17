@@ -25,6 +25,7 @@ import {
   encodeSecurityEventCursor,
 } from '../domain/security-events.js';
 import { describeUserAgent } from '../domain/sessions.js';
+import type { AccountInspections } from './account-inspections.js';
 import type { SupportViewCredentials } from './support-view.js';
 
 export type Credentials = Readonly<Record<string, string>>;
@@ -149,6 +150,8 @@ export interface IdentityRepository {
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
   /** Support view credentials; see ADR-011. */
   supportViews: SupportViewCredentials;
+  /** Luma support requests to inspect one account, answered by its owner. */
+  accountInspections: AccountInspections;
   /** Reads one account's security events, newest first, after an optional position. */
   listSecurityEvents(
     userId: string,
@@ -257,6 +260,144 @@ export function createIdentityService(
     });
   }
 
+  /**
+   * Adds, reassigns or removes a member under the organization lock. Requires
+   * `members.manage`; only owners change ownership, the last active owner stays, and nobody
+   * else can assign a role or change a member whose permissions exceed their own. Suspended
+   * owners don't count as active owners.
+   */
+  function applyMemberChange(
+    initialContext: TenantContext,
+    command: { commandId?: string } & (
+      | { action: 'add'; userId: string; roleId: string }
+      | { action: 'update'; memberId: string; roleId: string }
+      | { action: 'remove'; memberId: string }
+    ),
+  ) {
+    const { tenantId: organizationId, requestId } = initialContext;
+
+    return withTenant(initialContext, async (tx) => {
+      await tx.lockOrganization(organizationId);
+      // Recheck membership after taking the lock so concurrent revocations win.
+      const session = {
+        userId: initialContext.actor.id,
+        sessionId: initialContext.actor.sessionId,
+      };
+      const context = await resolve(tx, session, organizationId, requestId);
+      requirePermission(context, 'members.manage');
+      const request = JSON.stringify(command);
+      if (command.commandId) {
+        const previous = await tx.memberCommand(
+          organizationId,
+          command.commandId,
+        );
+        if (previous) {
+          if (
+            previous.actorId !== context.actor.id ||
+            previous.request !== request
+          )
+            throw new IdentityError(
+              409,
+              'CONFLICT',
+              'This command ID was already used for another request.',
+            );
+
+          return previous.result;
+        }
+      }
+      const members = await tx.listMembers(organizationId);
+      const target =
+        command.action === 'add'
+          ? null
+          : members.find((m) => m.id === command.memberId);
+      if (command.action !== 'add' && !target)
+        throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+      const next =
+        command.action === 'remove'
+          ? null
+          : await tx.findRole(organizationId, command.roleId);
+      if (command.action !== 'remove' && (!next || next.archived))
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This role is no longer available. Refresh and choose another role.',
+        );
+      if (
+        (target?.role.key === 'owner' || next?.reference.key === 'owner') &&
+        !isOwner(context)
+      )
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'Only owners can grant or remove ownership.',
+        );
+      if (
+        !isOwner(context) &&
+        ((target && !context.permissions.covers(target.permissions)) ||
+          (next && !context.permissions.covers(next.permissions)))
+      )
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'You can only assign roles, and change members, whose permissions you hold yourself.',
+        );
+      if (
+        target?.role.key === 'owner' &&
+        target.status !== 'suspended' &&
+        next?.reference.key !== 'owner' &&
+        members.filter(
+          (m) => m.role.key === 'owner' && m.status !== 'suspended',
+        ).length === 1
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'An organization must have an owner',
+        );
+      let result: Membership | null = null;
+      if (command.action === 'add')
+        result = await tx.addMember(
+          organizationId,
+          command.userId,
+          command.roleId,
+        );
+      else if (command.action === 'update')
+        result = await tx.updateMember(
+          organizationId,
+          command.memberId,
+          command.roleId,
+        );
+      else await tx.removeMember(organizationId, command.memberId);
+      const bounded = (member: Membership | null | undefined) =>
+        member
+          ? {
+              id: member.id,
+              userId: member.userId,
+              roleId: member.role.id,
+              roleName: member.role.name,
+            }
+          : null;
+      await tx.auditMember(
+        organizationId,
+        context.actor.id,
+        command.action,
+        bounded(target),
+        bounded(result),
+      );
+      const dto = result ? memberDto(result) : null;
+      if (command.commandId)
+        await tx.saveMemberCommand(
+          organizationId,
+          command.commandId,
+          context.actor.id,
+          request,
+          dto,
+        );
+
+      return dto;
+    });
+  }
+
   return {
     authenticate,
     /** Reauthorize the initiating user of a trusted durable workflow. */
@@ -353,9 +494,78 @@ export function createIdentityService(
 
       return repository.supportViews.cookie(null);
     },
-    /** Records the end of open support views that are no longer valid. */
+    /**
+     * Records the end of open support views that are no longer valid, and the lapse of
+     * unanswered inspection requests.
+     */
     sweepSupportViews: (requestId: string) =>
       repository.supportViews.sweep(requestId),
+    /**
+     * Lists Luma support requests to inspect the signed-in person's account, and approved access
+     * that is still open. The account comes from the session.
+     */
+    async supportInspections(credentials: Credentials) {
+      const session = await authenticate(credentials);
+
+      return {
+        items: await repository.accountInspections.list(session.userId),
+      };
+    },
+    /**
+     * Approves or declines a request to inspect the signed-in person's account. Approval opens
+     * thirty minutes from now. Repeating the same answer is accepted; a lapsed request or one with
+     * another answer returns 409.
+     */
+    async decideSupportInspection(
+      credentials: Credentials,
+      requestId: string,
+      decision: 'approve' | 'decline',
+      httpRequestId: string,
+    ) {
+      const session = await authenticate(credentials);
+      const change = await repository.accountInspections.decide(
+        session.userId,
+        requestId,
+        decision === 'approve' ? 'approved' : 'declined',
+        httpRequestId,
+      );
+      if (change === 'conflict')
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This request was already answered or has lapsed. Refresh the page.',
+        );
+
+      return {
+        items: await repository.accountInspections.list(session.userId),
+      };
+    },
+    /**
+     * Ends approved access to the signed-in person's account now. Emergency access can't be
+     * revoked; access that already ended returns 409.
+     */
+    async revokeSupportInspection(
+      credentials: Credentials,
+      requestId: string,
+      httpRequestId: string,
+    ) {
+      const session = await authenticate(credentials);
+      const change = await repository.accountInspections.revoke(
+        session.userId,
+        requestId,
+        httpRequestId,
+      );
+      if (change === 'conflict')
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This access already ended or can’t be revoked. Refresh the page.',
+        );
+
+      return {
+        items: await repository.accountInspections.list(session.userId),
+      };
+    },
     /** Stores the signed-in person's language for email; the account comes from the session. */
     async setLanguage(credentials: Credentials, language: 'en' | 'de') {
       const session = await authenticate(credentials);
@@ -518,141 +728,28 @@ export function createIdentityService(
       );
     },
     /**
-     * Adds, reassigns or removes a member under the organization lock. Requires
-     * `members.manage`; only owners change ownership, the last active owner stays, and nobody
-     * else can assign a role or change a member whose permissions exceed their own. Suspended
-     * owners don't count as active owners.
+     * Reassigns or removes a member; see `applyMemberChange` for the rules. People join a
+     * workspace only by accepting an invitation, so customer callers cannot add an account by ID.
      */
     changeMember(
-      initialContext: TenantContext,
+      context: TenantContext,
       command: { commandId?: string } & (
-        | { action: 'add'; userId: string; roleId: string }
         | { action: 'update'; memberId: string; roleId: string }
         | { action: 'remove'; memberId: string }
       ),
     ) {
-      const { tenantId: organizationId, requestId } = initialContext;
-
-      return withTenant(initialContext, async (tx) => {
-        await tx.lockOrganization(organizationId);
-        // Recheck membership after taking the lock so concurrent revocations win.
-        const session = {
-          userId: initialContext.actor.id,
-          sessionId: initialContext.actor.sessionId,
-        };
-        const context = await resolve(tx, session, organizationId, requestId);
-        requirePermission(context, 'members.manage');
-        const request = JSON.stringify(command);
-        if (command.commandId) {
-          const previous = await tx.memberCommand(
-            organizationId,
-            command.commandId,
-          );
-          if (previous) {
-            if (
-              previous.actorId !== context.actor.id ||
-              previous.request !== request
-            )
-              throw new IdentityError(
-                409,
-                'CONFLICT',
-                'This command ID was already used for another request.',
-              );
-
-            return previous.result;
-          }
-        }
-        const members = await tx.listMembers(organizationId);
-        const target =
-          command.action === 'add'
-            ? null
-            : members.find((m) => m.id === command.memberId);
-        if (command.action !== 'add' && !target)
-          throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
-        const next =
-          command.action === 'remove'
-            ? null
-            : await tx.findRole(organizationId, command.roleId);
-        if (command.action !== 'remove' && (!next || next.archived))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This role is no longer available. Refresh and choose another role.',
-          );
-        if (
-          (target?.role.key === 'owner' || next?.reference.key === 'owner') &&
-          !isOwner(context)
-        )
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
-            'Only owners can grant or remove ownership.',
-          );
-        if (
-          !isOwner(context) &&
-          ((target && !context.permissions.covers(target.permissions)) ||
-            (next && !context.permissions.covers(next.permissions)))
-        )
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
-            'You can only assign roles, and change members, whose permissions you hold yourself.',
-          );
-        if (
-          target?.role.key === 'owner' &&
-          target.status !== 'suspended' &&
-          next?.reference.key !== 'owner' &&
-          members.filter(
-            (m) => m.role.key === 'owner' && m.status !== 'suspended',
-          ).length === 1
-        )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'An organization must have an owner',
-          );
-        let result: Membership | null = null;
-        if (command.action === 'add')
-          result = await tx.addMember(
-            organizationId,
-            command.userId,
-            command.roleId,
-          );
-        else if (command.action === 'update')
-          result = await tx.updateMember(
-            organizationId,
-            command.memberId,
-            command.roleId,
-          );
-        else await tx.removeMember(organizationId, command.memberId);
-        const bounded = (member: Membership | null | undefined) =>
-          member
-            ? {
-                id: member.id,
-                userId: member.userId,
-                roleId: member.role.id,
-                roleName: member.role.name,
-              }
-            : null;
-        await tx.auditMember(
-          organizationId,
-          context.actor.id,
-          command.action,
-          bounded(target),
-          bounded(result),
-        );
-        const dto = result ? memberDto(result) : null;
-        if (command.commandId)
-          await tx.saveMemberCommand(
-            organizationId,
-            command.commandId,
-            context.actor.id,
-            request,
-            dto,
-          );
-
-        return dto;
-      });
+      return applyMemberChange(context, command);
+    },
+    /**
+     * Adds an existing account to the workspace without its consent, under the same rules as
+     * other membership changes. Internal provisioning for trusted compositions such as the
+     * synthetic pilot; no HTTP route exposes it. Customers invite people instead.
+     */
+    provisionMember(
+      context: TenantContext,
+      member: { userId: string; roleId: string },
+    ) {
+      return applyMemberChange(context, { action: 'add', ...member });
     },
   };
 }

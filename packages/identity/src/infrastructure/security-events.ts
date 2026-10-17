@@ -21,8 +21,9 @@ import {
   securityEventRetentionDays,
   signInFailureReason,
 } from '../domain/security-events.js';
-import type { AuthSettings } from './auth.js';
-import { passwordMailLocale } from './password-mail.js';
+import { deriveKey } from './keys.js';
+import type { SecurityMail } from './password-mail.js';
+import { passwordMailLocale, queueSecurityMail } from './password-mail.js';
 
 type Database = Pick<Pool, 'query'>;
 
@@ -136,6 +137,8 @@ interface Snapshot {
   /** Sessions a revocation would end, or whether a passkey to remove exists. */
   targets: number;
   resetUserId?: string;
+  /** Factors a reset removes because the account's address was never confirmed. */
+  resetFactors?: { passkeys: number; twoFactor: boolean };
 }
 
 const sessionPaths = new Set([
@@ -146,7 +149,7 @@ const sessionPaths = new Set([
   '/passkey/verify-registration',
   '/passkey/delete-passkey',
   '/change-password',
-  '/revoke-session',
+  '/revoke-session-by-id',
   '/revoke-sessions',
   '/revoke-other-sessions',
   '/reset-password',
@@ -179,7 +182,7 @@ function accountChange(
       return snapshot.targets ? ['passkey.removed', null] : null;
     case '/change-password':
       return ['password.changed', null];
-    case '/revoke-session':
+    case '/revoke-session-by-id':
       return snapshot.targets ? ['sessions.revoked', 'one'] : null;
     case '/revoke-sessions':
       return snapshot.targets ? ['sessions.revoked', 'all'] : null;
@@ -197,22 +200,34 @@ function bodyField(body: unknown, key: string): unknown {
 }
 
 /**
+ * Returns the keyed hash recorded for failures of a normalized email that matches no account.
+ * Sign-in lockout looks hashes up only within its short window, so a key change needs no
+ * rehash of older events.
+ */
+export function securityEmailHash(secret: string) {
+  const emailKey = deriveKey(secret, 'security-event-email');
+
+  return (email: string) =>
+    createHmac('sha256', emailKey)
+      .update(`account-security-email:${email}`)
+      .digest('hex');
+}
+
+/**
  * Records sign-ins and account security changes made through Better Auth endpoints. It runs
  * after the factor plugins, so a password sign-in that still needs a code is recorded as
  * pending rather than as a session. Responses are never changed: known and unknown emails
  * fail identically. If an event cannot be written the request fails, and no new session
- * cookie is delivered; a change that already happened is not undone.
+ * cookie is delivered; a change that already happened is not undone. With `passwordMail`, it
+ * also queues the owner's notices of added sign-in factors and password changes.
  */
 export function securityEventsPlugin(
   db: Database,
   secret: string,
-  passwordMail?: AuthSettings['passwordMail'],
+  passwordMail = false,
 ): BetterAuthPlugin {
   const snapshots = new WeakMap<object, Snapshot>();
-  const emailHash = (email: string) =>
-    createHmac('sha256', secret)
-      .update(`account-security-email:${email}`)
-      .digest('hex');
+  const emailHash = securityEmailHash(secret);
   const one = async <T extends Record<string, unknown>>(
     sql: string,
     values: unknown[],
@@ -277,6 +292,18 @@ export function securityEventsPlugin(
                       [verification.value],
                     )
                   )?.count ?? 0;
+                const factors = await one<{
+                  passkeys: number;
+                  two_factor: boolean;
+                }>(
+                  'SELECT (SELECT count(*)::int FROM passkeys WHERE user_id=u.id) AS passkeys,u.two_factor_enabled AS two_factor FROM users u WHERE u.id=$1 AND NOT u.email_verified',
+                  [verification.value],
+                );
+                if (factors)
+                  snapshot.resetFactors = {
+                    passkeys: factors.passkeys,
+                    twoFactor: factors.two_factor,
+                  };
               }
             }
             if (!session && ctx.path.startsWith('/two-factor/verify-')) {
@@ -292,7 +319,7 @@ export function securityEventsPlugin(
               snapshot.challengeUserId = verification?.value ?? null;
             }
             if (session) {
-              const target = bodyField(ctx.body, 'token');
+              const target = bodyField(ctx.body, 'sessionId');
               const passkey = bodyField(ctx.body, 'id');
               const count =
                 ctx.path === '/passkey/delete-passkey'
@@ -307,7 +334,7 @@ export function securityEventsPlugin(
                       (ctx.path === '/change-password' &&
                         bodyField(ctx.body, 'revokeOtherSessions') === true)
                     ? await one<{ count: number }>(
-                        `SELECT count(*)::int AS count FROM sessions WHERE user_id=$1 AND expires_at>now() AND ($2='all' OR ($2='others' AND id<>$3) OR ($2='one' AND token=$4))`,
+                        `SELECT count(*)::int AS count FROM sessions WHERE user_id=$1 AND expires_at>now() AND ($2='all' OR ($2='others' AND id<>$3) OR ($2='one' AND id::text=$4))`,
                         [
                           session.user_id,
                           ctx.path === '/revoke-sessions'
@@ -444,6 +471,22 @@ export function securityEventsPlugin(
                   snapshot.resetUserId,
                   null,
                 );
+              if (snapshot.resetFactors?.passkeys)
+                await record(
+                  'passkey.removed',
+                  'succeeded',
+                  'all',
+                  snapshot.resetUserId,
+                  null,
+                );
+              if (snapshot.resetFactors?.twoFactor)
+                await record(
+                  'two-factor.disabled',
+                  'succeeded',
+                  null,
+                  snapshot.resetUserId,
+                  null,
+                );
 
               return;
             }
@@ -480,11 +523,28 @@ export function securityEventsPlugin(
                 session.userId,
                 current,
               );
+            // The owner hears about a new factor even if someone else added it.
+            const queueMail = (mail: SecurityMail) =>
+              passwordMail
+                ? queueSecurityMail(
+                    ctx.context.adapter,
+                    secret,
+                    mail,
+                    passwordMailLocale(ctx.request),
+                  )
+                : undefined;
+            if (
+              change?.[0] === 'passkey.added' ||
+              change?.[0] === 'two-factor.enabled'
+            )
+              await queueMail({
+                kind: 'factor_added',
+                userId: session.userId,
+                factor:
+                  change[0] === 'passkey.added' ? 'passkey' : 'authenticator',
+              });
             if (path === '/change-password') {
-              await passwordMail?.changed(
-                session.userId,
-                passwordMailLocale(ctx.request),
-              );
+              await queueMail({ kind: 'changed', userId: session.userId });
               if (
                 bodyField(ctx.body, 'revokeOtherSessions') === true &&
                 snapshot.targets

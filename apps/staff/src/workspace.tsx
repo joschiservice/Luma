@@ -8,10 +8,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { AccessDialog, MembershipDialog, RevokeSessionsDialog } from './access';
+import { MembershipDialog, RevokeSessionsDialog } from './access';
 import { AccessHistory } from './access-history';
 import { Failure, Loading } from './feedback';
 import { WorkspaceHealth } from './health';
+import { InspectionAccess } from './inspection';
 import { sessionOptions, workspaceOptions } from './queries';
 import { staffRegion } from './regions';
 import { workspaceRoute } from './router';
@@ -30,7 +31,6 @@ export function WorkspacePage() {
     ...workspaceOptions(workspaceId, grantId),
     refetchInterval: 30_000,
   });
-  const [requestAccess, setRequestAccess] = useState(false);
   const [target, setTarget] = useState<{
     userId: string;
     email: string;
@@ -57,6 +57,8 @@ export function WorkspacePage() {
     session.data?.permissions.includes('staff.view-as') ?? false;
   const canEmergencyView =
     session.data?.permissions.includes('staff.view-as.emergency') ?? false;
+  const canEmergencyInspect =
+    session.data?.permissions.includes('staff.inspect.emergency') ?? false;
   const consented = !!detail.data?.supportAccess.allowedUntil;
   const activeOwners =
     detail.data?.members.filter(
@@ -80,16 +82,18 @@ export function WorkspacePage() {
       {!grantId ? (
         <>
           <PageHeader title="Workspace support access" />
-          <Alert tone="warning">
-            <AlertDescription>
-              Customer details require current support access.
-            </AlertDescription>
-          </Alert>
           {canInspect ? (
-            <Button onClick={() => setRequestAccess(true)}>
-              Open support access
-            </Button>
-          ) : null}
+            <InspectionAccess
+              target={{ kind: 'workspace', id: workspaceId }}
+              canEmergency={canEmergencyInspect}
+            />
+          ) : (
+            <Alert tone="warning">
+              <AlertDescription>
+                Your staff role does not allow workspace inspection.
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       ) : detail.isPending ? (
         <Loading>Checking access and reading workspace…</Loading>
@@ -98,9 +102,10 @@ export function WorkspacePage() {
           <PageHeader title="Workspace unavailable" />
           <Failure error={detail.error} retry={() => void detail.refetch()} />
           {canInspect ? (
-            <Button variant="outline" onClick={() => setRequestAccess(true)}>
-              Request new support access
-            </Button>
+            <InspectionAccess
+              target={{ kind: 'workspace', id: workspaceId }}
+              canEmergency={canEmergencyInspect}
+            />
           ) : null}
         </>
       ) : (
@@ -369,13 +374,6 @@ export function WorkspacePage() {
           <AccessHistory workspaceId={workspaceId} grantId={grantId} />
         </>
       )}
-      {requestAccess && canInspect ? (
-        <AccessDialog
-          workspaceId={workspaceId}
-          name={detail.data?.workspace.name ?? 'workspace'}
-          onClose={() => setRequestAccess(false)}
-        />
-      ) : null}
       {membership && canManageMemberships && detail.isSuccess ? (
         <MembershipDialog
           key={`${membership.userId}:${membership.action}`}

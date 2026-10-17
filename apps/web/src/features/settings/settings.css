@@ -1390,7 +1390,13 @@
 
 .settings-support-request-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.settings-support-request span.settings-support-request-note {
+  display: block;
+  margin-top: 4px;
 }
 .settings-authority-control {
   display: flex;

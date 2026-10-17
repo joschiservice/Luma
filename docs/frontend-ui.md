@@ -67,6 +67,17 @@ Stories and tests may use any layer. `pnpm test:architecture` checks the directi
 Features have no barrel `index.ts`: features import their own CSS, so a barrel would pull every
 module and style of a feature into each route that uses one export.
 
+## Content Security Policy
+
+Every web page is served with a nonce-based Content Security Policy, in development as in production:
+
+- Render inline scripts only through the root document and give them the router's nonce (`useRouter().options.ssr?.nonce`). Framework scripts from `HeadContent` and `Scripts` carry it already. Scripts those scripts load, such as lazy route chunks, are trusted through `'strict-dynamic'`.
+- Do not use inline event handler attributes, `javascript:` URLs, `eval` or `new Function`. Libraries that probe for `eval` must be configured not to; Zod's parser compilation is turned off by an inline boot script, because a module-level `z.config` runs after bundled schemas are created.
+- Requests, images and fonts load from the page's origin; the API is reached through `/api`. `data:` and `blob:` images are allowed. Loading anything from another origin requires changing the policy in `apps/web/src/security-headers.ts` deliberately.
+- Inline styles and `style` attributes are allowed, because React style props and the code editor's injected stylesheets cannot carry a nonce.
+
+Browser journeys fail on any policy violation, so a missed nonce shows up in the affected journey.
+
 ## Pages and navigation
 
 Top-level workspace pages are registered once in `workspaceDestinations` in the web shell. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record use `RecordHeader`: the breadcrumb reads “Section › Record” and is the only visible name, the `h1` stays for assistive technology, record actions go into the bar and the page opens with status flags and key facts. The section crumb returns to the list with its filters; when the reader arrived from another record, a back arrow before it returns there. Don't add a back link or a second title in the page. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.

@@ -144,6 +144,14 @@ Wenn Starshipit in deinem Arbeitsbereich verfügbar ist, installiere die App und
 ein. Wähle **Verbindung speichern** und **Zugriff prüfen**. Der Kontoname bezeichnet das
 mit diesen Schlüsseln verbundene Konto.
 
+Nach dem Speichern zeigt Luma einmalig eine URL für Änderungsbenachrichtigungen und einen
+Authorization-Header. Übernimm beides jetzt in Starshipit; das Geheimnis lässt sich später
+nicht mehr anzeigen. Starshipit sendet beides mit jeder Änderungsbenachrichtigung, und Luma
+liest daraufhin den aktuellen Versandstand. Wenn du das Geheimnis verlierst, öffne
+**Verbindungseinstellungen** und wähle **Neues Webhook-Geheimnis erzeugen**. Das bisherige
+Geheimnis funktioniert sofort nicht mehr, aktualisiere Starshipit also direkt. Auch neue
+Schlüssel ersetzen das Geheimnis. Jedes neue Geheimnis wird in der Aktivität erfasst.
+
 Luma liest Versandbestellungen und Sendungsverfolgung. Verknüpfe die Quelldatensätze mit
 bestehenden Bestellungen, bevor du sie in einem Änderungsplan verwendest. Gedruckte
 Etiketten belegen keine Übergabe an den Versanddienstleister. Korrekturen benötigen

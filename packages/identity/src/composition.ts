@@ -1,5 +1,6 @@
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
+import type { AtomicStore } from '@luma/platform';
 import { Pool } from 'pg';
 
 import { createIdentityService } from './application/identity.js';
@@ -10,11 +11,14 @@ import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
 import { eraseDueAccounts } from './infrastructure/account-deletion.js';
 import type { AuthSettings } from './infrastructure/auth.js';
+import {
+  createInvitationToken,
+  hashInvitationToken,
+} from './infrastructure/invitation-token.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createMailEvents } from './infrastructure/mail-events.js';
 import { createMorningBriefScheduler } from './infrastructure/morning-brief.js';
-import { createPasswordMail } from './infrastructure/password-mail.js';
 import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
 import { purgeSecurityEvents } from './infrastructure/security-events.js';
@@ -25,7 +29,20 @@ import { createSettingsRepository } from './infrastructure/settings.js';
  * release the owned database pool.
  */
 export function createIdentity(
-  settings: AuthSettings & {
+  settings: Omit<AuthSettings, 'rateLimit'> & {
+    /**
+     * Per-client limits on credential and mail endpoints; on unless `enabled` is false. `store`
+     * is the configured shared counter location; the HTTP composition opens it and passes it as
+     * `rateLimitStore`. Without that, each process counts in memory.
+     */
+    rateLimit?: {
+      enabled?: boolean;
+      store?: { url: string; cluster: boolean };
+    };
+    /** Shared Valkey counters for rate limits; the caller owns and closes it. */
+    rateLimitStore?: AtomicStore;
+    /** Header in which the proxy in front of the API sets the client address. */
+    clientIpHeader?: string;
     databaseUrl: string;
     mail?: {
       apiKey: string;
@@ -50,21 +67,21 @@ export function createIdentity(
   const provider =
     settings.mailProvider ??
     (settings.mail ? createResendMail(settings.mail) : undefined);
+  const rateLimitStore = settings.rateLimitStore;
   const { repository, auth } = createRepository(pool, {
     ...settings,
-    ...(provider
-      ? { passwordMail: createPasswordMail(pool, settings.secret) }
-      : {}),
+    rateLimit: {
+      enabled: settings.rateLimit?.enabled ?? true,
+      ...(rateLimitStore ? { store: rateLimitStore } : {}),
+    },
+    passwordMail: !!provider,
   });
   const region = settings.region ?? 'AU';
   const service = createIdentityService(repository, {
     region,
     enabledRegions: settings.enabledRegions ?? [region],
   });
-  const token = (tenantId: string, id: string, generation: number) =>
-    createHmac('sha256', settings.secret)
-      .update(`invitation:${tenantId}:${id}:${generation}`)
-      .digest('hex');
+  const invitationToken = createInvitationToken(settings.secret);
   const workspaceSettings = createSettingsService({
     repository: createSettingsRepository(pool, !!provider, settings.readOnly),
     identity: service,
@@ -74,8 +91,8 @@ export function createIdentity(
       : {}),
     now: () => new Date(),
     id: randomUUID,
-    token,
-    hash: (value) => createHash('sha256').update(value).digest('hex'),
+    token: invitationToken,
+    hash: hashInvitationToken,
   });
   const mailOrigin =
     settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL;
@@ -84,7 +101,7 @@ export function createIdentity(
     provider,
     mailOrigin,
     settings.secret,
-    token,
+    invitationToken,
     settings.morningBriefEnabled,
   );
 
@@ -132,6 +149,7 @@ export function createIdentity(
     },
     handler: auth.handler,
     baseURL: settings.baseURL,
+    clientIpHeader: settings.clientIpHeader,
     /** Registers an idle database connection error handler without coupling identity to HTTP. */
     onDatabaseError(handler: () => void) {
       pool.on('error', handler);

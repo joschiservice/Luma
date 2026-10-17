@@ -106,6 +106,31 @@ it('requires explicit identity credentials and exact trusted origins', () => {
   ).toThrow('32');
 });
 
+it('rejects placeholder and low-entropy auth secrets in production only', () => {
+  const production = {
+    ...authEnvironment,
+    NODE_ENV: 'production',
+    BETTER_AUTH_URL: 'https://app.example.test',
+    AUTH_TRUSTED_ORIGINS: '',
+  };
+  for (const BETTER_AUTH_SECRET of [
+    'replace-with-at-least-32-random-characters',
+    'a'.repeat(64),
+    'abcabcabcabcabcabcabcabcabcabcabcabc',
+  ]) {
+    expect(() =>
+      readIdentityConfig({ ...production, BETTER_AUTH_SECRET }),
+    ).toThrow('placeholder');
+    expect(
+      readIdentityConfig({ ...authEnvironment, BETTER_AUTH_SECRET }).secret,
+    ).toBe(BETTER_AUTH_SECRET);
+  }
+  const random = 'q8Zr0v3XkLp2Wm9TfYc6Hn1Bd4Gs7Ja5';
+  expect(
+    readIdentityConfig({ ...production, BETTER_AUTH_SECRET: random }).secret,
+  ).toBe(random);
+});
+
 it('reads the optional Resend webhook secret only with the mail settings', () => {
   const mail = {
     LUMA_REGIONAL_SERVICE_ENDPOINTS:

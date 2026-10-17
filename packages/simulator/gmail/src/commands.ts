@@ -28,9 +28,21 @@ export interface DeliverAttachment {
   base64: string;
 }
 
+/**
+ * The DMARC result Gmail's receiving servers record for a delivered message: `pass` for the
+ * sender's own domain (the default), `fail` for a forged sender, `none` for no result.
+ */
+type SenderAuthenticationResult = 'pass' | 'fail' | 'none';
+
 /** Merchant, supplier and customer actions on a simulated mailbox. */
 export type GmailCommand =
-  | { kind: 'bounce'; message: string; recipient: string; status: string }
+  | {
+      kind: 'bounce';
+      message: string;
+      recipient: string;
+      status: string;
+      authentication?: SenderAuthenticationResult | undefined;
+    }
   | {
       kind: 'seed-mailbox';
       address: string;
@@ -66,6 +78,8 @@ export type GmailCommand =
       attachments?: DeliverAttachment[] | undefined;
       /** Delivery time in epoch milliseconds; defaults to the simulation time. */
       at?: number | undefined;
+      /** Ignored for messages from the mailbox itself, which Gmail does not authenticate. */
+      authentication?: SenderAuthenticationResult | undefined;
     };
 
 export type GmailCommandResult =
@@ -181,6 +195,7 @@ async function deliver(
       references,
       date: at,
       deliveredTo: sent ? undefined : box.address,
+      authentication: sent ? 'none' : (command.authentication ?? 'pass'),
     }),
     messageId: id,
     inReplyTo,
@@ -234,6 +249,7 @@ export async function command(
       from: { address: 'mailer-daemon@mail.example.invalid' },
       threadOf: originalMessage.id,
       text: `Delivery failed (${input.status})`,
+      authentication: input.authentication,
       messageId: `bounce.${originalMessage.id}.${recipient.replace(/[^a-z0-9]/g, '')}@mail.example.invalid`,
     });
     if (result.kind === 'message') {

@@ -10,6 +10,11 @@ import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { IssuePanelClose } from '@luma/ui/components/issues/issue-panel-close';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -498,6 +503,36 @@ function Addresses({
   );
 }
 
+/**
+ * Says when the mailbox provider did not authenticate an inbound sender. A failed check means
+ * the From address may be forged; a missing one (such as imported mail) means it could not be
+ * checked. Authenticated senders and sent messages show nothing.
+ */
+function SenderAuthentication({ message }: { message: Message }) {
+  if (
+    message.senderAuthentication === null ||
+    message.senderAuthentication === 'aligned'
+  )
+    return null;
+  const unaligned = message.senderAuthentication === 'unaligned';
+  const domain = message.from.address.split('@')[1] ?? message.from.address;
+
+  return (
+    <Alert tone={unaligned ? 'warning' : 'neutral'}>
+      <AlertTitle>
+        {unaligned
+          ? m.messaging_sender_unaligned()
+          : m.messaging_sender_unknown()}
+      </AlertTitle>
+      <AlertDescription>
+        {unaligned
+          ? m.messaging_sender_unaligned_text({ domain })
+          : m.messaging_sender_unknown_text()}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 /** One message with sender, recipients, text, attachments and its provider identity. */
 function MessageItem({
   organizationId,
@@ -541,6 +576,7 @@ function MessageItem({
         <Addresses label={m.messaging_to()} addresses={message.to} />
         <Addresses label={m.messaging_cc()} addresses={message.cc} />
       </dl>
+      <SenderAuthentication message={message} />
       {message.text !== null ? (
         <div className="messaging-message-text">{message.text}</div>
       ) : (

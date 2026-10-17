@@ -15,7 +15,13 @@ import {
   resolutionReview,
 } from '../../../packages/ui/src/components/issues/resolution-fixtures.ts';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 test('reviews decisions, recovers ambiguous commands and escalates through the connected API', async ({
   resources: t,
@@ -43,19 +49,11 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
   page.setDefaultTimeout(15_000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page
-    .getByLabel('Email', { exact: true })
-    .fill('resolution@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'resolution@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('North Studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

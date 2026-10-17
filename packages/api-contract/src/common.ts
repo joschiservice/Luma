@@ -13,6 +13,7 @@ export const apiErrorSchema = z.object({
     'UNAUTHENTICATED',
     'FORBIDDEN',
     'ACCESS_SUSPENDED',
+    'EMAIL_NOT_VERIFIED',
     'READ_ONLY',
     'NOT_FOUND',
     'CONFLICT',

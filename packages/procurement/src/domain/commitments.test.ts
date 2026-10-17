@@ -304,6 +304,25 @@ describe('commitment review rules', () => {
     ).toContain('unmatched_line');
   });
 
+  it('holds every fact from an unauthenticated sender for review', () => {
+    expect(
+      reviewReasons(
+        { kind: 'confirmed_quantity', quantity: 100, date: null, lineId: 'a' },
+        line,
+        '2026-10-10',
+        { confident: true, lineRequired: true, senderVerified: false },
+      ),
+    ).toEqual(['sender_unverified']);
+    expect(
+      reviewReasons(
+        { kind: 'confirmed_quantity', quantity: 100, date: null, lineId: 'a' },
+        line,
+        '2026-10-10',
+        { confident: true, lineRequired: true, senderVerified: true },
+      ),
+    ).toEqual([]);
+  });
+
   it('treats only confirmed differences as material', () => {
     expect(isMaterialChange(fact({ quantity: 90 }), line, null)).toBe(true);
     expect(

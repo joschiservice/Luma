@@ -68,6 +68,21 @@ export type Email =
       link: string;
     }
   | {
+      kind: 'support_inspection_requested';
+      workspace: string;
+      reason: string;
+      link: string;
+    }
+  | {
+      kind: 'support_inspection_emergency';
+      workspace: string;
+      category: 'security_incident' | 'legal_request';
+      from: Date;
+      until: Date;
+      timeZone: string;
+      activityLink: string;
+    }
+  | {
       kind: 'support_view_started';
       workspace: string;
       member: string | null;
@@ -88,9 +103,33 @@ export type Email =
     }
   | { kind: 'password_reset'; link: string }
   | { kind: 'password_changed'; resetLink: string }
+  | { kind: 'email_verification'; link: string }
+  | {
+      kind: 'security_factor_added';
+      factor: 'passkey' | 'authenticator';
+      resetLink: string;
+    }
   | { kind: 'account_deletion_scheduled'; eraseAfter: Date }
   | { kind: 'account_restored'; signInLink: string }
-  | { kind: 'account_erased' };
+  | { kind: 'account_erased' }
+  | { kind: 'account_inspection_requested'; reason: string; link: string }
+  | {
+      kind: 'account_inspection_emergency';
+      category: 'security_incident' | 'legal_request';
+      from: Date;
+      until: Date;
+      link: string;
+    };
+
+/** Names why Luma support opened emergency access, in the recipient's language. */
+function inspectionCategory(
+  category: 'security_incident' | 'legal_request',
+  o: { locale: Locale },
+) {
+  return category === 'security_incident'
+    ? m.email_support_inspection_category_security_incident({}, o)
+    : m.email_support_inspection_category_legal_request({}, o);
+}
 
 /** The subject line and the document of one email in the recipient's language. */
 export function emailContent(
@@ -354,6 +393,75 @@ export function emailContent(
         ),
       };
     }
+    case 'support_inspection_requested': {
+      const values = { workspace: email.workspace };
+
+      return {
+        subject: m.email_support_inspection_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_support_inspection_preview(values, o)}
+            heading={m.email_support_inspection_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_support_inspection_body(values, o)}</Paragraph>
+            <Quote label={m.email_support_request_reason({}, o)}>
+              {email.reason}
+            </Quote>
+            <Paragraph>{m.email_support_inspection_limits({}, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_support_request_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'support_inspection_emergency': {
+      const values = {
+        workspace: email.workspace,
+        category: inspectionCategory(email.category, o),
+      };
+
+      return {
+        subject: m.email_support_inspection_emergency_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_support_inspection_emergency_preview(values, o)}
+            heading={m.email_support_inspection_emergency_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>
+              {m.email_support_inspection_emergency_body(values, o)}
+            </Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_support_emergency_from_label({}, o),
+                  value: formatEmailDateTime(
+                    email.from,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+                {
+                  label: m.email_support_emergency_until_label({}, o),
+                  value: formatEmailDateTime(
+                    email.until,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+              ]}
+            />
+            <Action locale={locale} href={email.activityLink}>
+              {m.email_support_emergency_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
     case 'support_view_started': {
       const end = formatEmailDateTime(email.endsAt, locale, email.timeZone);
       const values = {
@@ -476,6 +584,57 @@ export function emailContent(
           </EmailLayout>
         ),
       };
+    case 'email_verification':
+      return {
+        subject: m.email_verification_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_verification_preview({}, o)}
+            heading={m.email_verification_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_verification_body({}, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_verification_action({}, o)}
+            </Action>
+            <Paragraph tone="muted">
+              {m.email_verification_ignore({}, o)}
+            </Paragraph>
+          </EmailLayout>
+        ),
+      };
+    case 'security_factor_added': {
+      const passkey = email.factor === 'passkey';
+
+      return {
+        subject: passkey
+          ? m.email_factor_passkey_subject({}, o)
+          : m.email_factor_authenticator_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_factor_preview({}, o)}
+            heading={
+              passkey
+                ? m.email_factor_passkey_subject({}, o)
+                : m.email_factor_authenticator_subject({}, o)
+            }
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>
+              {passkey
+                ? m.email_factor_passkey_body({}, o)
+                : m.email_factor_authenticator_body({}, o)}
+            </Paragraph>
+            <Paragraph>{m.email_factor_warning({}, o)}</Paragraph>
+            <Action locale={locale} href={email.resetLink}>
+              {m.email_password_changed_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
     case 'account_deletion_scheduled': {
       const date = formatEmailDate(email.eraseAfter, locale, 'UTC');
 
@@ -529,5 +688,60 @@ export function emailContent(
           </EmailLayout>
         ),
       };
+    case 'account_inspection_requested':
+      return {
+        subject: m.email_account_inspection_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_account_inspection_preview({}, o)}
+            heading={m.email_account_inspection_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_account_inspection_body({}, o)}</Paragraph>
+            <Quote label={m.email_support_request_reason({}, o)}>
+              {email.reason}
+            </Quote>
+            <Paragraph>{m.email_account_inspection_limits({}, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_support_request_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    case 'account_inspection_emergency': {
+      const values = { category: inspectionCategory(email.category, o) };
+
+      return {
+        subject: m.email_account_inspection_emergency_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_account_inspection_emergency_preview(values, o)}
+            heading={m.email_account_inspection_emergency_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>
+              {m.email_account_inspection_emergency_body(values, o)}
+            </Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_support_emergency_from_label({}, o),
+                  value: formatEmailDateTime(email.from, locale, 'UTC'),
+                },
+                {
+                  label: m.email_support_emergency_until_label({}, o),
+                  value: formatEmailDateTime(email.until, locale, 'UTC'),
+                },
+              ]}
+            />
+            <Action locale={locale} href={email.link}>
+              {m.email_account_inspection_emergency_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
   }
 }

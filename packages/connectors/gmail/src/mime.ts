@@ -18,6 +18,13 @@ export interface ParsedAttachment {
   size: number;
 }
 
+/**
+ * Whether the receiving system authenticated the From domain: `aligned` when its DMARC check
+ * passed for exactly that domain, `unaligned` when it checked and did not, `unknown` when it
+ * left no result (such as messages the mailbox sent).
+ */
+type SenderAuthentication = 'aligned' | 'unaligned' | 'unknown';
+
 /** A Gmail message normalized into mailbox-independent fields. */
 export interface ParsedMessage {
   /** A structured permanent delivery failure; normal message text is never a bounce signal. */
@@ -35,6 +42,8 @@ export interface ParsedMessage {
   /** True only when provider-owned metadata confirms a sent message. */
   providerSent?: boolean;
   from: ParsedAddress;
+  /** What Gmail's own Authentication-Results header says about the From domain. */
+  senderAuthentication: SenderAuthentication;
   to: ParsedAddress[];
   cc: ParsedAddress[];
   replyTo: ParsedAddress[];
@@ -332,6 +341,122 @@ function deliveryFailure(
   return { originalMessageId, recipient, status: code };
 }
 
+/** The authserv-id Gmail's receiving servers write; results under other IDs are not trusted. */
+const trustedAuthServId = 'mx.google.com';
+
+/** Removes RFC 5322 comments, which may nest, while keeping quoted strings intact. */
+function stripComments(value: string) {
+  let result = '';
+  let depth = 0;
+  let quoted = false;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i]!;
+    if (char === '\\' && (quoted || depth)) {
+      if (!depth) result += char + (value[i + 1] ?? '');
+      i++;
+    } else if (quoted) {
+      result += char;
+      if (char === '"') quoted = false;
+    } else if (char === '(') depth++;
+    else if (char === ')' && depth) depth--;
+    else if (!depth) {
+      if (char === '"') quoted = true;
+      result += char;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * The results of one method in an Authentication-Results value, each with the domain named by
+ * the first of `properties` it carries (an address such as `header.i=@a.example` gives its
+ * domain).
+ */
+function methodResults(
+  results: readonly string[],
+  method: 'dmarc' | 'dkim',
+  properties: readonly string[],
+) {
+  return results.flatMap((result) => {
+    const [name = '', rest = ''] = result.split(/=(.*)/s);
+    if (
+      name
+        .trim()
+        .toLowerCase()
+        .replace(/\/\d+$/, '') !== method
+    )
+      return [];
+    const outcome = /^\s*([a-z]+)\b/i.exec(rest)?.[1]?.toLowerCase();
+    if (!outcome) return [];
+    const found = new Map<string, string>();
+    for (const match of rest.matchAll(
+      /(?:^|\s)([a-z]+\.[a-z]+)\s*=\s*("[^"]*"|\S+)/gi,
+    ))
+      if (!found.has(match[1]!.toLowerCase()))
+        found.set(match[1]!.toLowerCase(), unquote(match[2]!).toLowerCase());
+    const value = properties.map((p) => found.get(p)).find(Boolean);
+
+    return [
+      {
+        result: outcome,
+        domain: value
+          ? value.slice(value.lastIndexOf('@') + 1).replace(/\.$/, '')
+          : null,
+      },
+    ];
+  });
+}
+
+/**
+ * Parses an RFC 8601 Authentication-Results value into its authserv-id, the DMARC results with
+ * the `header.from` domain each evaluated, and the DKIM results with their signing domain.
+ */
+function authenticationResults(value: string) {
+  const [id = '', ...results] = stripComments(value.replace(/\r?\n/g, ' '))
+    .split(';')
+    .map((part) => part.trim());
+
+  return {
+    authServId: id.split(/\s+/)[0]!.toLowerCase(),
+    dmarc: methodResults(results, 'dmarc', ['header.from']),
+    dkim: methodResults(results, 'dkim', ['header.d', 'header.i']),
+  };
+}
+
+/**
+ * Reads the topmost Authentication-Results header Gmail's receiving servers added. Headers
+ * below it travelled with the message and may be forged by the sender, so they are ignored.
+ * Aligned needs exactly one From address whose domain passed DMARC. Mail from the mailbox's
+ * own domain, such as a colleague's, may carry no DMARC result; it is also aligned when Gmail
+ * verified a DKIM signature by exactly that domain. SPF is never enough: Google's sending
+ * servers are shared by every Workspace customer.
+ */
+function senderAuthentication(
+  part: MessagePart | undefined,
+  mailbox: string,
+): SenderAuthentication {
+  const trusted = headersOf(part, 'Authentication-Results')
+    .map(authenticationResults)
+    .find((result) => result.authServId === trustedAuthServId);
+  if (!trusted) return 'unknown';
+  const from = parseAddressList(headersOf(part, 'From').join(', '));
+  const domain =
+    from.length === 1
+      ? from[0]!.address.slice(from[0]!.address.lastIndexOf('@') + 1)
+      : null;
+  if (!domain) return 'unaligned';
+  const own = domain === mailbox.toLowerCase().split('@')[1];
+  const passed = (results: { result: string; domain: string | null }[]) =>
+    results.some(
+      (result) => result.result === 'pass' && result.domain === domain,
+    );
+
+  return passed(trusted.dmarc) || (own && passed(trusted.dkim))
+    ? 'aligned'
+    : 'unaligned';
+}
+
 const validTime = (value: number) =>
   Number.isFinite(value) && value > 0 && value < 8.64e15;
 
@@ -371,6 +496,7 @@ export function parseMessage(
         : 'inbound',
     providerSent: labelIds.includes('SENT'),
     from,
+    senderAuthentication: senderAuthentication(payload, mailbox),
     to: parseAddressList(headersOf(payload, 'To').join(', ')),
     cc: parseAddressList(headersOf(payload, 'Cc').join(', ')),
     replyTo: parseAddressList(headerOf(payload, 'Reply-To')),

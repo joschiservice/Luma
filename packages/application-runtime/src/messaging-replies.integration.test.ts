@@ -693,6 +693,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
         references: [],
         direction: 'inbound',
         from: { address: 'mailer-daemon@mail.example', name: null },
+        senderAuthentication: 'aligned',
         to: [ops],
         cc: [],
         replyTo: [],
@@ -740,6 +741,378 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
         )
       ).items,
     ).toHaveLength(1);
+  });
+
+  it('leaves a supplier send uncertain on a delivery report from an unauthenticated sender', async () => {
+    const { reply } = await supplierDraft();
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    await messaging.replies.decide(bob(), reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+    expect((await messaging.replies.check(alice(), reply.id)).state).toBe(
+      'sent',
+    );
+    const at = new Date().toISOString();
+    mailbox.push({
+      providerMessageId: `forged-bounce-${reply.id}`,
+      data: {
+        thread: { externalId: `new-${reply.id}`, scopeKey: '' },
+        rfcMessageId: `forged.${reply.id}@attacker.example`,
+        inReplyTo: `luma.${reply.id}@shop.example`,
+        references: [],
+        direction: 'inbound',
+        from: { address: 'mailer-daemon@attacker.example', name: null },
+        senderAuthentication: 'unaligned',
+        to: [ops],
+        cc: [],
+        replyTo: [],
+        subject: 'Delivery failure',
+        text: 'Permanent failure',
+        truncated: false,
+        sentAt: at,
+        receivedAt: at,
+        labels: ['INBOX'],
+        attachments: [],
+        deliveryFailure: {
+          originalMessageId: `luma.${reply.id}@shop.example`,
+          recipient: anna.address,
+          status: '5.1.1',
+        },
+      },
+    });
+    await messaging.store.transaction(tenant, async (tx) => {
+      const row = await tx.outbound.get(reply.id, true);
+      if (row)
+        await tx.outbound.update({
+          ...row,
+          document: {
+            ...row.document,
+            deliveryCheckedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+    });
+    await messaging.replies.pass(alice());
+    // Reading the thread again proves acceptance only; it must not settle delivery.
+    await messaging.replies.pass(alice());
+    await messaging.replies.check(alice(), reply.id);
+    const uncertain = await messaging.replies.get(alice(), reply.id);
+    expect(uncertain.state).toBe('uncertain');
+    expect(uncertain.stateReason).toContain('could not verify');
+    expect(
+      supplierEvents
+        .filter((event) => event.id === reply.id)
+        .map((e) => e.state),
+    ).toContain('uncertain');
+    expect(
+      supplierEvents.some(
+        (event) => event.id === reply.id && event.state === 'failed',
+      ),
+    ).toBe(false);
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
+  /** Pushes a message into the supplier send's provider thread. */
+  function pushToSend(
+    outboundId: string,
+    key: string,
+    data: Partial<MessageData>,
+  ) {
+    const at = new Date().toISOString();
+    mailbox.push({
+      providerMessageId: `${key}-${outboundId}`,
+      data: {
+        thread: { externalId: `new-${outboundId}`, scopeKey: '' },
+        rfcMessageId: `${key}.${outboundId}@acme.example`,
+        inReplyTo: `luma.${outboundId}@shop.example`,
+        references: [`luma.${outboundId}@shop.example`],
+        direction: 'inbound',
+        from: anna,
+        senderAuthentication: 'aligned',
+        to: [ops],
+        cc: [],
+        replyTo: [],
+        subject: 'Re: Purchase order',
+        text: 'Thanks, we received the order.',
+        truncated: false,
+        sentAt: at,
+        receivedAt: at,
+        labels: ['INBOX'],
+        attachments: [],
+        ...data,
+      },
+    });
+  }
+
+  /** Makes the next supplier mail pass read the send's thread again. */
+  async function readSendAgain(outboundId: string) {
+    await messaging.store.transaction(tenant, async (tx) => {
+      const row = await tx.outbound.get(outboundId, true);
+      if (row)
+        await tx.outbound.update({
+          ...row,
+          document: {
+            ...row.document,
+            deliveryCheckedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+    });
+    await messaging.replies.pass(alice());
+  }
+
+  /** A sent supplier email that an unauthenticated delivery report made uncertain. */
+  async function uncertainSupplierSend() {
+    const drafted = await supplierDraft();
+    const requested = await messaging.replies.request(
+      alice(),
+      drafted.reply.id,
+      {
+        id: randomUUID(),
+      },
+    );
+    await messaging.replies.decide(bob(), drafted.reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+    await messaging.replies.check(alice(), drafted.reply.id);
+    pushToSend(drafted.reply.id, 'forged-report', {
+      from: { address: 'mailer-daemon@attacker.example', name: null },
+      senderAuthentication: 'unaligned',
+      subject: 'Delivery failure',
+      text: 'Permanent failure',
+      deliveryFailure: {
+        originalMessageId: `luma.${drafted.reply.id}@shop.example`,
+        recipient: anna.address,
+        status: '5.1.1',
+      },
+    });
+    await readSendAgain(drafted.reply.id);
+    const reply = await messaging.replies.get(alice(), drafted.reply.id);
+    expect(reply).toMatchObject({
+      state: 'uncertain',
+      canResolveDelivery: true,
+      delivery: {
+        report: { recipient: anna.address, status: '5.1.1' },
+        resolution: null,
+      },
+    });
+
+    return { ...drafted, reply };
+  }
+
+  it('lets a person mark an uncertain supplier send as not delivered, once and with authority', async () => {
+    const { reply } = await uncertainSupplierSend();
+    const member = context(memberId, 'member');
+    const decision = {
+      id: randomUUID(),
+      expectedRevision: reply.revision,
+      outcome: 'not_delivered' as const,
+      note: '  Spoke to Anna; nothing arrived. ',
+    };
+
+    expect(
+      (await messaging.replies.get(member, reply.id)).canResolveDelivery,
+    ).toBe(false);
+    await expect(
+      messaging.replies.resolveDelivery(member, reply.id, decision),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      messaging.replies.resolveDelivery(
+        context(outsiderId, 'admin', otherTenant),
+        reply.id,
+        decision,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      messaging.replies.resolveDelivery(bob(), reply.id, {
+        ...decision,
+        expectedRevision: reply.revision - 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // Someone other than the requester decides; procurement hears as the requester.
+    const resolved = await messaging.replies.resolveDelivery(
+      bob(),
+      reply.id,
+      decision,
+    );
+    expect(resolved).toMatchObject({
+      state: 'failed',
+      canResolveDelivery: false,
+      stateReason: expect.stringContaining('did not arrive'),
+      delivery: {
+        resolution: {
+          outcome: 'not_delivered',
+          source: 'person',
+          by: bobId,
+          note: 'Spoke to Anna; nothing arrived.',
+        },
+      },
+    });
+    expect(
+      await messaging.replies.resolveDelivery(bob(), reply.id, decision),
+    ).toMatchObject({ state: 'failed', revision: resolved.revision });
+    await expect(
+      messaging.replies.resolveDelivery(bob(), reply.id, {
+        ...decision,
+        outcome: 'delivered',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      messaging.replies.resolveDelivery(bob(), reply.id, {
+        ...decision,
+        id: randomUUID(),
+        expectedRevision: resolved.revision,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(supplierEvents.filter((e) => e.id === reply.id).at(-1)).toEqual({
+      id: reply.id,
+      state: 'failed',
+    });
+    expect(
+      (await messaging.service.thread(alice(), reply.threadId)).events,
+    ).toContainEqual(
+      expect.objectContaining({
+        type: 'delivery_resolved',
+        actor: { kind: 'user', id: bobId },
+        details: expect.objectContaining({
+          outcome: 'not_delivered',
+          source: 'person',
+        }),
+      }),
+    );
+    const audits = await owner.query<{
+      document: { details: Record<string, string> };
+    }>(
+      "SELECT document FROM audit_entries WHERE tenant_id=$1 AND document->>'eventType'='messaging.reply.delivery_resolved' AND proposal_id=$2",
+      [tenant, reply.id],
+    );
+    expect(audits.rows.map((r) => r.document.details)).toEqual([
+      expect.objectContaining({
+        outcome: 'not_delivered',
+        source: 'person',
+        unverifiedReport: 'yes',
+      }),
+    ]);
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
+  it('lets a person mark an uncertain supplier send as delivered and keeps that against later unverified reports', async () => {
+    const { reply } = await uncertainSupplierSend();
+    const resolved = await messaging.replies.resolveDelivery(
+      alice(),
+      reply.id,
+      {
+        id: randomUUID(),
+        expectedRevision: reply.revision,
+        outcome: 'delivered',
+      },
+    );
+    expect(resolved).toMatchObject({
+      state: 'sent',
+      delivery: {
+        resolution: { outcome: 'delivered', by: aliceId, note: null },
+      },
+    });
+    expect(supplierEvents.filter((e) => e.id === reply.id).at(-1)).toEqual({
+      id: reply.id,
+      state: 'sent',
+    });
+
+    pushToSend(reply.id, 'second-forged-report', {
+      from: { address: 'mailer-daemon@attacker.example', name: null },
+      senderAuthentication: 'unaligned',
+      subject: 'Delivery failure',
+      text: 'Permanent failure',
+      deliveryFailure: {
+        originalMessageId: `luma.${reply.id}@shop.example`,
+        recipient: anna.address,
+        status: '5.1.1',
+      },
+    });
+    await readSendAgain(reply.id);
+    expect(await messaging.replies.get(alice(), reply.id)).toMatchObject({
+      state: 'sent',
+    });
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
+  it('refuses a delivery decision for replies that are not supplier emails', async () => {
+    const reply = await draft('Thanks, noted again.');
+    loseResponse = true;
+    const uncertain = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    loseResponse = false;
+    expect(uncertain).toMatchObject({
+      state: 'uncertain',
+      canResolveDelivery: false,
+    });
+    await expect(
+      messaging.replies.resolveDelivery(alice(), reply.id, {
+        id: randomUUID(),
+        expectedRevision: uncertain.revision,
+        outcome: 'delivered',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('settles an uncertain supplier send when the supplier replies from an authenticated address', async () => {
+    const { reply } = await uncertainSupplierSend();
+    // Unauthenticated replies and replies to another message prove nothing.
+    pushToSend(reply.id, 'unaligned-reply', {
+      senderAuthentication: 'unaligned',
+    });
+    pushToSend(reply.id, 'other-reply', {
+      inReplyTo: 'other.message@acme.example',
+      references: [
+        `luma.${reply.id}@shop.example`,
+        'other.message@acme.example',
+      ],
+    });
+    pushToSend(reply.id, 'stranger-reply', {
+      from: { address: 'stranger@elsewhere.example', name: null },
+    });
+    await readSendAgain(reply.id);
+    expect(await messaging.replies.get(alice(), reply.id)).toMatchObject({
+      state: 'uncertain',
+    });
+
+    pushToSend(reply.id, 'reply', {});
+    await readSendAgain(reply.id);
+    const settled = await messaging.replies.get(alice(), reply.id);
+    expect(settled).toMatchObject({
+      state: 'sent',
+      stateReason: expect.stringContaining('replied'),
+      delivery: {
+        resolution: { outcome: 'delivered', source: 'reply', by: null },
+      },
+    });
+    expect(supplierEvents.filter((e) => e.id === reply.id).at(-1)).toEqual({
+      id: reply.id,
+      state: 'sent',
+    });
+    expect(
+      (await messaging.service.thread(alice(), reply.threadId)).events,
+    ).toContainEqual(
+      expect.objectContaining({
+        type: 'delivery_resolved',
+        actor: { kind: 'luma', id: 'luma' },
+        details: expect.objectContaining({ source: 'reply' }),
+      }),
+    );
+    expect(
+      (
+        await owner.query(
+          "SELECT 1 FROM audit_entries WHERE tenant_id=$1 AND document->>'eventType'='messaging.reply.delivery_resolved' AND proposal_id=$2",
+          [tenant, reply.id],
+        )
+      ).rowCount,
+    ).toBe(1);
+    expect(await sendCount(reply.id)).toBe(1);
   });
 
   it('drafts from linked records with citations', async () => {

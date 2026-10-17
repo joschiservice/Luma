@@ -98,7 +98,21 @@ To stop using a declaration, add a reason and select **Revoke live declaration**
 
 ## Luma support
 
-**Luma support** decides whether Luma support can look into a problem by seeing this workspace as one of your members. Changing it needs **Manage Luma support access**.
+**Luma support** decides whether Luma support can look into this workspace's records or see it as one of your members. Changing it needs **Manage Luma support access**.
+
+### Inspection requests
+
+Luma support can't look at this workspace's records without your approval. To investigate a problem, a support team member asks for access, and the request appears under **Luma support** with their reason. Owners also get an email.
+
+- **Approve** gives that team member 30 minutes of read-only access from now. They see members and their roles, connections, sync health and access history; they can't change anything.
+- **Decline** refuses the request. A request nobody answers lapses after 24 hours.
+- While approved access is open, **End inspection** ends it now. Support's next read is refused.
+
+**Activity** shows each request, who answered it, revocations and lapsed requests.
+
+For a security incident or legal request, Luma support can open 30 minutes of access without approval. Owners get an email, **Activity** shows it with its reason category, and it can't be revoked. A suspended or closed workspace can't answer requests, so support can only use this emergency access there.
+
+### Support views
 
 - Choose how long to allow access, **24 hours**, **3 days** or **7 days**, and select **Allow access**. **Set new end time** replaces the current end time.
 - **Revoke access** ends it now, including any view that is open.

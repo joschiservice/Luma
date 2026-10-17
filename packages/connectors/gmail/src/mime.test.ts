@@ -372,3 +372,113 @@ describe('untrusted HTML limits', () => {
     expect(parsed.providerSent).toBe(false);
   });
 });
+
+describe('senderAuthentication', () => {
+  const gmail =
+    'mx.google.com;\r\n       dkim=pass header.i=@supplier.example header.s=s1 header.b=abc;\r\n       spf=pass (google.com: domain of sales@supplier.example designates 192.0.2.1 as permitted sender) smtp.mailfrom=sales@supplier.example;\r\n       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=supplier.example';
+  const parse = (
+    values: { name: string; value: string }[],
+    from = 'Sales <sales@supplier.example>',
+  ) =>
+    parseMessage(
+      message({
+        mimeType: 'text/plain',
+        headers: [
+          ...values.filter((h) => h.name !== 'From'),
+          ...(from ? [{ name: 'From', value: from }] : []),
+        ],
+        body: { data: b64('Confirmed, on time') },
+      }),
+      'ops@shop.example',
+    ).senderAuthentication;
+  const ar = (value: string) => ({ name: 'Authentication-Results', value });
+
+  it('is aligned when Gmail reports DMARC pass for the From domain', () => {
+    expect(parse([ar(gmail)])).toBe('aligned');
+    expect(
+      parse([ar('mx.google.com; dmarc=pass header.from="Supplier.Example"')]),
+    ).toBe('aligned');
+  });
+
+  it('is unknown without a result from Gmail', () => {
+    expect(parse([])).toBe('unknown');
+    expect(
+      parse([
+        ar('mx.attacker.example; dmarc=pass header.from=supplier.example'),
+      ]),
+    ).toBe('unknown');
+  });
+
+  it('ignores forged results below the topmost Gmail header', () => {
+    expect(
+      parse([
+        ar(
+          'mx.google.com; spf=softfail smtp.mailfrom=x@attacker.example; dmarc=fail (p=NONE) header.from=supplier.example',
+        ),
+        ar('mx.google.com; dmarc=pass header.from=supplier.example'),
+      ]),
+    ).toBe('unaligned');
+  });
+
+  it('is unaligned when DMARC fails or checked another domain', () => {
+    expect(parse([ar(gmail.replace('dmarc=pass', 'dmarc=fail'))])).toBe(
+      'unaligned',
+    );
+    expect(
+      parse([ar('mx.google.com; dmarc=none header.from=supplier.example')]),
+    ).toBe('unaligned');
+    expect(
+      parse([ar(gmail)], 'Sales <sales@supplier.example.attacker.example>'),
+    ).toBe('unaligned');
+    expect(
+      parse([
+        ar('mx.google.com; dkim=pass header.i=@supplier.example; spf=pass'),
+      ]),
+    ).toBe('unaligned');
+  });
+
+  it('does not let a comment or a second From address claim alignment', () => {
+    expect(
+      parse([
+        ar(
+          'mx.google.com; dmarc=fail (header.from=supplier.example dmarc=pass) header.from=supplier.example',
+        ),
+      ]),
+    ).toBe('unaligned');
+    expect(
+      parse([ar(gmail)], 'sales@supplier.example, other@attacker.example'),
+    ).toBe('unaligned');
+  });
+
+  it('accepts a DKIM signature by the mailbox’s own domain for a colleague’s mail', () => {
+    const colleague = 'Kim <kim@shop.example>';
+    expect(
+      parse(
+        [ar('mx.google.com; dkim=pass header.i=@shop.example header.s=google')],
+        colleague,
+      ),
+    ).toBe('aligned');
+    expect(
+      parse([ar('mx.google.com; dkim=pass header.d=shop.example')], colleague),
+    ).toBe('aligned');
+  });
+
+  it('keeps other internal-looking mail unverified', () => {
+    const colleague = 'Kim <kim@shop.example>';
+    // No result from Gmail at all, as for imported mail.
+    expect(parse([], colleague)).toBe('unknown');
+    // SPF alone, a signature by another domain or a parent domain, or a failed signature.
+    for (const value of [
+      'mx.google.com; spf=pass smtp.mailfrom=kim@shop.example',
+      'mx.google.com; dkim=pass header.i=@gmail.com',
+      'mx.google.com; dkim=pass header.d=sub.shop.example',
+      'mx.google.com; dkim=fail header.d=shop.example',
+      'mx.google.com; dkim=pass (header.d=shop.example)',
+    ])
+      expect(parse([ar(value)], colleague)).toBe('unaligned');
+    // An external sender's own DKIM signature is not DMARC.
+    expect(
+      parse([ar('mx.google.com; dkim=pass header.d=supplier.example')]),
+    ).toBe('unaligned');
+  });
+});

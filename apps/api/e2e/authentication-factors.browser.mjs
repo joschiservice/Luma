@@ -2,7 +2,13 @@
 import { createHmac } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 const password = 'browser-test-password-123';
 
@@ -91,15 +97,11 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
   resources: t,
 }) => {
   const { db, page, errors, cdp, authenticatorId } = await fixture(t);
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Grace');
-  await page.getByLabel('Email', { exact: true }).fill('grace@example.test');
-  await page.getByLabel('Password', { exact: true }).fill(password);
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Grace',
+    email: 'grace@example.test',
+    password,
+  });
   await heading(page, 'Create a workspace');
   await page.getByLabel('Workspace name').fill('Harbor Goods');
   await page
@@ -225,6 +227,8 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
       [row.event_type, row.outcome, row.reason_code].join(' '),
     ),
   ).toEqual([
+    // The first sign-in after confirming the new account's email address.
+    'sign-in.password succeeded ',
     'two-factor.enabled succeeded ',
     'sign-in.password succeeded second-factor-required',
     'sign-in.two-factor failed invalid-code',
@@ -241,7 +245,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
   await expect(activity.getByRole('listitem').first()).toContainText(
     'Two-factor authentication turned off',
   );
-  await expect(activity.getByRole('listitem')).toHaveCount(11);
+  await expect(activity.getByRole('listitem')).toHaveCount(12);
   await expect(activity.getByText('Code entry failed')).toHaveCount(2);
   await expect(
     activity.getByText('Signed in with a passkey', { exact: true }),

@@ -77,6 +77,7 @@ export class IdentityError extends Error {
       | 'UNAUTHENTICATED'
       | 'FORBIDDEN'
       | 'ACCESS_SUSPENDED'
+      | 'EMAIL_NOT_VERIFIED'
       | 'READ_ONLY'
       | 'NOT_FOUND'
       | 'CONFLICT'

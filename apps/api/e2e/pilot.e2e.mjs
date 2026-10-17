@@ -44,6 +44,7 @@ async function setup(t, scenario, options) {
     WORKFLOW_DATABASE_URL: db.runtimeUrl,
     BETTER_AUTH_SECRET: secret,
     BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+    AUTH_RATE_LIMIT: 'off',
     CONNECTIONS_ACTIVE_KEY_ID: 'test',
     CONNECTIONS_KEYS: JSON.stringify({
       test: randomBytes(32).toString('base64'),

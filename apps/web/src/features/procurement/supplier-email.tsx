@@ -17,20 +17,24 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
+import { contextOptions } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
+import { DeliveryDecision } from '../../shared/messaging/delivery-decision';
 import {
   outboundStateLabels,
   outboundStates,
 } from '../../shared/messaging/outbound-state';
-import { procurementError } from './data';
+import { ProcurementError, procurementError, procurementKey } from './data';
 import { useCommand } from './forms';
 import {
   downloadSupplierOrder,
   draftSupplierFollowUp,
   draftSupplierOrder,
+  resolveSupplierEmailDelivery,
   supplierEmailOptions,
 } from './supplier-email-data';
 
@@ -43,6 +47,15 @@ export function SupplierEmailPanel({
   record: PurchaseOrderRecord;
 }) {
   const query = useQuery(supplierEmailOptions(organizationId, record.order.id));
+  const memberName = useMemberName(organizationId);
+  const headingId = useId();
+  const client = useQueryClient();
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: procurementKey(organizationId) });
+    void client.invalidateQueries({
+      queryKey: ['private', 'organization', organizationId, 'messaging'],
+    });
+  };
   const [draft, setDraft] = useState<{
     kind: 'submission' | 'follow_up';
     attentionKey?: string;
@@ -79,8 +92,12 @@ export function SupplierEmailPanel({
   );
 
   return (
-    <Card className="procurement-section">
-      <h3>{m.procurement_email_title()}</h3>
+    <Card
+      as="section"
+      className="procurement-section"
+      aria-labelledby={headingId}
+    >
+      <h3 id={headingId}>{m.procurement_email_title()}</h3>
       <p className="procurement-muted">{m.procurement_email_description()}</p>
       {!data.mailboxes.length ? (
         <Alert tone="neutral">{m.procurement_email_connect()}</Alert>
@@ -135,11 +152,29 @@ export function SupplierEmailPanel({
                     ? m.procurement_email_sent()
                     : item.outbound.state === 'failed'
                       ? m.procurement_email_failed()
-                      : m.procurement_email_review()}
+                      : item.outbound.state === 'uncertain'
+                        ? m.procurement_email_uncertain()
+                        : m.procurement_email_review()}
                 </p>
                 {item.outbound.stateReason ? (
                   <p>{item.outbound.stateReason}</p>
                 ) : null}
+                <DeliveryDecision
+                  outbound={item.outbound}
+                  name={memberName}
+                  resolve={(body) =>
+                    resolveSupplierEmailDelivery(
+                      organizationId,
+                      item.outbound.id,
+                      body,
+                    )
+                  }
+                  errorText={procurementError}
+                  isUncertain={(error) =>
+                    !(error instanceof ProcurementError) || error.status >= 500
+                  }
+                  onResolved={refresh}
+                />
               </div>
               <div className="procurement-actions">
                 {item.outbound.attachments?.length ? (
@@ -184,6 +219,19 @@ export function SupplierEmailPanel({
       ) : null}
     </Card>
   );
+}
+
+/** Names a member who decided about an email: "You", their name or email, or a former member. */
+function useMemberName(organizationId: string) {
+  const members = useQuery(membersOptions(organizationId));
+  const self = useQuery(contextOptions(organizationId)).data?.actor.id;
+
+  return (id: string) => {
+    if (id === self) return m.messaging_member_you();
+    const member = members.data?.find((entry) => entry.userId === id);
+
+    return member?.name || member?.email || m.messaging_member_former();
+  };
 }
 
 function SupplierEmailDialog({

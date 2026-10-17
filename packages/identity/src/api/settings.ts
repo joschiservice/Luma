@@ -114,6 +114,22 @@ export function settingsRoutes(service?: SettingsService) {
           body,
         ),
     ),
+    decideSupportInspection: os.decideSupportInspection.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await use().decideSupportInspection(
+          context(request),
+          params.requestId,
+          body,
+        ),
+    ),
+    revokeSupportInspection: os.revokeSupportInspection.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await use().revokeSupportInspection(
+          context(request),
+          params.requestId,
+          body,
+        ),
+    ),
     previewInvitation: os.previewInvitation.handler(
       async ({ context: { request }, input: { body } }) =>
         await use().previewInvitation(credentials(request), body),

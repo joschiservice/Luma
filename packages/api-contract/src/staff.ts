@@ -14,6 +14,7 @@ export const staffPermissionSchema = z.enum([
   'staff.view-as.emergency',
   'staff.accounts.manage',
   'staff.accounts.delete',
+  'staff.inspect.emergency',
 ]);
 
 /** Why staff disabled an account. Staff see it; the customer never does. */
@@ -110,6 +111,46 @@ const staffDetailSchema = z.object({
 
 const staffReasonSchema = z.string().trim().min(10).max(500);
 
+/** Emergency support views and inspections need one of these reasons and an external reference. */
+const staffEmergencyCategorySchema = z.enum([
+  'security_incident',
+  'legal_request',
+]);
+
+/**
+ * Your latest request to inspect a workspace or account. `expired` covers a request nobody
+ * answered in 24 hours and approved access whose thirty minutes passed.
+ */
+export const staffInspectionRequestSchema = z.object({
+  id: z.string().uuid(),
+  mode: z.enum(['consent', 'emergency']),
+  status: z.enum(['pending', 'approved', 'declined', 'expired', 'revoked']),
+  requestedAt: z.string().datetime(),
+  /** An unanswered request lapses at this time. */
+  expiresAt: z.string().datetime(),
+  /** When the customer answered, or when emergency access opened. */
+  decidedAt: z.string().datetime().nullable(),
+  /** When approved access ends. */
+  accessExpiresAt: z.string().datetime().nullable(),
+  revokedAt: z.string().datetime().nullable(),
+});
+
+/** Opens a grant for the current session: under an approved request, or as emergency access. */
+const staffOpenAccessSchema = z.union([
+  z.object({ requestId: z.string().uuid() }).strict(),
+  z
+    .object({
+      reason: staffReasonSchema,
+      emergency: z
+        .object({
+          category: staffEmergencyCategorySchema,
+          reference: z.string().trim().min(3).max(200),
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+
 export const staffConfigSchema = z.object({
   mode: z.enum(['local', 'google']),
   providerId: z.literal('google').nullable(),
@@ -178,12 +219,6 @@ export const staffMembershipChangeSchema = z.object({
   lastActiveOwner: z.boolean(),
   completedAt: z.string().datetime(),
 });
-
-/** Emergency support views need one of these reasons and an external reference. */
-const staffEmergencyCategorySchema = z.enum([
-  'security_incident',
-  'legal_request',
-]);
 
 /** A started support view: open `url` in a new tab within two minutes. */
 export const staffSupportViewSchema = z.object({
@@ -586,12 +621,14 @@ export const staffContract = {
     .meta({ errors })
     .input(z.object({ params: workspaceParams }))
     .output(staffWorkspacePlacementSchema),
-  grantAccess: endpoint
+  requestAccess: endpoint
     .route({
       method: 'POST',
-      path: '/v1/staff/workspaces/{workspaceId}/access',
+      path: '/v1/staff/workspaces/{workspaceId}/access-requests',
       successStatus: 201,
-      summary: 'Open time-limited workspace support access',
+      summary: 'Ask a workspace to approve inspection',
+      description:
+        'Asks the workspace’s people with `support_access.manage` to approve thirty minutes of inspection. Owners are emailed; the reason is shown to them and recorded in the workspace’s Activity. One request per staff member can be pending; it lapses after 24 hours. Suspended or closed workspaces can’t answer (409). Requires `staff.directory.read` and `staff.workspace.inspect`.',
     })
     .meta({ errors })
     .input(
@@ -600,6 +637,27 @@ export const staffContract = {
         body: z.object({ reason: staffReasonSchema }).strict(),
       }),
     )
+    .output(staffInspectionRequestSchema),
+  accessRequest: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/staff/workspaces/{workspaceId}/access-requests/latest',
+      summary: 'Read your latest inspection request for a workspace',
+    })
+    .meta({ errors })
+    .input(z.object({ params: workspaceParams }))
+    .output(z.object({ request: staffInspectionRequestSchema.nullable() })),
+  grantAccess: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/workspaces/{workspaceId}/access',
+      successStatus: 201,
+      summary: 'Open approved or emergency workspace support access',
+      description:
+        'With `requestId`, opens access for the current staff session under your approved request, until its thirty minutes end. With `emergency`, opens thirty minutes without approval for a security incident or legal request; this needs `staff.inspect.emergency`, a reference and recent staff authentication, is recorded in the workspace’s Activity and emails its owners, and the workspace can’t revoke it.',
+    })
+    .meta({ errors })
+    .input(z.object({ params: workspaceParams, body: staffOpenAccessSchema }))
     .output(staffAccessSchema),
   workspace: endpoint
     .route({
@@ -790,14 +848,14 @@ export const staffContract = {
       }),
     )
     .output(staffSupportAccessRequestSchema),
-  grantAccountAccess: endpoint
+  requestAccountAccess: endpoint
     .route({
       method: 'POST',
-      path: '/v1/staff/accounts/{userId}/access',
+      path: '/v1/staff/accounts/{userId}/access-requests',
       successStatus: 201,
-      summary: 'Open time-limited account support access',
+      summary: 'Ask a person to approve inspection of their account',
       description:
-        'Opens thirty minutes of access to one customer account for the current staff session. Grants no workspace access.',
+        'Asks the person to approve thirty minutes of account inspection in Settings › Security. They are emailed; the reason is shown to them and recorded in their security events. One request per staff member can be pending; it lapses after 24 hours. Disabled accounts can’t answer (409). Requires `staff.directory.read` and `staff.accounts.inspect`.',
     })
     .meta({ errors })
     .input(
@@ -806,6 +864,27 @@ export const staffContract = {
         body: z.object({ reason: staffReasonSchema }).strict(),
       }),
     )
+    .output(staffInspectionRequestSchema),
+  accountAccessRequest: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/staff/accounts/{userId}/access-requests/latest',
+      summary: 'Read your latest inspection request for an account',
+    })
+    .meta({ errors })
+    .input(z.object({ params: accountParams }))
+    .output(z.object({ request: staffInspectionRequestSchema.nullable() })),
+  grantAccountAccess: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/access',
+      successStatus: 201,
+      summary: 'Open approved or emergency account support access',
+      description:
+        'With `requestId`, opens access to one customer account for the current staff session under your approved request, until its thirty minutes end. With `emergency`, opens thirty minutes without approval for a security incident or legal request; this needs `staff.inspect.emergency`, a reference and recent staff authentication, is recorded in the person’s security events and emails them. Grants no workspace access.',
+    })
+    .meta({ errors })
+    .input(z.object({ params: accountParams, body: staffOpenAccessSchema }))
     .output(staffAccountAccessSchema),
   account: endpoint
     .route({

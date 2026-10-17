@@ -16,6 +16,7 @@ test('the standalone worker starts and drains on SIGTERM', async (t) => {
     WORKFLOW_DATABASE_URL: db.runtimeUrl,
     BETTER_AUTH_SECRET: secret,
     BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+    AUTH_RATE_LIMIT: 'off',
     AUTH_TRUSTED_ORIGINS: 'http://127.0.0.1:3000',
     TEMPORAL_ADDRESS: temporal.address,
     TEMPORAL_NAMESPACE: 'default',

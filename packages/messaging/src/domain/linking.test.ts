@@ -49,6 +49,7 @@ describe('link proposals', () => {
     const [token] = referenceTokens('', 'See 1001');
     const proposals = proposeLinks({
       messageId: 'message-1',
+      senderVerified: true,
       rules: [{ rule: rule(), address: 'anna@supplier.example' }],
       customers: [],
       references: [
@@ -78,10 +79,46 @@ describe('link proposals', () => {
     ]);
   });
 
+  it('only suggests links from addresses of a sender the provider did not authenticate', () => {
+    const [token] = referenceTokens('', 'See PO-1001');
+    const proposals = proposeLinks({
+      messageId: 'm',
+      senderVerified: false,
+      rules: [{ rule: rule(), address: 'anna@supplier.example' }],
+      customers: [{ address: 'anna@supplier.example', ids: ['customer-1'] }],
+      references: [
+        { token: token!, records: [{ kind: 'purchase_order', id: 'po-1' }] },
+      ],
+    });
+
+    expect(proposals.map((p) => [p.kind, p.state, p.evidence])).toEqual([
+      [
+        'supplier',
+        'suggested',
+        expect.objectContaining({ ruleId: 'rule-1', senderUnverified: true }),
+      ],
+      [
+        'customer',
+        'suggested',
+        expect.objectContaining({ senderUnverified: true }),
+      ],
+      [
+        'purchase_order',
+        'active',
+        expect.not.objectContaining({ senderUnverified: true }),
+      ],
+    ]);
+    // A later authenticated message activates the suggestion.
+    expect(mergeLink({ state: 'suggested' }, { state: 'active' })).toBe(
+      'activate',
+    );
+  });
+
   it('activates a unique customer address and keeps evidence', () => {
     expect(
       proposeLinks({
         messageId: 'm',
+        senderVerified: true,
         rules: [{ rule: rule({ party: { kind: 'customer' } }), address: 'x' }],
         customers: [{ address: 'kim@example.com', ids: ['customer-1'] }],
         references: [],
