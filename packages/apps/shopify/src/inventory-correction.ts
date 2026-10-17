@@ -365,7 +365,10 @@ export function createShopifyInventoryCorrection(
             status: 'active',
             adapterVersion: inventoryCorrectionAdapterVersion,
             mechanism: 'api',
-            executor: { kind: 'connector', id: inventoryCorrectionAdapterVersion },
+            executor: {
+              kind: 'connector',
+              id: inventoryCorrectionAdapterVersion,
+            },
             capabilities: scoped.capabilities,
           };
         },

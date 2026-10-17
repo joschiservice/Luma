@@ -16,6 +16,6 @@
   },
   {
     "apps": ["jtl", "shopify"],
-    "files": ["src/app-evidence.integration.test.ts"]
+    "files": ["src/composition/app-evidence.integration.test.ts"]
   }
 ]

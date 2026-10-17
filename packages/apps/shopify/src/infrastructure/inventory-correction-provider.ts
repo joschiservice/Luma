@@ -388,7 +388,10 @@ export function createInventoryCorrectionProvider(
               referenceDocumentUri,
               adjustmentId,
               ...acceptanceProvenance(context, [
-                { resource: 'inventory_adjustment_group', externalId: adjustmentId },
+                {
+                  resource: 'inventory_adjustment_group',
+                  externalId: adjustmentId,
+                },
               ]),
             },
           }),

@@ -14,7 +14,7 @@ import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createMigratedDatabase } from './test-support/database.js';
+import { createMigratedDatabase } from '../test-support/database.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -247,7 +247,11 @@ describe.skipIf(!databaseUrl)('app-stored evidence on PostgreSQL', () => {
     const connectionId = await connection(tenantId, 'shopify');
     const store = createCorrectionStore(tenants);
     const tenant = context(tenantId);
-    const [current, accepted, older] = [randomUUID(), randomUUID(), randomUUID()];
+    const [current, accepted, older] = [
+      randomUUID(),
+      randomUUID(),
+      randomUUID(),
+    ];
     await store.record(tenant, connectionId, {
       id: current,
       kind: 'observation',

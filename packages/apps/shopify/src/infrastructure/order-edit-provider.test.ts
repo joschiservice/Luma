@@ -267,9 +267,9 @@ describe('Shopify order edit provider', () => {
       dispatchIdentity: '["shopify","shopify-order-edit/1"]',
     };
     await f.provider.handler.run(context, await f.input());
-    expect(f.evidence.find((item) => item.kind === 'calculation')).toMatchObject(
-      { document: { completeness: 'complete' } },
-    );
+    expect(
+      f.evidence.find((item) => item.kind === 'calculation'),
+    ).toMatchObject({ document: { completeness: 'complete' } });
     expect(f.evidence.at(-1)).toMatchObject({
       kind: 'acceptance',
       document: {

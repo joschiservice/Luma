@@ -2,7 +2,11 @@ import type { AppEvidence } from '@luma/app-host';
 import type { SqlTransaction } from '@luma/platform';
 import { z } from 'zod';
 
-const text = z.string().min(1).catch('').transform((value) => value || null);
+const text = z
+  .string()
+  .min(1)
+  .catch('')
+  .transform((value) => value || null);
 const record = z.object({
   resource: z.string().min(1),
   externalId: z.string().min(1),

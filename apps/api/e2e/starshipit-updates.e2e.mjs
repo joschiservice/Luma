@@ -34,7 +34,22 @@ test('Starshipit mapped authoritative quantities require independent approval, d
     sent.every((view) => ['verified', 'uncertain'].includes(view.state)),
   );
   assert.equal((await f.call('check', { id: preview.id })).state, 'verified');
-  assert.equal((await f.receipts()).length, 1);
+  const [receipt] = await f.receipts();
+  assert.equal(receipt.document.adapterVersion, 'starshipit-update/1');
+  assert.match(receipt.document.dispatchIdentity, /starshipit-update\/1$/);
+  assert.deepEqual(receipt.document.records, [
+    { resource: 'order', externalId: '1' },
+    { resource: 'order_line', externalId: f.itemId },
+  ]);
+  const reads = await f.db.owner.query(
+    "SELECT document FROM starshipit_order_update_evidence WHERE tenant_id=$1 AND document->>'kind'='observation'",
+    [f.manifest.organizationId],
+  );
+  assert.ok(reads.rows.length > 0);
+  for (const { document } of reads.rows) {
+    assert.equal(document.adapterVersion, 'starshipit-update/1');
+    assert.equal(document.completeness, 'complete');
+  }
   f.pilot = await f.restart();
   assert.equal((await f.call('execute', { id: preview.id })).state, 'verified');
   assert.equal((await f.receipts()).length, 1);

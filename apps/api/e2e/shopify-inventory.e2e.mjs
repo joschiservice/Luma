@@ -159,10 +159,22 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
     '12',
   );
   const evidence = await f.db.owner.query(
-    'SELECT kind FROM shopify_inventory_evidence WHERE tenant_id=$1',
+    'SELECT kind,document FROM shopify_inventory_evidence WHERE tenant_id=$1',
     [f.org.id],
   );
-  assert.ok(evidence.rows.some((r) => r.kind === 'acceptance'));
+  const acceptance = evidence.rows.find((r) => r.kind === 'acceptance');
+  assert.equal(acceptance.document.adapterVersion, 'shopify-inventory/1');
+  assert.match(acceptance.document.dispatchIdentity, /shopify-inventory\/1/);
+  assert.equal(
+    acceptance.document.records[0].resource,
+    'inventory_adjustment_group',
+  );
+  for (const { document } of evidence.rows.filter(
+    (r) => r.kind === 'observation',
+  )) {
+    assert.equal(document.adapterVersion, 'shopify-inventory/1');
+    assert.equal(document.completeness, 'complete');
+  }
   const audit = await f.db.owner.query(
     "SELECT document->>'eventType' AS event FROM audit_entries WHERE tenant_id=$1 AND document->>'proposalId'=$2",
     [f.org.id, preview.id],

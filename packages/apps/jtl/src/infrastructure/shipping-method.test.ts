@@ -127,7 +127,11 @@ function fixture(cloud = false) {
     map: vi.fn(async () => input),
     checkPreconditions: vi.fn(async () => true),
     storeRead: vi.fn(
-      async (_context: TenantContext, _intent: EffectIntent, read: CitedRead) => {
+      async (
+        _context: TenantContext,
+        _intent: EffectIntent,
+        read: CitedRead,
+      ) => {
         reads.push(read);
       },
     ),
@@ -241,7 +245,11 @@ describe('JTL shipping-method correction', () => {
     f.binding.storeRead.mockRejectedValueOnce(new Error('store down'));
     const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
     await expect(effect.execute(f.intent, 'first')).rejects.toMatchObject({
-      failure: { effect: 'unknown', retry: 'reconcile', dispatch: 'dispatched' },
+      failure: {
+        effect: 'unknown',
+        retry: 'reconcile',
+        dispatch: 'dispatched',
+      },
     });
     expect(f.effects()).toBe(1);
     expect(await effect.verify(f.intent)).toMatchObject({
