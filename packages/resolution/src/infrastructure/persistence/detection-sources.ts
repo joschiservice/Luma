@@ -360,12 +360,12 @@ export function createDetectionSources(
           `SELECT p.connection_id AS "connectionId",c.document->>'provider' AS provider,
             m.external_id AS "externalId",m.scope_key AS "scopeKey",
             LEAST(s.observed_at,(SELECT min(fs.observed_at) FROM orders_snapshots fs
-              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.snapshot_id=fs.id
+              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.entity_id=fs.entity_id AND fp.connection_id=fs.connection_id AND fp.snapshot_id=fs.id
               WHERE fs.tenant_id=$1 AND fs.connection_id=p.connection_id AND fs.kind='fulfillment'
                AND fs.order_id=p.entity_id)) AS "observedAt",
             COALESCE(c.document->'permissions' ? 'fulfillment.read' AND c.document->'granted' ? 'fulfillment.read',false) AS fulfillments,
             COALESCE((SELECT jsonb_agg(o.document->'observation' ORDER BY fs.entity_id) FROM orders_snapshots fs
-              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.snapshot_id=fs.id
+              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.entity_id=fs.entity_id AND fp.connection_id=fs.connection_id AND fp.snapshot_id=fs.id
               JOIN connector_observations o ON o.tenant_id=fs.tenant_id AND o.connection_id=fs.connection_id AND o.id=fs.observation_id
               WHERE fs.tenant_id=$1 AND fs.connection_id=p.connection_id AND fs.kind='fulfillment'
                AND fs.order_id=p.entity_id AND fs.document->>'deleted' IS DISTINCT FROM 'true'),'[]'::jsonb) AS stored

@@ -42,10 +42,14 @@ export interface ExchangeChoice extends Omit<
 
 /** All writes and audit entries belong to orders and serialize with the case's order lock. */
 export interface ReturnExchangeStore {
+  /** Runs one tenant transaction; `readOnlySnapshot` gives reads one consistent view without locks. */
   transaction<T>(
     tenantId: string,
     fn: (tx: {
+      /** Reads the case after taking its order lock and row lock; use only before writes. */
       lock(caseId: string): Promise<ReturnCase | null>;
+      /** Reads the case without locks, so polling does not wait for or block writers. */
+      read(caseId: string): Promise<ReturnCase | null>;
       root(caseId: string): Promise<ReturnExchange | null>;
       saveRoot(value: ReturnExchange): Promise<void>;
       get(id: string): Promise<ExchangeStep | null>;
@@ -58,6 +62,7 @@ export interface ReturnExchangeStore {
       finishCase(value: ReturnCase, event: ReturnCaseEvent): Promise<void>;
       audit(entry: AuditEntry): Promise<void>;
     }) => Promise<T>,
+    options?: { readOnlySnapshot: true },
   ): Promise<T>;
 }
 
@@ -563,7 +568,7 @@ export function createReturnExchanges(deps: Dependencies) {
         context.tenantId,
         async (tx) => {
           const c =
-            (await tx.lock(caseId)) ?? fail(404, 'Return case not found');
+            (await tx.read(caseId)) ?? fail(404, 'Return case not found');
 
           return {
             c,
@@ -571,6 +576,7 @@ export function createReturnExchanges(deps: Dependencies) {
             steps: await tx.list(caseId),
           };
         },
+        { readOnlySnapshot: true },
       );
       const options = hasPermission(context, 'returns.manage')
         ? await choices(context, data.c)

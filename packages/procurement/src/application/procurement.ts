@@ -462,6 +462,14 @@ export function createProcurementService(deps: {
 
       return { items, canManage: hasPermission(context, 'procurement.manage') };
     },
+    /** Reads one purchase order after refreshing workspace membership; null when absent. */
+    async order(context: TenantContext, id: string) {
+      context = await authorize(context);
+
+      return deps.store.transaction(context.tenantId, false, (tx) =>
+        tx.order(id),
+      );
+    },
     /** Looks up one tenant supplier without exposing another workspace's records. */
     async supplier(context: TenantContext, id: string) {
       context = await authorize(context);

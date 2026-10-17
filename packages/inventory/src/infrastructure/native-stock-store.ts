@@ -6,14 +6,23 @@ import { IdentityError, requireTenant } from '@luma/identity';
 import { canonicalJson, type TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
-import type { StockEvidence } from '../application/ledger.js';
 import type {
   NativeStockDemand,
   NativeStockStore,
   NativeStockTransaction,
 } from '../application/native-stock.js';
 import { LedgerError, nextStockVersion } from '../domain/ledger.js';
-import { createLedgerStore, stockEvidenceSchema } from './ledger-store.js';
+import {
+  account,
+  type AccountRow,
+  createLedgerStore,
+  ledgerAccountColumns,
+  shadowComparison,
+  shadowComparisonColumns,
+  type ShadowComparisonRow,
+  stockEvidenceBatch,
+  stockEvidenceSchema,
+} from './ledger-store.js';
 import { ledgerReceiptSchema } from './ledger-validation.js';
 import {
   ownershipReviewSchema,
@@ -155,6 +164,18 @@ const resultSchema = z
     orderVersion: z.number().int().nonnegative(),
   })
   .strict();
+
+/** Groups values by key, keeping first-seen key order and each group's input order. */
+function groupBy<T>(values: readonly T[], key: (value: T) => string) {
+  const groups = new Map<string, T[]>();
+  for (const value of values) {
+    const group = groups.get(key(value));
+    if (group) group.push(value);
+    else groups.set(key(value), [value]);
+  }
+
+  return groups;
+}
 
 /** Persists native records, original receipts and audit alongside the ledger on one tenant transaction. */
 export function createNativeStockStore(
@@ -672,56 +693,75 @@ export function createNativeStockStore(
                   'SELECT id FROM inventory_ledger_accounts WHERE tenant_id=$1 AND location_id=$2 ORDER BY id FOR UPDATE',
                   [tenant, locationId],
                 );
-                const pools = [];
-                for (const opening of openings) {
-                  const initial: StockEvidence = stockEvidenceSchema.parse(
-                    opening.source,
-                  );
-                  const snapshots = (
-                    await sql.query<{ snapshot_id: string }>(
-                      `SELECT p.snapshot_id FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.connection_id=$2 AND s.kind='position' AND s.sku_id=$3 AND s.location_id=$4 AND s.unit=$5 ORDER BY p.entity_id LIMIT 2`,
-                      [
-                        tenant,
-                        connectionId,
-                        opening.sku_id,
-                        locationId,
-                        opening.unit,
-                      ],
+                // Set-based reads keep the review to a fixed number of round trips while the locks above are held.
+                const scopes = [
+                  tenant,
+                  connectionId,
+                  locationId,
+                  openings.map((opening) => opening.sku_id),
+                  openings.map((opening) => opening.unit),
+                ];
+                const poolKey = (skuId: string, unit: string) =>
+                  JSON.stringify([skuId, unit]);
+                const snapshots = groupBy(
+                  (
+                    await sql.query<{
+                      sku_id: string;
+                      unit: string;
+                      snapshot_id: string;
+                    }>(
+                      `SELECT o.sku_id,o.unit,x.snapshot_id FROM unnest($4::uuid[],$5::text[]) WITH ORDINALITY AS o(sku_id,unit,ord)
+  CROSS JOIN LATERAL (SELECT p.snapshot_id FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.connection_id=$2 AND s.kind='position' AND s.sku_id=o.sku_id AND s.location_id=$3 AND s.unit=o.unit ORDER BY p.entity_id LIMIT 2) x ORDER BY o.ord`,
+                      scopes,
                     )
-                  ).rows;
-                  const source =
-                    snapshots.length === 1
-                      ? await ledger.stockEvidence(snapshots[0]!.snapshot_id)
-                      : null;
-                  const comparison = (
-                    await sql.query<{ command_key: string }>(
-                      'SELECT command_key FROM inventory_shadow_reconciliations WHERE tenant_id=$1 AND connection_id=$2 AND sku_id=$3 AND location_id=$4 AND unit=$5 ORDER BY recorded_at DESC,id DESC LIMIT 1',
-                      [
-                        tenant,
-                        connectionId,
-                        opening.sku_id,
-                        locationId,
-                        opening.unit,
-                      ],
+                  ).rows,
+                  (row) => poolKey(row.sku_id, row.unit),
+                );
+                const sourceIds = new Map(
+                  [...snapshots].flatMap(([key, rows]) =>
+                    rows.length === 1 ? [[key, rows[0]!.snapshot_id]] : [],
+                  ),
+                );
+                const sources = await stockEvidenceBatch(sql, tenant, [
+                  ...sourceIds.values(),
+                ]);
+                const comparisons = new Map(
+                  (
+                    await sql.query<
+                      ShadowComparisonRow & { sku_id: string; unit: string }
+                    >(
+                      `SELECT o.sku_id,o.unit,c.* FROM unnest($4::uuid[],$5::text[]) AS o(sku_id,unit)
+  CROSS JOIN LATERAL (SELECT ${shadowComparisonColumns} FROM inventory_shadow_reconciliations r WHERE r.tenant_id=$1 AND r.connection_id=$2 AND r.sku_id=o.sku_id AND r.location_id=$3 AND r.unit=o.unit ORDER BY r.recorded_at DESC,r.id DESC LIMIT 1) c`,
+                      scopes,
                     )
-                  ).rows[0];
-                  pools.push({
+                  ).rows.map((row) => [
+                    poolKey(row.sku_id, row.unit),
+                    shadowComparison(row),
+                  ]),
+                );
+                const accounts = groupBy(
+                  (
+                    await sql.query<AccountRow>(
+                      `SELECT ${ledgerAccountColumns} FROM inventory_ledger_accounts a WHERE a.tenant_id=$1 AND a.location_id=$2 AND (a.sku_id,a.unit) IN (SELECT * FROM unnest($3::uuid[],$4::text[])) ORDER BY a.id`,
+                      [tenant, ...scopes.slice(2)],
+                    )
+                  ).rows.map(account),
+                  (value) => poolKey(value.address.skuId, value.address.unit),
+                );
+                const pools = openings.map((opening) => {
+                  const key = poolKey(opening.sku_id, opening.unit),
+                    sourceId = sourceIds.get(key);
+
+                  return {
                     skuId: opening.sku_id,
                     unit: opening.unit,
                     openingReviewId: opening.review_id,
-                    opening: initial,
-                    source,
-                    comparison: comparison
-                      ? await ledger.comparison(comparison.command_key)
-                      : null,
-                    accounts: await ledger.pool(
-                      opening.sku_id,
-                      locationId,
-                      opening.unit,
-                      false,
-                    ),
-                  });
-                }
+                    opening: stockEvidenceSchema.parse(opening.source),
+                    source: sourceId ? (sources.get(sourceId) ?? null) : null,
+                    comparison: comparisons.get(key) ?? null,
+                    accounts: accounts.get(key) ?? [],
+                  };
+                });
 
                 return {
                   scope: current,

@@ -43,7 +43,7 @@ const idFor = (tenant: string, address: AccountAddress) => {
 };
 const iso = (value: Date | string) => new Date(value).toISOString();
 
-type AccountRow = {
+export type AccountRow = {
   id: string;
   sku_id: string;
   location_id: string;
@@ -54,7 +54,8 @@ type AccountRow = {
   version: string;
 };
 
-const account = (row: AccountRow): LedgerAccount => ({
+/** Maps a ledger account row selected with `ledgerAccountColumns`. */
+export const account = (row: AccountRow): LedgerAccount => ({
   id: row.id,
   address: addressSchema.parse({
     skuId: row.sku_id,
@@ -66,7 +67,9 @@ const account = (row: AccountRow): LedgerAccount => ({
   balance: row.balance,
   version: row.version,
 });
-const columns =
+
+/** Ledger account columns read by `account`. */
+export const ledgerAccountColumns =
   'id,sku_id,location_id,unit,state,connection_id,trim_scale(balance)::text AS balance,version::text AS version';
 
 export const stockEvidenceSchema = z.object({
@@ -101,6 +104,34 @@ export const stockEvidenceSchema = z.object({
     .optional(),
   complete: z.boolean(),
   bundleParent: z.boolean().nullable(),
+});
+
+/** Shadow reconciliation row selected with `shadowComparisonColumns`. */
+export type ShadowComparisonRow = {
+  id: string;
+  command_key: string;
+  source_document: unknown;
+  native_quantity: string;
+  drift_quantity: string;
+  native_versions: ShadowComparison['nativeVersions'];
+  entry_id: string | null;
+};
+
+/** Shadow reconciliation columns read by `shadowComparison`. */
+export const shadowComparisonColumns =
+  'id,command_key,source_document,trim_scale(native_quantity)::text AS native_quantity,trim_scale(drift_quantity)::text AS drift_quantity,native_versions,entry_id';
+
+/** Maps a retained shadow reconciliation row; rejects source documents that are not stock evidence. */
+export const shadowComparison = (
+  row: ShadowComparisonRow,
+): ShadowComparison => ({
+  id: row.id,
+  key: row.command_key,
+  source: stockEvidenceSchema.parse(row.source_document),
+  nativeQuantity: row.native_quantity,
+  driftQuantity: row.drift_quantity,
+  nativeVersions: row.native_versions,
+  entryId: row.entry_id,
 });
 
 type ReviewRow = {
@@ -208,7 +239,7 @@ export function createLedgerStore(
               ],
             );
           const rows = await tx.query<AccountRow>(
-            `SELECT ${columns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id ${lock ? 'FOR UPDATE' : ''}`,
+            `SELECT ${ledgerAccountColumns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id ${lock ? 'FOR UPDATE' : ''}`,
             [tenant, list.map((item) => item.id)],
           );
           if (rows.rows.length !== list.length)
@@ -287,7 +318,7 @@ export function createLedgerStore(
           pool: async (skuId, locationId, unit, lock) =>
             (
               await tx.query<AccountRow>(
-                `SELECT ${columns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND sku_id=$2 AND location_id=$3 AND unit=$4 ORDER BY id ${lock ? 'FOR UPDATE' : ''}`,
+                `SELECT ${ledgerAccountColumns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND sku_id=$2 AND location_id=$3 AND unit=$4 ORDER BY id ${lock ? 'FOR UPDATE' : ''}`,
                 [tenant, skuId, locationId, unit],
               )
             ).rows.map(account),
@@ -301,7 +332,7 @@ export function createLedgerStore(
           ) => {
             const current = (
               await tx.query<AccountRow>(
-                `SELECT ${columns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND id=$2`,
+                `SELECT ${ledgerAccountColumns} FROM inventory_ledger_accounts WHERE tenant_id=$1 AND id=$2`,
                 [tenant, idFor(tenant, address)],
               )
             ).rows[0];
@@ -343,7 +374,7 @@ export function createLedgerStore(
                   basis: 'effective' | 'recorded';
                 }
               >(
-                `SELECT ${columns},aging_entry_id,COALESCE(nonzero_since_effective,nonzero_since_recorded) AS since,CASE WHEN nonzero_since_effective IS NULL THEN 'recorded' ELSE 'effective' END AS basis FROM inventory_ledger_accounts
+                `SELECT ${ledgerAccountColumns},aging_entry_id,COALESCE(nonzero_since_effective,nonzero_since_recorded) AS since,CASE WHEN nonzero_since_effective IS NULL THEN 'recorded' ELSE 'effective' END AS basis FROM inventory_ledger_accounts
      WHERE tenant_id=$1 AND state IN ('in_transit','returned_inspection','external') AND balance<>0 AND COALESCE(nonzero_since_effective,nonzero_since_recorded)<=$2 ORDER BY COALESCE(nonzero_since_effective,nonzero_since_recorded),id LIMIT $3`,
                 [tenant, before, limit],
               )
@@ -364,30 +395,13 @@ export function createLedgerStore(
           },
           comparison: async (key) => {
             const row = (
-              await tx.query<{
-                id: string;
-                command_key: string;
-                source_document: unknown;
-                native_quantity: string;
-                drift_quantity: string;
-                native_versions: ShadowComparison['nativeVersions'];
-                entry_id: string | null;
-              }>(
-                `SELECT id,command_key,source_document,trim_scale(native_quantity)::text AS native_quantity,trim_scale(drift_quantity)::text AS drift_quantity,native_versions,entry_id FROM inventory_shadow_reconciliations WHERE tenant_id=$1 AND command_key=$2`,
+              await tx.query<ShadowComparisonRow>(
+                `SELECT ${shadowComparisonColumns} FROM inventory_shadow_reconciliations WHERE tenant_id=$1 AND command_key=$2`,
                 [tenant, key],
               )
             ).rows[0];
-            if (!row) return null;
 
-            return {
-              id: row.id,
-              key: row.command_key,
-              source: stockEvidenceSchema.parse(row.source_document),
-              nativeQuantity: row.native_quantity,
-              driftQuantity: row.drift_quantity,
-              nativeVersions: row.native_versions,
-              entryId: row.entry_id,
-            };
+            return row ? shadowComparison(row) : null;
           },
           saveComparison: async (value) => {
             const physical = (
@@ -781,8 +795,27 @@ async function stockEvidence(
   tenant: string,
   snapshotId: string,
 ): Promise<StockEvidence | null> {
-  const row = (
+  return (
+    (await stockEvidenceBatch(tx, tenant, [snapshotId])).get(snapshotId) ?? null
+  );
+}
+
+/**
+ * Reads current stock evidence for several original position snapshots in a fixed number of queries.
+ * Share-locks each current projection in the given order, as repeated single reads would, and returns
+ * a map keyed by the requested snapshot id; ids without position evidence are absent.
+ */
+export async function stockEvidenceBatch(
+  tx: SqlTransaction,
+  tenant: string,
+  snapshotIds: readonly string[],
+): Promise<Map<string, StockEvidence>> {
+  const ids = [...new Set(snapshotIds)];
+  const result = new Map<string, StockEvidence>();
+  if (!ids.length) return result;
+  const rows = (
     await tx.query<{
+      requested_id: string;
       snapshot_id: string;
       document: unknown;
       status: string;
@@ -790,20 +823,124 @@ async function stockEvidence(
       catalog_parent: boolean | null;
       catalog_observed: Date | null;
     }>(
-      `SELECT p.snapshot_id,current.document,i.document->>'status' AS status,
+      `SELECT q.id AS requested_id,p.snapshot_id,current.document,i.document->>'status' AS status,
   COALESCE(i.document->'granted','[]'::jsonb) AS granted,k.parent AS catalog_parent,k.observed_at AS catalog_observed
-  FROM inventory_snapshots original JOIN inventory_projections p ON p.tenant_id=original.tenant_id AND p.entity_id=original.entity_id AND p.connection_id=original.connection_id
+  FROM unnest($2::uuid[]) WITH ORDINALITY AS q(id,ord)
+  JOIN inventory_snapshots original ON original.tenant_id=$1 AND original.id=q.id AND original.kind='position'
+  JOIN inventory_projections p ON p.tenant_id=original.tenant_id AND p.entity_id=original.entity_id AND p.connection_id=original.connection_id
   JOIN inventory_snapshots current ON current.tenant_id=p.tenant_id AND current.id=p.snapshot_id
   JOIN connector_installations i ON i.tenant_id=p.tenant_id AND i.id=p.connection_id
   LEFT JOIN LATERAL (SELECT (requires_components OR component_count>0) AS parent,observed_at FROM inventory_product_skus k JOIN inventory_projections kp ON kp.tenant_id=k.tenant_id AND kp.entity_id=k.product_id AND kp.connection_id=k.connection_id AND kp.snapshot_id=k.snapshot_id WHERE k.tenant_id=p.tenant_id AND k.connection_id=p.connection_id AND k.sku_id=current.sku_id ORDER BY k.observed_at DESC,k.product_id LIMIT 1 FOR SHARE OF kp) k ON true
-  WHERE original.tenant_id=$1 AND original.id=$2 AND original.kind='position' FOR SHARE OF p`,
-      [tenant, snapshotId],
+  ORDER BY q.ord FOR SHARE OF p`,
+      [tenant, ids],
     )
-  ).rows[0];
-  if (!row) return null;
-  const value = snapshotSchema.parse(row.document);
-  if (value.data.type !== 'position') return null;
-  const data = value.data;
+  ).rows;
+  const positions = rows.flatMap((row) => {
+    const value = snapshotSchema.parse(row.document);
+
+    return value.data.type === 'position'
+      ? [{ row, value, data: value.data }]
+      : [];
+  });
+  if (!positions.length) return result;
+  const scopes = {
+    connections: positions.map(({ value }) => value.connectionId),
+    skus: positions.map(({ data }) => data.skuId),
+    locations: positions.map(({ data }) => data.locationId),
+    units: positions.map(({ data }) => data.unit),
+  };
+  const scopeKey = (
+    connectionId: string,
+    skuId: string,
+    locationId: string,
+    unit: string,
+  ) => JSON.stringify([connectionId, skuId, locationId, unit]);
+  const checks = new Map(
+    (
+      await tx.query<{
+        connection_id: string;
+        sku_id: string;
+        location_id: string;
+        unit: string;
+        state: string;
+        recorded_at: Date;
+      }>(
+        `SELECT q.connection_id,q.sku_id,q.location_id,q.unit,c.state,c.recorded_at
+  FROM unnest($2::uuid[],$3::uuid[],$4::uuid[],$5::text[]) AS q(connection_id,sku_id,location_id,unit)
+  CROSS JOIN LATERAL (SELECT state,recorded_at FROM inventory_native_stock_read_checks c WHERE c.tenant_id=$1 AND c.connection_id=q.connection_id AND c.sku_id=q.sku_id AND c.location_id=q.location_id AND c.unit=q.unit ORDER BY c.recorded_at DESC,c.id DESC LIMIT 1) c`,
+        [
+          tenant,
+          scopes.connections,
+          scopes.skus,
+          scopes.locations,
+          scopes.units,
+        ],
+      )
+    ).rows.map((row) => [
+      scopeKey(row.connection_id, row.sku_id, row.location_id, row.unit),
+      row,
+    ]),
+  );
+  const replicas = new Set(
+    (
+      await tx.query<{
+        connection_id: string;
+        sku_id: string;
+        location_id: string;
+        unit: string;
+      }>(
+        `SELECT q.connection_id,q.sku_id,q.location_id,q.unit
+  FROM unnest($2::uuid[],$3::uuid[],$4::uuid[],$5::text[]) AS q(connection_id,sku_id,location_id,unit)
+  WHERE EXISTS (SELECT 1 FROM shopify_native_stock_replicas r
+   JOIN inventory_stock_ownership_scopes o ON o.tenant_id=r.tenant_id AND o.location_id=r.location_id
+    AND o.connection_id=r.connection_id AND o.version=r.scope_version AND o.mode='own'
+   WHERE r.tenant_id=$1 AND r.connection_id=q.connection_id AND r.sku_id=q.sku_id AND r.location_id=q.location_id AND r.unit=q.unit)`,
+        [
+          tenant,
+          scopes.connections,
+          scopes.skus,
+          scopes.locations,
+          scopes.units,
+        ],
+      )
+    ).rows.map((row) =>
+      scopeKey(row.connection_id, row.sku_id, row.location_id, row.unit),
+    ),
+  );
+
+  for (const { row, value, data } of positions) {
+    const key = scopeKey(
+      value.connectionId,
+      data.skuId,
+      data.locationId,
+      data.unit,
+    );
+    result.set(
+      row.requested_id,
+      evidenceFrom(row, value, data, checks.get(key), replicas.has(key)),
+    );
+  }
+
+  return result;
+}
+
+type PositionSnapshot = z.infer<typeof snapshotSchema>;
+
+type PositionData = Extract<PositionSnapshot['data'], { type: 'position' }>;
+
+function evidenceFrom(
+  row: {
+    snapshot_id: string;
+    status: string;
+    granted: string[];
+    catalog_parent: boolean | null;
+    catalog_observed: Date | null;
+  },
+  value: PositionSnapshot,
+  data: PositionData,
+  check: { state: string; recorded_at: Date } | undefined,
+  channelReplica: boolean,
+): StockEvidence {
   const composition = data.composition;
   const parent =
     composition === null
@@ -828,12 +965,6 @@ async function stockEvidence(
           data.safetyStock,
         ]
       : [data.onHand, data.available, data.reserved];
-  const check = (
-    await tx.query<{ state: string; recorded_at: Date }>(
-      `SELECT state,recorded_at FROM inventory_native_stock_read_checks WHERE tenant_id=$1 AND connection_id=$2 AND sku_id=$3 AND location_id=$4 AND unit=$5 ORDER BY recorded_at DESC,id DESC LIMIT 1`,
-      [tenant, value.connectionId, data.skuId, data.locationId, data.unit],
-    )
-  ).rows[0];
   const unavailable =
     check?.state === 'unavailable' &&
     Date.parse(value.observedAt) <= check.recorded_at.getTime();
@@ -848,17 +979,6 @@ async function stockEvidence(
       (data.tracked === true &&
         typeof data.itemActive === 'boolean' &&
         typeof data.locationActive === 'boolean'));
-
-  const channelReplica =
-    ((
-      await tx.query(
-        `SELECT 1 FROM shopify_native_stock_replicas r
-   JOIN inventory_stock_ownership_scopes o ON o.tenant_id=r.tenant_id AND o.location_id=r.location_id
-    AND o.connection_id=r.connection_id AND o.version=r.scope_version AND o.mode='own'
-   WHERE r.tenant_id=$1 AND r.connection_id=$2 AND r.sku_id=$3 AND r.location_id=$4 AND r.unit=$5 LIMIT 1`,
-        [tenant, value.connectionId, data.skuId, data.locationId, data.unit],
-      )
-    ).rowCount ?? 0) > 0;
 
   return {
     snapshotId: row.snapshot_id,

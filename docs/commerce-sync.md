@@ -87,13 +87,21 @@ Customer profile retention follows the separate policy below. The returns stream
 and refunds.
 
 Coverage per stream comes from the ledger (counts, oldest and newest creation date) and
-from the page `history` limit. `history_from` is the limit reported when the history
+from the page `history` limit. Ledger triggers write signed count changes to
+`commerce_sync_item_counts` in the statement that changes a ledger row, so counts match the
+ledger in every snapshot whichever path wrote it, including erasure. Page commits fold their
+stream's changes into one row. Write the ledger only through SQL that fires these triggers;
+truncating it clears the counts. `history_from` is the limit reported when the history
 import started; a later scan without a limit reports that older history is available.
 Shopify limits orders to 60 days unless `read_all_orders` is granted, and granting it does
 not backfill: an operator re-imports order history. Page `total` drives progress only.
 
 Observations are stored with ingest key `sync:<observation id>`. Each page outcome is
 recorded as a read check for connection freshness; only product pages keep their items.
+Each successful product page also updates the latest stored revision of its products, which
+case evidence reads for SKU labels; a page with an older revision leaves a newer label in
+place. Read checks are not pruned: coverage and order comparisons read the latest check at a
+historical time.
 
 ## Change notifications
 

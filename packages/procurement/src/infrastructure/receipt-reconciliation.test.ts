@@ -94,6 +94,7 @@ function fixture() {
     ],
     countPurchaseOrders: async () => 1,
     supplier: async (id) => (id === supplier.id ? supplier : null),
+    suppliers: async (ids) => (ids.includes(supplier.id) ? [supplier] : []),
     updateSupplier: async () => {},
     history: async () => [],
     submissions: async () => submissions,
