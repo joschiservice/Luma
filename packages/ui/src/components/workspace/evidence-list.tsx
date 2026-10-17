@@ -32,6 +32,8 @@ const recordLabels: Record<EvidenceRecordKind, () => string> = {
   order_change: m.evidence_record_order_change,
   submission: m.evidence_record_submission,
   commitment: m.evidence_record_commitment,
+  supplier_message: m.evidence_record_supplier_message,
+  follow_up: m.evidence_record_follow_up,
   policy_decision: m.evidence_record_policy_decision,
   approval: m.evidence_record_approval,
   return_case: m.evidence_record_return_case,
@@ -116,6 +118,9 @@ function EvidenceEntry({
 }) {
   const { resolution } = item;
   const badge = kindBadge(resolution);
+  // A missing read or receipt the record relies on is a gap; an unknown reference is not.
+  const citedEvidence =
+    item.citedAs === 'read' || item.citedAs === 'write_receipt';
 
   return (
     <li className="evidence-entry" data-kind={resolution.kind}>
@@ -140,7 +145,9 @@ function EvidenceEntry({
                 ? recordLabels[resolution.record]()
                 : resolution.kind === 'not_retained'
                   ? m.evidence_not_retained_title()
-                  : m.evidence_unresolved_title()}
+                  : citedEvidence
+                    ? m.evidence_unresolved_title()
+                    : m.evidence_unresolved_reference_title()}
         </strong>
       </div>
       {resolution.kind === 'read' ? (
@@ -241,7 +248,11 @@ function EvidenceEntry({
           <NotRetained since={resolution.retentionStartedAt} />
         </p>
       ) : (
-        <p className="evidence-note">{m.evidence_unresolved_detail()}</p>
+        <p className="evidence-note">
+          {citedEvidence
+            ? m.evidence_unresolved_detail()
+            : m.evidence_unresolved_reference_detail()}
+        </p>
       )}
       <p className="evidence-reference">
         {m.evidence_field_reference()} <code>{item.ref}</code>

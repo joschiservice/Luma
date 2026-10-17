@@ -1,4 +1,4 @@
-import type { TenantContext } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
 import { hasPermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { forbidden, notFound, unavailable } from '@luma/platform';
@@ -91,7 +91,10 @@ export function createEvidenceReader(
         context.tenantId,
         async (tx) => {
           const tenantId = context.tenantId;
-          const own = await owner.citations(tx, tenantId, subject.id);
+          const access = {
+            can: (permission: Permission) => hasPermission(context, permission),
+          };
+          const own = await owner.citations(tx, tenantId, subject.id, access);
           if (!own) throw notFound('This record was not found');
           const citations = [
             ...own.citations,
@@ -103,13 +106,21 @@ export function createEvidenceReader(
             : all.slice(0, evidenceReferenceLimit);
           const uuids = uuidRefs(refs);
           const requested = new Set(uuids);
-          const found = await owner.lookup(tx, tenantId, subject.id, {
-            all: refs,
-            uuids,
-            cited: uuidRefs(
-              citations.filter((c) => c.citedAs !== 'record').map((c) => c.ref),
-            ).filter((ref) => requested.has(ref)),
-          });
+          const found = await owner.lookup(
+            tx,
+            tenantId,
+            subject.id,
+            {
+              all: refs,
+              uuids,
+              cited: uuidRefs(
+                citations
+                  .filter((c) => c.citedAs !== 'record')
+                  .map((c) => c.ref),
+              ).filter((ref) => requested.has(ref)),
+            },
+            access,
+          );
           const connectionIds = uuidRefs(
             found.flatMap((e) =>
               e.kind === 'luma_record' ? [] : [e.connectionId],

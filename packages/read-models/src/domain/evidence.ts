@@ -32,6 +32,8 @@ export const evidenceRecordKinds = [
   'order_change',
   'submission',
   'commitment',
+  'supplier_message',
+  'follow_up',
   'policy_decision',
   'approval',
   'return_case',

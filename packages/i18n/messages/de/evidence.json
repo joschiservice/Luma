@@ -72,5 +72,9 @@
   "evidence_summary_amount": "Betrag",
   "evidence_summary_currency": "Währung",
   "evidence_summary_lines": "Positionen",
-  "evidence_summary_complete": "Vollständig"
+  "evidence_summary_complete": "Vollständig",
+  "evidence_record_supplier_message": "Lieferantennachricht",
+  "evidence_record_follow_up": "Nachfass beim Lieferanten",
+  "evidence_unresolved_reference_title": "Zu diesem Verweis gibt es nichts anzuzeigen",
+  "evidence_unresolved_reference_detail": "Dieser Verweis zeigt weder auf einen gespeicherten Nachweis eines Anbieters noch auf einen Luma-Datensatz, den diese Ansicht anzeigen kann."
 }

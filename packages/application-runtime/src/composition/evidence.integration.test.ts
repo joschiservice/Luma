@@ -125,7 +125,11 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         caseAction = randomUUID(),
         shopifyRead = randomUUID(),
         shopifyAcceptance = randomUUID(),
-        uncitedShopify = randomUUID();
+        uncitedShopify = randomUUID(),
+        observationId = randomUUID(),
+        messageRecord = randomUUID(),
+        stockAction = randomUUID(),
+        stockAcceptance = randomUUID();
       const now = new Date().toISOString();
       const long = '2020-01-01T00:00:00.000Z';
       for (const tenant of [tenantId, otherTenant])
@@ -150,6 +154,7 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
               version: 1,
               status: 'active',
               label: 'Main warehouse',
+              target: { kind: 'jtl-cloud' },
             },
           ],
         );
@@ -283,6 +288,69 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
             { id: decisionId, tenantId, outcome: 'approval_required' },
           ],
         );
+        // A purchasing-system observation a commitment cites, and a supplier message.
+        await seed.query(
+          `INSERT INTO procurement_observations(tenant_id,id,purchase_order_id,connection_id,digest,document,observed_at)
+           VALUES($1,$2,$3,$4,'d',$5,$6)`,
+          [
+            tenantId,
+            observationId,
+            orderId,
+            connectionId,
+            {
+              externalId: 'JTL-7',
+              status: 'open',
+              orderNumber: 'B-100',
+              confirmed: true,
+              lines: [{}],
+            },
+            now,
+          ],
+        );
+        await seed.query(
+          `INSERT INTO procurement_communications(tenant_id,id,supplier_id,purchase_order_id,message_key,document,received_at,retain_until,created_at)
+           VALUES($1,$2,$3,$4,'k',$5,now(),now()+interval '1 year',now())`,
+          [
+            tenantId,
+            messageRecord,
+            randomUUID(),
+            orderId,
+            { id: messageRecord, tenantId },
+          ],
+        );
+        // A Shopify stock booking of the order's receipt, accepted by Shopify.
+        const correctionId = randomUUID();
+        await seed.query(
+          `INSERT INTO shopify_inventory_corrections(tenant_id,id,connection_id,position_id,revision,document)
+           VALUES($1,$2,$3,$4,'1',$5)`,
+          [
+            tenantId,
+            correctionId,
+            connectionId,
+            randomUUID(),
+            {
+              id: correctionId,
+              tenantId,
+              action: { id: stockAction },
+              target: { receipt: { purchaseOrderId: orderId } },
+            },
+          ],
+        );
+        await seed.query(
+          `INSERT INTO shopify_inventory_evidence(tenant_id,connection_id,id,kind,observed_at,document) VALUES($1,$2,$3,'acceptance',$4,$5)`,
+          [
+            tenantId,
+            connectionId,
+            stockAcceptance,
+            now,
+            { adjustmentId: 'gid://2' },
+          ],
+        );
+        await executed(seed, tenantId, stockAction, {
+          receipts: [stockAcceptance],
+          reads: [],
+          at: now,
+        });
         // A revision verified before purchasing reads were stored.
         const changeId = randomUUID();
         await seed.query(
@@ -524,15 +592,57 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
       // Named references: records of this order resolve, another tenant's read does not.
       const named = await reader.resolve(reading, {
         subject: { kind: 'purchase_order', id: orderId },
-        refs: [decisionId, orderId, submissionId, otherReadId, 'not-a-uuid'],
+        refs: [
+          decisionId,
+          orderId,
+          submissionId,
+          messageRecord,
+          observationId,
+          otherReadId,
+          'not-a-uuid',
+        ],
       });
       expect(named.items.map((item) => item.resolution)).toEqual([
         { kind: 'luma_record', record: 'policy_decision', id: decisionId },
         { kind: 'luma_record', record: 'purchase_order', id: orderId },
         { kind: 'luma_record', record: 'submission', id: submissionId },
+        { kind: 'luma_record', record: 'supplier_message', id: messageRecord },
+        expect.objectContaining({
+          kind: 'read',
+          record: { resource: 'purchase_order', externalId: 'JTL-7' },
+          // Observations predate read evidence and record no completeness.
+          completeness: null,
+          summary: [
+            { field: 'status', value: 'open' },
+            { field: 'orderNumber', value: 'B-100' },
+            { field: 'confirmed', value: 'true' },
+            { field: 'lines', value: '1' },
+          ],
+        }),
         { kind: 'unresolved' },
         { kind: 'unresolved' },
       ]);
+
+      // Stock booking proof needs inventory access as well as procurement access.
+      expect(byRef.get(stockAcceptance)).toMatchObject({
+        citedAs: 'write_receipt',
+        resolution: { kind: 'write_receipt', provider: 'shopify' },
+      });
+      const withoutStock = await reader.resolve(
+        readerContext(tenantId, ['procurement.read']),
+        { subject: { kind: 'purchase_order', id: orderId } },
+      );
+      expect(withoutStock.items.map((item) => item.ref)).not.toContain(
+        stockAcceptance,
+      );
+      expect(
+        (
+          await reader.resolve(readerContext(tenantId, ['procurement.read']), {
+            subject: { kind: 'purchase_order', id: orderId },
+            refs: [stockAcceptance],
+          })
+        ).items[0]?.resolution,
+      ).toEqual({ kind: 'unresolved' });
 
       const settlement = await reader.resolve(reading, {
         subject: { kind: 'return_settlement', id: settlementId },

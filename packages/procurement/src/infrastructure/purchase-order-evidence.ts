@@ -46,6 +46,8 @@ type PurchaseOrderEvidence =
         | 'order_change'
         | 'submission'
         | 'commitment'
+        | 'supplier_message'
+        | 'follow_up'
         | 'policy_decision'
         | 'approval';
     };
@@ -59,15 +61,22 @@ const orderActions = `
   UNION SELECT (document->>'actionId')::uuid FROM procurement_submissions
    WHERE tenant_id=$1 AND purchase_order_id=$2::uuid`;
 
+/** Stock bookings of the order's receipts, which the inventory owner's corrections record. */
+const stockActions = `
+  SELECT (document->'action'->>'id')::uuid AS id FROM shopify_inventory_corrections
+   WHERE tenant_id=$1 AND document->'target'->'receipt'->>'purchaseOrderId'=$2::text`;
+
 /**
  * Reads what a purchase order cites, for the evidence view: the purchasing actions whose
- * execution attempts belong to it and the reads its verified revisions cite. Returns null when
- * the tenant has no such order.
+ * execution attempts belong to it and the reads its verified revisions cite. With `stock`, for
+ * readers with inventory access, also the stock bookings of its receipts. Returns null when the
+ * tenant has no such order.
  */
 export async function purchaseOrderCitations(
   tx: SqlTransaction,
   tenantId: string,
   purchaseOrderId: string,
+  options: { stock: boolean },
 ): Promise<{ actionIds: string[]; citations: PurchaseOrderCitation[] } | null> {
   const order = await tx.query(
     'SELECT 1 FROM procurement_purchase_orders WHERE tenant_id=$1 AND id=$2',
@@ -75,7 +84,8 @@ export async function purchaseOrderCitations(
   );
   if (!order.rowCount) return null;
   const actions = await tx.query<{ id: string }>(
-    `SELECT id::text FROM (${orderActions}) a WHERE id IS NOT NULL LIMIT 200`,
+    `SELECT id::text FROM (${orderActions}${options.stock ? ` UNION ${stockActions}` : ''}) a
+     WHERE id IS NOT NULL LIMIT 200`,
     [tenantId, purchaseOrderId],
   );
   const revisions = await tx.query<{
@@ -124,6 +134,29 @@ export async function purchaseOrderEvidence(
      WHERE tenant_id=$1 AND purchase_order_id=$2::uuid AND id=ANY($3::uuid[])`,
     [tenantId, purchaseOrderId, refs.uuids],
   );
+  // Purchasing-system reads of the order that commitment facts cite. They predate the read
+  // evidence table and record no completeness, revision or adapter version.
+  const observations = await tx.query<{
+    id: string;
+    connection_id: string;
+    provider: string | null;
+    external_id: string;
+    observed_at: Date;
+    document: {
+      status?: string;
+      orderNumber?: string | null;
+      confirmed?: boolean | null;
+      lines?: unknown[];
+    };
+  }>(
+    `SELECT o.id::text,o.connection_id::text,
+      COALESCE(c.document->>'provider',c.document->'target'->>'kind') AS provider,
+      o.document->>'externalId' AS external_id,o.observed_at,o.document
+     FROM procurement_observations o
+     LEFT JOIN connector_installations c ON c.tenant_id=o.tenant_id AND c.id=o.connection_id
+     WHERE o.tenant_id=$1 AND o.purchase_order_id=$2::uuid AND o.id=ANY($3::uuid[])`,
+    [tenantId, purchaseOrderId, refs.uuids],
+  );
   const records = await tx.query<{
     id: string;
     record: Extract<PurchaseOrderEvidence, { kind: 'luma_record' }>['record'];
@@ -138,6 +171,10 @@ export async function purchaseOrderEvidence(
      UNION ALL SELECT id::text,'submission' FROM procurement_submissions
       WHERE tenant_id=$1 AND purchase_order_id=$2::uuid AND id=ANY($3::uuid[])
      UNION ALL SELECT id::text,'commitment' FROM procurement_commitments
+      WHERE tenant_id=$1 AND purchase_order_id=$2::uuid AND id=ANY($3::uuid[])
+     UNION ALL SELECT id::text,'supplier_message' FROM procurement_communications
+      WHERE tenant_id=$1 AND purchase_order_id=$2::uuid AND id=ANY($3::uuid[])
+     UNION ALL SELECT id::text,'follow_up' FROM procurement_follow_ups
       WHERE tenant_id=$1 AND purchase_order_id=$2::uuid AND id=ANY($3::uuid[])
      UNION ALL SELECT id::text,'policy_decision' FROM policy_decisions
       WHERE tenant_id=$1 AND id=ANY($3::uuid[]) AND proposal_id IN (SELECT id FROM actions)
@@ -181,6 +218,33 @@ export async function purchaseOrderEvidence(
         data: read.data,
       };
     }),
+    ...observations.rows.flatMap((row): PurchaseOrderEvidence[] =>
+      row.provider
+        ? [
+            {
+              kind: 'read',
+              id: row.id,
+              provider: row.provider,
+              connectionId: row.connection_id,
+              record: {
+                resource: 'purchase_order',
+                externalId: row.external_id,
+              },
+              observedAt: row.observed_at.toISOString(),
+              sourceUpdatedAt: null,
+              sourceRevision: null,
+              adapterVersion: null,
+              completeness: null,
+              data: {
+                status: row.document.status,
+                orderNumber: row.document.orderNumber,
+                confirmed: row.document.confirmed,
+                lines: row.document.lines,
+              },
+            },
+          ]
+        : [],
+    ),
     ...records.rows.map((row) => ({
       kind: 'luma_record' as const,
       id: row.id,

@@ -96,6 +96,12 @@ const evidence: EvidenceListData = {
       citedAt: '2026-10-17T11:56:00Z',
       resolution: { kind: 'unresolved' },
     },
+    {
+      ref: 'procurement-follow-up-recorded/1',
+      citedAs: null,
+      citedAt: null,
+      resolution: { kind: 'unresolved' },
+    },
   ],
 };
 
@@ -121,7 +127,7 @@ export const Resolved: Story = {
     const canvas = within(canvasElement);
     const list = canvas.getByRole('list', { name: 'Cited evidence' });
     const entries = within(list).getAllByRole('listitem');
-    expect(entries.filter((entry) => entry.dataset.kind)).toHaveLength(6);
+    expect(entries.filter((entry) => entry.dataset.kind)).toHaveLength(7);
 
     // Reads name the system, freshness and completeness in text.
     expect(
@@ -155,6 +161,13 @@ export const Resolved: Story = {
     ).toBeInTheDocument();
     expect(canvas.getByText('Not retained')).toBeInTheDocument();
     expect(canvas.getByText('No stored evidence found')).toBeInTheDocument();
+    expect(
+      canvas.getByText(/Treat the outcome it supports as unconfirmed/),
+    ).toBeInTheDocument();
+    // A reference that names nothing this view shows is not presented as missing evidence.
+    expect(
+      canvas.getByText('Nothing to show for this reference'),
+    ).toBeInTheDocument();
   },
 };
 

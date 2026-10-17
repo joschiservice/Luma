@@ -113,8 +113,24 @@ export function createEvidenceOwners(
     purchase_order: {
       permission: 'procurement.read',
       retention: { read: 'procurement_reads', write_receipt: 'write_receipts' },
-      citations: purchaseOrderCitations,
-      lookup: purchaseOrderEvidence,
+      // Stock booking proof of the order's receipts is the inventory area's evidence.
+      citations: (tx, tenantId, id, access) =>
+        purchaseOrderCitations(tx, tenantId, id, {
+          stock: access.can('inventory.read'),
+        }),
+      async lookup(tx, tenantId, id, refs, access) {
+        const found: StoredEvidence[] = await purchaseOrderEvidence(
+          tx,
+          tenantId,
+          id,
+          refs,
+        );
+        if (access.can('inventory.read') && refs.cited.length)
+          for (const app of apps)
+            found.push(...(await app.read(tx, tenantId, refs.cited)));
+
+        return found;
+      },
     },
     reply: {
       permission: 'messages.read',

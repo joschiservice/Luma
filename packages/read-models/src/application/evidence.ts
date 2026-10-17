@@ -56,11 +56,15 @@ export interface EvidenceSubjectOwner {
     read: RetentionKind | null;
     write_receipt: RetentionKind | null;
   };
-  /** Returns null when the tenant has no such subject. */
+  /**
+   * Returns null when the tenant has no such subject. `access` names the reader's other read
+   * permissions, for citations another area guards, such as stock booking proof.
+   */
   citations(
     tx: SqlTransaction,
     tenantId: string,
     subjectId: string,
+    access: EvidenceAccess,
   ): Promise<SubjectCitations | null>;
   /**
    * Finds stored evidence and Luma records among the references. Owner tables are matched
@@ -72,7 +76,13 @@ export interface EvidenceSubjectOwner {
     tenantId: string,
     subjectId: string,
     refs: EvidenceLookup,
+    access: EvidenceAccess,
   ): Promise<StoredEvidence[]>;
+}
+
+/** The reader's read permissions, for evidence another area guards. */
+export interface EvidenceAccess {
+  can(permission: Permission): boolean;
 }
 
 /** The references one request resolves. */
