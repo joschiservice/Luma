@@ -146,6 +146,10 @@ export interface ReturnCaseTransaction {
       creation: ReturnCreation | null;
       assignment: ReturnCaseEvent | null;
       completion?: ExchangeConsistencyReport | null;
+      /** The case's exchange, whose completion check `completion` is. */
+      exchangeId?: string | null;
+      /** The case's latest refund, restock or exchange step. */
+      settlement?: SettlementReference | null;
     }[]
   >;
   /** Serializes case changes of one order until the transaction ends. */
@@ -400,10 +404,19 @@ export interface ReturnCaseList {
   nextCursor: string | null;
 }
 
+/** A refund, restock or exchange step of a return case, as its evidence names it. */
+interface SettlementReference {
+  kind: 'settlement' | 'exchange_step';
+  id: string;
+}
+
 /** Persisted work and creation controls currently waiting on a person. */
 export interface ReturnCaseAttention {
-  completion?: ExchangeConsistencyReport;
+  /** An unresolved completion check of the case's exchange, `exchangeId`. */
+  completion?: ExchangeConsistencyReport & { exchangeId: string };
   waiting?: {
+    /** The wait occurrence. */
+    id?: string;
     dueAt: string;
     reason: string;
     observedAt: string | null;
@@ -411,6 +424,8 @@ export interface ReturnCaseAttention {
   };
   case: ReturnCaseSummary & { orderNumber: string | null; revision: number };
   creation: CreationView | null;
+  /** The case's latest refund, restock or exchange step, whatever its state. */
+  settlement: SettlementReference | null;
   canManage: boolean;
   assignment: {
     assigneeId: string;
@@ -1447,13 +1462,15 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           ? await deps.admission.decisions(context, decisionIds)
           : undefined,
       );
-      const result = [];
+      const result: ReturnCaseAttention[] = [];
       for (const {
         value,
         orderNumber,
         creation,
         assignment,
         completion,
+        exchangeId,
+        settlement,
       } of data.items)
         result.push({
           case: {
@@ -1462,10 +1479,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             revision: value.revision,
           },
           assignment,
-          ...(completion?.state === 'unresolved'
+          ...(completion?.state === 'unresolved' && exchangeId
             ? {
                 completion: {
                   ...completion,
+                  exchangeId,
                   ownerId: value.assigneeId ?? value.openedBy,
                 },
               }
@@ -1473,6 +1491,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           creation: creation
             ? await creationView(context, creation, data.people, reads)
             : null,
+          settlement: settlement ?? null,
           canManage: hasPermission(context, 'returns.manage'),
         });
 

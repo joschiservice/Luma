@@ -169,7 +169,7 @@ const evidence = [
   'packages/read-models/src/{api,application,domain}/evidence.ts',
   'packages/read-models/src/infrastructure/evidence/**',
   'packages/api-contract/src/{evidence,contracts/evidence}.ts',
-  'packages/procurement/src/infrastructure/purchase-order-evidence.ts',
+  'packages/procurement/src/infrastructure/{purchase-order-evidence,replenishment-evidence}.ts',
   'packages/inventory/src/infrastructure/evidence.ts',
   'packages/execution/src/infrastructure/action-evidence.ts',
   'packages/orders/src/infrastructure/{return-evidence,order-read-evidence}.ts',
@@ -1191,6 +1191,8 @@ export const journeyAreas = {
     ...webProcurement,
     ...webInventory,
     ...webExtensions,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'replenishment.e2e.mjs': [
     ...simulator,
@@ -1296,6 +1298,8 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+    ...webEvidence,
+    ...webNeedsYou,
   ],
   'return-exchange.e2e.mjs': [
     ...simulator,

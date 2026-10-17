@@ -203,10 +203,13 @@ const evidencePermissions: Partial<
 > = {
   purchase_order: 'procurement.read',
   purchasing_plan: 'procurement.read',
+  replenishment_run: 'procurement.read',
   native_receipt: 'inventory.read',
   return_creation: 'returns.read',
   return_settlement: 'returns.read',
+  return_exchange: 'returns.read',
   return_exchange_step: 'returns.read',
+  return_wait: 'returns.read',
   reply: 'messages.read',
   case: 'issues.read',
 };

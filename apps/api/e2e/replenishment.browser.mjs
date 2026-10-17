@@ -135,6 +135,36 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
       .first()
       .getAttribute('href'),
   ).toContain(`item=replenishment%3A${run.id}`);
+  // Needs you: the proposal opens the stock read, rule and policy decision it rests on, read
+  // only when opened.
+  let evidenceReads = 0;
+  review.on('request', (request) => {
+    if (request.url().endsWith('/evidence/resolve')) evidenceReads += 1;
+  });
+  await review.goto(
+    `/app/${f.manifest.organizationId}/needs-you?item=${encodeURIComponent(`replenishment:${run.id}`)}`,
+  );
+  const cites = review.getByText('What this decision cites', { exact: true });
+  await expect(cites).toBeVisible();
+  expect(evidenceReads).toBe(0);
+  await cites.click();
+  const runEvidence = review.getByRole('list', { name: 'Cited evidence' });
+  await expect(runEvidence.getByText(/^Read from /).first()).toBeVisible();
+  await expect(
+    runEvidence.getByText('Available', { exact: true }).first(),
+  ).toBeVisible();
+  for (const record of [
+    'Replenishment rule',
+    'Proposed purchase-order draft',
+    'Policy decision',
+    'Supplier',
+  ])
+    await expect(
+      runEvidence.getByText(record, { exact: true }).first(),
+    ).toBeVisible();
+  await expect(runEvidence.getByText('Not found')).toHaveCount(0);
+  expect(evidenceReads).toBe(1);
+  await review.goto(path);
   await review.getByRole('tab', { name: /^Runs/, selected: true }).waitFor();
   await review.getByRole('button', { name: 'Approve 50 units' }).click();
   await review.getByText('Decision recorded.', { exact: false }).waitFor();

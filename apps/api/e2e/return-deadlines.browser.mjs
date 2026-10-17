@@ -86,6 +86,24 @@ test('configures deadlines by keyboard and follows independently verified native
   await expect(
     waiting.getByText('Money pending', { exact: true }),
   ).toBeVisible();
+  // Needs you: the case's due wait opens the refund read it is waiting on.
+  const casePage = page.url();
+  await page.goto(
+    `/app/${f.org}/needs-you?item=${encodeURIComponent(`return-case:${f.detail.case.id}`)}`,
+  );
+  await page.getByText('What this decision cites', { exact: true }).click();
+  const waitEvidence = page.getByRole('list', { name: 'Cited evidence' });
+  await expect(waitEvidence.getByText(/^Read from /).first()).toBeVisible();
+  await expect(waitEvidence.getByText('Not found')).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.goto(casePage);
+  await waiting
+    .getByRole('button', { name: 'Check progress', exact: true })
+    .waitFor();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

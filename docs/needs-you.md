@@ -26,11 +26,14 @@ labeled `unknown`, never guessed.
 
 A decision that cites stored evidence names its subject for the
 [evidence reader](execution.md#reading-cited-evidence) in `citedEvidence`, with the references it
-relies on when they are only part of what the subject cites: a purchasing plan, a native stock
-receipt review, a purchase order with a revision's or supplier item's references, a return
-creation, a reply, a case, or an app decision by its proposal. The decision view shows it as a
-disclosure that reads the evidence only when opened, hidden when the reader's role can't read
-the subject's area; the evidence reader checks access again. Other decisions show none.
+relies on when they are only part of what the subject cites: a purchasing plan, a replenishment
+run, a native stock receipt review, a purchase order with a revision's or supplier item's
+references, a reply, a case, or an app decision by its proposal. A return case item cites the
+record behind what it asks for, in this order: a creation waiting on a person, an unresolved
+exchange completion check, the deadline wait that is due, the latest refund, restock or exchange
+step, then the last creation. The decision view shows it as a disclosure that reads the evidence
+only when opened, hidden when the reader's role can't read the subject's area; the evidence
+reader checks access again. Other decisions show none.
 
 Decision sources read persisted state only; they must not call external providers or models. A Shopify
 preview can therefore be listed as approvable and still be refused when its review reads

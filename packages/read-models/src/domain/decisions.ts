@@ -425,6 +425,8 @@ export function presentReplenishment(
       definitionId: item.definitionId,
       runId: item.runId,
     },
+    // The stock and demand reads, existing orders and policy decision the proposal rests on.
+    citedEvidence: { subject: { kind: 'replenishment_run', id: item.runId } },
     group: {
       key: 'replenishment:approval',
       label: 'Purchase-order drafts awaiting approval',

@@ -490,6 +490,59 @@ export const RecordsNarrow: Story = {
   ],
 };
 
+/** A replenishment proposal's records, with its stock read restricted to inventory readers. */
+const runRecord = (
+  id: string,
+  record: 'replenishment_rule' | 'replenishment_proposal' | 'supplier',
+): EvidenceListData['items'][number] => ({
+  ref: id,
+  citedAs: 'record',
+  citedAt: '2026-10-17T11:40:00Z',
+  resolution: { kind: 'luma_record', record, id },
+});
+
+const replenishment: EvidenceListData = {
+  ...evidence,
+  subject: {
+    kind: 'replenishment_run',
+    id: '00000000-0000-4000-8000-000000000003',
+  },
+  items: [
+    runRecord('00000000-0000-4000-8000-0000000000c1', 'replenishment_rule'),
+    runRecord('00000000-0000-4000-8000-0000000000c2', 'replenishment_proposal'),
+    runRecord('00000000-0000-4000-8000-0000000000c3', 'supplier'),
+    {
+      ref: '00000000-0000-4000-8000-0000000000c4',
+      citedAs: 'read',
+      citedAt: '2026-10-17T11:40:00Z',
+      resolution: { kind: 'restricted', permission: 'inventory.read' },
+    },
+  ],
+};
+
+export const ReplenishmentRun: Story = {
+  args: {
+    state: { status: 'ready', evidence: replenishment },
+    now,
+    permissionName: (permission: string) =>
+      permission === 'inventory.read' ? 'View inventory' : permission,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const label of [
+      'Replenishment rule',
+      'Proposed purchase-order draft',
+      'Supplier',
+    ])
+      expect(canvas.getByText(label)).toBeInTheDocument();
+    // The stock read the proposal rests on is named for readers without inventory access.
+    expect(canvas.getByText('No access')).toBeInTheDocument();
+    expect(
+      canvas.getByText(/Someone with “View inventory”/),
+    ).toBeInTheDocument();
+  },
+};
+
 export const NotFound: Story = {
   args: { state: { status: 'not_found' } },
 };
