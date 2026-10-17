@@ -45,6 +45,17 @@ export const Installed: Story = {
 
 export const Dark: Story = { globals: { theme: 'dark' } };
 
+export const NeedsAttention: Story = {
+  parameters: { connectionState: 'attention' },
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(
+      await c.findByText('1 connection needs attention'),
+    ).toBeVisible();
+    await expect(c.getByText('Healthy')).toBeVisible();
+  },
+};
+
 export const Empty: Story = { parameters: { connectionState: 'empty' } };
 
 export const Loading: Story = { parameters: { connectionState: 'loading' } };
@@ -57,9 +68,10 @@ export const ReadOnly: Story = {
   parameters: { connectionState: 'member' },
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
+    await expect(await c.findByRole('link', { name: 'Shopify' })).toBeVisible();
     await expect(
-      (await c.findAllByRole('link', { name: 'Manage app' }))[0]!,
-    ).toBeVisible();
+      c.queryByRole('button', { name: 'Install Shopify' }),
+    ).not.toBeInTheDocument();
     await expect(
       c.queryByRole('button', { name: 'Validate access' }),
     ).not.toBeInTheDocument();

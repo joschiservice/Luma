@@ -165,12 +165,81 @@ export function ConnectionsPreview({ children }: { children: ReactNode }) {
   );
 }
 
-export type MockState = 'ready' | 'empty' | 'loading' | 'error' | 'member';
+export type MockState =
+  'ready' | 'attention' | 'empty' | 'loading' | 'error' | 'member';
+
+/** A healthy store and a warehouse whose reads fail, as the overview and app page show them. */
+const attention: InstalledConnection[] = [
+  {
+    ...shopify,
+    coverage: {
+      health: 'healthy',
+      lastObservedAt: '2026-09-18T00:55:00Z',
+      freshness: 'fresh',
+    },
+  },
+  {
+    ...warehouse,
+    status: 'degraded',
+    granted: ['orders.read'],
+    coverage: {
+      health: 'failing',
+      lastObservedAt: '2026-09-17T08:00:00Z',
+      freshness: 'stale',
+    },
+  },
+];
+
+/** Lifecycle events Activity records for a connection, newest first. */
+function history(connectionId: string) {
+  const event = (id: string, action: string, recordedAt: string) => ({
+    id,
+    recordedAt,
+    occurredAt: recordedAt,
+    actor: {
+      kind: 'member',
+      id: 'user-1',
+      name: 'Mara Lindqvist',
+      email: null,
+      workflow: null,
+    },
+    action,
+    type: 'connection',
+    outcome: 'recorded',
+    exceptionId: null,
+    proposalId: null,
+    attemptId: null,
+    connectionId,
+    system: null,
+    resource: null,
+    playbookId: null,
+    mode: 'unrecorded',
+    summary: null,
+    executionState: null,
+    verificationPhase: null,
+    failureCode: null,
+    connections: [],
+    dispatch: null,
+    verification: null,
+    evidenceRefs: [],
+  });
+
+  return [
+    event('renamed', 'connection.renamed', '2026-09-18T01:00:00Z'),
+    event('checked', 'connection.health_checked', '2026-09-18T00:10:00Z'),
+    event('installed', 'connection.installed', '2026-09-18T00:00:00Z'),
+  ];
+}
 
 /** Keep every API request local to the preview, including credential and OAuth actions. */
 export function mockConnections(state: MockState = 'ready') {
   const original = globalThis.fetch;
-  let items = state === 'empty' ? [] : structuredClone([shopify, warehouse]);
+  let items =
+    state === 'empty'
+      ? []
+      : structuredClone(
+          state === 'attention' ? attention : [shopify, warehouse],
+        );
   const installations =
     state === 'empty'
       ? []
@@ -223,6 +292,13 @@ export function mockConnections(state: MockState = 'ready') {
     if (state === 'error') return fail(503);
     if (url.pathname.endsWith('/apps'))
       return Response.json({ catalog, installations });
+    if (url.pathname.endsWith('/activity'))
+      return Response.json({
+        visibility: 'admin',
+        items: history(url.searchParams.get('connectionId') ?? ''),
+        nextCursor: null,
+        coverage: 'complete',
+      });
     const appAction = /\/apps\/([^/]+)\/(install|uninstall)$/.exec(
       url.pathname,
     );
@@ -271,6 +347,12 @@ export function mockConnections(state: MockState = 'ready') {
       return Response.json(item, { status: 201 });
     }
     const item = items.find((entry) => url.pathname.includes(entry.id));
+    if (item && method === 'PATCH' && url.pathname.endsWith('/label')) {
+      const renamed = { ...item, label: body.label, version: item.version + 1 };
+      items = items.map((entry) => (entry.id === item.id ? renamed : entry));
+
+      return Response.json(renamed);
+    }
     if (item && method === 'POST') {
       const updated: InstalledConnection = {
         ...item,

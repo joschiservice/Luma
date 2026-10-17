@@ -1,13 +1,15 @@
+import type { AppManifest, InstalledConnection } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from '@luma/ui/components/primitives/card';
-import { StateDot } from '@luma/ui/components/primitives/state';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Card } from '@luma/ui/components/primitives/card';
+import { Empty } from '@luma/ui/components/primitives/empty';
+import { StatePill } from '@luma/ui/components/primitives/state';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
+import { ChevronRight, Plug } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { appsOptions, changeApp } from '../../kit/apps/data';
@@ -16,8 +18,20 @@ import {
   connectionsOptions,
 } from '../../kit/connections/data';
 import { AppAccessDialog } from './access';
+import {
+  appCategoryLabel,
+  appConnectionSummary,
+  AppIcon,
+} from './presentation';
 
-/** Shows installed apps with connection summaries and a separate catalog for discovery. */
+// Rows name at most this many connections; the rest are counted.
+const namedConnections = 3;
+
+/**
+ * Lists installed apps with the health of their connections, apps that can be installed, and
+ * earlier apps whose connections Luma keeps. Installing asks for consent first and then opens
+ * the app's page so the next step, adding a connection, is in view.
+ */
 export function AppStore({
   organizationId,
   canManage,
@@ -71,14 +85,45 @@ export function AppStore({
     }
   }
 
-  if (query.isPending) return <p role="status">{m.apps_store_loading()}</p>;
-  if (query.error) return <p role="alert">{connectionError(query.error)}</p>;
-  const installed = query.data.installations.filter(
-    (app) => app.status === 'installed',
+  if (query.isPending)
+    return (
+      <div className="apps-loading" role="status">
+        <span className="sr-only">{m.apps_store_loading()}</span>
+        <span className="lu-skeleton" />
+        <span className="lu-skeleton" />
+        <span className="lu-skeleton" />
+      </div>
+    );
+  if (query.error)
+    return (
+      <Alert tone="danger" role="alert">
+        {connectionError(query.error)}{' '}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void query.refetch()}
+        >
+          {m.common_retry()}
+        </Button>
+      </Alert>
+    );
+  const catalog = query.data.catalog;
+  const installed = query.data.installations
+    .filter((app) => app.status === 'installed')
+    .map((installation) => ({
+      installation,
+      app: catalog.find((item) => item.id === installation.appId),
+    }))
+    .sort((a, b) =>
+      (a.app?.name ?? a.installation.appId).localeCompare(
+        b.app?.name ?? b.installation.appId,
+      ),
+    );
+  const available = catalog.filter(
+    (app) => !installed.some((item) => item.installation.appId === app.id),
   );
-  const available = query.data.catalog.filter(
-    (app) => !installed.some((item) => item.appId === app.id),
-  );
+  const byApp = (appId: string) =>
+    connections.data?.filter((item) => item.appId === appId) ?? [];
   // Retain access to historical connections after uninstall or removal from the catalog.
   const historical = [
     ...new Set(
@@ -86,145 +131,116 @@ export function AppStore({
         ?.map((item) => item.appId)
         .filter((id): id is string => !!id),
     ),
-  ].filter((id) => !installed.some((app) => app.appId === id));
+  ].filter((id) => !installed.some((item) => item.installation.appId === id));
 
   return (
     <>
-      {!canManage ? (
-        <p className="apps-note">{m.apps_store_manage_denied()}</p>
-      ) : null}
-      <section className="connections-section" aria-labelledby="installed-apps">
-        <h2 id="installed-apps">{m.apps_store_installed_title()}</h2>
-        {!installed.length ? (
-          <p className="apps-note">{m.apps_store_installed_empty()}</p>
-        ) : null}
-        <div className="connection-providers">
-          {installed.map((installation) => {
-            const app = query.data.catalog.find(
-              (item) => item.id === installation.appId,
-            );
-            const items =
-              connections.data?.filter(
-                (item) => item.appId === installation.appId,
-              ) ?? [];
-            const live = items.filter(
-              (item) => !['disconnected', 'revoked'].includes(item.status),
-            );
-            const attention = items.filter((item) =>
-              ['pending', 'degraded', 'revoked'].includes(item.status),
-            );
-            const params = { organizationId, appId: installation.appId };
-
-            return (
-              <Card as="article" key={installation.appId} className="app-tile">
-                <CardHeader>
-                  <span className="app-tile-icon" aria-hidden="true">
-                    {(app?.name ?? installation.appId).slice(0, 1)}
-                  </span>
-                  <CardTitle as="h3">
-                    {app?.name ?? installation.appId}
-                  </CardTitle>
-                </CardHeader>
-                <p className="app-tile-description">
-                  {app?.description ?? m.apps_store_app_unavailable()}
-                </p>
-                {app?.connectionTypes.length ? (
-                  <p className="app-tile-status">
-                    <StateDot
-                      state={
-                        connections.error
-                          ? 'idle'
-                          : attention.length
-                            ? 'attention'
-                            : live.length
-                              ? 'verified'
-                              : 'waiting'
-                      }
-                    />
-                    {connections.isPending
-                      ? m.apps_connections_loading()
-                      : connections.error
-                        ? m.apps_store_connections_unavailable()
-                        : live.length
-                          ? m.apps_store_connections_count({
-                              count: live.length,
-                            })
-                          : m.apps_store_connections_empty()}
-                  </p>
-                ) : null}
-                {!connections.error && attention.length ? (
-                  <Link
-                    to="/app/$organizationId/apps/$appId/settings"
-                    params={params}
-                    hash={`connection-${attention[0]!.id}`}
-                    className="app-attention"
-                  >
-                    {m.apps_store_connections_attention({
-                      count: attention.length,
-                    })}
-                  </Link>
-                ) : null}
-                <Link
-                  className={buttonVariants({ variant: 'outline' })}
-                  to="/app/$organizationId/apps/$appId/settings"
-                  params={params}
-                >
-                  {m.apps_store_manage()}
-                </Link>
-              </Card>
-            );
-          })}
+      <section className="apps-section" aria-labelledby="installed-apps">
+        <div className="apps-section-heading">
+          <h2 id="installed-apps">{m.apps_store_installed_title()}</h2>
+          {installed.length ? (
+            <span className="apps-section-count">{installed.length}</span>
+          ) : null}
         </div>
+        {connections.error ? (
+          <Alert tone="warning" role="alert">
+            {connectionError(connections.error)}
+          </Alert>
+        ) : null}
+        {installed.length ? (
+          <ul className="apps-rows">
+            {installed.map(({ installation, app }) => (
+              <InstalledApp
+                key={installation.appId}
+                organizationId={organizationId}
+                appId={installation.appId}
+                app={app}
+                pendingAccess={installation.pendingScopes.length > 0}
+                connections={byApp(installation.appId)}
+                connectionsState={
+                  connections.isPending
+                    ? 'loading'
+                    : connections.error
+                      ? 'failed'
+                      : 'ready'
+                }
+              />
+            ))}
+          </ul>
+        ) : (
+          <Empty className="apps-empty">
+            <Plug aria-hidden="true" />
+            <h3>{m.apps_store_installed_empty_title()}</h3>
+            <p>{m.apps_store_installed_empty()}</p>
+          </Empty>
+        )}
       </section>
-      <section className="connections-section" aria-labelledby="available-apps">
-        <h2 id="available-apps">{m.apps_store_available_title()}</h2>
-        <div className="connection-providers">
-          {available.map((app) => (
-            <Card as="article" key={app.id} className="app-tile">
-              <CardHeader>
-                <span className="app-tile-icon" aria-hidden="true">
-                  {app.name.slice(0, 1)}
-                </span>
-                <CardTitle as="h3">{app.name}</CardTitle>
-              </CardHeader>
-              <p className="app-tile-description">{app.description}</p>
-              <Button
+      <section className="apps-section" aria-labelledby="available-apps">
+        <div className="apps-section-heading">
+          <h2 id="available-apps">{m.apps_store_available_title()}</h2>
+        </div>
+        {!canManage ? (
+          <p className="apps-note">{m.apps_store_manage_denied()}</p>
+        ) : null}
+        {available.length ? (
+          <div className="apps-catalog">
+            {available.map((app) => (
+              <CatalogApp
+                key={app.id}
+                app={app}
                 disabled={!canManage || pending}
-                onClick={() => {
+                install={() => {
                   setMessage('');
                   setReviewing(app.id);
                 }}
-              >
-                {m.apps_store_install({ app: app.name })}
-              </Button>
-            </Card>
-          ))}
-        </div>
-        {!available.length ? (
+              />
+            ))}
+          </div>
+        ) : (
           <p className="apps-note">{m.apps_store_available_empty()}</p>
-        ) : null}
+        )}
       </section>
       {historical.length ? (
-        <section className="connections-section" aria-labelledby="past-apps">
-          <h2 id="past-apps">{m.apps_store_history_title()}</h2>
+        <section className="apps-section" aria-labelledby="past-apps">
+          <div className="apps-section-heading">
+            <h2 id="past-apps">{m.apps_store_history_title()}</h2>
+          </div>
           <p className="apps-note">{m.apps_store_history_description()}</p>
-          <ul className="apps-history">
-            {historical.map((appId) => (
-              <li key={appId}>
-                <Link
-                  to="/app/$organizationId/apps/$appId/settings"
-                  params={{ organizationId, appId }}
-                >
-                  {query.data.catalog.find((app) => app.id === appId)?.name ??
-                    appId}
-                </Link>
-              </li>
-            ))}
+          <ul className="apps-rows" data-variant="history">
+            {historical.map((appId) => {
+              const app = catalog.find((item) => item.id === appId);
+              const count = byApp(appId).length;
+
+              return (
+                <li key={appId} className="app-row">
+                  <AppIcon category={app?.category} />
+                  <div className="app-row-main">
+                    <h3>
+                      <Link
+                        className="app-row-link"
+                        to="/app/$organizationId/apps/$appId/settings"
+                        params={{ organizationId, appId }}
+                      >
+                        {app?.name ?? appId}
+                      </Link>
+                    </h3>
+                    <p className="app-row-meta">
+                      {m.apps_store_history_connections({ count })}
+                    </p>
+                  </div>
+                  <div className="app-row-status">
+                    <Badge>{m.apps_store_not_installed()}</Badge>
+                  </div>
+                  <ChevronRight
+                    className="app-row-chevron"
+                    size={16}
+                    aria-hidden="true"
+                  />
+                </li>
+              );
+            })}
           </ul>
         </section>
-      ) : null}
-      {connections.error ? (
-        <p role="alert">{connectionError(connections.error)}</p>
       ) : null}
       {reviewing ? null : <p role="status">{message}</p>}
       {available.map((app) => (
@@ -242,5 +258,130 @@ export function AppStore({
         />
       ))}
     </>
+  );
+}
+
+/**
+ * One installed app as a row: what it connects, which connections it has and whether any needs
+ * someone. The row opens the app's page, at the first connection that needs attention.
+ */
+function InstalledApp({
+  organizationId,
+  appId,
+  app,
+  pendingAccess,
+  connections,
+  connectionsState,
+}: {
+  organizationId: string;
+  appId: string;
+  app: AppManifest | undefined;
+  pendingAccess: boolean;
+  connections: InstalledConnection[];
+  connectionsState: 'loading' | 'failed' | 'ready';
+}) {
+  const connector = !app || app.connectionTypes.length > 0;
+  const summary = appConnectionSummary(connections);
+  const names = summary.live.map((item) => item.label);
+  const shown = names.slice(0, namedConnections);
+  const hidden = names.length - shown.length;
+  const meta = !app
+    ? m.apps_store_app_unavailable()
+    : !connector
+      ? app.description
+      : connectionsState === 'loading'
+        ? m.apps_connections_loading()
+        : connectionsState === 'failed'
+          ? m.apps_store_connections_unavailable()
+          : names.length
+            ? hidden
+              ? m.apps_store_connections_more({
+                  names: formatList(shown, { type: 'unit', style: 'short' }),
+                  count: hidden,
+                })
+              : formatList(shown)
+            : null;
+
+  return (
+    <li
+      className="app-row"
+      data-attention={
+        (connectionsState === 'ready' && summary.attention.length > 0) ||
+        pendingAccess ||
+        undefined
+      }
+    >
+      <AppIcon category={app?.category} />
+      <div className="app-row-main">
+        <h3>
+          <Link
+            className="app-row-link"
+            to="/app/$organizationId/apps/$appId/settings"
+            params={{ organizationId, appId }}
+            hash={
+              connectionsState === 'ready' && summary.attention[0]
+                ? `connection-${summary.attention[0].id}`
+                : ''
+            }
+          >
+            {app?.name ?? appId}
+          </Link>
+        </h3>
+        <p className="app-row-meta">
+          {app ? <span>{appCategoryLabel(app.category)}</span> : null}
+          {meta ? <span>{meta}</span> : null}
+        </p>
+      </div>
+      <div className="app-row-status">
+        {pendingAccess ? (
+          <Badge tone="warning">{m.apps_store_access_review()}</Badge>
+        ) : null}
+        {connector && connectionsState === 'ready' ? (
+          <>
+            <StatePill state={summary.state}>{summary.label}</StatePill>
+            {summary.live.length ? (
+              <span className="app-row-count">
+                {m.apps_store_connections_count({
+                  count: summary.live.length,
+                })}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+      <ChevronRight className="app-row-chevron" size={16} aria-hidden="true" />
+    </li>
+  );
+}
+
+/** An app that can be installed, with what it connects and does. */
+function CatalogApp({
+  app,
+  disabled,
+  install,
+}: {
+  app: AppManifest;
+  disabled: boolean;
+  install: () => void;
+}) {
+  return (
+    <Card as="article" className="app-tile" aria-labelledby={`app-${app.id}`}>
+      <div className="app-tile-head">
+        <AppIcon category={app.category} />
+        <div>
+          <h3 id={`app-${app.id}`}>{app.name}</h3>
+          <p>{appCategoryLabel(app.category)}</p>
+        </div>
+      </div>
+      <p className="app-tile-description">{app.description}</p>
+      <Button
+        variant="outline"
+        disabled={disabled}
+        onClick={install}
+        aria-label={m.apps_store_install({ app: app.name })}
+      >
+        {m.apps_store_install_short()}
+      </Button>
+    </Card>
   );
 }

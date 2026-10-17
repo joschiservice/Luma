@@ -21,7 +21,6 @@
   "sync_connection_manage": "Manage connection",
   "sync_connection_inactive": "Syncing pauses while the connection isn’t active. Records already imported stay in Luma.",
   "sync_connection_record_types": "Record types from {connection}",
-  "sync_connection_summary": "{title}. {detail}",
   "sync_type_orders_title": "Orders",
   "sync_type_orders_noun": "orders",
   "sync_type_orders_one": "order",

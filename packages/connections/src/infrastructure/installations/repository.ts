@@ -72,6 +72,11 @@ export function createInstallationRepository(
                 ],
               );
         if (result.rowCount !== 1) return false;
+        // Renames record the names; every other event records the write mode it leaves.
+        const audited = (value: InstalledConnection | undefined) =>
+          event === 'renamed'
+            ? { label: value?.label ?? null }
+            : { writeMode: value?.writeMode ?? null };
         await tx.query(
           'INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version,before_value,after_value) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
           [
@@ -82,8 +87,8 @@ export function createInstallationRepository(
             actorId,
             c.status,
             c.credentialVersion,
-            { writeMode: before?.writeMode ?? null },
-            { writeMode: c.writeMode ?? null },
+            audited(before),
+            audited(c),
           ],
         );
 

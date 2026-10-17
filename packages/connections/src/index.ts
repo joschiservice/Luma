@@ -96,6 +96,8 @@ export type {
 
 export type { CoverageReader } from './application/coverage.js';
 
+export { importedReads } from './domain/coverage.js';
+
 export type {
   PlaybookGrantReader,
   PlaybookGrantSource,

@@ -163,7 +163,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       description:
         'Read shipping orders and carrier tracking, and review unshipped order corrections.',
       version: '1.0.0',
-      category: 'utility',
+      category: 'shipping',
       ui: ['connections', 'settings', 'record'],
       connectionTypes: [{ kind: 'starshipit', name: 'Starshipit' }],
       permissions: [

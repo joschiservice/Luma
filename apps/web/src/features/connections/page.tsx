@@ -60,7 +60,7 @@ export function Connections({
   const canManage = can('apps.manage');
 
   return (
-    <div className="connections-page apps-page">
+    <div className="apps-page">
       <PageTitle title={m.connections_page_title()} />
       {appResult ? (
         <Alert

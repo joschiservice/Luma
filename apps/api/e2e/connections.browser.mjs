@@ -57,7 +57,7 @@ async function fixture(t) {
   await page.getByRole('heading', { name: 'Needs you' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page.getByRole('link', { name: 'Manage apps', exact: true }).click();
-  await page.getByText('No apps installed yet.', { exact: false }).waitFor();
+  await page.getByText('No apps installed yet', { exact: true }).waitFor();
   expect(appModules).toEqual([]);
 
   return { db, api, page, context, organizationId, errors, appModules };
@@ -92,7 +92,8 @@ async function save(page, label) {
     .getByRole('button', { name: 'Save connection', exact: true })
     .click();
   const card = page.getByRole('article', { name: label, exact: true });
-  await card.getByText('Importing', { exact: true }).waitFor();
+  // Luma can't read through a new connection until someone validates it.
+  await card.getByText('Awaiting validation', { exact: true }).waitFor();
 
   return card;
 }
@@ -112,7 +113,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   const shop = await save(page, 'Main shop');
   await shop.getByRole('button', { name: 'Validate access' }).click();
   await shop.getByText('Read failing', { exact: true }).waitFor();
-  expect(await shop.getByText('Permitted', { exact: true }).count()).toBe(0);
+  await shop.getByText('None yet', { exact: true }).waitFor();
   await shop.getByRole('button', { name: 'Connection settings' }).click();
   expect(
     await page.getByLabel('Access token', { exact: true }).inputValue(),
@@ -121,11 +122,11 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     .getByLabel('Access token', { exact: true })
     .fill('valid-test-token');
   await page.getByRole('button', { name: 'Confirm replacement' }).click();
-  await shop.getByText('Importing', { exact: true }).waitFor();
+  await shop.getByText('Awaiting validation', { exact: true }).waitFor();
   await shop.getByRole('button', { name: 'Validate access' }).click();
   await shop.getByText('Importing', { exact: true }).waitFor();
-  await expect(shop.getByText('Permitted', { exact: true })).toHaveCount(4);
-  await shop.getByText('Read-only access', { exact: true }).waitFor();
+  await expect(shop.getByText('4 reads', { exact: true })).toBeVisible();
+  await shop.getByText('Read-only', { exact: true }).waitFor();
   await setup(page, 'JTL Cloud', 'Warehouse');
   await page
     .getByLabel('JTL Cloud tenant ID')
@@ -133,10 +134,29 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   await page.getByLabel(/Allow shipping method corrections/).check();
   const cloud = await save(page, 'Warehouse');
   await cloud.getByRole('button', { name: 'Validate access' }).click();
-  await cloud.getByText('Read and write access', { exact: true }).waitFor();
-  await page.getByRole('link', { name: 'All apps' }).click();
+  await cloud.getByText('Read and write', { exact: true }).waitFor();
+  await cloud.getByRole('button', { name: 'Actions for Warehouse' }).click();
+  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('Connection name')
+    .fill('Berlin warehouse');
+  await page.getByRole('button', { name: 'Save name', exact: true }).click();
+  const berlin = page.getByRole('article', {
+    name: 'Berlin warehouse',
+    exact: true,
+  });
+  await berlin.getByText('Read and write', { exact: true }).waitFor();
+  // The history reads the connection's own events from Activity.
+  await berlin.getByText('History', { exact: true }).click();
+  await berlin.getByText('Connection renamed', { exact: true }).waitFor();
+  await berlin.getByText('Connection added', { exact: true }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Manage apps' })
+    .click();
   const jtlSummary = page
-    .getByRole('article')
+    .getByRole('listitem')
     .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
   await jtlSummary.getByText('2 connections', { exact: true }).waitFor();
   await page.screenshot({
@@ -147,7 +167,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   expect(
     await page.getByRole('article', { name: 'Main shop', exact: true }).count(),
   ).toBe(0);
-  await jtlSummary.getByRole('link', { name: 'Manage app' }).click();
+  await jtlSummary.getByRole('link', { name: 'JTL', exact: true }).click();
   await shop.waitFor();
   const linkedConnections = await (
     await context.request.get(
@@ -167,7 +187,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   const onprem = await save(page, 'Local ERP');
   await onprem.getByRole('button', { name: 'Validate access' }).click();
   await onprem.getByText('Importing', { exact: true }).waitFor();
-  await expect(onprem.getByText('Permitted', { exact: true })).toHaveCount(4);
+  await expect(onprem.getByText('4 reads', { exact: true })).toBeVisible();
   await page.goto(`/app/${organizationId}/apps/jtl/settings`);
   await page.getByRole('heading', { name: 'JTL', exact: true }).waitFor();
   expect(
@@ -199,10 +219,16 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   expect(state).not.toContain('test-token');
   expect(page.url()).not.toContain('token');
   await page.setViewportSize({ width: 390, height: 844 });
-  await shop.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  const disconnect = async () => {
+    await shop.getByRole('button', { name: 'Actions for Main shop' }).click();
+    await page
+      .getByRole('menuitem', { name: 'Disconnect', exact: true })
+      .click();
+  };
+  await disconnect();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await shop.getByText('Importing', { exact: true }).waitFor();
-  await shop.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await disconnect();
   await page.getByRole('dialog').waitFor({ state: 'visible' });
   await expect
     .poll(() =>
@@ -229,7 +255,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await shop.getByRole('button', { name: 'Connection settings' }).click();
+  await shop.getByRole('button', { name: 'Reconnect' }).click();
   await page
     .getByRole('dialog')
     .getByLabel('Connection name')
@@ -246,9 +272,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   });
   await reconnected.getByRole('button', { name: 'Validate access' }).click();
   await reconnected.getByText('Importing', { exact: true }).waitFor();
-  await expect(reconnected.getByText('Permitted', { exact: true })).toHaveCount(
-    4,
-  );
+  await expect(reconnected.getByText('4 reads', { exact: true })).toBeVisible();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
   await page
     .getByRole('button', { name: 'Uninstall app', exact: true })
@@ -484,10 +508,11 @@ test('keeps basic Wawi access independent of an explicitly requested exchange re
   await card.getByRole('button', { name: 'Validate access' }).click();
   // This provider fixture supports basic reads only. Opt-in must never manufacture a grant.
   await expect(card.getByText('Read failing', { exact: true })).toBeVisible();
+  // Unconfirmed permissions explain the failure, so they show without another click.
   await expect(
     card.getByText('Replacement order and reservation evidence', {
       exact: true,
     }),
   ).toBeVisible();
-  expect(await card.getByText('Permitted', { exact: true }).count()).toBe(0);
+  await expect(card.getByText('None yet', { exact: true })).toBeVisible();
 });

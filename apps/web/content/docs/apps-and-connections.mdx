@@ -9,7 +9,7 @@ Apps connect Luma to the systems you already use. Each app, such as Shopify, JTL
 
 The **Manage apps** page has up to three lists:
 
-- **Installed apps**: each app shows how many connections it has and links to any connection that needs attention. Choose **Manage app** to open the app’s page with its connections and access.
+- **Installed apps**: one row per app with what it connects, the names of its connections and one state for all of them, such as **Healthy**, **Importing** or **1 connection needs attention**. Choose the app to open its page. When a connection needs attention, the page opens at that connection.
 - **Available apps**: apps you can install in this workspace.
 - **Previously used apps**: apps that aren’t installed anymore but still have earlier connections. Open one to see them. Records those connections imported stay in Luma.
 
@@ -17,7 +17,7 @@ Everyone in the workspace can see apps and connections. Installing, uninstalling
 
 ## Install an app
 
-1. Under **Available apps**, choose the app’s install button, for example **Install Cin7 Core**.
+1. Under **Available apps**, choose **Install** on the app.
 2. Review what the app gets:
    - **Data and actions the app can use**, such as orders, stock or proposing actions. Items marked **Sensitive** can change data in your systems, move money, change access or approval rules, or read personal data.
    - **New permissions for roles**: the app’s own permissions. Shopify adds **Recover Shopify fulfillments** and **Correct Shopify inventory**. JTL adds **Send purchase orders to JTL** and **Change JTL shipping methods**. Owners and admins get them automatically. To give them to another role, edit the role in [Settings → Roles](/docs/roles-and-permissions).
@@ -35,7 +35,7 @@ When an app update asks for more access, its page says so and offers **Review ne
 2. Enter a **Connection name** your team will recognize, and the **Shop hostname**: the store’s `.myshopify.com` address, such as `your-store.myshopify.com`. Shopify lists it under **Settings → Domains**.
 3. Choose **Continue to Shopify** and approve the access there. You can cancel before approving.
 
-Shopify then returns you to Luma, which checks the access it received. **Connection added. Luma confirmed it can read the data it needs.** means you’re done. If Luma couldn’t confirm every permission, check the connection’s card. If you declined in Shopify, no connection is added; add it again to retry.
+Shopify then returns you to Luma, which checks the access it received. **Connection added. Luma confirmed it can read the data it needs.** means you’re done. If Luma couldn’t confirm every permission, check the connection’s **Permissions**. If you declined in Shopify, no connection is added; add it again to retry.
 
 Luma asks for access to read orders, products, inventory, returns and fulfillment, and to change inventory and fulfillment. Luma changes them only for the stock corrections and fulfillment recoveries people approve. Before you continue, the form also says:
 
@@ -85,35 +85,43 @@ Luma only reads from Cin7 Core and never changes anything there. Cin7 allows eac
 
 ## Check a connection
 
-Each connection’s card shows its state, what Luma may do through it, and a sync summary with **View Data sync**.
+Each connection shows its state with what to do next, when Luma last read from it, whether it may only read or also change data, and whether changes are allowed. Below that, **Data** lists the last complete read of each type of record. Choose a type, or **View Data sync**, to see its sync.
 
-| State                   | What it means                                                                                                                 | What to do                                                                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Awaiting validation** | Luma hasn’t confirmed the credentials yet.                                                                                    | Choose **Validate access**.                                                                                                           |
-| **Validated**           | Luma confirmed the credentials and the requested permissions.                                                                 | Nothing.                                                                                                                              |
-| **Needs attention**     | Luma couldn’t confirm the credentials or every requested permission.                                                          | Check the access granted in the connected system, then **Validate access**, or open **Connection settings** to enter new credentials. |
-| **Access revoked**      | The connected system stopped accepting Luma’s access, for example because the token was revoked or the app was removed there. | Choose **Reconnect** and enter new access.                                                                                            |
-| **Disconnected**        | Someone disconnected it. Luma no longer reads or changes anything through it.                                                 | Add a new connection to use the system again.                                                                                         |
+| State                   | What it means                                                                                                                 | What to do                                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Awaiting validation** | Luma hasn’t confirmed the credentials yet and can’t read anything.                                                            | Choose **Validate access**.                                                                                                      |
+| **Importing**           | Luma confirmed access and is still importing. Some records may be missing until every type has arrived.                       | Nothing. **Data** shows which types arrived.                                                                                     |
+| **Healthy**             | Every type of record is current.                                                                                              | Nothing.                                                                                                                         |
+| **Delayed**             | Some data hasn’t been read for more than a day.                                                                               | Open **Data sync** to see which.                                                                                                 |
+| **Read failing**        | Luma couldn’t confirm the credentials or every requested permission.                                                          | Check the access granted in the connected system, then **Validate access**, or open **Connection settings** to enter new access. |
+| **Access lost**         | The connected system stopped accepting Luma’s access, for example because the token was revoked or the app was removed there. | Choose **Reconnect** and enter new access.                                                                                       |
+| **Disconnected**        | Someone disconnected it. Luma no longer reads or changes anything through it. It’s listed below the live connections.         | Choose **Reconnect** to set it up again.                                                                                         |
 
-The heading above the permission list says **Read-only access**, **Read and write access** or **No access enabled**. Each permission is marked **Permitted**, **Not enabled**, or **Granted · not enabled** when the system granted it but Luma isn’t using it yet, for example before validation.
+**Permissions** lists what Luma may read and change through the connection. Permissions Luma doesn’t use yet are listed under **Not in use** with the reason: before validation, or because the connected system hasn’t confirmed them. When a connection needs attention, this list opens by itself. **Details** shows the account or address the connection points to, when it was added and its ID for support. **History** lists the latest changes to the connection, such as who added, checked, renamed or reconnected it, and links to all of them in [Activity](/docs/activity). It's shown to people who can see restricted activity.
+
+To check every connection of an app at once, choose **Validate all** above the connections. Luma checks them one by one and says how many it confirmed; each connection then shows its own state.
 
 If a form says Luma couldn’t confirm whether your change was saved, close it and choose **Refresh list** before you try again.
+
+## Rename a connection
+
+Open the connection's actions menu (**…**), choose **Rename**, enter the new name and choose **Save name**. Only the name changes: the account, access and imported records stay as they are. The change appears in the connection's history.
 
 ## Change or reconnect a connection
 
 **Connection settings** updates a connection’s access. For Shopify, **Continue to Shopify** authorizes the same store again, which also requests access that was added since. For JTL, enter the new access token, and the challenge code for on-premise; for Cin7 Core, the new application key. Then choose **Confirm replacement** and validate again. The account or address a connection points to can’t be changed; add a new connection for a different one.
 
-When a connection shows **Access revoked**, Luma also opens an issue. Choose **Reconnect** on the connection’s card, or the reconnect button on the issue, and enter new access. The connection keeps its records and links, and sync resumes. See [Data sync](/docs/data-sync#when-a-sync-needs-you).
+When a connection shows **Access lost**, Luma also opens an issue. Choose **Reconnect** on the connection, or the reconnect button on the issue, and enter new access. The connection keeps its records and links, and sync resumes. See [Data sync](/docs/data-sync#when-a-sync-needs-you).
 
 ## Disconnect a connection
 
-Choose **Disconnect**, then **Confirm disconnect**. Luma deletes the stored credentials and stops new reads and changes. Requests already sent may still finish. Records the connection imported stay in Luma.
+Open the connection’s actions menu (**…**), choose **Disconnect**, then **Confirm disconnect**. Luma deletes the stored credentials and stops new reads and changes. Requests already sent may still finish. Records the connection imported stay in Luma.
 
 Disconnecting doesn’t revoke the access token in Shopify or JTL. To remove Luma’s access there too, uninstall the Luma app from the Shopify store, or remove Luma’s app registration or token in JTL.
 
 ## Uninstall an app
 
-On the app’s page, choose **Uninstall app**, then **Uninstall and disconnect**. Uninstalling:
+At the end of the app’s page, choose **Uninstall app**, then **Uninstall and disconnect**. Uninstalling:
 
 - Disconnects every connection of the app and deletes their stored credentials.
 - Removes the app’s permissions from all roles. Reinstalling doesn’t restore them; the dialog names the roles you’ll need to grant them to again.
@@ -128,8 +136,9 @@ them and show proposed changes without writing to a provider. Proposals say **Wo
 writes are enabled**; you cannot approve them while observe-only applies.
 
 Workspace owners can enable provider writes in **Settings → Workspace → Provider writes**.
-The connection card in an app's settings can impose **Observe-only** for that connection,
-or **Use workspace write mode** to restore inheritance. A connection cannot enable writes
+In a connection's actions menu (**…**) on the app's page, owners can choose **Make
+observe-only** for that connection, or **Use workspace write mode** to restore inheritance.
+The connection's **Changes** fact shows which applies. A connection cannot enable writes
 while the workspace observes only. Each mode change is recorded in the audit history.
 Enabling writes keeps normal permissions, approvals and verification requirements. Work
 already recorded as not executed needs a fresh proposal before it can run.

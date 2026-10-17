@@ -149,10 +149,65 @@ it.each([{ installed: false }, { catalog: false }])(
 it('summarizes multiple connections and attention on the overview', () => {
   const html = render({
     overview: true,
-    items: [connection, { ...connection, id: 'second', status: 'degraded' }],
+    items: [
+      connection,
+      { ...connection, id: 'second', label: 'Returns', status: 'degraded' },
+      { ...connection, id: 'third', label: 'Old', status: 'disconnected' },
+    ],
   });
   expect(html).toContain('2 connections');
   expect(html).toContain('1 connection needs attention');
-  expect(html).toContain('Manage app');
-  expect(html).not.toContain('Main warehouse');
+  expect(html).toContain('Main warehouse and Returns');
+  // Disconnected connections are history, not part of the app's status.
+  expect(html).not.toContain('Old');
+});
+
+it('reports healthy apps and pending access on the overview', () => {
+  const html = render({
+    overview: true,
+    items: [
+      {
+        ...connection,
+        coverage: {
+          health: 'healthy',
+          lastObservedAt: connection.updatedAt,
+          freshness: 'fresh',
+        },
+      },
+    ],
+  });
+  expect(html).toContain('Healthy');
+  expect(html).toContain('1 connection');
+  expect(html).toContain('ERP');
+});
+
+it('lists disconnected connections after live ones on the app page', () => {
+  const html = render({
+    items: [
+      { ...connection, id: 'old', label: 'Old shop', status: 'disconnected' },
+      connection,
+    ],
+  });
+  expect(html.indexOf('Main warehouse')).toBeLessThan(html.indexOf('Old shop'));
+  expect(html).toContain('1 disconnected connection');
+});
+
+it('keeps uninstalling apart from everyday management', () => {
+  const owner = render();
+  expect(owner).toContain('Uninstall JTL');
+  expect(owner).toContain('Uninstall app</button>');
+  const admin = render({ role: 'member' });
+  expect(admin).not.toContain('Uninstall JTL');
+});
+
+it('offers to validate every connection at once only to managers with several', () => {
+  const items = [connection, { ...connection, id: 'second', label: 'Second' }];
+  expect(render({ items })).toContain('Validate all');
+  expect(render({ items: [connection] })).not.toContain('Validate all');
+  expect(render({ items, role: 'member' })).not.toContain('Validate all');
+  expect(
+    render({
+      items: [connection, { ...connection, id: 'r', status: 'revoked' }],
+    }),
+  ).not.toContain('Validate all');
 });

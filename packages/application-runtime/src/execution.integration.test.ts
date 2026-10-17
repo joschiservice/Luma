@@ -771,6 +771,63 @@ describe.skipIf(!databaseUrl)(
       await admin.end();
     });
 
+    it('renames a connection for managers only and audits both names', async () => {
+      const connections = createInstalledConnections(
+        createTenantDatabase(runtime),
+        {
+          refreshContext,
+          verify: async (connection) => connection.permissions,
+          activeKeyId: 'test',
+          keys: new Map([['test', randomBytes(32)]]),
+        },
+      );
+      const installed = await connections.install(alice, {
+        label: 'Main warehouse',
+        target: { kind: 'fixture' },
+        permissions: ['inventory.available.reconcile'],
+        credentials: { token: 'fixture' },
+      });
+      await expect(
+        connections.rename(member, installed.id, installed.version, 'Other'),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await expect(
+        connections.rename(outsider, installed.id, installed.version, 'Other'),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      await expect(
+        connections.rename(bob, installed.id, installed.version, '   '),
+      ).rejects.toMatchObject({ statusCode: 422 });
+      const renamed = await connections.rename(
+        bob,
+        installed.id,
+        installed.version,
+        '  North warehouse ',
+      );
+      expect(renamed).toMatchObject({
+        label: 'North warehouse',
+        status: installed.status,
+        target: installed.target,
+        version: installed.version + 1,
+      });
+      // A stale version means someone changed the connection since it was read.
+      await expect(
+        connections.rename(alice, installed.id, installed.version, 'Late'),
+      ).rejects.toMatchObject({ statusCode: 409 });
+      expect(
+        (
+          await owner.query(
+            "SELECT actor_id,before_value,after_value FROM connector_lifecycle_events WHERE tenant_id=$1 AND connection_id=$2 AND event='renamed'",
+            [tenantId, installed.id],
+          )
+        ).rows,
+      ).toEqual([
+        {
+          actor_id: bob.actor.id,
+          before_value: { label: 'Main warehouse' },
+          after_value: { label: 'North warehouse' },
+        },
+      ]);
+    });
+
     it('isolates connection controls, audits owner changes and retains observed proposals after enabling writes', async () => {
       const connections = createInstalledConnections(
         createTenantDatabase(runtime),

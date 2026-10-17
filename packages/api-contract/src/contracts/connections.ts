@@ -51,6 +51,30 @@ export const connectionsContract = {
       }),
     )
     .output(installedConnectionSchema),
+  rename: endpoint
+    .route({
+      method: 'PATCH',
+      path: '/v1/organizations/{organizationId}/connections/{connectionId}/label',
+      summary: 'Rename a connection',
+      description:
+        'Requires `connections.manage`. Changes only the name people see; the account, credentials and grants stay as they are. Rejects stale versions.',
+    })
+    .meta({
+      access: requires('connections.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({
+        params: connectionParams,
+        body: z
+          .object({
+            version: z.number().int().positive(),
+            label: z.string().trim().min(1).max(120),
+          })
+          .strict(),
+      }),
+    )
+    .output(installedConnectionSchema),
   install: endpoint
     .route({
       method: 'POST',

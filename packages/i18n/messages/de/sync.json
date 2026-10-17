@@ -21,7 +21,6 @@
   "sync_connection_manage": "Verbindung verwalten",
   "sync_connection_inactive": "Der Abgleich pausiert, solange die Verbindung nicht aktiv ist. Bereits importierte Datensätze bleiben in Luma.",
   "sync_connection_record_types": "Datentypen von {connection}",
-  "sync_connection_summary": "{title}. {detail}",
   "sync_type_orders_title": "Bestellungen",
   "sync_type_orders_noun": "Bestellungen",
   "sync_type_orders_one": "Bestellung",

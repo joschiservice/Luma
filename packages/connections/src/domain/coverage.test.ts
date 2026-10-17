@@ -107,4 +107,43 @@ describe('connection coverage', () => {
       ).toMatchObject({ lastObservedAt: null, freshness: 'unobserved' });
     },
   );
+
+  it('ignores point reads that never import records', () => {
+    const shipping = {
+      ...connection,
+      status: 'active' as const,
+      permissions: [...connection.permissions, 'orders.shipping-method.read'],
+      granted: [...connection.granted, 'orders.shipping-method.read'],
+    } satisfies InstalledConnection;
+    expect(
+      summarizeConnectionCoverage(
+        shipping,
+        [
+          { capability: 'orders.read', observedAt: asOf },
+          { capability: 'inventory.read', observedAt: asOf },
+        ],
+        asOf,
+      ),
+    ).toMatchObject({ health: 'healthy', freshness: 'fresh' });
+  });
+
+  it('reports a validated mailbox without imported reads as current', () => {
+    expect(
+      summarizeConnectionCoverage(
+        {
+          ...connection,
+          status: 'active',
+          target: { kind: 'gmail', emailAddress: 'ops@example.test' },
+          permissions: ['messages.read', 'messages.send'],
+          granted: ['messages.read', 'messages.send'],
+        },
+        [],
+        asOf,
+      ),
+    ).toMatchObject({
+      health: 'healthy',
+      freshness: 'fresh',
+      lastObservedAt: null,
+    });
+  });
 });

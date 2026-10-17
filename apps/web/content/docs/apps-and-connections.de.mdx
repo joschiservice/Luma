@@ -9,7 +9,7 @@ Apps verbinden Luma mit den Systemen, die du bereits nutzt. Jede App, etwa Shopi
 
 Die Seite **Apps verwalten** zeigt bis zu drei Listen:
 
-- **Installierte Apps**: Jede App zeigt, wie viele Verbindungen sie hat, und verlinkt Verbindungen, die geprüft werden müssen. Mit **App verwalten** öffnest du die Seite der App mit ihren Verbindungen und ihrem Zugriff.
+- **Installierte Apps**: eine Zeile je App mit dem, was sie verbindet, den Namen ihrer Verbindungen und einem gemeinsamen Zustand, etwa **In Ordnung**, **Import läuft** oder **1 Verbindung muss geprüft werden**. Wähle die App, um ihre Seite zu öffnen. Muss eine Verbindung geprüft werden, öffnet sich die Seite bei dieser Verbindung.
 - **Verfügbare Apps**: Apps, die du in diesem Workspace installieren kannst.
 - **Früher genutzte Apps**: Apps, die nicht mehr installiert sind, aber noch frühere Verbindungen haben. Öffne eine App, um diese zu sehen. Datensätze, die diese Verbindungen importiert haben, bleiben in Luma.
 
@@ -17,7 +17,7 @@ Alle im Workspace sehen Apps und Verbindungen. Zum Installieren, Deinstallieren 
 
 ## App installieren [#install-an-app]
 
-1. Wähle unter **Verfügbare Apps** die Schaltfläche zum Installieren der App, zum Beispiel **Cin7 Core installieren**.
+1. Wähle unter **Verfügbare Apps** bei der App **Installieren**.
 2. Prüfe, was die App erhält:
    - **Daten und Aktionen, die die App nutzen kann**, etwa Bestellungen, Bestand oder das Vorschlagen von Aktionen. Einträge mit **Sensibel** können Daten in deinen Systemen ändern, Geld bewegen, Zugriffe oder Genehmigungsregeln ändern oder personenbezogene Daten lesen.
    - **Neue Berechtigungen für Rollen**: die eigenen Berechtigungen der App. Shopify ergänzt **Shopify-Fulfillments wiederherstellen** und **Shopify-Bestand korrigieren**. JTL ergänzt **Lieferantenbestellungen an JTL senden** und **JTL-Versandarten ändern**. Inhaber und Admins erhalten sie automatisch. Für eine andere Rolle bearbeitest du die Rolle unter [Einstellungen → Rollen](/docs/roles-and-permissions).
@@ -35,7 +35,7 @@ Fordert eine App nach einem Update mehr Zugriff an, zeigt ihre Seite einen Hinwe
 2. Gib unter **Name der Verbindung** einen Namen ein, den dein Team wiedererkennt, und unter **Shop-Hostname** die `.myshopify.com`-Adresse des Shops, etwa `dein-shop.myshopify.com`. Shopify zeigt sie unter **Einstellungen → Domains**.
 3. Wähle **Weiter zu Shopify** und genehmige dort den Zugriff. Du kannst vor der Genehmigung abbrechen.
 
-Shopify leitet dich danach zu Luma zurück, und Luma prüft den erhaltenen Zugriff. **Verbindung hinzugefügt. Luma hat bestätigt, dass es die benötigten Daten lesen kann.** bedeutet, dass du fertig bist. Konnte Luma nicht jede Berechtigung bestätigen, prüfe die Karte der Verbindung. Hast du in Shopify abgelehnt, wird keine Verbindung hinzugefügt; füge sie erneut hinzu, um es noch einmal zu versuchen.
+Shopify leitet dich danach zu Luma zurück, und Luma prüft den erhaltenen Zugriff. **Verbindung hinzugefügt. Luma hat bestätigt, dass es die benötigten Daten lesen kann.** bedeutet, dass du fertig bist. Konnte Luma nicht jede Berechtigung bestätigen, prüfe die **Berechtigungen** der Verbindung. Hast du in Shopify abgelehnt, wird keine Verbindung hinzugefügt; füge sie erneut hinzu, um es noch einmal zu versuchen.
 
 Luma fordert Zugriff an, um Bestellungen, Produkte, Bestand, Retouren und Fulfillment zu lesen sowie Bestand und Fulfillment zu ändern. Luma ändert sie nur für Bestandskorrekturen und Fulfillment-Wiederherstellungen, die Personen genehmigen. Vor dem Fortfahren zeigt das Formular außerdem:
 
@@ -85,35 +85,43 @@ Luma liest aus Cin7 Core nur und ändert dort nie etwas. Cin7 erlaubt jeder API-
 
 ## Verbindung prüfen [#check-a-connection]
 
-Die Karte jeder Verbindung zeigt ihren Zustand, was Luma darüber tun darf, und eine Zusammenfassung des Abgleichs mit **Datenabgleich ansehen**.
+Jede Verbindung zeigt ihren Zustand mit dem nächsten Schritt, wann Luma zuletzt darüber gelesen hat, ob Luma nur lesen oder auch ändern darf und ob Änderungen erlaubt sind. Darunter zeigt **Letzter vollständiger Abruf je Datenart**, wann jede Art von Datensätzen zuletzt vollständig gelesen wurde. Wähle eine Datenart oder **Datenabgleich ansehen**, um ihren Abgleich zu sehen.
 
-| Zustand                    | Bedeutung                                                                                                                          | Was zu tun ist                                                                                                                                                     |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Wartet auf Prüfung**     | Luma hat die Zugangsdaten noch nicht bestätigt.                                                                                    | Wähle **Zugriff prüfen**.                                                                                                                                          |
-| **Geprüft**                | Luma hat die Zugangsdaten und die angeforderten Berechtigungen bestätigt.                                                          | Nichts.                                                                                                                                                            |
-| **Braucht Aufmerksamkeit** | Luma konnte die Zugangsdaten oder nicht jede angeforderte Berechtigung bestätigen.                                                 | Prüfe den im verbundenen System erteilten Zugriff und wähle dann **Zugriff prüfen**, oder öffne die **Verbindungseinstellungen**, um neue Zugangsdaten einzugeben. |
-| **Zugriff entzogen**       | Das verbundene System akzeptiert den Zugriff von Luma nicht mehr, etwa weil das Token widerrufen oder die App dort entfernt wurde. | Wähle **Neu verbinden** und gib neuen Zugriff ein.                                                                                                                 |
-| **Getrennt**               | Jemand hat die Verbindung getrennt. Luma liest und ändert darüber nichts mehr.                                                     | Füge eine neue Verbindung hinzu, um das System wieder zu nutzen.                                                                                                   |
+| Zustand                  | Bedeutung                                                                                                                          | Was zu tun ist                                                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wartet auf Prüfung**   | Luma hat die Zugangsdaten noch nicht bestätigt und kann nichts lesen.                                                              | Wähle **Zugriff prüfen**.                                                                                                                           |
+| **Import läuft**         | Luma hat den Zugriff bestätigt und importiert noch. Einige Datensätze können fehlen, bis alle Datenarten angekommen sind.          | Nichts. Die Liste der Datenarten zeigt, welche angekommen sind.                                                                                     |
+| **In Ordnung**           | Alle Datenarten sind aktuell.                                                                                                      | Nichts.                                                                                                                                             |
+| **Verzögert**            | Einige Daten wurden seit über einem Tag nicht gelesen.                                                                             | Öffne den **Datenabgleich**, um zu sehen, welche.                                                                                                   |
+| **Lesen fehlgeschlagen** | Luma konnte die Zugangsdaten oder nicht jede angeforderte Berechtigung bestätigen.                                                 | Prüfe den im verbundenen System erteilten Zugriff und wähle dann **Zugriff prüfen**, oder öffne die **Verbindungseinstellungen** für neuen Zugriff. |
+| **Zugriff verloren**     | Das verbundene System akzeptiert den Zugriff von Luma nicht mehr, etwa weil das Token widerrufen oder die App dort entfernt wurde. | Wähle **Neu verbinden** und gib neuen Zugriff ein.                                                                                                  |
+| **Getrennt**             | Jemand hat die Verbindung getrennt. Luma liest und ändert darüber nichts mehr. Sie steht unterhalb der aktiven Verbindungen.       | Wähle **Neu verbinden**, um sie wieder einzurichten.                                                                                                |
 
-Die Überschrift über der Liste der Berechtigungen lautet **Nur Lesezugriff**, **Lese- und Schreibzugriff** oder **Kein Zugriff aktiviert**. Jede Berechtigung ist als **Erlaubt**, **Nicht aktiviert** oder **Gewährt · nicht aktiviert** markiert. Letzteres heißt, das System hat sie erteilt, Luma nutzt sie aber noch nicht, etwa vor der Prüfung.
+**Berechtigungen** zeigt, was Luma über die Verbindung lesen und ändern darf. Berechtigungen, die Luma noch nicht nutzt, stehen unter **Nicht genutzt** mit dem Grund: vor der Prüfung oder weil das verbundene System sie nicht bestätigt hat. Muss eine Verbindung geprüft werden, öffnet sich diese Liste von selbst. **Details** zeigt das Konto oder die Adresse der Verbindung, wann sie hinzugefügt wurde und ihre ID für den Support. **Verlauf** listet die letzten Änderungen an der Verbindung, etwa wer sie hinzugefügt, geprüft, umbenannt oder neu verbunden hat, und verlinkt alle in der [Aktivität](/docs/activity). Der Verlauf ist für Personen sichtbar, die eingeschränkte Aktivität sehen dürfen.
+
+Um alle Verbindungen einer App auf einmal zu prüfen, wähle **Alle prüfen** über den Verbindungen. Luma prüft sie nacheinander und sagt, wie viele es bestätigt hat; danach zeigt jede Verbindung ihren eigenen Zustand.
 
 Meldet ein Formular, dass Luma nicht bestätigen konnte, ob deine Änderung gespeichert wurde, schließe es und wähle **Liste aktualisieren**, bevor du es erneut versuchst.
+
+## Verbindung umbenennen [#rename-a-connection]
+
+Öffne das Aktionsmenü der Verbindung (**…**), wähle **Umbenennen**, gib den neuen Namen ein und wähle **Namen speichern**. Nur der Name ändert sich: Konto, Zugriff und importierte Datensätze bleiben gleich. Die Änderung erscheint im Verlauf der Verbindung.
 
 ## Verbindung ändern oder neu verbinden [#change-or-reconnect-a-connection]
 
 Über die **Verbindungseinstellungen** aktualisierst du den Zugriff einer Verbindung. Bei Shopify autorisiert **Weiter zu Shopify** denselben Shop erneut und fordert dabei auch neu hinzugekommenen Zugriff an. Bei JTL gibst du das neue Zugriffstoken ein, bei lokal installierter JTL-Wawi auch den Challenge-Code, bei Cin7 Core den neuen Application Key. Wähle dann **Ersetzen bestätigen** und prüfe den Zugriff erneut. Konto oder Adresse einer Verbindung lassen sich nicht ändern; füge für ein anderes Konto eine neue Verbindung hinzu.
 
-Zeigt eine Verbindung **Zugriff entzogen**, öffnet Luma zusätzlich ein Problem. Wähle **Neu verbinden** auf der Karte der Verbindung oder die Schaltfläche zum Neuverbinden im Problem und gib neuen Zugriff ein. Die Verbindung behält ihre Datensätze und Verknüpfungen, und der Abgleich läuft weiter. Siehe [Datenabgleich](/docs/data-sync#when-a-sync-needs-you).
+Zeigt eine Verbindung **Zugriff verloren**, öffnet Luma zusätzlich ein Problem. Wähle **Neu verbinden** bei der Verbindung oder die Schaltfläche zum Neuverbinden im Problem und gib neuen Zugriff ein. Die Verbindung behält ihre Datensätze und Verknüpfungen, und der Abgleich läuft weiter. Siehe [Datenabgleich](/docs/data-sync#when-a-sync-needs-you).
 
 ## Verbindung trennen [#disconnect-a-connection]
 
-Wähle **Trennen** und dann **Trennen bestätigen**. Luma löscht die gespeicherten Zugangsdaten und beendet neue Lese- und Änderungsvorgänge. Bereits gesendete Anfragen werden möglicherweise noch abgeschlossen. Datensätze, die die Verbindung importiert hat, bleiben in Luma.
+Öffne das Aktionsmenü der Verbindung (**…**), wähle **Trennen** und dann **Trennen bestätigen**. Luma löscht die gespeicherten Zugangsdaten und beendet neue Lese- und Änderungsvorgänge. Bereits gesendete Anfragen werden möglicherweise noch abgeschlossen. Datensätze, die die Verbindung importiert hat, bleiben in Luma.
 
 Das Trennen widerruft das Zugriffstoken in Shopify oder JTL nicht. Um den Zugriff von Luma auch dort zu entfernen, deinstalliere die Luma-App im Shopify-Shop oder entferne die App-Registrierung oder das Token von Luma in JTL.
 
 ## App deinstallieren [#uninstall-an-app]
 
-Wähle auf der Seite der App **App deinstallieren** und dann **Deinstallieren und trennen**. Beim Deinstallieren:
+Wähle am Ende der Seite der App **App deinstallieren** und dann **Deinstallieren und trennen**. Beim Deinstallieren:
 
 - Werden alle Verbindungen der App getrennt und ihre gespeicherten Zugangsdaten gelöscht.
 - Werden die Berechtigungen der App aus allen Rollen entfernt. Eine Neuinstallation stellt sie nicht wieder her; der Dialog nennt die Rollen, denen du sie erneut erteilen musst.
@@ -129,9 +137,10 @@ erkennen, untersuchen und Änderungen vorschlagen, ohne etwas im verbundenen Sys
 erlaubt sind** und lassen sich nicht genehmigen.
 
 Workspace-Inhaber erlauben Änderungen unter **Einstellungen → Workspace → Änderungen in
-verbundenen Systemen**. In den App-Einstellungen kannst du eine einzelne Verbindung auf
-**Nur beobachten** setzen oder mit **Änderungsmodus des Workspace verwenden** wieder die
-Workspace-Einstellung übernehmen. Eine Verbindung kann keine Änderungen erlauben, solange
+verbundenen Systemen**. Im Aktionsmenü (**…**) einer Verbindung auf der Seite der App setzen
+Inhaber eine einzelne Verbindung auf **Nur beobachten** oder übernehmen mit
+**Änderungsmodus des Workspace verwenden** wieder die Workspace-Einstellung. Die Angabe
+**Änderungen** der Verbindung zeigt, was gilt. Eine Verbindung kann keine Änderungen erlauben, solange
 der Workspace nur beobachtet. Jede Umstellung wird protokolliert. Auch mit erlaubten
 Änderungen gelten Berechtigungen, Genehmigungen und unabhängige Prüfungen. Bereits als
 nicht ausgeführt protokollierte Arbeit braucht einen neuen Vorschlag.

@@ -57,17 +57,28 @@ export const DisconnectFlow: Story = {
       name: 'North warehouse',
     });
     await userEvent.click(
-      within(card).getByRole('button', { name: 'Disconnect' }),
+      within(card).getByRole('button', {
+        name: 'Actions for North warehouse',
+      }),
+    );
+    await userEvent.click(
+      await within(document.body).findByRole('menuitem', {
+        name: 'Disconnect',
+      }),
     );
     const dialog = await within(document.body).findByRole('dialog');
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Confirm disconnect' }),
     );
+    // Disconnected connections move below the live ones.
+    const disconnected = await within(canvasElement).findByRole('article', {
+      name: 'North warehouse',
+    });
     await expect(
-      await within(card).findByText('Disconnected', { exact: true }),
+      await within(disconnected).findByText('Disconnected', { exact: true }),
     ).toBeVisible();
     await expect(
-      within(card).queryByRole('button', { name: 'Validate access' }),
+      within(disconnected).queryByRole('button', { name: 'Validate access' }),
     ).not.toBeInTheDocument();
   },
 };

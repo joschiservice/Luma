@@ -3,6 +3,8 @@ import type {
   InstalledConnection,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
+import type { OperationalState } from '@luma/ui/components/primitives/state';
+import { connectionHealthLabel } from '@luma/ui/lib/connection-health';
 
 /** Reads each message when accessed, so labels follow the active language. */
 function localized<K extends string>(
@@ -96,4 +98,120 @@ export function connectionKindName(kind: string) {
   if (kind === 'starshipit') return 'Starshipit';
 
   return kind;
+}
+
+/** Whether a capability only reads; every other capability changes data in the connected system. */
+function isReadCapability(capability: string) {
+  return capability.endsWith('.read');
+}
+
+/** The one state a connection shows, with a label and whether someone needs to act. */
+export interface ConnectionState {
+  state: OperationalState;
+  label: string;
+  attention: boolean;
+}
+
+const lifecycleStates = {
+  pending: 'waiting',
+  active: 'verified',
+  degraded: 'attention',
+  revoked: 'error',
+  disconnected: 'idle',
+} satisfies Record<InstalledConnection['status'], OperationalState>;
+
+/**
+ * Combines installation validation and operational health into one state. Shared health wins,
+ * so Home, Data sync and Apps agree, except before validation: a pending connection can't read
+ * anything yet, so it says so instead of reporting an import.
+ */
+export function connectionState(
+  connection: Pick<InstalledConnection, 'status' | 'coverage'>,
+): ConnectionState {
+  const health =
+    connection.status !== 'pending' && connection.coverage?.health
+      ? connectionHealthLabel(connection.coverage.health)
+      : {
+          state: lifecycleStates[connection.status],
+          label: statuses[connection.status],
+        };
+
+  return {
+    ...health,
+    attention:
+      ['pending', 'degraded', 'revoked'].includes(connection.status) ||
+      health.state === 'error' ||
+      health.state === 'attention',
+  };
+}
+
+/**
+ * Splits a connection's requested capabilities into those Luma may use now, by reads and
+ * changes, and those it can't use. Only an active connection of an available app permits
+ * anything, and only capabilities that are both requested and confirmed by the provider.
+ */
+export function connectionAccess(
+  connection: Pick<InstalledConnection, 'status' | 'permissions' | 'granted'>,
+  appAvailable = true,
+) {
+  const permitted =
+    connection.status === 'active' && appAvailable
+      ? connection.permissions.filter((item) =>
+          connection.granted.includes(item),
+        )
+      : [];
+  const reads = permitted.filter(isReadCapability);
+  const changes = permitted.filter((item) => !isReadCapability(item));
+
+  return {
+    reads,
+    changes,
+    unavailable: connection.permissions.filter(
+      (item) => !permitted.includes(item),
+    ),
+    level: changes.length
+      ? ('read_write' as const)
+      : reads.length
+        ? ('read_only' as const)
+        : ('none' as const),
+  };
+}
+
+const targetLabels: Record<string, () => string> = {
+  shop: m.connections_target_shop,
+  jtlTenantId: m.connections_target_tenant,
+  baseUrl: m.connections_target_base_url,
+  appId: m.connections_target_app_id,
+  appVersion: m.connections_target_app_version,
+  accountId: m.connections_target_account,
+  emailAddress: m.connections_target_mailbox,
+};
+
+// The field that names the account a person recognizes, in order of preference.
+const primaryTargets = [
+  'shop',
+  'emailAddress',
+  'baseUrl',
+  'jtlTenantId',
+  'accountId',
+];
+
+/**
+ * Names the account a connection reaches: its most recognizable identifier, such as the shop
+ * hostname or mailbox, and every target field with a label. Unknown fields keep their key.
+ */
+export function connectionTarget(target: InstalledConnection['target']) {
+  const fields = Object.entries(target)
+    .filter(([key]) => key !== 'kind')
+    .map(([key, value]) => ({
+      key,
+      label: targetLabels[key]?.() ?? key,
+      value,
+    }));
+  const primary =
+    primaryTargets
+      .map((key) => fields.find((field) => field.key === key))
+      .find(Boolean) ?? fields[0];
+
+  return { primary: primary?.value, fields };
 }

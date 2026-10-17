@@ -90,6 +90,16 @@ const activityLabels: Record<string, Label> = {
   'connection.revoked': m.activity_action_connection_revoked,
   'connection.webhook_secret_generated':
     m.activity_action_connection_webhook_secret_generated,
+  'connection.installed': m.activity_action_connection_installed,
+  'connection.health_checked': m.activity_action_connection_health_checked,
+  'connection.credentials_rotated':
+    m.activity_action_connection_credentials_rotated,
+  'connection.write_mode_changed':
+    m.activity_action_connection_write_mode_changed,
+  'connection.provider_access_failed':
+    m.activity_action_connection_provider_access_failed,
+  'connection.app_uninstalled': m.activity_action_connection_app_uninstalled,
+  'connection.renamed': m.activity_action_connection_renamed,
   'purchase_order.created': m.activity_action_po_created,
   'purchase_order.status_changed': m.activity_action_po_status_changed,
   'purchase_order.submitted': m.activity_action_po_submitted,
