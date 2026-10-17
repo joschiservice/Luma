@@ -1,22 +1,13 @@
 import type { ConnectorFailure } from '@luma/connector-core';
 
 import type { OrderBundleGroup, ProductBundle } from './bundles.js';
-import type {
-  InventoryShipmentSnapshot,
-  InventoryTransferSnapshot,
-} from './inventory-transfers.js';
-import type { PurchaseOrderRevisionInput } from './purchase-order-revisions.js';
-import type {
-  ReturnExchangeProof,
-  ReturnExchangeQuoted,
-  ReturnExchangeRead,
-} from './return-exchanges.js';
-import type {
-  ReturnSettlementPlan,
-  ReturnSettlementProof,
-  ReturnSettlementQuote,
-  ReturnSettlementWrite,
-} from './return-settlement.js';
+import type { CatalogCapabilities } from './catalog-capabilities.js';
+import type { FulfillmentCapabilities } from './fulfillment-capabilities.js';
+import type { InventoryCapabilities } from './inventory-capabilities.js';
+import type { MessageCapabilities } from './message-capabilities.js';
+import type { OrderCapabilities } from './order-capabilities.js';
+import type { PurchasingCapabilities } from './purchasing-capabilities.js';
+import type { ReturnCapabilities } from './return-capabilities.js';
 
 export { ConnectorError } from '@luma/connector-core';
 
@@ -70,7 +61,7 @@ export interface Observation<T> {
   data: T;
 }
 
-interface PageQuery {
+export interface PageQuery {
   /** Point lookup to confirm a previously observed record missing from a complete scan. */
   confirmMissing?: ExternalId & { createdAt: string | null };
   cursor?: string;
@@ -115,7 +106,7 @@ export interface Page<T> {
   retryAfterMs?: number;
 }
 
-interface Quantity {
+export interface Quantity {
   /** Decimal string with at most six fractional and fourteen integer digits. */
   amount: string;
   unit: string;
@@ -642,18 +633,6 @@ export interface SupplierOrderSnapshot {
   }[];
 }
 
-/** Creates one purchase order in the purchasing system for an approved Luma order. */
-interface PurchaseOrderSubmission {
-  /** The Luma purchase-order ID; the adapter stores it so the order can be found again. */
-  lumaOrderId: string;
-  /** Buyer reference shown to the supplier. */
-  reference: string;
-  supplier: ExternalId;
-  /** Calendar date (YYYY-MM-DD). */
-  requestedDeliveryDate: string;
-  lines: { sku: ExternalId; quantity: Quantity }[];
-}
-
 /** A choice the source requires when a return is created there. Descriptive only. */
 export interface ReturnOptionSnapshot {
   /** Resource `location` for warehouses, `return_reason` for reasons. */
@@ -681,48 +660,6 @@ export interface CreatedReturnSnapshot {
   }[];
 }
 
-/** Creates one return at the source for a Luma return case. */
-interface ReturnCreation {
-  /** The Luma return case ID; the adapter stores it so the return can be found again. */
-  lumaCaseId: string;
-  order: ExternalId;
-  /** Approve this requested return instead of creating another return. */
-  requestedReturn?: ExternalId;
-  /** The source warehouse that receives the returned items. */
-  warehouse: ExternalId;
-  /** The source return reason recorded on every line. */
-  reason: ExternalId;
-  lines: { orderLine: ExternalId; quantity: Quantity }[];
-}
-
-interface ShippingMethodSnapshot {
-  orderStatus: 'open' | 'shipped' | 'cancelled' | 'unknown';
-  shippingMethod: ExternalId;
-  isCancelled: boolean;
-}
-
-/** A recovery command is bound to an exact provider record and reviewed revision. */
-interface OrderQuantityEditInput {
-  /** Luma's operation UUID; the adapter fences and marks the provider write with it. */
-  operationId: string;
-  orderId: string;
-  /** The order revision the approval reviewed. */
-  expectedRevision: string;
-  /** Returns removed units to stock; only applies to reductions. */
-  restock: boolean;
-  lines: { lineItemId: string; currentQuantity: number; quantity: number }[];
-  /** Digest of the approved provider calculation; null when none was approved, which withholds. */
-  calculationDigest: string | null;
-}
-
-interface FulfillmentRecoveryInput {
-  orderId: string;
-  fulfillmentOrderId: string;
-  expectedRevision: string;
-  holdId?: string;
-  locationId?: string;
-}
-
 /**
  * Which messages a mailbox read returns. A message matches when any condition matches; an
  * empty filter matches nothing. Adapters apply it at the provider, so Luma never receives
@@ -741,7 +678,7 @@ export interface MailboxFilter {
   includeSent: boolean;
 }
 
-interface MessageAddress {
+export interface MessageAddress {
   /** Lower-case address. */
   address: string;
   name: string | null;
@@ -799,301 +736,16 @@ export interface AttachmentContent {
   base64: string;
 }
 
-/** A reply or new message Luma asks the mailbox to send. */
-interface OutboundMessage {
-  /**
-   * Luma's outbound ID. Adapters derive the RFC Message-ID from it and refuse to send when the
-   * mailbox already holds a message with that ID.
-   */
-  outboundId: string;
-  thread: ExternalId | null;
-  inReplyTo: string | null;
-  references: string[];
-  to: MessageAddress[];
-  cc: MessageAddress[];
-  subject: string;
-  text: string;
-  attachments?: { filename: string; mimeType: string; base64: string }[];
-}
-
-interface CapabilityContract {
-  /** Places, tightens or releases an incident-owned stock hold through exact CAS. */
-  'inventory.available.protect': {
-    input: {
-      inventoryItemId: string;
-      locationId: string;
-      expectedRevision: string;
-      expectedAvailable: number;
-      available: number;
-    };
-    output: WriteReceipt;
-  };
-  /** Corrects one approved item/location's available stock using provider CAS and idempotency. */
-  'inventory.available.reconcile': {
-    input: {
-      inventoryItemId: string;
-      locationId: string;
-      expectedRevision: string;
-      expectedAvailable: number;
-      available: number;
-    };
-    output: WriteReceipt;
-  };
-  'fulfillment.hold.release': {
-    input: FulfillmentRecoveryInput;
-    output: WriteReceipt;
-  };
-  'fulfillment.open': { input: FulfillmentRecoveryInput; output: WriteReceipt };
-  'fulfillment.move': { input: FulfillmentRecoveryInput; output: WriteReceipt };
-  /** Publishes a persisted, approved physical dispatch once against exact provider work lines. */
-  'fulfillment.shipment.create': {
-    input: { operationId: string; orderId: string; expectedRevision: string };
-    output: WriteReceipt;
-  };
-  /** Publishes persisted tracking and notification choices for an exact existing shipment. */
-  'fulfillment.tracking.update': {
-    input: { operationId: string; orderId: string; expectedRevision: string };
-    output: WriteReceipt;
-  };
-  /** Copies reviewed authoritative quantities to an existing unshipped shipping order.
-   * The provider may lack atomic revisions and idempotency; the adapter must fence one dispatch.
-   * This does not recalculate storefront prices, restock units, or create/delete source lines.
-   */
-  'orders.quantity.update': {
-    input: {
-      operationId: string;
-      orderId: string;
-      expectedRevision: string;
-      lines: {
-        lineItemId: string;
-        currentQuantity: number;
-        quantity: number;
-      }[];
-    };
-    output: WriteReceipt;
-  };
-  /**
-   * Sets approved quantities on existing, unfulfilled order lines through one provider order
-   * edit. Adapters recalculate before sending, withhold any change from the approved
-   * calculation, and send the commit at most once per operation.
-   */
-  'orders.quantity.edit': {
-    input: OrderQuantityEditInput;
-    output: WriteReceipt;
-  };
-  'orders.shipping-method.read': {
-    input: PageQuery & { order: ExternalId };
-    output: Page<ShippingMethodSnapshot>;
-  };
-  'orders.shipping-method.write': {
-    input: {
-      order: ExternalId;
-      expectedShippingMethod: ExternalId;
-      shippingMethod: ExternalId;
-    };
-    output: WriteReceipt;
-  };
-  /**
-   * `order` reads exactly that order by its source ID; send it only to handlers whose
-   * descriptor lists `order`. The page then holds that order when the source has it, or
-   * nothing, and never a cursor.
-   */
-  'orders.read': {
-    input: PageQuery & { order?: ExternalId };
-    output: Page<OrderSnapshot>;
-  };
-  'suppliers.read': {
-    input: PageQuery & { supplier?: ExternalId };
-    output: Page<SupplierSnapshot>;
-  };
-  /**
-   * Reads purchase orders by source ID, or finds the orders created for a Luma purchase order
-   * at or after `createdSince`. Resource `purchase_order`.
-   */
-  'purchase-orders.read': {
-    input: PageQuery & {
-      order?: ExternalId;
-      created?: { lumaOrderId: string; createdSince: string };
-    };
-    output: Page<SupplierOrderSnapshot>;
-  };
-  /** Acceptance means the purchasing system recorded the order, not that a supplier saw it. */
-  'purchase-orders.submit': {
-    input: PurchaseOrderSubmission;
-    output: WriteReceipt;
-  };
-  'purchase-orders.revise': {
-    input: PurchaseOrderRevisionInput;
-    output: WriteReceipt;
-  };
-  'orders.write': {
-    input: { order: ExternalId; operation: 'cancel'; expectedRevision: string };
-    output: WriteReceipt;
-  };
-  'inventory.read': {
-    input: PageQuery & {
-      sku?: ExternalId;
-      location?: ExternalId;
-      includeComposition?: boolean;
-    };
-    output: Page<InventorySnapshot>;
-  };
-  'inventory.transfers.read': {
-    input: PageQuery;
-    output: Page<InventoryTransferSnapshot>;
-  };
-  'inventory.shipments.read': {
-    input: PageQuery;
-    output: Page<InventoryShipmentSnapshot>;
-  };
-  'inventory.write': {
-    input: {
-      sku: ExternalId;
-      location: ExternalId;
-      available: Quantity;
-      expectedRevision: string;
-    };
-    output: WriteReceipt;
-  };
-  'fulfillment.read': {
-    input: PageQuery & { order?: ExternalId };
-    output: Page<FulfillmentSnapshot>;
-  };
-  'fulfillment.retry': {
-    input: { fulfillment: ExternalId; expectedRevision: string };
-    output: WriteReceipt;
-  };
-  'products.read': { input: PageQuery; output: Page<ProductSnapshot> };
-  'customers.read': { input: PageQuery; output: Page<CustomerSnapshot> };
-  /** Warehouses and return reasons to choose from when creating a return at the source. */
-  'returns.options.read': {
-    input: PageQuery;
-    output: Page<ReturnOptionSnapshot>;
-  };
-  /** Finds the returns created at the source for a Luma return case. Resource `return`. */
-  'returns.created.read': {
-    input: PageQuery & {
-      order: ExternalId;
-      lumaCaseId: string;
-      requestedReturn?: ExternalId;
-    };
-    output: Page<CreatedReturnSnapshot>;
-  };
-  /** Acceptance means the source recorded the return, not that any item came back. */
-  'returns.create': { input: ReturnCreation; output: WriteReceipt };
-  /** Calculates the exact refund or reads the selected warehouse stock baseline. */
-  'returns.settlement.quote.read': {
-    input: ReturnSettlementQuote;
-    output: {
-      plan: ReturnSettlementPlan;
-      observedAt: string;
-      evidenceRefs: string[];
-    };
-  };
-  /** Independently reconciles the operation's exact marker and approved outcome. */
-  'returns.settlement.proof.read': {
-    input: ReturnSettlementWrite;
-    output: ReturnSettlementProof;
-  };
-  /** Financial write only: never restocks returned goods. */
-  'returns.refund': { input: ReturnSettlementWrite; output: WriteReceipt };
-  /** Adds only the approved resale units to the selected warehouse. */
-  'returns.restock': { input: ReturnSettlementWrite; output: WriteReceipt };
-  /** Quotes one exchange step from native store state; available inventory is not a reservation. */
-  'returns.exchange.quote.read': {
-    input: ReturnExchangeRead;
-    output: ReturnExchangeQuoted;
-  };
-  /** Reads bounded, explicitly mapped storefront variant choices and current reported availability. */
-  'returns.exchange.options.read': {
-    input: { inventoryItems: ExternalId[] };
-    output: {
-      choices: {
-        inventoryItem: ExternalId;
-        variantId: string;
-        name: string;
-        available: number | null;
-      }[];
-      observedAt: string;
-      evidenceRefs: string[];
-      complete: boolean;
-    };
-  };
-  /** Independently reconciles the operation's native return, replacement fulfillment and money. */
-  /** Reads the native price of the processed replacement, including discounts and tax. */
-  'returns.exchange.price.read': {
-    input: ReturnExchangeRead;
-    output: {
-      total: { amount: string; currency: string } | null;
-      observedAt: string;
-      evidenceRefs: string[];
-    };
-  };
-  /** Finds exact ERP replacement orders and order-specific native reservations. */
-  'returns.exchange.reservation.read': {
-    input: { operationId: string; item: ExternalId };
-    output: {
-      complete: boolean;
-      observedAt: string;
-      evidenceRefs: string[];
-      orders: {
-        id: ExternalId;
-        total: { amount: string; currency: string } | null;
-        paid: boolean;
-        cancelled: boolean;
-        exactLines: boolean;
-        quantity: string;
-        reserved: string | null;
-      }[];
-    };
-  };
-  'returns.exchange.proof.read': {
-    input: ReturnExchangeRead;
-    output: ReturnExchangeProof;
-  };
-  /** Records the replacement request through a native unprocessed Shopify return. */
-  'returns.exchange.request': {
-    input: ReturnExchangeRead;
-    output: WriteReceipt;
-  };
-  /** Processes the exact native exchange and financial difference once. */
-  'returns.exchange.process': {
-    input: ReturnExchangeRead;
-    output: WriteReceipt;
-  };
-  /** Cancels an unprocessed exchange intent before an operator changes the replacement or chooses a refund. */
-  'returns.exchange.cancel': {
-    input: ReturnExchangeRead;
-    output: WriteReceipt;
-  };
-  /** Releases only the exchange's payment hold after fresh independent payment proof. */
-  'returns.exchange.release': {
-    input: ReturnExchangeRead;
-    output: WriteReceipt;
-  };
-  /** Returns and refunds per order; the observation resource is `return` or `refund`. */
-  'returns.read': {
-    input: PageQuery & { order?: ExternalId };
-    output: Page<ReturnSnapshot | RefundSnapshot>;
-  };
-  /** Messages matching `filter` received at or after `receivedSince`. Resource `message`. */
-  'messages.read': {
-    input: PageQuery & { filter: MailboxFilter; receivedSince: string };
-    output: Page<MessageSnapshot>;
-  };
-  /** Every message of one thread, for refreshing a thread and verifying sends. */
-  'message-threads.read': {
-    input: PageQuery & { thread: ExternalId };
-    output: Page<MessageSnapshot>;
-  };
-  /** Reads one attachment; fails with `invalid_request` above `maxBytes`. */
-  'message-attachments.read': {
-    input: { message: ExternalId; attachment: ExternalId; maxBytes: number };
-    output: AttachmentContent;
-  };
-  /** Acceptance means the provider accepted the message, not that anyone received it. */
-  'messages.send': { input: OutboundMessage; output: WriteReceipt };
-}
+/** Every capability with its input and output, joined from the per-family contracts. */
+interface CapabilityContract
+  extends
+    InventoryCapabilities,
+    FulfillmentCapabilities,
+    OrderCapabilities,
+    PurchasingCapabilities,
+    CatalogCapabilities,
+    ReturnCapabilities,
+    MessageCapabilities {}
 
 export type Capability = keyof CapabilityContract;
 
