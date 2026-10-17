@@ -8,6 +8,7 @@ import { inboxFixture } from './inbox-fixture.mjs';
 import { purchasingWorker } from './purchasing-worker-fixture.mjs';
 import {
   citedReturnReads,
+  providerWrites,
   settlementFixture,
 } from './return-settlement-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
@@ -439,6 +440,12 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
     'succeeded',
   );
 
+  // The background pass finds the send reserved, so it only reads the refund.
+  await dueReturnWrite(f, 'orders_return_actions', refund.id);
+  await worker.returnWrites();
+  expect(await refunds()).toHaveLength(1);
+  expect((await settlement()).state).toBe('pending');
+
   // While payment is pending, the worker's check reads the refund and reconciles nothing.
   await due();
   await worker.returns();
@@ -466,6 +473,12 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
   await expectNoWriteReceipt(f, actionId);
+  // Shopify received one refund request, the one whose response was lost.
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.refund'), {
+      timeout: 5_000,
+    })
+    .toEqual(['response-loss']);
 
   // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
   const reads = await citedReturnReads(f, f.detail.case.id);
@@ -564,6 +577,12 @@ it('refunds an approved return from the sync worker once and verifies it after a
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
   await expectNoWriteReceipt(f, actionId);
+  // Shopify received one refund request, the one whose response was lost.
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.refund'), {
+      timeout: 5_000,
+    })
+    .toEqual(['response-loss']);
 
   // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
   const reads = await citedReturnReads(f, f.detail.case.id);
@@ -645,6 +664,12 @@ it('creates an approved return from the sync worker once and records it after a 
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
   await expectNoWriteReceipt(f, actionId);
+  // Shopify received one return creation, the one whose response was lost.
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.create'), {
+      timeout: 5_000,
+    })
+    .toEqual(['response-loss']);
 
   // Every read the verifications and the creation audit cite resolves to the stored return read.
   const reads = await citedReturnReads(f, f.detail.case.id);

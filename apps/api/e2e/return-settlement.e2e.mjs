@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 import { expectResolvedEvidence } from './evidence-fixture.mjs';
 import {
   citedReturnReads,
+  providerWrites,
   returnWriteReceipts,
   settlementFixture,
 } from './return-settlement-fixture.mjs';
@@ -225,6 +226,16 @@ it('separately verifies resale stock and a lost-response refund without restocki
         completeness: 'complete',
       },
     });
+  // Each provider received its write once, and the response was lost; repeated sends and
+  // checks only read.
+  await expect
+    .poll(() => providerWrites(f, 'jtl', 'returns.restock'), { timeout: 5_000 })
+    .toEqual(['response-loss']);
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.refund'), {
+      timeout: 5_000,
+    })
+    .toEqual(['response-loss']);
   // Both responses were lost, so neither write has a receipt and neither attempt cites one.
   const receipts = await returnWriteReceipts(f, detail.case.id);
   expect(receipts.map((attempt) => [attempt.cited, attempt.stored])).toEqual([

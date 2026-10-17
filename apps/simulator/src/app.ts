@@ -180,7 +180,8 @@ export async function createApp(options: SimulatorOptions) {
 
   /**
    * Arms a fault rule in the run's session. With `origin`, an existing rule from the same
-   * request is kept instead of arming another.
+   * request is kept instead of arming another. The caller tells the dispatcher after the
+   * session commits, so no request caches the rules from before it.
    */
   async function armFault(
     client: pg.PoolClient,
@@ -213,7 +214,6 @@ export async function createApp(options: SimulatorOptions) {
       'INSERT INTO sim_faults (run_id, id, rule) VALUES ($1, $2, $3)',
       [run.id, fault.id, fault],
     );
-    dispatcher.rulesChanged(run.id);
   }
 
   const webhooks = createWebhookDelivery(pool);
@@ -511,7 +511,6 @@ export async function createApp(options: SimulatorOptions) {
             'UPDATE sim_faults SET rule = $3 WHERE run_id = $1 AND id = $2',
             [run.id, input.id, { ...rows[0].rule, status: 'disabled' }],
           );
-          dispatcher.rulesChanged(run.id);
           break;
         }
         case 'service-health':
@@ -528,6 +527,8 @@ export async function createApp(options: SimulatorOptions) {
           break;
       }
     });
+    if (input.action === 'fault' || input.action === 'disable')
+      dispatcher.rulesChanged(id);
 
     return detail(pool, await load(id));
   });
@@ -621,6 +622,8 @@ export async function createApp(options: SimulatorOptions) {
         return started;
       },
     );
+    if (scenario.steps.some((step) => step.kind === 'fault'))
+      dispatcher.rulesChanged(id);
 
     return incidents.map((incident) =>
       viewIncident(incident, null, Date.now()),

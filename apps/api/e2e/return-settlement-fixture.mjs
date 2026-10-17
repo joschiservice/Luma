@@ -270,6 +270,23 @@ export async function settlementFixture(
 }
 
 /**
+ * One entry per `operation` write request that reached the simulated `instance`, oldest first:
+ * the fault the simulator applied to it, or null. Unlike provider records, this also counts a
+ * repeated send that the provider's idempotency key answered with the first result. The
+ * simulator writes its journal in batches, so poll for the expected list.
+ */
+export async function providerWrites(f, instance, operation) {
+  const journal = await f.call(
+    `runs/operations/journal?kind=provider-write&instance=${instance}&limit=100`,
+  );
+
+  return journal.items
+    .filter((item) => item.detail.operation === operation)
+    .map((item) => item.detail.fault)
+    .reverse();
+}
+
+/**
  * Asserts that every write receipt a return case's creation, settlement and exchange attempts
  * and their completion audit cite resolves to exactly one receipt orders stored for the case,
  * and returns the attempts.

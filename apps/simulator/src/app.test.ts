@@ -5,9 +5,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { merchantProfiles } from '@luma/simulator-commerce';
 import type { RunDetail } from '@luma/simulator-contract';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from './app.js';
+import { createDispatcher } from './runtime/dispatch.js';
 import { disposableDatabase } from './test-support/database.js';
 
 const adminUrl = process.env.TEST_DATABASE_URL;
@@ -265,6 +267,77 @@ describe.skipIf(!adminUrl)('simulator host', () => {
         occurrence: 2,
       }),
     ]);
+  });
+
+  it('applies a fault armed while another request was reading the rules', async () => {
+    await call('runs', {
+      id: 'rules',
+      profile: 'test',
+      chaos: 'calm',
+      running: false,
+    });
+    await ready('rules');
+    // A dispatcher whose rule reads wait for the test, as a busy request's read can.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reading!: () => void;
+    const read = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    const pool = new pg.Pool({ connectionString: database.url, max: 4 });
+    pool.on('connect', (client) => {
+      const query = client.query.bind(client) as (
+        ...args: unknown[]
+      ) => unknown;
+      Object.assign(client, {
+        query: (...args: unknown[]) =>
+          String(args[0]).startsWith('SELECT id, rule FROM sim_faults')
+            ? (query(...args) as Promise<unknown>).then(async (result) => {
+                reading();
+                await held;
+
+                return result;
+              })
+            : query(...args),
+      });
+    });
+    const dispatcher = createDispatcher(pool);
+    const shop: Parameters<typeof dispatcher.dispatch>[2] = {
+      url: shopify,
+      method: 'POST',
+      headers: {
+        'x-shopify-access-token': 'synthetic',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ query: '{ shop { name } }' }),
+    };
+    try {
+      // The first request reads no armed rule, and the rule is armed and announced before
+      // that read finishes. The stale read must not hide the rule from later requests.
+      const first = dispatcher.dispatch('rules', 'shopify', shop);
+      await read;
+      await call('runs/rules/control', {
+        action: 'fault',
+        rule: { instance: 'shopify', operation: '*', kind: 'malformed' },
+      });
+      dispatcher.rulesChanged('rules');
+      release();
+      expect(await first).toMatchObject({ response: { status: 200 } });
+      const second = await dispatcher.dispatch('rules', 'shopify', shop);
+      expect(second).toMatchObject({ response: { status: 200 } });
+      expect(second.kind === 'response' && 'bodyText' in second.response).toBe(
+        true,
+      );
+      expect((await call<RunDetail>('runs/rules')).faults).toEqual([
+        expect.objectContaining({ kind: 'malformed', status: 'triggered' }),
+      ]);
+    } finally {
+      release();
+      await dispatcher.close();
+      await pool.end();
+    }
   });
 
   it('places orders through the integration, advances time and records metrics and journal', async () => {

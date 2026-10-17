@@ -125,7 +125,10 @@ function faultResponse(
 export function createDispatcher(pool: Pool) {
   const occurrences = new Map<string, number>();
   const buckets = new Map<string, Bucket>();
+  // Whether a run has armed rules, so requests can skip the rule transaction. A request
+  // caches what it read only if no rule changed meanwhile: its snapshot may predate the change.
   const armedRules = new Map<string, boolean>();
+  const ruleChanges = new Map<string, number>();
   // Request metrics and journal entries are written in batches, not once per request.
   const pending = new Map<
     string,
@@ -177,6 +180,7 @@ export function createDispatcher(pool: Pool) {
     phase: 'before' | 'after-commit',
   ) {
     if (armedRules.get(run.id) === false) return undefined;
+    const changes = ruleChanges.get(run.id) ?? 0;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -185,10 +189,11 @@ export function createDispatcher(pool: Pool) {
         [run.id],
       );
       const rules = rows.map((row) => row.rule);
-      armedRules.set(
-        run.id,
-        rules.some((rule) => rule.status === 'armed'),
-      );
+      if ((ruleChanges.get(run.id) ?? 0) === changes)
+        armedRules.set(
+          run.id,
+          rules.some((rule) => rule.status === 'armed'),
+        );
       const before = JSON.stringify(rules);
       const fired = matchFault(rules, { ...target, phase }, currentTime(run));
       if (JSON.stringify(rules) !== before)
@@ -309,8 +314,9 @@ export function createDispatcher(pool: Pool) {
       await flushing;
       await flush();
     },
-    /** Forgets cached rule state after rules change. */
+    /** Forgets cached rule state; call after the transaction that changed the rules commits. */
     rulesChanged(runId: string) {
+      ruleChanges.set(runId, (ruleChanges.get(runId) ?? 0) + 1);
       armedRules.delete(runId);
     },
     async dispatch(

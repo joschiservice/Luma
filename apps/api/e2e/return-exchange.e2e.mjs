@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 
 import {
   citedReturnReads,
+  providerWrites,
   returnWriteReceipts,
   settlementFixture,
 } from './return-settlement-fixture.mjs';
@@ -118,6 +119,14 @@ it('tracks an even exchange through lost responses without a second replacement 
     )
   ).items.filter((w) => w.data.order === f.providerOrderId);
   expect(works).toHaveLength(2);
+  // Shopify received each exchange write once, and each response was lost.
+  for (const operation of [
+    'returns.exchange.request',
+    'returns.exchange.process',
+  ])
+    await expect
+      .poll(() => providerWrites(f, 'shopify', operation), { timeout: 5_000 })
+      .toEqual(['response-loss']);
   expect((await request(`${path}/exchange`)).operation).toMatchObject({
     id: body.operationId,
     processingStarted: true,

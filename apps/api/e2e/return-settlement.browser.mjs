@@ -2,7 +2,10 @@
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { returnBrowserCommand } from './return-browser-commands.mjs';
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  providerWrites,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
 
 test('independently approves a refund, distinguishes pending payment, and checks actual settlement on a narrow case', async ({
   resources: t,
@@ -90,6 +93,14 @@ test('independently approves a refund, distinguishes pending payment, and checks
   await expect(
     section.getByText('Refund processing', { exact: true }),
   ).toBeVisible();
+  // The approved send consumed the armed loss, so its acceptance never reached Luma.
+  expect((await f.call('runs/operations')).faults).toEqual([
+    expect.objectContaining({
+      operation: 'returns.refund',
+      kind: 'response-loss',
+      status: 'triggered',
+    }),
+  ]);
   await expect(
     section.getByText('Independently verified', { exact: true }),
   ).toHaveCount(0);
@@ -149,4 +160,8 @@ test('independently approves a refund, distinguishes pending payment, and checks
   expect(items.filter((r) => r.data.note?.startsWith('luma-rs:'))).toHaveLength(
     1,
   );
+  // Shopify received exactly one refund request, the one whose response was lost.
+  await expect
+    .poll(() => providerWrites(f, 'shopify', 'returns.refund'))
+    .toEqual(['response-loss']);
 });
