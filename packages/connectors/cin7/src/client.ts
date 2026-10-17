@@ -8,6 +8,7 @@ import {
 import { z } from 'zod';
 
 import { createRequestPacer, type RequestPacer } from './pacer.js';
+import { accountId } from './schemas.js';
 
 export const API_VERSION = 'v2';
 
@@ -36,10 +37,6 @@ const header = z
   .min(1)
   .max(4096)
   .regex(/^[\x20-\x7e]+$/);
-
-export const accountId = z
-  .string()
-  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
 /**
  * Cin7 enforces its limit per minute and documents no Retry-After header, so a throttled
