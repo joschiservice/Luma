@@ -62,4 +62,5 @@ export { createStockProtectionConsent } from './infrastructure/stock-protection.
 export { createStockProtectionAdmission } from './infrastructure/stock-protection.js';
 
 export { policyAudit } from './application/policy-audit.js';
+
 export { createLatestPolicyDecisionReader } from './infrastructure/latest-decision.js';
