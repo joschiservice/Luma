@@ -7,6 +7,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import type {
   AppFactoryContext,
@@ -64,10 +65,6 @@ export interface AppRepository {
   ): Promise<WorkspaceApp>;
 }
 
-function forbidden(message: string): never {
-  throw new IdentityError(403, 'FORBIDDEN', message);
-}
-
 const snapshot = (manifest: AppManifest): InstalledManifest => ({
   version: manifest.version,
   name: manifest.name,
@@ -97,7 +94,7 @@ export function createAppService(
       (scope) => !isPermission(scope) || !hasPermission(context, scope),
     );
     if (missing.length)
-      forbidden(
+      throw forbidden(
         `You can only grant access you have yourself. Missing: ${missing.join(', ')}.`,
       );
   }
@@ -130,22 +127,22 @@ export function createAppService(
             .get(request.app)!
             .manifest.permissions.some((item) => item.key === permission)
         )
-          forbidden(`${permission} is not a permission of this app.`);
+          throw forbidden(`${permission} is not a permission of this app.`);
         if (!context.permissions.has(permission))
-          forbidden(
+          throw forbidden(
             'Your role does not allow this app action. Ask a workspace admin for access.',
           );
       } else if (!isPermission(permission))
-        forbidden(`${permission} is not a known permission.`);
+        throw forbidden(`${permission} is not a known permission.`);
       else requirePermission(context, permission);
     }
     for (const scope of request.scopes ?? []) {
       if (!current.scopes.includes(scope))
-        forbidden(
+        throw forbidden(
           `This app has not been granted ${scope}. Ask a workspace admin to review the app’s access.`,
         );
       if (!context.permissions.has(scope))
-        forbidden(
+        throw forbidden(
           'Your role does not allow this app action. Ask a workspace admin for access.',
         );
     }
@@ -294,7 +291,7 @@ export function createAppService(
       const current = await installation(context, appId);
       const missing = scopes.filter((scope) => !current.scopes.includes(scope));
       if (missing.length)
-        forbidden(
+        throw forbidden(
           `This app has not been granted ${missing.join(', ')}. Ask a workspace admin to review the app’s access.`,
         );
     },

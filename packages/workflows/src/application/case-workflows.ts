@@ -10,7 +10,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
 import {
@@ -310,10 +310,6 @@ export function createCaseWorkflows(deps: {
       throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found.');
 
     return found;
-  }
-
-  function conflict(message: string): never {
-    throw new IdentityError(409, 'CONFLICT', message);
   }
 
   const issueLabel = (version: ProcessWorkflowVersion) =>
@@ -1026,7 +1022,7 @@ export function createCaseWorkflows(deps: {
           existing.principalId !== context.actor.id ||
           existing.versionDigest !== input.reviewedDigest
         )
-          conflict('This activation ID belongs to another request.');
+          throw conflict('This activation ID belongs to another request.');
 
         return view(existing);
       }
@@ -1040,16 +1036,16 @@ export function createCaseWorkflows(deps: {
         input.version !== found.version.version ||
         input.reviewedDigest !== found.version.digest
       )
-        conflict('The reviewed version changed. Reload the workflow.');
+        throw conflict('The reviewed version changed. Reload the workflow.');
       if (
         input.policyVersion !==
         (await deps.policies.currentVersion(context.tenantId))
       )
-        conflict('The approval policy changed. Review it again.');
+        throw conflict('The approval policy changed. Review it again.');
       const missing = (await caseRequirements(context, found)).find(
         (item) => !item.met,
       );
-      if (missing) conflict(missing.detail);
+      if (missing) throw conflict(missing.detail);
       await deps.catalog.publish(context, found.version);
       const reviewedAt = deps.now().toISOString();
       const activation = await deps.store.insert(context, {
@@ -1091,7 +1087,7 @@ export function createCaseWorkflows(deps: {
       if (!current)
         throw new IdentityError(404, 'NOT_FOUND', 'Activation not found.');
       if (current.artifactDigest !== digest)
-        conflict(
+        throw conflict(
           'The reviewed activation changed. Refresh before turning it off.',
         );
       if (!current.active) return view(current);

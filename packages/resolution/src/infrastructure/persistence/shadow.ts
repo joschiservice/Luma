@@ -2,6 +2,8 @@ import type { Diagnosis, IncidentVerificationAttempt } from '@luma/exceptions';
 import { IdentityError } from '@luma/identity';
 import {
   canonicalJson as canonicalPlaybook,
+  conflict,
+  notFound,
   type TenantDatabase,
 } from '@luma/platform';
 import type {
@@ -16,10 +18,7 @@ import type {
   ShadowEvaluation,
 } from '../../application/shadow-evaluation.js';
 
-const missing = () =>
-  new IdentityError(404, 'NOT_FOUND', 'Shadow evaluation or case not found');
-const conflict = (message: string) =>
-  new IdentityError(409, 'CONFLICT', message);
+const missing = () => notFound('Shadow evaluation or case not found');
 
 /** Stores immutable Shadow snapshots and reviews under tenant RLS; reads only retained production evidence. */
 export function createShadowStore(

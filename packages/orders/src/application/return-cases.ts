@@ -8,7 +8,13 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  invalid,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import {
@@ -471,26 +477,11 @@ const auditSummaries: Record<ReturnCaseEventKind, string> = {
   exchange_reopened: 'Exchange reopened after an unresolved source check',
 };
 
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
-
-const notFound = (message: string): never => {
-  throw new IdentityError(404, 'NOT_FOUND', message);
-};
-
-const unavailable = (message: string): never => {
-  throw new IdentityError(503, 'SERVICE_UNAVAILABLE', message);
-};
-
-const invalidInput = (message: string): never => {
-  throw new IdentityError(422, 'VALIDATION_ERROR', message);
-};
-
-const unreadable = () =>
-  unavailable(
+function unreadable(): never {
+  throw unavailable(
     'The order’s system could not be read. Check the connection in Apps and try again.',
   );
+}
 
 /** Runs a domain rule and reports a broken rule as an HTTP error with its message. */
 function rule<T>(operation: () => T): T {
@@ -601,7 +592,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const prior = await tx.event(commandId);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -633,21 +624,21 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       { caseId, request },
       async (tx, digest) => {
         const value = await tx.case(caseId);
-        if (!value) notFound('Return case not found');
-        if (value!.revision !== input.expectedRevision)
-          conflict('This return case changed. Refresh it and try again.');
-        await tx.lockOrder(value!.orderId);
+        if (!value) throw notFound('Return case not found');
+        if (value.revision !== input.expectedRevision)
+          throw conflict('This return case changed. Refresh it and try again.');
+        await tx.lockOrder(value.orderId);
         const current = await tx.case(caseId);
         if (!current || current.revision !== input.expectedRevision)
-          conflict('This return case changed. Refresh it and try again.');
-        const applied = await apply(current!, tx);
+          throw conflict('This return case changed. Refresh it and try again.');
+        const applied = await apply(current, tx);
         const next: ReturnCase = {
           ...applied.next,
-          revision: value!.revision + 1,
+          revision: value.revision + 1,
           updatedAt: deps.now().toISOString(),
         };
         if (!(await tx.saveCase(next)))
-          conflict('This return case changed. Refresh it and try again.');
+          throw conflict('This return case changed. Refresh it and try again.');
         const entry = event(
           context,
           next,
@@ -858,13 +849,13 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         };
       },
     );
-    if (!data) notFound('Return case not found');
-    const { value, people } = data!;
+    if (!data) throw notFound('Return case not found');
+    const { value, people } = data;
     const person = (id: string): PersonView => ({
       id,
       name: people.get(id)?.name ?? null,
     });
-    const latest = data!.creations[0] ?? null;
+    const latest = data.creations[0] ?? null;
     const received = new Map(
       value.receipt?.lines.map((l) => [l.orderLineId, l.received]) ?? [],
     );
@@ -883,7 +874,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
 
     return {
       case: {
-        ...summary(value, data!.creations, people),
+        ...summary(value, data.creations, people),
         revision: value.revision,
         openedBy: person(value.openedBy),
         cancellation: value.cancellation
@@ -896,18 +887,18 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       },
       order: {
         id: value.orderId,
-        number: data!.source?.displayNumber ?? null,
+        number: data.source?.displayNumber ?? null,
         connection: {
           id: value.connectionId,
           label: connection?.label ?? null,
           provider: connection?.provider ?? null,
         },
       },
-      sourceReturn: data!.sourceReturn
+      sourceReturn: data.sourceReturn
         ? {
-            id: data!.sourceReturn.entityId,
-            name: data!.sourceReturn.name,
-            status: data!.sourceReturn.status,
+            id: data.sourceReturn.entityId,
+            name: data.sourceReturn.name,
+            status: data.sourceReturn.status,
           }
         : null,
       lines: value.lines.map((line) => {
@@ -950,7 +941,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             evidence: value.proposal.evidence,
           }
         : null,
-      history: data!.events.map((e) => ({
+      history: data.events.map((e) => ({
         id: e.id,
         kind: e.kind,
         actor: person(e.actorId),
@@ -972,8 +963,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         connection,
         value,
         latest,
-        data!.mapped,
-        data!.sourceReturn,
+        data.mapped,
+        data.sourceReturn,
       ),
       canManage: hasPermission(context, 'returns.manage'),
       asOf: deps.now().toISOString(),
@@ -1118,9 +1109,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       (tx) => tx.creation(creationId),
     );
     if (!creation || creation.caseId !== caseId)
-      notFound('Return creation not found');
+      throw notFound('Return creation not found');
 
-    return creation!;
+    return creation;
   }
 
   async function viewOf(context: TenantContext, creation: ReturnCreation) {
@@ -1164,8 +1155,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           };
         },
       );
-      if (!data) notFound('Order not found');
-      const { sources, cases, storeReturns, people, creations } = data!;
+      if (!data) throw notFound('Order not found');
+      const { sources, cases, storeReturns, people, creations } = data;
 
       return {
         sources: sources.map((source) => {
@@ -1224,7 +1215,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         query.limit > 50 ||
         query.q.length > 120
       )
-        invalidInput(
+        throw invalid(
           'Choose a page size from 1 to 50 and a search up to 120 characters.',
         );
       const scope = deps.digest([
@@ -1256,7 +1247,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             throw new Error('Cursor');
           after = { at: decoded.at, id: decoded.id };
         } catch {
-          invalidInput(
+          throw invalid(
             'This page link no longer matches the case search. Start from the first page.',
           );
         }
@@ -1307,7 +1298,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             limit: 501,
           });
           if (rows.length > 500)
-            unavailable(
+            throw unavailable(
               'Return attention exceeds this view’s read limit. Open return cases from their orders or search.',
             );
           const items = rows.map((row) => ({
@@ -1391,15 +1382,17 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         { orderId, input },
         async (tx, digest) => {
           if (await tx.case(input.id))
-            conflict(
+            throw conflict(
               'This request ID was already used. Refresh before trying again.',
             );
           await tx.lockOrder(orderId);
           const sources = await tx.orderSources(orderId);
-          if (!sources.length) notFound('Order not found');
-          const source =
-            sources.find((s) => s.connectionId === input.connectionId) ??
-            invalidInput('Choose order lines from a source of this order.');
+          if (!sources.length) throw notFound('Order not found');
+          const source = sources.find(
+            (s) => s.connectionId === input.connectionId,
+          );
+          if (!source)
+            throw invalid('Choose order lines from a source of this order.');
           const cases = (await tx.cases(orderId)).filter(
             (c) => c.connectionId === input.connectionId,
           );
@@ -1410,9 +1403,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               linked.orderId !== orderId ||
               linked.connectionId !== input.connectionId
             )
-              notFound('Store return not found on this order');
-            if (['declined', 'cancelled'].includes(linked!.status))
-              conflict('This store return is declined or cancelled.');
+              throw notFound('Store return not found on this order');
+            if (['declined', 'cancelled'].includes(linked.status))
+              throw conflict('This store return is declined or cancelled.');
             if (
               cases.some(
                 (c) =>
@@ -1420,7 +1413,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
                   c.sourceReturnId === input.sourceReturnId,
               )
             )
-              conflict('Another return case already works this store return.');
+              throw conflict(
+                'Another return case already works this store return.',
+              );
           }
           const storeReturns = (await tx.storeReturns(orderId)).filter(
             (r) =>
@@ -1507,7 +1502,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           )
           .catch(() => null);
         if (!assignee || !hasPermission(assignee, 'returns.manage'))
-          conflict('Choose a current member who can manage returns.');
+          throw conflict('Choose a current member who can manage returns.');
       }
 
       return change(
@@ -1518,7 +1513,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         'assigned',
         async (value) => {
           if (value.state !== 'open')
-            conflict('This return case is cancelled. Open a new case instead.');
+            throw conflict(
+              'This return case is cancelled. Open a new case instead.',
+            );
 
           return {
             next: { ...value, assigneeId: input.assigneeId },
@@ -1649,7 +1646,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               ['approved', 'sending', 'uncertain'].includes(c.state),
             )
           )
-            conflict(
+            throw conflict(
               'The return is being created in the order’s system. Wait until Luma has checked the result.',
             );
           for (const creation of creations)
@@ -1678,14 +1675,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     async creationOptions(context: TenantContext, caseId: string) {
       context = await authorize(context, true);
       if (!deps.system || !deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const value = await deps.store.transaction(
         context.tenantId,
         false,
         (tx) => tx.case(caseId),
       );
-      if (!value) notFound('Return case not found');
-      const result = await deps.system!.options(context, value!.connectionId);
+      if (!value) throw notFound('Return case not found');
+      const result = await deps.system.options(context, value.connectionId);
 
       return result.ok ? result.value : unreadable();
     },
@@ -1701,7 +1698,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.system || !deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const existing = await deps.store.transaction(
         context.tenantId,
         false,
@@ -1724,7 +1721,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               input.reason.scopeKey,
             ])
         )
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -1735,11 +1732,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         false,
         (tx) => tx.case(caseId),
       );
-      if (!current) notFound('Return case not found');
-      const options = await deps.system!.options(
-        context,
-        current!.connectionId,
-      );
+      if (!current) throw notFound('Return case not found');
+      const options = await deps.system.options(context, current.connectionId);
       const choices = options.ok ? options.value : unreadable();
       const pick = (list: ReturnOption[], ref: SourceRef) =>
         list.find(
@@ -1748,16 +1742,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const warehouse = pick(choices.warehouses, input.warehouse);
       const reason = pick(choices.reasons, input.reason);
       if (!warehouse || !reason)
-        conflict(
+        throw conflict(
           'Choose a warehouse and a return reason from the current lists.',
         );
       if ((await detail(context, caseId)).creationAvailability.blocker)
-        conflict(
+        throw conflict(
           'The return can’t be created in the order’s system right now.',
         );
 
-      const connection = (await deps.system!.connections(context)).find(
-        (c) => c.id === current!.connectionId,
+      const connection = (await deps.system.connections(context)).find(
+        (c) => c.id === current.connectionId,
       );
       const creation = await deps.store.transaction(
         context.tenantId,
@@ -1765,7 +1759,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         async (tx) => {
           const value = await tx.case(caseId);
           if (!value || value.state !== 'open')
-            conflict('This return case is cancelled. Open a new case instead.');
+            throw conflict(
+              'This return case is cancelled. Open a new case instead.',
+            );
           const live = (await tx.creations(caseId)).find((c) =>
             liveCreationStates.includes(c.state),
           );
@@ -1776,48 +1772,50 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               Date.parse(live.expiresAt) <= deps.now().getTime()
             )
           )
-            conflict('This return is already being created or was created.');
+            throw conflict(
+              'This return is already being created or was created.',
+            );
           if (live) await saveCreation(tx, live, { state: 'expired' });
           const ids = await tx.sourceIds(
-            value!.connectionId,
-            value!.orderId,
-            value!.lines.map((l) => l.orderLineId),
+            value.connectionId,
+            value.orderId,
+            value.lines.map((l) => l.orderLineId),
           );
           if (
             !ids.order ||
-            value!.lines.some((l) => !ids.lines.has(l.orderLineId))
+            value.lines.some((l) => !ids.lines.has(l.orderLineId))
           )
-            conflict('Some lines are not linked to the order’s system.');
-          const sourceReturn = value!.sourceReturnId
-            ? await tx.sourceReturn(value!.sourceReturnId)
+            throw conflict('Some lines are not linked to the order’s system.');
+          const sourceReturn = value.sourceReturnId
+            ? await tx.sourceReturn(value.sourceReturnId)
             : null;
           if (
             connection?.provider === 'shopify' &&
             sourceReturn &&
             (sourceReturn.status !== 'requested' || !sourceReturn.source)
           )
-            conflict('Only a requested Shopify return can be approved.');
+            throw conflict('Only a requested Shopify return can be approved.');
           const now = deps.now();
           const created: ReturnCreation = {
             id: input.id,
             tenantId: context.tenantId,
             caseId,
-            connectionId: value!.connectionId,
-            order: ids.order!,
+            connectionId: value.connectionId,
+            order: ids.order,
             ...(connection?.provider === 'shopify' && sourceReturn?.source
               ? { requestedReturn: sourceReturn.source }
               : {}),
             warehouse: {
-              externalId: warehouse!.externalId,
-              scopeKey: warehouse!.scopeKey,
-              name: warehouse!.name,
+              externalId: warehouse.externalId,
+              scopeKey: warehouse.scopeKey,
+              name: warehouse.name,
             },
             reason: {
-              externalId: reason!.externalId,
-              scopeKey: reason!.scopeKey,
-              name: reason!.name,
+              externalId: reason.externalId,
+              scopeKey: reason.scopeKey,
+              name: reason.name,
             },
-            lines: value!.lines.map((l) => ({
+            lines: value.lines.map((l) => ({
               orderLineId: l.orderLineId,
               source: ids.lines.get(l.orderLineId)!,
               quantity: l.quantity,
@@ -1845,7 +1843,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       let decision: PolicyDecision;
       try {
-        decision = await deps.admission!.prepare(
+        decision = await deps.admission.prepare(
           context,
           creation,
           creationAction(creation),
@@ -1875,7 +1873,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (
         saved.state === 'approved' ||
-        (await deps.admission!.writeMode?.(context, saved.connectionId)) ===
+        (await deps.admission.writeMode?.(context, saved.connectionId)) ===
           'observe_only'
       )
         await dispatch(context, saved);
@@ -1895,14 +1893,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const creation = await loadCreation(context, caseId, creationId);
       const view = await viewOf(context, creation);
       if (!view.canApprove || creation.decisionId !== input.decisionId)
-        conflict(
+        throw conflict(
           'This request changed, expired or needs a different approver. Refresh it.',
         );
-      await deps.admission!.respond(
+      await deps.admission.respond(
         context,
         input.decisionId,
         input.outcome,
@@ -1957,7 +1955,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const creation = await loadCreation(context, caseId, creationId);
       const view = await viewOf(context, creation);
       if (!view.canSend)
-        conflict('Only the requester can send an approved return.');
+        throw conflict('Only the requester can send an approved return.');
       await dispatch(context, creation);
 
       return detail(context, caseId);
@@ -1971,7 +1969,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const creation = await loadCreation(context, caseId, creationId);
       if (['uncertain', 'sending'].includes(creation.state)) {
         const principal = await deps
@@ -1982,7 +1980,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           )
           .catch((error: unknown) => {
             if (error instanceof MembershipSuspendedError)
-              conflict(
+              throw conflict(
                 'The person who requested this return can’t access this workspace right now. Luma checks it after their access is restored.',
               );
             throw error;
@@ -1990,7 +1988,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         await settle(
           principal,
           creationId,
-          await deps.admission!.reconcile(principal, creation),
+          await deps.admission.reconcile(principal, creation),
         );
       }
 

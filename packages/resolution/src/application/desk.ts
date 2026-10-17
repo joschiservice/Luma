@@ -8,6 +8,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict } from '@luma/platform';
 import type { Approval, PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 import type { ProcessStepOutput } from '@luma/workflows';
@@ -179,11 +180,8 @@ const decisionPermission = {
   close: 'issues.manage',
 } as const satisfies Record<CaseDecision['kind'], Permission>;
 
-function conflict(
-  message = 'The case changed. Refresh before deciding.',
-): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
+const caseChanged = () =>
+  conflict('The case changed. Refresh before deciding.');
 
 /** Exposes persisted dispatch and independent verification without treating acceptance as resolution. */
 function executionView(e: ExecutionRecord | null) {
@@ -473,7 +471,7 @@ export function createDeskService(deps: DeskDependencies) {
                     .sort(),
                 )
             )
-              conflict(
+              throw conflict(
                 'This command ID was already used for a different decision.',
               );
 
@@ -484,9 +482,9 @@ export function createDeskService(deps: DeskDependencies) {
             s.revision !== request.caseRevision ||
             (s.diagnosis?.revision ?? 0) !== request.diagnosisRevision
           )
-            conflict();
+            throw caseChanged();
           if (!permitted(context, s).includes(request.kind))
-            conflict('This decision is no longer permitted.');
+            throw conflict('This decision is no longer permitted.');
           let approvalId: string | null = null;
           let revision = s.revision;
           if (request.kind === 'close')
@@ -503,12 +501,14 @@ export function createDeskService(deps: DeskDependencies) {
               request.proposalVersion !== p.version ||
               request.decisionId !== s.decision?.id
             )
-              conflict();
+              throw caseChanged();
             if (
               request.kind === 'approve' &&
               !(await deps.checkCapability(context, p.action))
             )
-              conflict('The capability or its preconditions are unavailable.');
+              throw conflict(
+                'The capability or its preconditions are unavailable.',
+              );
             const expiry = new Date(
               Math.min(
                 Date.parse(p.action.expiresAt),
@@ -529,7 +529,7 @@ export function createDeskService(deps: DeskDependencies) {
               approval.outcome !==
               (request.kind === 'approve' ? 'approved' : 'rejected')
             )
-              conflict('A conflicting response already exists.');
+              throw conflict('A conflicting response already exists.');
             approvalId = approval.id;
           }
           const receipt: DecisionReceipt = {

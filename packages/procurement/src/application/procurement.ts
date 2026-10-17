@@ -6,6 +6,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict } from '@luma/platform';
 
 import {
   type Commitment,
@@ -199,10 +200,6 @@ export function createProcurementService(deps: {
     return fresh;
   }
 
-  function conflict(message: string): never {
-    throw new IdentityError(409, 'CONFLICT', message);
-  }
-
   async function command<T extends Supplier | PurchaseOrder>(
     context: TenantContext,
     id: string,
@@ -215,7 +212,7 @@ export function createProcurementService(deps: {
       const prior = await tx.command(id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -413,7 +410,9 @@ export function createProcurementService(deps: {
           if (!supplier)
             throw new IdentityError(404, 'NOT_FOUND', 'Supplier not found');
           if ((supplier.revision ?? 1) !== request.expectedRevision)
-            conflict('This supplier changed. Refresh and review it again.');
+            throw conflict(
+              'This supplier changed. Refresh and review it again.',
+            );
           if (!tx.updateSupplier)
             throw new IdentityError(
               503,
@@ -512,7 +511,7 @@ export function createProcurementService(deps: {
       context = await authorize(context, true);
       const request = deps.parseOrder(input);
       const problem = purchaseOrderProblem(request);
-      if (problem) conflict(problem);
+      if (problem) throw conflict(problem);
 
       return command(
         context,
@@ -531,7 +530,7 @@ export function createProcurementService(deps: {
               !request.origin.sourceAttentionKey ||
               source.order.supplierId === request.supplierId
             )
-              conflict(
+              throw conflict(
                 'Review the source shortfall and choose another supplier.',
               );
             const progress = orderProgress({
@@ -550,7 +549,7 @@ export function createProcurementService(deps: {
                   ),
               )
             )
-              conflict(
+              throw conflict(
                 'This difference already has a decision. Refresh the source order.',
               );
           }
@@ -566,7 +565,7 @@ export function createProcurementService(deps: {
                 ),
             )
           )
-            conflict(
+            throw conflict(
               'An existing draft or open purchase order already covers this SKU.',
             );
           const lines = await Promise.all(
@@ -645,19 +644,19 @@ export function createProcurementService(deps: {
             request.status === 'cancelled' &&
             (await tx.submittedNativeOrder?.(id))
           )
-            conflict(
+            throw conflict(
               'Submitted purchasing-system orders require verified source cancellation. This connection does not support cancellation.',
             );
           if (await tx.pendingOrderChange?.(id))
-            conflict(
+            throw conflict(
               'An order change still needs approval or verification. Resolve it before changing the order lifecycle.',
             );
           if (order.revision !== request.expectedRevision)
-            conflict(
+            throw conflict(
               'This purchase order changed. Refresh and review its current status.',
             );
           if (!nextStatuses(order).includes(request.status))
-            conflict(
+            throw conflict(
               'This status change is not available for this purchase order.',
             );
           const updated = {

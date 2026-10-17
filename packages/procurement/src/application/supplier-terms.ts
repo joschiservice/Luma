@@ -6,6 +6,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict } from '@luma/platform';
 
 import type {
   SupplierProductTerms,
@@ -75,10 +76,6 @@ export function createSupplierTermsService(deps: {
     return fresh;
   }
 
-  const conflict = (message: string): never => {
-    throw new IdentityError(409, 'CONFLICT', message);
-  };
-
   async function record(
     context: TenantContext,
     request: SupplierTermsInput,
@@ -111,7 +108,7 @@ export function createSupplierTermsService(deps: {
       const prior = await tx.command(request.id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used for different purchasing terms.',
           );
 
@@ -127,7 +124,9 @@ export function createSupplierTermsService(deps: {
         await tx.list({ supplierId: request.supplierId, skuId: request.skuId })
       )[0];
       if (!provenance && (current?.revision ?? 0) !== request.expectedRevision)
-        conflict('Purchasing terms changed. Refresh and review before saving.');
+        throw conflict(
+          'Purchasing terms changed. Refresh and review before saving.',
+        );
       if (provenance)
         await tx.recordRead?.(
           request.supplierId,
@@ -156,7 +155,7 @@ export function createSupplierTermsService(deps: {
             item.effective.preferred === true,
         )
       )
-        conflict(
+        throw conflict(
           'Another supplier is preferred. Remove that preference before changing suppliers.',
         );
       const recordedAt = deps.now().toISOString();

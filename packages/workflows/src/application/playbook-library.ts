@@ -9,6 +9,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, notFound } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -78,12 +79,7 @@ export interface PlaybookLibraryDependencies extends PlaybookLibraryScope {
   /** Reads the workspace approval setting so approval is described as admission applies it. */
   approvalPolicy: Pick<PolicyService, 'approvalRequirement'>;
 }
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
-const missing = (): never => {
-  throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
-};
+const missing = () => notFound('Workflow not found');
 const equalRequest = (left: ActivatePlaybook, right: ActivatePlaybook) =>
   left.id === right.id &&
   left.version === right.version &&
@@ -285,7 +281,7 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       scope.grants(context, lock),
       lock ? [] : scope.store.runs(context, definitionId),
     ]);
-    if (!published.length) return missing();
+    if (!published.length) throw missing();
     published.sort((a, b) => {
       const left = a.version.split('.').map(Number),
         right = b.version.split('.').map(Number);
@@ -389,7 +385,7 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
     },
     async runs(context: TenantContext, id: string) {
       context = await authorize(context, 'workflows.read');
-      if (!(await deps.store.versions(context, id)).length) return missing();
+      if (!(await deps.store.versions(context, id)).length) throw missing();
 
       return deps.store.runs(context, id);
     },
@@ -409,14 +405,14 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
             prior.actorId !== context.actor.id ||
             !equalRequest(prior.request, request))
         )
-          return conflict(
+          throw conflict(
             'This request ID already has another scope. Reload and review a new request.',
           );
         const view = await detail(context, id, scope, true);
         const existing = view.activations.find((a) => a.id === request.id);
         if (existing) {
           if (!prior || !existing.active)
-            return conflict(
+            throw conflict(
               'This activation already exists or was revoked. Review a new activation.',
             );
 
@@ -430,13 +426,12 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
           version.digest !== request.reviewedDigest ||
           !request.scopeReviewed
         )
-          return conflict(
+          throw conflict(
             'The reviewed version changed. Reload and review its exact digest.',
           );
-        if (version.blockers.length)
-          return conflict(version.blockers.join(' '));
+        if (version.blockers.length) throw conflict(version.blockers.join(' '));
         if (request.policyVersion !== currentPolicyVersion)
-          return conflict(
+          throw conflict(
             'Policy changed. Reload and review the current approval behavior.',
           );
         const connection = view.connections.find(
@@ -445,18 +440,18 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
         if (!connection)
           throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
         if (connection.version !== request.connectionVersion)
-          return conflict(
+          throw conflict(
             'Connection grants changed. Reload and review the current scope.',
           );
         if (connection.blockers.length)
-          return conflict(connection.blockers.join(' '));
+          throw conflict(connection.blockers.join(' '));
         if (
           !request.targetIds.length ||
           request.targetIds.some(
             (id) => !connection.targets.some((t) => t.id === id),
           )
         )
-          return conflict(
+          throw conflict(
             'An order is not mapped to this connection. Refresh the scope and select mapped orders.',
           );
         if (
@@ -468,7 +463,7 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
               a.grants.targetIds.some((id) => request.targetIds.includes(id)),
           )
         )
-          return conflict(
+          throw conflict(
             'An active version already covers this scope. Revoke it before granting a replacement.',
           );
         await scope.store.recordReview(context, id, request);
@@ -502,9 +497,9 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
         const activation = (await scope.store.activations(context, id)).find(
           (a) => a.id === activationId,
         );
-        if (!activation) return missing();
+        if (!activation) throw missing();
         if (activation.artifactDigest !== artifactDigest)
-          return conflict('Activation changed. Reload before revoking.');
+          throw conflict('Activation changed. Reload before revoking.');
         await scope.commands.revoke(context, activationId);
 
         return { ...activation, active: false };

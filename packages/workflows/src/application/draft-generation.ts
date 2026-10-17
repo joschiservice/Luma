@@ -12,7 +12,11 @@ import type {
   ModelUsage,
   TraceContext,
 } from '@luma/platform';
-import { authoringModelProfile, ModelGatewayError } from '@luma/platform';
+import {
+  authoringModelProfile,
+  conflict,
+  ModelGatewayError,
+} from '@luma/platform';
 
 import {
   diagnostic,
@@ -463,10 +467,6 @@ export function createDraftGeneration(deps: {
     return fresh;
   }
 
-  const conflict = (message: string): never => {
-    throw new IdentityError(409, 'CONFLICT', message);
-  };
-
   function available(): ModelGateway {
     if (!deps.availability.available || !deps.gateway)
       throw new IdentityError(
@@ -492,11 +492,11 @@ export function createDraftGeneration(deps: {
 
   function editable(draft: WorkflowDraft, revision: number) {
     if (draft.state !== 'draft')
-      conflict(
+      throw conflict(
         'This draft was already published. Edit the workflow to start a new draft.',
       );
     if (draft.revision !== revision)
-      conflict(
+      throw conflict(
         'Someone saved this draft after you loaded it. Reload it, then try again.',
       );
   }
@@ -504,7 +504,7 @@ export function createDraftGeneration(deps: {
   /** Narrows a stored result for replay. Failed requests are recorded under their own IDs. */
   function completed(record: GenerationRecord): Completed {
     if (record.outcome === 'failed' || record.result === null)
-      conflict(
+      throw conflict(
         'This request ID was already used for a different request. Start a new request.',
       );
 
@@ -525,7 +525,7 @@ export function createDraftGeneration(deps: {
       record.requestDigest !== requestDigest ||
       record.draftId !== draftId
     )
-      conflict(
+      throw conflict(
         'This request ID was already used for a different request. Start a new request.',
       );
 
@@ -556,7 +556,7 @@ export function createDraftGeneration(deps: {
       previous.kind !== stored.kind ||
       previous.draftId !== stored.draftId
     )
-      return conflict(
+      throw conflict(
         'This request ID was already used for a different request. Start a new request.',
       );
 
@@ -759,7 +759,7 @@ export function createDraftGeneration(deps: {
         };
       const gateway = available();
       if (await draftExists(context, input.draftId))
-        conflict('This draft ID was already used. Start a new draft.');
+        throw conflict('This draft ID was already used. Start a new draft.');
       const vocabulary = await deps.drafts.vocabulary(context);
       const limit = deadline(options);
       const run = await generateDraft({
@@ -941,7 +941,7 @@ export function createDraftGeneration(deps: {
           evidence,
         );
         if (deps.hash(currentEvidence) !== deps.hash(evidence))
-          conflict(
+          throw conflict(
             'The verified evidence changed during generation. Review it and request a new improvement.',
           );
       }
@@ -1031,16 +1031,16 @@ export function createDraftGeneration(deps: {
           candidate.improvement.evidence,
         );
         if (candidate.diagnostics.some((item) => item.severity === 'error'))
-          conflict(
+          throw conflict(
             'Resolve the candidate validation errors before accepting this improvement.',
           );
       }
       const decision = found.proposal!;
       if (decision.state === 'rejected')
-        conflict('This change was rejected. Ask for a new change.');
+        throw conflict('This change was rejected. Ask for a new change.');
       if (decision.state === 'accepted') {
         if (decision.saveId !== input.saveId)
-          conflict('This change was already accepted.');
+          throw conflict('This change was already accepted.');
 
         return {
           draft: await deps.drafts.get(context, draftId),
@@ -1048,7 +1048,7 @@ export function createDraftGeneration(deps: {
         };
       }
       if (input.revision !== found.baseRevision)
-        conflict(
+        throw conflict(
           'This change was proposed for another revision. Ask again to change the latest draft.',
         );
       const decided = await deps.store.apply(
@@ -1073,7 +1073,7 @@ export function createDraftGeneration(deps: {
         decided.proposal?.state !== 'accepted' ||
         decided.proposal.saveId !== input.saveId
       )
-        conflict('Someone else decided on this change first.');
+        throw conflict('Someone else decided on this change first.');
 
       return {
         draft: await deps.drafts.get(context, draftId),
@@ -1085,7 +1085,7 @@ export function createDraftGeneration(deps: {
       context = await authorize(context, 'workflows.author');
       const found = await proposal(context, draftId, proposalId);
       if (found.proposal!.state === 'accepted')
-        conflict('This change was already accepted.');
+        throw conflict('This change was already accepted.');
       if (found.proposal!.state === 'open')
         await deps.store.decide(context, proposalId, {
           state: 'rejected',
@@ -1096,7 +1096,7 @@ export function createDraftGeneration(deps: {
         });
       const decided = (await deps.store.get(context, proposalId))!;
       if (decided.proposal?.state !== 'rejected')
-        conflict('This change was already accepted.');
+        throw conflict('This change was already accepted.');
 
       return { proposal: proposalView(completed(decided)) };
     },
@@ -1137,12 +1137,12 @@ export function createDraftGeneration(deps: {
       const gateway = available();
       editable(draft, input.revision);
       if (!codeStepsAvailable(await deps.drafts.vocabulary(context)))
-        conflict(
+        throw conflict(
           'Code Steps aren’t installed on this Luma server. Whoever runs the server needs to install the Code Step runtime.',
         );
       const position = codeStepPosition(draft.content, input.stepId);
       if (!position)
-        conflict(
+        throw conflict(
           'Choose a Code Step from the saved draft. Save your changes, then try again.',
         );
       const limit = deadline(options);
@@ -1151,13 +1151,13 @@ export function createDraftGeneration(deps: {
         gateway,
         trace: options.trace ?? deps.trace(context),
         signal: limit.signal,
-        messages: codeStepMessages(position!, input.description),
-        output: deps.outputs.codeStep(position!),
+        messages: codeStepMessages(position, input.description),
+        output: deps.outputs.codeStep(position),
         maxOutputTokens: 4096,
         maxAttempts,
         review: async (output: CodeStepOutput) => ({
           value: output,
-          problems: codeProblems(output, position!),
+          problems: codeProblems(output, position),
           reply: JSON.stringify(output),
         }),
       });
@@ -1176,7 +1176,7 @@ export function createDraftGeneration(deps: {
           limit.expired(),
           'Nothing was changed.',
         );
-      const grantable = position!.grantable.map((step) => step.id);
+      const grantable = position.grantable.map((step) => step.id);
       const outside = best.value.grants.findIndex(
         (grant, index) => grantable[index] !== grant,
       );
@@ -1188,7 +1188,7 @@ export function createDraftGeneration(deps: {
             ? best.value.grants
             : best.value.grants.slice(0, outside),
       };
-      const diagnostics = codeProblems(output, position!);
+      const diagnostics = codeProblems(output, position);
       const result: CodeStepResult = {
         stepId: input.stepId,
         source: output.source,

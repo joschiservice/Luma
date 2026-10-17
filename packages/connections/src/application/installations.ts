@@ -6,6 +6,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, notFound } from '@luma/platform';
 
 import { ConnectorError } from '../domain/capabilities.js';
 import type {
@@ -166,11 +167,9 @@ function requireCapability(
     });
 }
 
-const unavailable = () =>
-  new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+const unavailable = () => notFound('Connection not found');
 
-const conflict = () =>
-  new IdentityError(409, 'CONFLICT', 'Connection changed; reload and retry');
+const changed = () => conflict('Connection changed; reload and retry');
 
 /**
  * Creates connection lifecycle commands that refresh authorization, validate input, and
@@ -214,7 +213,7 @@ export function createInstallationService(
     event: string,
   ) {
     if (!(await deps.repository.save(record, version, actor, event)))
-      throw conflict();
+      throw changed();
 
     return record.connection;
   }
@@ -236,7 +235,7 @@ export function createInstallationService(
           'Invalid connection write mode',
         );
       const record = await get(fresh, id);
-      if (record.connection.version !== version) throw conflict();
+      if (record.connection.version !== version) throw changed();
       if ((record.connection.writeMode ?? null) === writeMode)
         return record.connection;
 
@@ -309,7 +308,7 @@ export function createInstallationService(
         record.connection.version !== version ||
         record.connection.status === 'disconnected'
       )
-        throw conflict();
+        throw changed();
       await deps.provider?.(fresh, record.connection.target);
       let credentials: InstallationCredentials;
       try {
@@ -349,7 +348,7 @@ export function createInstallationService(
         !record.secret ||
         ['revoked', 'disconnected'].includes(record.connection.status)
       )
-        throw conflict();
+        throw changed();
       await deps.provider?.(fresh, record.connection.target);
       deps.beforeCheck?.(record.connection.target);
       let granted: InstallationCapability[] = [];
@@ -400,7 +399,7 @@ export function createInstallationService(
         record.connection.version !== version ||
         !['disconnected', 'revoked'].includes(status)
       )
-        throw conflict();
+        throw changed();
 
       return save(
         {

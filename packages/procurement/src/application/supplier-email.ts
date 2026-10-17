@@ -5,6 +5,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict } from '@luma/platform';
 
 import type { OrderProgress, Submission } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
@@ -110,10 +111,6 @@ export interface SupplierMailbox {
   ): Promise<SupplierEmailDraft>;
 }
 
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
 /**
  * Drafts supplier work in the existing inbox. Only its verified send hands off a submission
  * or moves a follow-up deadline; acceptance never creates a supplier confirmation.
@@ -187,7 +184,7 @@ export function createSupplierEmail(deps: {
       (m) => m.connectionId === connectionId,
     );
     if (!mailbox || mailbox.connectionStatus !== 'active' || !mailbox.canSend)
-      conflict(
+      throw conflict(
         'Connect an Operations Inbox with permission to send before drafting supplier mail.',
       );
   }
@@ -250,7 +247,7 @@ export function createSupplierEmail(deps: {
       });
       if (retry) {
         if (retry.work.requestDigest !== requestDigest)
-          conflict('This request ID was used for another draft.');
+          throw conflict('This request ID was used for another draft.');
 
         return retry.outbound;
       }
@@ -260,9 +257,13 @@ export function createSupplierEmail(deps: {
         record.order.authority !== 'luma' ||
         !['draft', 'open'].includes(record.order.status)
       )
-        conflict('This order uses a purchasing system or cannot be submitted.');
+        throw conflict(
+          'This order uses a purchasing system or cannot be submitted.',
+        );
       if (!record.supplier?.email)
-        conflict('Add the supplier’s email address before drafting the order.');
+        throw conflict(
+          'Add the supplier’s email address before drafting the order.',
+        );
       // At most one live submission per order, including drafts created by another buyer.
       const existing = (await deps.inbox.work(context, purchaseOrderId)).find(
         (item) =>
@@ -272,7 +273,7 @@ export function createSupplierEmail(deps: {
           ),
       );
       if (existing && existing.outbound.id !== request.id)
-        conflict(
+        throw conflict(
           'A submission already exists for this order. Review it in the Operations Inbox.',
         );
       if (
@@ -280,7 +281,7 @@ export function createSupplierEmail(deps: {
         !['failed', 'rejected', 'expired'].includes(record.submission.state) &&
         record.submission.outgoing?.outboundId !== request.id
       )
-        conflict('This order already has an active submission.');
+        throw conflict('This order already has an active submission.');
       const language = record.supplier.language ?? 'en';
       let bytes: Uint8Array;
       try {
@@ -292,7 +293,7 @@ export function createSupplierEmail(deps: {
           requestedDeliveryDate: request.requestedDeliveryDate,
         });
       } catch {
-        conflict(
+        throw conflict(
           'The purchasing PDF could not be created. Check company and article text for unsupported characters.',
         );
       }
@@ -320,7 +321,7 @@ export function createSupplierEmail(deps: {
           {
             filename: `purchase-order-${request.id}.pdf`,
             mimeType: 'application/pdf',
-            base64: Buffer.from(bytes!).toString('base64'),
+            base64: Buffer.from(bytes).toString('base64'),
           },
         ],
         procurement: {
@@ -353,7 +354,7 @@ export function createSupplierEmail(deps: {
       });
       if (retry) {
         if (retry.work.requestDigest !== requestDigest)
-          conflict('This request ID was used for another draft.');
+          throw conflict('This request ID was used for another draft.');
 
         return retry.outbound;
       }
@@ -362,7 +363,7 @@ export function createSupplierEmail(deps: {
         record.submission?.channel === 'email' &&
         record.submission.state === 'failed'
       )
-        conflict(
+        throw conflict(
           'Resolve the failed order email in the Operations Inbox before following up.',
         );
       const attention = record.progress.attention.find(
@@ -371,12 +372,12 @@ export function createSupplierEmail(deps: {
           ['confirmation_overdue', 'delivery_overdue'].includes(item.kind),
       );
       if (!attention)
-        conflict(
+        throw conflict(
           'This deadline changed. Refresh the order before following up.',
         );
       const time = Date.parse(request.nextCheckAt) - deps.now().getTime();
       if (time <= 0 || time > 60 * 86_400_000)
-        conflict('Choose a next check within the next 60 days.');
+        throw conflict('Choose a next check within the next 60 days.');
       const threads = (
         await deps.inbox.threads(context, purchaseOrderId)
       ).filter((t) => t.connectionId === request.connectionId);
@@ -384,10 +385,10 @@ export function createSupplierEmail(deps: {
         ? threads.find((t) => t.id === request.threadId)
         : threads[0];
       if (request.threadId && !thread)
-        conflict('The thread is not linked to this order.');
+        throw conflict('The thread is not linked to this order.');
       const recipient = record.supplier?.email ?? thread?.address;
       if (!recipient)
-        conflict(
+        throw conflict(
           'Add a supplier email address or link its inbox thread before following up.',
         );
       const language = record.supplier?.language ?? 'en';

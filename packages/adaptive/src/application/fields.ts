@@ -7,6 +7,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { invalid } from '@luma/platform';
 
 import type {
   AdaptiveRecordType,
@@ -17,13 +18,7 @@ import type {
   CustomFieldValue,
 } from '../domain/fields.js';
 
-const invalid = (): never => {
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
-    'Custom field input is invalid.',
-  );
-};
+const invalidInput = () => invalid('Custom field input is invalid.');
 
 function assertUuid(value: string) {
   if (
@@ -31,7 +26,7 @@ function assertUuid(value: string) {
       value,
     )
   )
-    invalid();
+    throw invalidInput();
 }
 
 function assertRecordType(value: string) {
@@ -40,11 +35,12 @@ function assertRecordType(value: string) {
       value,
     )
   )
-    invalid();
+    throw invalidInput();
 }
 
 function assertBounded(value: number, min: number, max: number) {
-  if (!Number.isInteger(value) || value < min || value > max) invalid();
+  if (!Number.isInteger(value) || value < min || value > max)
+    throw invalidInput();
 }
 
 function assertRevision(value: number, min: number) {
@@ -593,7 +589,8 @@ export function createFieldsService(deps: {
       assertUuid(input.fieldId);
       assertRevision(input.revision, 0);
       assertRevision(input.fieldRevision, 1);
-      if (!input.commandId || input.commandId.length > 200) invalid();
+      if (!input.commandId || input.commandId.length > 200)
+        throw invalidInput();
       const digest = JSON.stringify({
         actorId: context.actor.id,
         recordType: input.recordType,
@@ -609,7 +606,7 @@ export function createFieldsService(deps: {
         const field = await get(tx, input.fieldId);
         fieldPermission(context, field, false);
         fieldPermission(context, field, true);
-        if (field.recordType !== input.recordType) invalid();
+        if (field.recordType !== input.recordType) throw invalidInput();
         const prior = await tx.effect(input.commandId);
         if (prior) {
           if (prior.digest !== digest)
@@ -789,7 +786,7 @@ export function createFieldsService(deps: {
               'is_empty',
             ].includes(filter.operator)
           )
-            invalid();
+            throw invalidInput();
           if (filter.operator !== 'is_empty')
             deps.parseValue(
               field,
@@ -815,7 +812,7 @@ export function createFieldsService(deps: {
             );
         }
         if (input.sort && !['asc', 'desc'].includes(input.sort.direction))
-          invalid();
+          throw invalidInput();
 
         return tx.query(input, fields);
       });

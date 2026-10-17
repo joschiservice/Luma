@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { unavailable } from '@luma/platform';
 
 import type {
   InsightChartResponse,
@@ -24,13 +24,6 @@ import {
   readRecordWindow,
 } from './window.js';
 
-const unavailable = () =>
-  new IdentityError(
-    503,
-    'SERVICE_UNAVAILABLE',
-    'Order history is being prepared for charts. Try again in a few minutes.',
-  );
-
 /*
  * Orders placed in each bucket, by current status. Without a connection, each canonical order
  * counts once through its selected source row, so orders linked across sources are not added
@@ -53,7 +46,10 @@ async function ready(tx: SqlTransaction, tenantId: string) {
     'SELECT 1 FROM orders_list_backfill WHERE tenant_id=$1',
     [tenantId],
   );
-  if (backfill.rowCount) throw unavailable();
+  if (backfill.rowCount)
+    throw unavailable(
+      'Order history is being prepared for charts. Try again in a few minutes.',
+    );
 }
 
 async function prepare(

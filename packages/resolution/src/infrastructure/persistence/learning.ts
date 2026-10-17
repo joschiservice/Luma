@@ -1,7 +1,7 @@
 import type { Diagnosis, Incident } from '@luma/exceptions';
 import type { ActivatedArtifact } from '@luma/execution';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 
 import type {
   LearningEvent,
@@ -13,12 +13,7 @@ import type {
 } from '../../application/learning.js';
 import { learningEvidence } from '../../domain/learning.js';
 
-const missing = () =>
-  new IdentityError(404, 'NOT_FOUND', 'Resolution run or source not found');
-
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
+const missing = () => notFound('Resolution run or source not found');
 
 async function lock(tx: SqlTransaction, tenantId: string, runId: string) {
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
@@ -83,7 +78,7 @@ export function createLearningStore(
         ).rows[0];
         if (previous) {
           if (!previous.matches)
-            conflict('Run ID already belongs to a different selection');
+            throw conflict('Run ID already belongs to a different selection');
 
           return previous.document;
         }
@@ -172,7 +167,7 @@ export function createLearningStore(
         ).rows[0];
         if (previous) {
           if (!previous.matches)
-            conflict('Event ID already belongs to a different record');
+            throw conflict('Event ID already belongs to a different record');
 
           return previous.document;
         }

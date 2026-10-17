@@ -6,6 +6,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, notFound, unavailable } from '@luma/platform';
 
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
@@ -69,18 +70,6 @@ export function createReturnDeadlines(deps: {
   uuid(name: string): string;
   digest(value: unknown): string;
 }) {
-  function fail(status: 404 | 409 | 503, message: string): never {
-    throw new IdentityError(
-      status,
-      status === 404
-        ? 'NOT_FOUND'
-        : status === 409
-          ? 'CONFLICT'
-          : 'SERVICE_UNAVAILABLE',
-      message,
-    );
-  }
-
   async function authorize(context: TenantContext, write = false) {
     requireTenant(context, context.tenantId);
     const current = await deps.refreshContext(context);
@@ -124,10 +113,10 @@ export function createReturnDeadlines(deps: {
   async function view(context: TenantContext, caseId: string) {
     return deps.store.transaction(context.tenantId, async (tx) => {
       const c = await tx.case(caseId);
-      if (!c) fail(404, 'Return case not found');
+      if (!c) throw notFound('Return case not found');
       const episodes = await tx.episodes(caseId);
       if (episodes.length > 500)
-        fail(503, 'Waiting history exceeds this view’s limit');
+        throw unavailable('Waiting history exceeds this view’s limit');
 
       return {
         policy: await tx.policy(),
@@ -146,7 +135,7 @@ export function createReturnDeadlines(deps: {
       refund: await tx.refund(caseId),
       exchange: await tx.exchange(caseId),
     }));
-    if (!data.value) fail(404, 'Return case not found');
+    if (!data.value) throw notFound('Return case not found');
     if (!data.policy) return;
     const money =
       data.policy.enabled && data.value.state === 'open' && data.value.proposal
@@ -181,15 +170,14 @@ export function createReturnDeadlines(deps: {
         c.revision !== data.value!.revision ||
         policy.revision !== data.policy!.revision
       )
-        fail(
-          409,
+        throw conflict(
           'The case or deadlines changed during the read. Check again.',
         );
       const result = returnWaitingConditions(c, policy, money, now),
         existing = await tx.episodes(caseId),
         ownerId = c.assigneeId ?? c.openedBy;
       if (existing.length > 500)
-        fail(503, 'Waiting history exceeds this view’s limit');
+        throw unavailable('Waiting history exceeds this view’s limit');
       for (const old of existing.filter((e) =>
         ['waiting', 'escalated'].includes(e.state),
       )) {
@@ -339,13 +327,13 @@ export function createReturnDeadlines(deps: {
         const old = await tx.policyCommand(input.commandId);
         if (old) {
           if (old.digest !== digest)
-            fail(409, 'This command was used for different deadlines');
+            throw conflict('This command was used for different deadlines');
 
           return { policy: old.policy, canManage: true };
         }
         const current = await tx.policy();
         if ((current?.revision ?? 0) !== input.expectedRevision)
-          fail(409, 'Deadlines changed. Reload before saving.');
+          throw conflict('Deadlines changed. Reload before saving.');
         const { commandId, expectedRevision, ...settings } = input;
         const policy: ReturnDeadlinePolicy = {
           ...settings,
@@ -403,8 +391,7 @@ export function createReturnDeadlines(deps: {
         tx.openEpisodes(501),
       );
       if (values.length > 500)
-        fail(
-          503,
+        throw unavailable(
           'Return waiting attention exceeds this view’s limit. Review cases from their orders.',
         );
 
