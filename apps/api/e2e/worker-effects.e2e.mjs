@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
+import { addMembership } from './helpers.mjs';
 import { inboxFixture } from './inbox-fixture.mjs';
 import { purchasingWorker } from './purchasing-worker-fixture.mjs';
 import {
@@ -37,9 +38,10 @@ async function login(f, email) {
 
 /**
  * Adds a third admin, so suspending the requester keeps independent approval and the decision's
- * policy version unchanged.
+ * policy version unchanged. Customers add people only by invitation, so the membership is
+ * written through the shared fixture.
  */
-async function addAdmin(f, ownerCookie) {
+async function addAdmin(f) {
   const name = `Worker${randomUUID().slice(0, 8)}`;
   const response = await f.pilot.app.inject({
     method: 'POST',
@@ -53,13 +55,12 @@ async function addAdmin(f, ownerCookie) {
     },
   });
   assert.equal(response.statusCode, 200, response.body);
-  const added = await f.pilot.app.inject({
-    method: 'POST',
-    url: `/v1/organizations/${f.manifest.organizationId}/members`,
-    headers: { cookie: ownerCookie, origin },
-    payload: { userId: response.json().user.id, roleId: 'admin' },
-  });
-  assert.equal(added.statusCode, 201, added.body);
+  await addMembership(
+    f.db.owner,
+    f.manifest.organizationId,
+    response.json().user.id,
+    'admin',
+  );
 }
 
 /**
@@ -175,7 +176,7 @@ it('places an approved purchase order from the worker once and verifies it after
   const org = f.manifest.organizationId;
   const buyer = await login(f, 'pilot-operator@example.test');
   const approver = await login(f, 'pilot-requester@example.test');
-  await addAdmin(f, approver);
+  await addAdmin(f);
   const call = async (path, body, { cookie = buyer, status = 200 } = {}) => {
     const response = await f.pilot.app.inject({
       method: body ? 'POST' : 'GET',
@@ -497,7 +498,7 @@ const dueReturnWrite = (f, table, id) =>
 
 it('refunds an approved return from the sync worker once and verifies it after a lost response and restart', async (t) => {
   const f = await settlementFixture(t);
-  await addAdmin(f, f.approver);
+  await addAdmin(f);
   const refund = await f.request(`${f.path}/settlements`, {
     id: randomUUID(),
     kind: 'refund',
@@ -584,7 +585,7 @@ it('refunds an approved return from the sync worker once and verifies it after a
 
 it('creates an approved return from the sync worker once and records it after a lost response and restart', async (t) => {
   const f = await settlementFixture(t, { prepare: 'opened' });
-  await addAdmin(f, f.approver);
+  await addAdmin(f);
   const requested = await f.request(`${f.path}/creations`, {
     id: randomUUID(),
     warehouse: { externalId: 'shopify', scopeKey: '' },
@@ -672,7 +673,7 @@ it('creates an approved return from the sync worker once and records it after a 
 
 it('records an approved return refund that was never sent as expired once its approval ends', async (t) => {
   const f = await settlementFixture(t);
-  await addAdmin(f, f.approver);
+  await addAdmin(f);
   const refund = await f.request(`${f.path}/settlements`, {
     id: randomUUID(),
     kind: 'refund',
