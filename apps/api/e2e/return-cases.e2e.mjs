@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
-import { citedReturnReads } from './return-settlement-fixture.mjs';
+import {
+  citedReturnReads,
+  returnWriteReceipts,
+} from './return-settlement-fixture.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
@@ -628,6 +631,21 @@ it('creates an approved return in JTL-Wawi once and verifies it with an independ
         data: { lumaCaseId: caseId },
       },
     });
+  // The creation's write receipt names the JTL return and resolves to one stored receipt.
+  const receipts = await returnWriteReceipts(f, caseId);
+  expect(receipts.map((attempt) => attempt.stored)).toEqual([
+    [
+      expect.objectContaining({
+        document: expect.objectContaining({
+          purpose: 'creation',
+          subjectId: requestBody.id,
+          capability: 'returns.create',
+          source: { provider: 'jtl', connectionId: jtl },
+          records: [{ resource: 'return', externalId: expect.any(String) }],
+        }),
+      }),
+    ],
+  ]);
 });
 
 it('creates and approves Shopify returns through policy, links imported units once and reconciles independently', async (t) => {
@@ -805,5 +823,13 @@ it('creates and approves Shopify returns through policy, links imported units on
           completeness: 'complete',
         },
       });
+    // Any accepted creation cites one receipt orders stored with that creation.
+    for (const attempt of await returnWriteReceipts(f, caseId))
+      for (const row of attempt.stored)
+        expect(row.document).toMatchObject({
+          purpose: 'creation',
+          subjectId: creationId,
+          source: { provider: 'shopify', connectionId },
+        });
   }
 });

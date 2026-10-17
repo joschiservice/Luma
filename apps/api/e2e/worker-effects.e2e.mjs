@@ -10,6 +10,7 @@ import {
   settlementFixture,
 } from './return-settlement-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 // Background workers compose the same service graph as the API through applicationOptionsFor.
 // Each journey has a separate worker process execute or reconcile one provider write, restarts
@@ -143,6 +144,20 @@ async function citedPurchasingReads(f, proposalId, purchaseOrderId) {
   return { cited, stored: stored.rows };
 }
 
+/**
+ * Asserts that a write whose response was lost has no receipt: nothing is stored for the
+ * attempt, and neither the attempt nor its completion audit cites one.
+ */
+async function expectNoWriteReceipt(f, proposalId) {
+  const attempts = await expectStoredWriteReceipts(
+    f.db.owner,
+    f.manifest.organizationId,
+    [proposalId],
+  );
+  expect(attempts).toHaveLength(1);
+  expect(attempts[0]).toMatchObject({ cited: [], stored: [] });
+}
+
 /** Restarts the worker process and runs one pass in the new one. */
 async function restart(t, f, worker, pass) {
   const pid = worker.pid;
@@ -266,6 +281,7 @@ it('places an approved purchase order from the worker once and verifies it after
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+  await expectNoWriteReceipt(f, requested.actionId);
 
   // Every read the verification and submission audit cite resolves to stored evidence.
   const reads = await citedPurchasingReads(f, requested.actionId, order.id);
@@ -369,6 +385,7 @@ it('sends an approved reply from the worker once and confirms it by reading the 
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+  await expectNoWriteReceipt(f, settled.action_id);
 });
 
 it('reconciles a lost-response refund from the worker by reading, without another refund, across a restart', async (t) => {
@@ -447,6 +464,7 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+  await expectNoWriteReceipt(f, actionId);
 
   // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
   const reads = await citedReturnReads(f, f.detail.case.id);
@@ -544,6 +562,7 @@ it('refunds an approved return from the sync worker once and verifies it after a
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+  await expectNoWriteReceipt(f, actionId);
 
   // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
   const reads = await citedReturnReads(f, f.detail.case.id);
@@ -624,6 +643,7 @@ it('creates an approved return from the sync worker once and records it after a 
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+  await expectNoWriteReceipt(f, actionId);
 
   // Every read the verifications and the creation audit cite resolves to the stored return read.
   const reads = await citedReturnReads(f, f.detail.case.id);

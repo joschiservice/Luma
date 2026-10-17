@@ -8,6 +8,7 @@ import {
   mailboxAddress,
   splitDelivery,
 } from './inbox-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 
@@ -738,6 +739,21 @@ test('replies cite records, send once after a fresh read, need another admin for
       'sent',
     ]),
   );
+
+  // Each accepted send cites one stored send receipt, naming the sent message.
+  const receipts = await expectStoredWriteReceipts(f.db.owner, f.org);
+  const accepted = receipts.filter((attempt) => attempt.cited.length);
+  expect(accepted).toHaveLength(2);
+  for (const attempt of accepted)
+    expect(attempt.stored[0]).toMatchObject({
+      owner: 'messaging',
+      document: {
+        source: { provider: 'gmail' },
+        records: expect.arrayContaining([
+          { resource: 'message', externalId: expect.any(String) },
+        ]),
+      },
+    });
 });
 
 test('another workspace cannot read or act on this inbox’s threads, documents or replies', async (t) => {

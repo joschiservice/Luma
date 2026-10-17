@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
+import { expect } from 'vitest';
+
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 /** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
 export async function settlementFixture(
@@ -264,6 +267,34 @@ export async function settlementFixture(
     lines,
     evidence,
   };
+}
+
+/**
+ * Asserts that every write receipt a return case's creation, settlement and exchange attempts
+ * and their completion audit cite resolves to exactly one receipt orders stored for the case,
+ * and returns the attempts.
+ */
+export async function returnWriteReceipts(f, caseId) {
+  const org = f.manifest.organizationId;
+  const proposals = await f.db.owner.query(
+    `SELECT document->>'actionId' AS id FROM orders_return_creations WHERE tenant_id=$1 AND case_id=$2
+     UNION SELECT document->>'actionId' FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+     UNION SELECT document->>'actionId' FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2`,
+    [org, caseId],
+  );
+  const attempts = await expectStoredWriteReceipts(
+    f.db.owner,
+    org,
+    proposals.rows.map((row) => row.id),
+  );
+  for (const attempt of attempts)
+    for (const row of attempt.stored)
+      expect(row).toMatchObject({
+        owner: 'orders',
+        document: { caseId, source: { connectionId: expect.any(String) } },
+      });
+
+  return attempts;
 }
 
 /**
