@@ -19,20 +19,12 @@ import { describeActionDiff } from '@luma/connections';
 import {
   createConnectionCoverage,
   createOrderSourceVisibility,
-  createPlaybookGrantReader,
   createSourceAuthority,
   type InstalledMessageRuntime,
   type InstalledPurchaseOrderRuntime,
   type InstalledReturnRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
-import {
-  caseTimelineQuery,
-  createCaseMetricReader,
-  createOrderAttentionBoundaryReader,
-  orderAttentionForOrders,
-  orderAttentionQuery,
-} from '@luma/exceptions/composition';
 import type { BoundActionStep } from '@luma/execution';
 import {
   hasPermission,
@@ -45,7 +37,6 @@ import {
 } from '@luma/inventory/composition';
 import { createMessaging } from '@luma/messaging/composition';
 import {
-  createOrderMetricReader,
   createReturnActionService,
   createReturnCaseService,
   createReturnDeadlineService,
@@ -62,15 +53,11 @@ import type {
   TenantDatabase,
 } from '@luma/platform';
 import { canonicalJson } from '@luma/platform';
-import {
-  createFollowUpEnvironmentReader,
-  createReplenishmentScenarios,
-} from '@luma/procurement';
+import { createFollowUpEnvironmentReader } from '@luma/procurement';
 import {
   createIncomingStock,
   createIncomingStockReader,
   createProcurement,
-  createProcurementMetricReader,
   createPurchaseOrderChanges,
   createPurchasing,
   createPurchasingInputs,
@@ -79,7 +66,6 @@ import {
   createPurchasingOverview,
   createPurchasingStore,
   createReplenishmentReviewContext,
-  createStockRiskReader,
   createSupplierCommitmentService,
   createSupplierEmailService,
   createSupplierTerms,
@@ -88,31 +74,15 @@ import {
 import {
   appDecisionProvider,
   createActionDiffReader,
-  createCustomerWorkspace,
-  createFulfillmentWorkspace,
-  createInsights,
-  createInventoryWorkspace,
-  createOperationalMetrics,
-  createOperationalSummary,
-  createOrderWorkspace,
-  createProcurementContext,
-  createProductWorkspace,
-  createRecordExplorer,
-  createReturnWorkspace,
   createSourceOrderLines,
 } from '@luma/read-models/composition';
 import {
   createReturnStepFollowUp,
-  createShippingMethodTemplate,
   returnStepFollowUpSource,
-  shippingMethodPlaybook,
-  shippingMethodVocabulary,
 } from '@luma/resolution';
 import {
-  createActivityStore,
   createOperationsOverview,
   createRefundFollowUpCursor,
-  createResolutionImprovementDiscovery,
   createResolutionLearning,
   createResolutionMeasurements,
   createResolutionMetricReader,
@@ -125,17 +95,12 @@ import type {
   WorkflowImprovementControls,
 } from '@luma/workflows';
 import {
-  compilePlaybook,
   compileProcessWorkflow,
   createCodeProcesses,
   createCoordination,
-  createDraftGenerations,
-  createDrafts,
-  createDraftTestRuns,
   createProcessStepStore,
   createWorkflowEventSink,
   createWorkflows,
-  createWorkflowTemplates,
   createWorkflowTriggerStore,
 } from '@luma/workflows/composition';
 
@@ -182,6 +147,10 @@ import {
 import { createPurchaseReceiptTimeline } from './purchase-receipt-timeline.js';
 import { createPurchasingAdmission } from './purchasing-admission.js';
 import {
+  createReadModelServices,
+  type ReadModelServices,
+} from './read-models.js';
+import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
 } from './replenishment.js';
@@ -208,7 +177,10 @@ import {
   createResolutionPlaybooks,
   createSafetyServices,
 } from './services.js';
-import { createWorkflowImprovementSource } from './workflow-improvements.js';
+import {
+  createWorkflowAuthoring,
+  type WorkflowAuthoring,
+} from './workflow-authoring.js';
 
 /** Correlates supplier-message model calls with the request that made them. */
 function supplierTrace(requestId: string) {
@@ -228,10 +200,10 @@ export interface ApplicationServices {
   desk: ReturnType<typeof createDeskServices>;
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
   workflows: ReturnType<typeof createWorkflows>;
-  drafts: ReturnType<typeof createDrafts>;
-  draftTests: ReturnType<typeof createDraftTestRuns>;
-  generation: ReturnType<typeof createDraftGenerations>;
-  templates: ReturnType<typeof createWorkflowTemplates>;
+  drafts: WorkflowAuthoring['drafts'];
+  draftTests: WorkflowAuthoring['draftTests'];
+  generation: WorkflowAuthoring['generation'];
+  templates: WorkflowAuthoring['templates'];
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
   caseWorkflows: ReturnType<typeof createCaseWorkflowServices>;
   codeProcesses: ReturnType<typeof createCodeProcesses>;
@@ -251,54 +223,54 @@ export interface ApplicationServices {
     cases: ReturnType<typeof createDetectionServices>['cases'];
     commitments: SupplierCommitments;
     connectionCoverage: import('@luma/connections').CoverageReader;
-    customers: ReturnType<typeof createCustomerWorkspace>;
+    customers: ReadModelServices['customers'];
     decisionAssignments: ReturnType<
       typeof createDecisionServices
     >['assignments'];
     decisions: ReturnType<typeof createDecisionServices>['decisions'];
     desk: ReturnType<typeof createDeskServices>;
-    draftTests: ReturnType<typeof createDraftTestRuns>;
+    draftTests: WorkflowAuthoring['draftTests'];
     fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
-    fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
+    fulfillment: ReadModelServices['fulfillment'];
     governedFollowUps: ReturnType<
       typeof createScopedSupplierFollowUp
     >['service'];
     incoming: ReturnType<typeof createIncomingStock>;
-    insights: ReturnType<typeof createInsights>;
-    inventory: ReturnType<typeof createInventoryWorkspace>;
+    insights: ReadModelServices['insights'];
+    inventory: ReadModelServices['inventory'];
     inventoryLedger: ReturnType<typeof createInventoryLedgerRuntime>;
     learning: ReturnType<typeof createResolutionLearning>;
     measurements: ReturnType<typeof createResolutionMeasurements>;
     messaging: ReturnType<typeof createMessaging>['service'];
     messagingDocuments: ReturnType<typeof createMessaging>['documents'];
     messagingReplies: ReturnType<typeof createMessaging>['replies'];
-    metrics: ReturnType<typeof createOperationalMetrics>;
+    metrics: ReadModelServices['metrics'];
     nativeStock: ReturnType<typeof createNativeStockRuntime>;
-    operationalSummary: ReturnType<typeof createOperationalSummary>;
+    operationalSummary: ReadModelServices['operationalSummary'];
     operations: ReturnType<typeof createOperationsOverview>;
     orderChanges: ReturnType<typeof createPurchaseOrderChanges>;
-    orders: ReturnType<typeof createOrderWorkspace>;
+    orders: ReadModelServices['orders'];
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     procurement: ReturnType<typeof createProcurement>;
-    procurementContext: ReturnType<typeof createProcurementContext>;
-    products: ReturnType<typeof createProductWorkspace>;
+    procurementContext: ReadModelServices['procurementContext'];
+    products: ReadModelServices['products'];
     purchasing: ReturnType<typeof createPurchasing>;
     purchasingOutcomes: ReturnType<typeof createPurchasingOutcomesService>;
-    records: ReturnType<typeof createRecordExplorer>;
+    records: ReadModelServices['records'];
     returnActions: ReturnActions;
     returnCases: ReturnCases;
     returnDeadlines: ReturnDeadlines;
     returnExchanges: ReturnExchanges;
-    returns: ReturnType<typeof createReturnWorkspace>;
+    returns: ReadModelServices['returns'];
     sales: ReturnType<typeof createSalesRuntime>;
     scopedAutonomy: ReturnType<typeof createSafetyServices>['autonomy'];
     shadow: ReturnType<typeof createShadowEvaluations>;
     sourceAuthority: ReturnType<typeof createSourceAuthority>;
     supplierEmail: ReturnType<typeof createSupplierEmailService>;
     supplierTerms: ReturnType<typeof createSupplierTerms>;
-    workflowDrafts: ReturnType<typeof createDrafts>;
-    workflowGeneration: ReturnType<typeof createDraftGenerations>;
-    workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
+    workflowDrafts: WorkflowAuthoring['drafts'];
+    workflowGeneration: WorkflowAuthoring['generation'];
+    workflowTemplates: WorkflowAuthoring['templates'];
     workflows: ReturnType<typeof createWorkflows>;
   };
 }
@@ -494,6 +466,12 @@ export function createApplicationServices(
     createAuditLog,
     projectIncoming,
   );
+  // The owners below and their action controls refer to each other. `safety` admits and runs
+  // every owner's actions through `combinedEffects` and its `eligible` chain, which call back
+  // into owners composed after it; supplier commitments, messaging and supplier email also read
+  // one another. These references are closures that run only once requests arrive, so an owner
+  // may be named before it is composed. Keep these owners in this function, where that order
+  // stays visible; services that only read composed owners have their own modules.
   const procurementEffects =
     options.execution.kind === 'enabled'
       ? createProcurementEffects(procurement)
@@ -1108,92 +1086,21 @@ export function createApplicationServices(
   });
 
   const playbooks = createResolutionPlaybooks(database, identity, safety);
-  const templateSources = [
-    replenishment.template,
-    createShippingMethodTemplate({
-      digest: compilePlaybook(shippingMethodPlaybook).digest,
-      grants: createPlaybookGrantReader(database),
-      library,
-      publish: async (context) => {
-        await playbooks.publish(context, shippingMethodPlaybook);
-      },
-    }),
-    ...caseWorkflows.templates,
-  ];
-  const templates = createWorkflowTemplates({
-    sources: templateSources,
-    refreshContext: identity.refreshContext,
-  });
-  const drafts = createDrafts(database, {
-    refreshContext: identity.refreshContext,
-    audit: createAuditLog,
-    sources: [
+  const { drafts, draftTests, generation, templates } = createWorkflowAuthoring(
+    {
+      database,
+      identity,
+      caseWorkflows,
       codeProcesses,
-      { vocabulary: replenishment.vocabulary },
-      shippingMethodVocabulary,
-      {
-        vocabulary: async () => ({
-          triggers: (['event', 'exception'] as const).map((kind) => ({
-            kind,
-            executable: false,
-            options: templateSources.flatMap((source) => {
-              const content = source.content();
-              const trigger = content.applicability.trigger;
-              if (
-                trigger.kind !== kind ||
-                (trigger.kind !== 'event' && trigger.kind !== 'exception')
-              )
-                return [];
-              const value =
-                trigger.kind === 'event'
-                  ? trigger.eventType
-                  : trigger.issueType;
-
-              return [
-                {
-                  value,
-                  label: value
-                    .replaceAll(/[._-]/g, ' ')
-                    .replace(/^./, (letter) => letter.toUpperCase()),
-                },
-              ];
-            }),
-          })),
-        }),
-      },
-    ],
-    builtIn: [
-      replenishment.version.definition.id,
-      shippingMethodPlaybook.definition.id,
-      ...caseWorkflows.templates.map((item) => item.id),
-    ],
-    templates: templateSources,
-  });
-  const draftTests = createDraftTestRuns(database, {
-    refreshContext: identity.refreshContext,
-    vocabulary: drafts.vocabulary,
-    scenarioSources: [createReplenishmentScenarios(replenishment.version)],
-  });
-  const generation = createDraftGenerations(database, {
-    drafts,
-    improvements: createWorkflowImprovementSource(
-      createResolutionLearning(database, identity.refreshContext),
-      createTenantFeatureRelease(options.observability),
-      createResolutionImprovementDiscovery(
-        database,
-        identity.refreshContext,
-        (tenantId) =>
-          purchasingRelease(tenantId, 'workflow-improvement-discovery'),
-      ),
-      options.workflowImprovementControls,
-    ),
-    gateway: options.modelGateway ?? null,
-    availability: options.authoring ?? {
-      available: false,
-      reason: 'Describing workflows isn’t set up on this server.',
+      library,
+      playbooks,
+      replenishment,
+      release: purchasingRelease,
+      modelGateway: options.modelGateway,
+      availability: options.authoring,
+      improvementControls: options.workflowImprovementControls,
     },
-    refreshContext: identity.refreshContext,
-  });
+  );
   const workflows = createWorkflows(
     database,
     library,
@@ -1250,64 +1157,30 @@ export function createApplicationServices(
       },
       (tenantId) => purchasingRelease(tenantId, 'action-review-diffs'),
     );
-  const orderQueries = {
-    state: orderStateQueries,
-    attention: orderAttentionQuery,
-    attentionFor: orderAttentionForOrders,
-  };
-  const orders = createOrderWorkspace(
+  const {
+    customers,
+    fulfillment,
+    insights,
+    inventory,
+    metrics,
+    operationalSummary,
+    orders,
+    procurementContext,
+    products,
+    records,
+    returns,
+  } = createReadModelServices({
     database,
-    orderQueries,
-    createActivityStore,
-    identity.refreshContext,
+    identity,
     authority,
-    undefined,
     hiddenOrderSources,
-    options.actionPermission,
-  );
-  const fulfillment = createFulfillmentWorkspace(
-    database,
-    orderQueries,
-    createActivityStore,
-    identity.refreshContext,
-  );
-  const inventory = createInventoryWorkspace(database);
-  const returns = createReturnWorkspace(database);
-  const insights = createInsights(database, {
-    orders: orderQueries,
-    cases: caseTimelineQuery,
-    stock: createStockRiskReader,
-    procurement: async (context) => {
-      const [summaries, { items }] = await Promise.all([
-        commitments.summaries(context),
-        procurement.orders(context),
-      ]);
-      const orders = new Map(items.map((order) => [order.id, order]));
-
-      // Orders created between the two reads are left for the next refresh.
-      return summaries.flatMap((summary) => {
-        const order = orders.get(summary.id);
-
-        return order
-          ? [
-              {
-                id: summary.id,
-                reference: order.reference,
-                supplierName: order.supplierName,
-                stage: summary.stage,
-                expectedDate: summary.expectedDate,
-                overdue: summary.overdue,
-                attention: summary.attention,
-                nextOwner: summary.nextOwner,
-                createdAt: order.createdAt,
-              },
-            ]
-          : [];
-      });
-    },
-    refreshContext: identity.refreshContext,
+    ...(options.actionPermission
+      ? { actionPermission: options.actionPermission }
+      : {}),
+    commitments,
+    procurement,
+    release: purchasingRelease,
   });
-  const customers = createCustomerWorkspace(database);
   const assistant = createWorkspaceAssistant({
     contextualEnabled: (context) =>
       purchasingRelease(context.tenantId, 'contextual-record-assistance'),
@@ -1330,7 +1203,6 @@ export function createApplicationServices(
     observability: options.observability,
   });
 
-  const products = createProductWorkspace(database);
   const adaptive = createAdaptiveWorkspaceRuntime({
     database,
     identity,
@@ -1406,21 +1278,9 @@ export function createApplicationServices(
       messaging: messaging.service,
       messagingDocuments: messaging.documents,
       messagingReplies: messaging.replies,
-      metrics: createOperationalMetrics(database, {
-        orders: (db) =>
-          createOrderMetricReader(db, orderAttentionQuery, hiddenOrderSources),
-        attentionBoundary: createOrderAttentionBoundaryReader,
-        coverage: createConnectionCoverage,
-      }),
+      metrics,
       nativeStock,
-      operationalSummary: createOperationalSummary(database, {
-        resolutionInsightsEnabled: (tenantId) =>
-          purchasingRelease(tenantId, 'resolution-insights'),
-        cases: createCaseMetricReader,
-        resolution: createResolutionMetricReader,
-        procurement: createProcurementMetricReader,
-        coverage: createConnectionCoverage,
-      }),
+      operationalSummary,
       operations: createOperationsOverview(
         detection.cases,
         createConnectionCoverage(database),
@@ -1445,11 +1305,11 @@ export function createApplicationServices(
       orders,
       playbooks: library,
       procurement,
-      procurementContext: createProcurementContext(database),
+      procurementContext,
       products,
       purchasing,
       purchasingOutcomes,
-      records: createRecordExplorer(database, hiddenOrderSources),
+      records,
       returnActions,
       returnCases,
       returnDeadlines,

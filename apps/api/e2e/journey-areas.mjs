@@ -46,7 +46,7 @@ export const sharedPaths = [
   // Every request passes through these services and policies.
   'packages/{platform,config,identity,identity-provider,audit,policies,execution,app-host,app-catalog,workflow-temporal}/**',
   'packages/application-runtime/src/*.ts',
-  'packages/application-runtime/src/composition/{application,http-app,runtime-app,resources,services,admission,readiness}.ts',
+  'packages/application-runtime/src/composition/{application,http-app,runtime-app,resources,services,admission,readiness,decisions,read-models,workflow-authoring}.ts',
   // Every journey applies the full migration chain.
   'packages/application-runtime/{migrations,scripts}/**',
   'packages/api-contract/src/{client,common,index,layout,openapi,routes}.ts',
@@ -143,6 +143,7 @@ const rmDecisions = [
   'packages/read-models/src/api/decisions.ts',
   'packages/read-models/src/application/decisions.ts',
   'packages/read-models/src/domain/decision*.ts',
+  'packages/read-models/src/domain/workflow-step-decisions.ts',
   'packages/read-models/src/infrastructure/decisions/**',
 ];
 const rmMetrics = [
