@@ -129,7 +129,11 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         observationId = randomUUID(),
         messageRecord = randomUUID(),
         stockAction = randomUUID(),
-        stockAcceptance = randomUUID();
+        stockAcceptance = randomUUID(),
+        correctionId = randomUUID(),
+        stockDecision = randomUUID(),
+        otherStockAction = randomUUID(),
+        otherStockAcceptance = randomUUID();
       const now = new Date().toISOString();
       const long = '2020-01-01T00:00:00.000Z';
       for (const tenant of [tenantId, otherTenant])
@@ -319,7 +323,6 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
           ],
         );
         // A Shopify stock booking of the order's receipt, accepted by Shopify.
-        const correctionId = randomUUID();
         await seed.query(
           `INSERT INTO shopify_inventory_corrections(tenant_id,id,connection_id,position_id,revision,document)
            VALUES($1,$2,$3,$4,'1',$5)`,
@@ -348,6 +351,39 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         );
         await executed(seed, tenantId, stockAction, {
           receipts: [stockAcceptance],
+          reads: [],
+          at: now,
+        });
+        await seed.query(
+          'INSERT INTO policy_decisions(id,tenant_id,proposal_id,action_hash,document) VALUES($1,$2,$3,$4,$5)',
+          [
+            stockDecision,
+            tenantId,
+            stockAction,
+            'a'.repeat(64),
+            { id: stockDecision, tenantId, outcome: 'approval_required' },
+          ],
+        );
+        // Another tenant's stock booking of its own order.
+        const otherCorrection = randomUUID();
+        await seed.query(
+          `INSERT INTO shopify_inventory_corrections(tenant_id,id,connection_id,position_id,revision,document)
+           VALUES($1,$2,$3,$4,'1',$5)`,
+          [
+            otherTenant,
+            otherCorrection,
+            connectionId,
+            randomUUID(),
+            {
+              id: otherCorrection,
+              tenantId: otherTenant,
+              action: { id: otherStockAction },
+              target: { receipt: { purchaseOrderId: otherOrderId } },
+            },
+          ],
+        );
+        await executed(seed, otherTenant, otherStockAction, {
+          receipts: [otherStockAcceptance],
           reads: [],
           at: now,
         });
@@ -628,18 +664,57 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         citedAs: 'write_receipt',
         resolution: { kind: 'write_receipt', provider: 'shopify' },
       });
-      const withoutStock = await reader.resolve(
-        readerContext(tenantId, ['procurement.read']),
-        { subject: { kind: 'purchase_order', id: orderId } },
-      );
-      expect(withoutStock.items.map((item) => item.ref)).not.toContain(
-        stockAcceptance,
-      );
+      expect(byRef.get(correctionId)).toMatchObject({
+        citedAs: 'record',
+        resolution: { kind: 'luma_record', record: 'stock_booking' },
+      });
+      // Without it, the proof is still listed, as restricted and naming the permission.
+      const procurementOnly = readerContext(tenantId, ['procurement.read']);
+      const withoutStock = await reader.resolve(procurementOnly, {
+        subject: { kind: 'purchase_order', id: orderId },
+      });
+      const restricted = { kind: 'restricted', permission: 'inventory.read' };
+      expect(
+        withoutStock.items.find((item) => item.ref === stockAcceptance),
+      ).toMatchObject({ citedAs: 'write_receipt', resolution: restricted });
+      expect(
+        withoutStock.items.find((item) => item.ref === correctionId),
+      ).toMatchObject({ citedAs: 'record', resolution: restricted });
+      expect(
+        withoutStock.items.find((item) => item.ref === readId)?.resolution,
+      ).toMatchObject({ kind: 'read' });
       expect(
         (
-          await reader.resolve(readerContext(tenantId, ['procurement.read']), {
+          await reader.resolve(procurementOnly, {
             subject: { kind: 'purchase_order', id: orderId },
-            refs: [stockAcceptance],
+            refs: [stockAcceptance, stockDecision, correctionId, decisionId],
+          })
+        ).items.map((item) => item.resolution),
+      ).toEqual([
+        restricted,
+        restricted,
+        restricted,
+        { kind: 'luma_record', record: 'policy_decision', id: decisionId },
+      ]);
+      expect(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'purchase_order', id: orderId },
+            refs: [stockDecision],
+          })
+        ).items[0]?.resolution,
+      ).toEqual({
+        kind: 'luma_record',
+        record: 'policy_decision',
+        id: stockDecision,
+      });
+      // Another tenant's stock booking proof is neither shown nor restricted through this order,
+      // so a restricted entry never reveals that it exists.
+      expect(
+        (
+          await reader.resolve(procurementOnly, {
+            subject: { kind: 'purchase_order', id: orderId },
+            refs: [otherStockAcceptance],
           })
         ).items[0]?.resolution,
       ).toEqual({ kind: 'unresolved' });

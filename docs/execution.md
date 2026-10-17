@@ -141,9 +141,12 @@ the owner.
 Evidence another area guards is `restricted` for a reader without that area's read permission,
 naming the permission, rather than left out: plan stock reads and ledger entries, native receipts
 and their proof need `inventory.read`, plan demand reads `orders.read`, order emails
-`messages.read`, and the commitments a receipt books `procurement.read`. Shopify stock booking
-proof of an order is still listed only for readers with inventory access, like its timeline
-entries.
+`messages.read`, the commitments a receipt books `procurement.read`, and an order's Shopify stock
+bookings with their policy records, receipts and verification reads `inventory.read`. The
+order's timeline still hides stock booking entries from readers without inventory access; its
+evidence lists them as restricted, so the reader knows the proof exists. A reference that
+belongs to another subject or tenant is `unresolved`, never `restricted`, so a restricted entry
+reveals nothing the subject does not cite.
 
 Records written before an owner stored a kind of evidence cite IDs that were never kept and
 cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return

@@ -44,6 +44,7 @@ import {
   purchaseOrderCitations,
   purchaseOrderEvidence,
   purchaseOrderMessageRefs,
+  purchaseOrderStockRefs,
   purchasingPlanCitations,
   purchasingPlanEvidence,
   type SupplierCommitments,
@@ -237,13 +238,22 @@ export function createEvidenceOwners(
     purchase_order: {
       permission: 'procurement.read',
       retention: { read: 'procurement_reads', write_receipt: 'write_receipts' },
-      // Stock booking proof of the order's receipts is the inventory area's evidence.
-      citations: (tx, tenantId, id, access) =>
-        purchaseOrderCitations(tx, tenantId, id, {
-          stock: access.can('inventory.read'),
-        }),
-      async lookup(tx, tenantId, id, refs, access) {
+      citations: (tx, tenantId, id) => purchaseOrderCitations(tx, tenantId, id),
+      async lookup(tx, tenantId, id, requested, access) {
         const stock = access.can('inventory.read');
+        // Stock booking proof of the order's receipts is the inventory area's evidence: without
+        // inventory access it is listed as restricted, never resolved or left out.
+        const bookings = new Set(
+          stock
+            ? []
+            : await purchaseOrderStockRefs(tx, tenantId, id, requested.uuids),
+        );
+        const open = (ref: string) => !bookings.has(ref);
+        const refs = {
+          all: requested.all.filter(open),
+          uuids: requested.uuids.filter(open),
+          cited: requested.cited.filter(open),
+        };
         const messages = await purchaseOrderMessageRefs(
           tx,
           tenantId,
@@ -252,6 +262,11 @@ export function createEvidenceOwners(
         );
 
         return [
+          ...[...bookings].map((ref): StoredEvidence => ({
+            kind: 'restricted',
+            id: ref,
+            permission: 'inventory.read',
+          })),
           ...(await purchaseOrderEvidence(tx, tenantId, id, refs, { stock })),
           ...(stock ? await appEvidence(tx, tenantId, refs.cited) : []),
           ...(await planInputs(tx, tenantId, refs.cited, access)),

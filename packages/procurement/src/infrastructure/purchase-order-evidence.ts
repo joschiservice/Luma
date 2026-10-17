@@ -202,15 +202,16 @@ export async function purchasingPlanCitations(
 
 /**
  * Reads what a purchase order cites, for the evidence view: the purchasing actions whose
- * execution attempts belong to it, the reads its verified revisions cite and what the plans that
- * drafted it cite. With `stock`, for readers with inventory access, also the stock bookings of
- * its receipts. Returns null when the tenant has no such order.
+ * execution attempts belong to it, the reads its verified revisions cite, what the plans that
+ * drafted it cite, and the stock bookings of its receipts with their execution. Stock booking
+ * proof is the inventory area's evidence: `purchaseOrderStockRefs` names it, so readers without
+ * inventory access see that it exists without seeing it. Returns null when the tenant has no
+ * such order.
  */
 export async function purchaseOrderCitations(
   tx: SqlTransaction,
   tenantId: string,
   purchaseOrderId: string,
-  options: { stock: boolean },
 ): Promise<{ actionIds: string[]; citations: PurchaseOrderCitation[] } | null> {
   const order = await tx.query(
     'SELECT 1 FROM procurement_purchase_orders WHERE tenant_id=$1 AND id=$2',
@@ -218,8 +219,14 @@ export async function purchaseOrderCitations(
   );
   if (!order.rowCount) return null;
   const actions = await tx.query<{ id: string }>(
-    `SELECT id::text FROM (${orderActions}${options.stock ? ` UNION ${stockActions}` : ''}) a
+    `SELECT id::text FROM (${orderActions} UNION ${stockActions}) a
      WHERE id IS NOT NULL LIMIT 200`,
+    [tenantId, purchaseOrderId],
+  );
+  const bookings = await tx.query<{ id: string; created_at: Date }>(
+    `SELECT id::text,created_at FROM shopify_inventory_corrections
+     WHERE tenant_id=$1 AND document->'target'->'receipt'->>'purchaseOrderId'=$2::text
+     ORDER BY created_at DESC LIMIT 100`,
     [tenantId, purchaseOrderId],
   );
   const revisions = await tx.query<{
@@ -242,6 +249,11 @@ export async function purchaseOrderCitations(
     actionIds: actions.rows.map((row) => row.id),
     citations: [
       ...drafts,
+      ...bookings.rows.map((row) => ({
+        ref: row.id,
+        citedAs: 'record' as const,
+        citedAt: row.created_at.toISOString(),
+      })),
       ...revisions.rows.flatMap((row) =>
         Array.isArray(row.refs)
           ? row.refs
@@ -407,6 +419,40 @@ export async function purchasingPlanEvidence(
     await plans(tx, tenantId, { planId }),
     refs.uuids,
   );
+}
+
+/**
+ * The order's stock booking proof among the references: the bookings of its receipts, their
+ * policy decisions and approvals, and the receipts and reads their execution attempts cite. The
+ * inventory owner's corrections record the bookings; this only says which references they are,
+ * so the evidence view can restrict them for readers without inventory access.
+ */
+export async function purchaseOrderStockRefs(
+  tx: SqlTransaction,
+  tenantId: string,
+  purchaseOrderId: string,
+  uuids: string[],
+): Promise<string[]> {
+  if (!uuids.length) return [];
+
+  return (
+    await tx.query<{ id: string }>(
+      `WITH actions AS (${stockActions}),
+       refs AS (
+        SELECT id::text AS id FROM shopify_inventory_corrections
+         WHERE tenant_id=$1 AND document->'target'->'receipt'->>'purchaseOrderId'=$2::text
+        UNION SELECT id::text FROM policy_decisions
+         WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM actions)
+        UNION SELECT id::text FROM policy_approvals
+         WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM actions)
+        UNION SELECT r FROM executed_actions x,
+          jsonb_array_elements_text(COALESCE(x.document->'attempt'->'effectEvidenceRefs','[]'::jsonb)
+            || COALESCE(x.document->'attempt'->'verification'->'observationRefs','[]'::jsonb)) r
+         WHERE x.tenant_id=$1 AND x.proposal_id IN (SELECT id FROM actions))
+       SELECT DISTINCT id FROM refs WHERE id=ANY($3::text[])`,
+      [tenantId, purchaseOrderId, uuids],
+    )
+  ).rows.map((row) => row.id);
 }
 
 /**
