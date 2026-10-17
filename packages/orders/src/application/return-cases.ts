@@ -13,6 +13,7 @@ import {
   forbidden,
   invalid,
   notFound,
+  ServiceError,
   unavailable,
 } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
@@ -45,6 +46,7 @@ import {
   type ReturnCreation,
   type SourceRef,
 } from '../domain/return-creations.js';
+import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type { ReturnData } from '../domain/returns.js';
 
 /** One source's current order: its connection, number and lines. */
@@ -153,6 +155,8 @@ export interface ReturnCaseTransaction {
   creation(id: string): Promise<ReturnCreation | null>;
   insertCreation(value: ReturnCreation): Promise<void>;
   saveCreation(value: ReturnCreation): Promise<void>;
+  /** One requester's creations that may need a background step, oldest first, at most 100. */
+  liveCreations(requestedBy: string): Promise<ReturnCreation[]>;
   /** The connection's source IDs of the order and the given order lines, when mapped. */
   sourceIds(
     connectionId: string,
@@ -559,6 +563,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     kind: ReturnCaseEventKind,
     evidence: DecisionEvidence | null,
     details: ReturnCaseEvent['details'],
+    actorId = context.actor.id,
   ): ReturnCaseEvent {
     return {
       id: deps.uuid(`return-case-event:${context.tenantId}:${commandId}`),
@@ -567,7 +572,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       commandId,
       digest,
       kind,
-      actorId: context.actor.id,
+      actorId,
       revision: value.revision,
       occurredAt: deps.now().toISOString(),
       evidence,
@@ -667,8 +672,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       creation.decisionId && deps.admission
         ? await deps.admission.decision(context, creation.decisionId)
         : null;
+    // An unsent approval ends with its window; the background pass records it soon after.
     const expired =
-      creation.state === 'approval_required' &&
+      ['approval_required', 'approved'].includes(creation.state) &&
       Date.parse(creation.expiresAt) <= deps.now().getTime();
     const observeOnly =
       creation.state === 'not_executed' ||
@@ -992,16 +998,23 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     kind: ReturnCaseEventKind,
     details: ReturnCaseEvent['details'] = {},
     evidenceRefs: string[] = [],
+    actorId = context.actor.id,
   ) {
     const value = (await tx.case(creation.caseId))!;
     const commandId = deps.uuid(
       `return-creation:${context.tenantId}:${kind}:${creation.id}`,
     );
     if (await tx.event(commandId)) return;
-    const entry = event(context, value, commandId, commandId, kind, null, {
-      creationId: creation.id,
-      ...details,
-    });
+    const entry = event(
+      context,
+      value,
+      commandId,
+      commandId,
+      kind,
+      null,
+      { creationId: creation.id, ...details },
+      actorId,
+    );
     await tx.insertEvent(entry);
     await tx.audit(audit(context, entry, value, evidenceRefs));
   }
@@ -1766,7 +1779,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           if (
             live &&
             !(
-              live.state === 'approval_required' &&
+              ['approval_required', 'approved'].includes(live.state) &&
               Date.parse(live.expiresAt) <= deps.now().getTime()
             )
           )
@@ -1989,6 +2002,103 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       }
 
       return detail(context, caseId);
+    },
+
+    /**
+     * Background step for one requester, run as them: applies an approval the case never
+     * stored, sends an approved creation within its approval, expires an unsent one after it,
+     * resumes a send the execution ledger never reserved, and settles uncertain ones by reading.
+     * It never sends a reserved or expired creation again. Without `returns.manage` it only
+     * records expiry.
+     */
+    async recover(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      context = await deps.refreshContext(context);
+      const manage = hasPermission(context, 'returns.manage');
+      const creations = await deps.store.transaction(
+        context.tenantId,
+        false,
+        (tx) => tx.liveCreations(context.actor.id),
+      );
+      const save = (creation: ReturnCreation, patch: Partial<ReturnCreation>) =>
+        deps.store.transaction(context.tenantId, true, async (tx) => {
+          const current = await tx.creation(creation.id);
+          // Another pass or request moved it on; the next pass sees its new state.
+          if (!current || current.state !== creation.state) return null;
+
+          return saveCreation(tx, current, patch);
+        });
+      const failures: unknown[] = [];
+      for (let creation of creations) {
+        try {
+          let step = returnRecoveryStep(creation, deps.now());
+          if (step === 'expire') {
+            await save(creation, { state: 'expired' });
+            continue;
+          }
+          if (!step || !manage || !deps.admission) continue;
+          if (step === 'decision') {
+            const approval = (
+              await deps.admission.decision(context, creation.decisionId!)
+            )?.approval;
+            if (!approval) continue;
+            const decided = await deps.store.transaction(
+              context.tenantId,
+              true,
+              async (tx) => {
+                const current = await tx.creation(creation.id);
+                if (current?.state !== 'approval_required') return null;
+                const saved = await saveCreation(tx, current, {
+                  state: approval.outcome,
+                  decidedBy: approval.approverId,
+                  decidedAt: deps.now().toISOString(),
+                });
+                await creationEvent(
+                  context,
+                  tx,
+                  saved,
+                  approval.outcome === 'approved'
+                    ? 'creation_approved'
+                    : 'creation_rejected',
+                  {},
+                  [],
+                  approval.approverId,
+                );
+
+                return saved;
+              },
+            );
+            if (decided?.state !== 'approved') continue;
+            creation = decided;
+            step = 'send';
+          }
+          if (step === 'send') {
+            await dispatch(context, creation);
+            continue;
+          }
+          const execution = await deps.admission.reconcile(context, creation);
+          if (execution.state !== 'not_started')
+            await settle(context, creation.id, execution);
+          else if (Date.parse(creation.expiresAt) > deps.now().getTime()) {
+            // Never reserved: resume the same execution identity under its approval.
+            const resumed =
+              creation.state === 'sending'
+                ? creation
+                : await save(creation, { state: 'sending' });
+            if (resumed) await dispatch(context, resumed);
+          }
+          // The approval ended before anything was reserved, so nothing can be dispatched.
+          else await save(creation, { state: 'expired' });
+        } catch (error) {
+          // A refused step stays for the next pass; other failures must not hold up the rest.
+          if (!(error instanceof ServiceError)) failures.push(error);
+        }
+      }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          'Some return creations could not be followed up',
+        );
     },
 
     /** Admission hook: the bound creation must still match its open case and approval. */

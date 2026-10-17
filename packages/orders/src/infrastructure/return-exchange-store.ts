@@ -74,6 +74,15 @@ export function createReturnExchangeStore(
                 [tenantId, caseId],
               )
             ).rows.map((r) => r.document),
+          live: async (requestedBy) =>
+            (
+              await tx.query<{ document: ExchangeStep }>(
+                `SELECT document FROM orders_return_exchange_steps WHERE tenant_id=$1 AND document->>'requestedBy'=$2
+                  AND state IN ('approval_required','approved','sending','uncertain')
+                ORDER BY requested_at,id LIMIT 100`,
+                [tenantId, requestedBy],
+              )
+            ).rows.map((r) => r.document),
           insert: async (value) => {
             await tx.query(
               'INSERT INTO orders_return_exchange_steps(tenant_id,id,operation_id,case_id,kind,marker,state,sent,document,requested_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',

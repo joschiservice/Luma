@@ -2,7 +2,9 @@ import type { EffectRegistry } from '@luma/connections';
 import type { InstalledReturnRuntime } from '@luma/connections/composition';
 import { AdmissionRejected } from '@luma/execution';
 import { parseAction } from '@luma/execution/composition';
+import type { TenantContext } from '@luma/identity';
 import type {
+  CreationExecution,
   ReturnActions,
   ReturnSettlementAdmission,
   ReturnSettlementSystem,
@@ -108,6 +110,21 @@ export function createReturnSettlementAdmission(
 ): ReturnSettlementAdmission {
   const stepId = 'settle';
 
+  /** What the execution ledger recorded for the write; nothing recorded means nothing was sent. */
+  async function ledger(
+    context: TenantContext,
+    value: { actionId: string },
+  ): Promise<CreationExecution> {
+    const result = await safety.execution.get(context, value.actionId);
+    if (result?.state === 'not_executed') return { state: 'not_executed' };
+    if (result && 'record' in result)
+      return result.record.attempt.dispatch === 'not_dispatched'
+        ? { state: 'withheld', failure: 'not_sent' }
+        : { state: 'uncertain' };
+
+    return { state: 'not_started' };
+  }
+
   return {
     writeMode: safety.execution.writeMode,
     async prepare(context, value, action) {
@@ -182,21 +199,12 @@ export function createReturnSettlementAdmission(
 
         return { state: 'uncertain' };
       } catch (error) {
-        if (error instanceof AdmissionRejected) {
-          // Another sender may have reserved this identity after admission's first read.
-          const result = await safety.execution.get(context, value.actionId);
-          if (result?.state === 'not_executed')
-            return { state: 'not_executed' };
-          if (result && 'record' in result)
-            return result.record.attempt.dispatch === 'not_dispatched'
-              ? { state: 'withheld', failure: 'not_sent' }
-              : { state: 'uncertain' };
-
-          return { state: 'not_started' };
-        }
+        // Another sender may have reserved this identity after admission's first read.
+        if (error instanceof AdmissionRejected) return ledger(context, value);
         throw error;
       }
     },
+    get: ledger,
     async reconcile(context, value) {
       await safety.execution.reconcile(context, value.actionId);
 

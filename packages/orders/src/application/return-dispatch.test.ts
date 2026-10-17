@@ -10,6 +10,7 @@ import type {
 import {
   createReturnActions,
   type ReturnActionStore,
+  type ReturnSettlementAdmission,
 } from './return-actions.js';
 import {
   createReturnExchanges,
@@ -179,6 +180,7 @@ function fixture(kind: 'settlement' | 'exchange') {
           action = structuredClone(v);
         },
         list: async () => [structuredClone(action)],
+        live: async () => [structuredClone(action)],
         insert: unavailable,
         targets: async () => [],
         audit: async () => {},
@@ -197,6 +199,7 @@ function fixture(kind: 'settlement' | 'exchange') {
           step = structuredClone(v);
         },
         list: async () => [structuredClone(step)],
+        live: async () => [structuredClone(step)],
         insert: unavailable,
         choices: async () => [],
         refundFallback: unavailable,
@@ -209,12 +212,28 @@ function fixture(kind: 'settlement' | 'exchange') {
     state: 'uncertain' | 'withheld' | 'not_started';
     failure: 'withheld';
   }> => ({ state: 'uncertain', failure: 'withheld' });
+  let executions = 0;
+  let ledger: 'not_started' | 'uncertain' = 'not_started';
+  let approval: {
+    outcome: 'approved' | 'rejected';
+    approverId: string;
+  } | null = null;
   const admission = {
     prepare: unavailable,
-    decision: async () => null,
+    decision: async () =>
+      approval
+        ? ({ approval } as unknown as Awaited<
+            ReturnType<ReturnSettlementAdmission['decision']>
+          >)
+        : null,
     respond: async () => {},
-    execute: () => execute(),
+    execute: () => {
+      executions++;
+
+      return execute();
+    },
     reconcile: async () => ({ state: 'uncertain' as const }),
+    get: async () => ({ state: ledger }),
     writeMode: async () => 'writes_enabled' as const,
   };
   const common = {
@@ -274,6 +293,19 @@ function fixture(kind: 'settlement' | 'exchange') {
 
   return {
     send: () => service.send(context, 'case', 'effect'),
+    recover: () => service.recover(context),
+    executions: () => executions,
+    setLedger: (next: typeof ledger) => {
+      ledger = next;
+    },
+    setApproval: (next: typeof approval) => {
+      approval = next;
+    },
+    patch: (next: Partial<ReturnAction & ExchangeStep>) => {
+      if (kind === 'settlement')
+        action = { ...action, ...next } as ReturnAction;
+      else step = { ...step, ...next } as ExchangeStep;
+    },
     check: () => service.check(context, 'case', 'effect'),
     setOutcome: (next: typeof outcome) => {
       outcome = next;
@@ -368,6 +400,86 @@ describe.each(['settlement', 'exchange'] as const)(
         state: 'not_executed',
       });
       if (kind === 'exchange') expect(f.root().processingStarted).toBe(false);
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s background follow-up',
+  (kind) => {
+    const later = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+    it('sends an approved write as its requester once and verifies it by reading', async () => {
+      const f = fixture(kind);
+      await f.recover();
+      expect(f.current()).toMatchObject({
+        sent: true,
+        state: 'verified',
+        proof: { outcome: 'passed' },
+      });
+      await f.recover();
+      expect(f.executions()).toBe(1);
+    });
+
+    it('records an expired approval without sending', async () => {
+      const f = fixture(kind);
+      f.patch({ expiresAt: later(1) });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: false, state: 'expired' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('applies an approval policy recorded but the owner never stored, then sends', async () => {
+      const f = fixture(kind);
+      f.patch({ state: 'approval_required', decidedBy: null, decidedAt: null });
+      await f.recover();
+      expect(f.current().state).toBe('approval_required');
+      f.setApproval({ outcome: 'approved', approverId: 'approver' });
+      await f.recover();
+      expect(f.current()).toMatchObject({
+        decidedBy: 'approver',
+        sent: true,
+        state: 'verified',
+      });
+      expect(f.executions()).toBe(1);
+    });
+
+    it('reads a reserved uncertain write and never sends it again', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain', updatedAt: later(60_000) });
+      f.setLedger('uncertain');
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'verified' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('resumes a fenced send the ledger never reserved, within its approval', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'sending', updatedAt: later(2 * 60_000) });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'verified' });
+      expect(f.executions()).toBe(1);
+    });
+
+    it('releases a fenced send the ledger never reserved once its approval ended', async () => {
+      const f = fixture(kind);
+      f.patch({
+        sent: true,
+        state: 'uncertain',
+        expiresAt: later(1),
+        updatedAt: later(60_000),
+      });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: false, state: 'expired' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('leaves a recent send to the request dispatching it', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'sending' });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'sending' });
+      expect(f.executions()).toBe(0);
     });
   },
 );

@@ -23,6 +23,7 @@ import type {
   ExchangeStepPlan,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
+import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type {
   CreationExecution,
   ReturnCaseDependencies,
@@ -49,6 +50,8 @@ export interface ReturnExchangeStore {
       saveRoot(value: ReturnExchange): Promise<void>;
       get(id: string): Promise<ExchangeStep | null>;
       list(caseId: string): Promise<ExchangeStep[]>;
+      /** One requester's steps that may need a background step, oldest first, at most 100. */
+      live(requestedBy: string): Promise<ExchangeStep[]>;
       save(value: ExchangeStep): Promise<void>;
       insert(value: ExchangeStep): Promise<void>;
       choices(value: ReturnCase): Promise<ExchangeChoice[]>;
@@ -130,6 +133,8 @@ export interface ReturnExchangeAdmission {
     context: TenantContext,
     value: ExchangeStep,
   ): Promise<CreationExecution>;
+  /** The execution ledger's record; `not_started` means nothing was reserved or dispatched. */
+  get(context: TenantContext, value: ExchangeStep): Promise<CreationExecution>;
   writeMode(
     context: TenantContext,
     id: string,
@@ -345,6 +350,13 @@ export function createReturnExchanges(deps: Dependencies) {
 
     return {
       ...value,
+      // An unsent approval ends with its window; the background pass records it soon after.
+      state:
+        !live &&
+        !value.sent &&
+        ['approval_required', 'approved'].includes(value.state)
+          ? ('expired' as const)
+          : value.state,
       ...(diff ? { diff } : {}),
       observeOnly,
       canApprove:
@@ -1322,6 +1334,79 @@ export function createReturnExchanges(deps: Dependencies) {
         throw new Error('Fresh financial proof unavailable');
 
       return value.proof;
+    },
+    /**
+     * Background step for one requester, run as them: applies approvals the owner never stored,
+     * sends approved steps within their approval, expires unsent ones after it, resumes a send
+     * the execution ledger never reserved, and checks sent ones by reading. It never sends a
+     * reserved or expired step again. Without `returns.manage` it only records expiry.
+     */
+    async recover(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      context = await deps.refreshContext(context);
+      const manage = hasPermission(context, 'returns.manage');
+      const values = await deps.store.transaction(context.tenantId, (tx) =>
+        tx.live(context.actor.id),
+      );
+      const failures: unknown[] = [];
+      for (let value of values) {
+        try {
+          let step = returnRecoveryStep(value, deps.now());
+          if (step === 'expire') {
+            await save(
+              context,
+              value,
+              { state: 'expired' },
+              'return.exchange.expired',
+            );
+            continue;
+          }
+          if (!step || !manage || !deps.admission) continue;
+          if (step === 'decision') {
+            const approval = (
+              await deps.admission.decision(context, value.decisionId!)
+            )?.approval;
+            if (!approval) continue;
+            value = await save(context, value, {
+              state: approval.outcome,
+              decidedBy: approval.approverId,
+              decidedAt: deps.now().toISOString(),
+            });
+            step = value.state === 'approved' ? 'send' : null;
+          }
+          if (step === 'send') await dispatch(context, value);
+          else if (step === 'reconcile') {
+            if (
+              (await deps.admission.get(context, value)).state !== 'not_started'
+            )
+              await check(context, value);
+            else if (Date.parse(value.expiresAt) > deps.now().getTime())
+              // Never reserved: resume the same execution identity under its approval.
+              await dispatch(
+                context,
+                value.state === 'sending'
+                  ? value
+                  : await save(context, value, { state: 'sending' }),
+              );
+            // The approval ended before anything was reserved, so nothing can be dispatched.
+            else
+              await save(
+                context,
+                value,
+                { state: 'expired', sent: false, failure: null },
+                'return.exchange.expired',
+              );
+          }
+        } catch (error) {
+          // A refused step stays for the next pass; other failures must not hold up the rest.
+          if (!(error instanceof ServiceError)) failures.push(error);
+        }
+      }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          'Some return exchange steps could not be followed up',
+        );
     },
     /** Resolves only an exact tenant-owned execution intent. */
     async forAction(context: TenantContext, id: string) {

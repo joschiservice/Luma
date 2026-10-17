@@ -271,6 +271,13 @@ export function createReturnCaseStore(
                 [tenantId, id],
               )
             )[0] ?? null,
+          liveCreations: (requestedBy) =>
+            documents<ReturnCreation>(
+              `SELECT document FROM orders_return_creations WHERE tenant_id=$1 AND principal_id=$2
+                AND state IN ('approval_required','approved','sending','uncertain')
+              ORDER BY created_at,id LIMIT 100`,
+              [tenantId, requestedBy],
+            ),
           insertCreation: async (value) => {
             await tx.query(
               `INSERT INTO orders_return_creations(tenant_id,id,case_id,connection_id,state,principal_id,document,created_at)

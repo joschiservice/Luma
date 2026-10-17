@@ -17,6 +17,7 @@ import type {
 } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
 import type { SourceRef } from '../domain/return-creations.js';
+import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type {
   CreationExecution,
   ReturnCaseDependencies,
@@ -42,6 +43,8 @@ export interface ReturnActionStore {
       lock(caseId: string): Promise<ReturnCase | null>;
       get(id: string): Promise<ReturnAction | null>;
       list(caseId: string): Promise<ReturnAction[]>;
+      /** One requester's writes that may need a background step, oldest first, at most 100. */
+      live(requestedBy: string): Promise<ReturnAction[]>;
       save(value: ReturnAction): Promise<void>;
       insert(value: ReturnAction): Promise<void>;
       targets(
@@ -114,6 +117,8 @@ export interface ReturnSettlementAdmission {
     context: TenantContext,
     value: ReturnAction,
   ): Promise<CreationExecution>;
+  /** The execution ledger's record; `not_started` means nothing was reserved or dispatched. */
+  get(context: TenantContext, value: ReturnAction): Promise<CreationExecution>;
   writeMode(
     context: TenantContext,
     id: string,
@@ -292,6 +297,13 @@ export function createReturnActions(deps: Dependencies) {
 
     return {
       ...value,
+      // An unsent approval ends with its window; the background pass records it soon after.
+      state:
+        !live &&
+        !value.sent &&
+        ['approval_required', 'approved'].includes(value.state)
+          ? ('expired' as const)
+          : value.state,
       ...(diff ? { diff } : {}),
       canApprove:
         manage &&
@@ -809,6 +821,79 @@ export function createReturnActions(deps: Dependencies) {
         throw new Error('Fresh financial proof unavailable');
 
       return value.proof;
+    },
+    /**
+     * Background step for one requester, run as them: applies approvals the owner never stored,
+     * sends approved settlements within their approval, expires unsent ones after it, resumes a
+     * send the execution ledger never reserved, and checks sent ones by reading. It never sends
+     * a reserved or expired write again. Without `returns.manage` it only records expiry.
+     */
+    async recover(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      context = await deps.refreshContext(context);
+      const manage = hasPermission(context, 'returns.manage');
+      const values = await deps.store.transaction(context.tenantId, (tx) =>
+        tx.live(context.actor.id),
+      );
+      const failures: unknown[] = [];
+      for (let value of values) {
+        try {
+          let step = returnRecoveryStep(value, deps.now());
+          if (step === 'expire') {
+            await save(
+              context,
+              value,
+              { state: 'expired' },
+              'return.settlement.expired',
+            );
+            continue;
+          }
+          if (!step || !manage || !deps.admission) continue;
+          if (step === 'decision') {
+            const approval = (
+              await deps.admission.decision(context, value.decisionId!)
+            )?.approval;
+            if (!approval) continue;
+            value = await save(context, value, {
+              state: approval.outcome,
+              decidedBy: approval.approverId,
+              decidedAt: deps.now().toISOString(),
+            });
+            step = value.state === 'approved' ? 'send' : null;
+          }
+          if (step === 'send') await dispatch(context, value);
+          else if (step === 'reconcile') {
+            if (
+              (await deps.admission.get(context, value)).state !== 'not_started'
+            )
+              await check(context, value);
+            else if (Date.parse(value.expiresAt) > deps.now().getTime())
+              // Never reserved: resume the same execution identity under its approval.
+              await dispatch(
+                context,
+                value.state === 'sending'
+                  ? value
+                  : await save(context, value, { state: 'sending' }),
+              );
+            // The approval ended before anything was reserved, so nothing can be dispatched.
+            else
+              await save(
+                context,
+                value,
+                { state: 'expired', sent: false, failure: null },
+                'return.settlement.expired',
+              );
+          }
+        } catch (error) {
+          // A refused step stays for the next pass; other failures must not hold up the rest.
+          if (!(error instanceof ServiceError)) failures.push(error);
+        }
+      }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          'Some return settlements could not be followed up',
+        );
     },
     /** Resolves only a tenant-owned exact intent for the execution gateway. */
     async forAction(context: TenantContext, id: string) {
