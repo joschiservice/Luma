@@ -1,6 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import type {
   PublishingRun,
@@ -83,9 +82,7 @@ export function createPublishingStore(
           )
         ).rows;
         if (pending.some((item) => item.run_id !== run.id))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another publishing is awaiting reconciliation. Check its outcome before another action.',
           );
         const key = `${run.choice.source.downstreamConnectionId}:${run.choice.source.shipmentId}:${run.choice.capability}:${run.choice.capability === 'fulfillment.tracking.update' ? `${run.choice.fulfillmentId}:${run.before.dispatch?.revision}` : 'create'}`;
@@ -100,9 +97,7 @@ export function createPublishingStore(
           )
         ).rows[0];
         if (source?.run_id !== run.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This dispatch already has a publication. Check its outcome before another action.',
           );
         if (run.choice.capability === 'fulfillment.tracking.update') {
@@ -123,9 +118,7 @@ export function createPublishingStore(
               'fulfillment.tracking.update' ||
             lineage.document.choice.fulfillmentId !== run.choice.fulfillmentId
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This dispatch is already linked to another Shopify fulfillment.',
             );
           const original = (
@@ -143,9 +136,7 @@ export function createPublishingStore(
             (original.length !== 1 ||
               original[0]?.fulfillment_id !== run.choice.fulfillmentId)
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'Reconcile the original shipment publication before changing its tracking.',
             );
         }
@@ -166,9 +157,7 @@ export function createPublishingStore(
           )
         ).rows[0];
         if (row?.run_id !== run.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another publishing already reserved this fulfillment revision. Refresh to review it.',
           );
       }),
@@ -203,9 +192,7 @@ export function createPublishingStore(
         !stored ||
         canonicalJson({ ...stored, decisionId: null }) !== canonicalJson(run)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This fulfillment revision already has a publishing. Refresh to review it.',
         );
 

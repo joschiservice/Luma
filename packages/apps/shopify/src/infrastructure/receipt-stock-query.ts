@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 
 import type { AuthorityReader } from '@luma/connections';
+import { requirePermission, type TenantContext } from '@luma/identity';
 import {
-  IdentityError,
-  requirePermission,
-  type TenantContext,
-} from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+  canonicalJson,
+  conflict,
+  type TenantDatabase,
+  unavailable,
+} from '@luma/platform';
 import { z } from 'zod';
 
 import { receiptStockBindingSchema } from '../domain/inventory-correction.js';
@@ -37,19 +38,13 @@ export function createReceiptStockQuery(
   ) {
     requirePermission(context, 'procurement.read');
     if (!(await released(context.tenantId)))
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Receipt stock booking is not enabled.',
-      );
+      throw unavailable('Receipt stock booking is not enabled.');
     const authority = await sourceAuthority?.read(context);
     const group = authority?.groups.find(
       (value) => value.group === 'inventory_stock',
     );
     if (!authority || !group?.connectionId)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'Select the system that owns stock before booking this receipt.',
       );
     const stockConnectionId = group.connectionId;
@@ -80,9 +75,7 @@ export function createReceiptStockQuery(
         ? parsed.data.lines.find((value) => value.id === lineId)
         : undefined;
       if (!line?.locationId || line.unit !== 'each')
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This receipt needs an exact receiving location and whole-unit stock.',
         );
       const purchasingSystem = (
@@ -96,11 +89,7 @@ export function createReceiptStockQuery(
         )
       ).rows.length;
       if (purchasingSystem)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The purchasing system books its own receipts.',
-        );
+        throw conflict('The purchasing system books its own receipts.');
       const owned = (
         await tx.query(
           `SELECT 1 FROM inventory_stock_ownership_scopes WHERE tenant_id=$1 AND location_id=$2 AND mode='own'`,
@@ -108,9 +97,7 @@ export function createReceiptStockQuery(
         )
       ).rows.length;
       if (owned)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Inventory owns this location. Book this receipt through the native stock ledger.',
         );
       const facts = z
@@ -156,24 +143,14 @@ export function createReceiptStockQuery(
             )
             .at(-1);
       if (proofBinding?.damagedCommitmentId && !damaged)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The approved damaged receipt evidence was not found.',
-        );
+        throw conflict('The approved damaged receipt evidence was not found.');
       if (!receipt || receipt.source.kind !== 'manual_receipt')
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Record a manual receipt before proposing stock booking.',
         );
       const cumulativeGood = (receipt.quantity ?? 0) - (damaged?.quantity ?? 0);
       if (!Number.isSafeInteger(cumulativeGood) || cumulativeGood <= 0)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This receipt has no whole, undamaged units to book.',
-        );
+        throw conflict('This receipt has no whole, undamaged units to book.');
       const prior = (
         await tx.query<{
           receipt_id: string;
@@ -201,9 +178,7 @@ export function createReceiptStockQuery(
             row.state !== 'succeeded' && row.dispatch !== 'not_dispatched',
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Check the previous receipt stock booking before proposing more stock.',
         );
       const previouslyBooked = Math.max(
@@ -229,9 +204,7 @@ export function createReceiptStockQuery(
         )
       ).rows;
       if (positions.length !== 1)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Map this receipt to exactly one Shopify stock position.',
         );
 
@@ -273,9 +246,7 @@ export function createReceiptStockQuery(
         current.connectionId !== connectionId ||
         current.positionId !== positionId
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Receipt, previous bookings, mappings or stock authority changed. Review again.',
         );
       const available = binding.baselineAvailable + binding.quantity;
@@ -284,9 +255,7 @@ export function createReceiptStockQuery(
         available < 0 ||
         available > 2147483647
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The resulting Shopify quantity must be a supported whole number.',
         );
 

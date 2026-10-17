@@ -2,8 +2,12 @@ import { createHash } from 'node:crypto';
 
 import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  notFound,
+  type TenantDatabase,
+} from '@luma/platform';
 import { z } from 'zod';
 
 import {
@@ -83,9 +87,7 @@ export function createCorrectionQuery(
   function exact(row: Row, resource: string) {
     const mappings = row.mappings.filter((m) => m.resource === resource);
     if (mappings.length !== 1 || mappings[0]!.scopeKey !== '')
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'SKU or location mappings are ambiguous. Confirm one exact source mapping before correcting stock.',
       );
 
@@ -229,9 +231,7 @@ export function createCorrectionQuery(
           ),
         );
         if (held.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Stock protection owns this position. Release the hold before correcting stock.',
           );
       }
@@ -241,11 +241,7 @@ export function createCorrectionQuery(
           target.nativeAllocation ||
           target.sourceConnectionId !== target.connectionId
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'A receipt must use one stock authority.',
-          );
+          throw conflict('A receipt must use one stock authority.');
         const source = (await rows(context, target.positionId)).find(
           (row) => row.connectionId === target.connectionId,
         );
@@ -258,9 +254,7 @@ export function createCorrectionQuery(
           source.deleted ||
           source.unit !== 'each'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Receipt stock needs an active, readable Shopify position.',
           );
         const inventoryItemId = exact(source, 'sku'),
@@ -269,11 +263,7 @@ export function createCorrectionQuery(
           !/^gid:\/\/shopify\/InventoryItem\/[0-9]+$/.test(inventoryItemId) ||
           !/^gid:\/\/shopify\/Location\/[0-9]+$/.test(locationId)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Confirm exact Shopify item and location mappings.',
-          );
+          throw conflict('Confirm exact Shopify item and location mappings.');
 
         return {
           inventoryItemId,
@@ -288,30 +278,19 @@ export function createCorrectionQuery(
         };
       }
       if (target.nativeAllocation) {
-        if (!authority)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Source authority is unavailable.',
-          );
+        if (!authority) throw conflict('Source authority is unavailable.');
         const source = (await rows(context, target.positionId)).find(
           (row) => row.connectionId === target.connectionId,
         );
         if (!source)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'The selected Shopify stock position was not found.',
-          );
+          throw notFound('The selected Shopify stock position was not found.');
         const inventoryItemId = exact(source, 'sku'),
           locationId = exact(source, 'location');
         if (
           !/^gid:\/\/shopify\/InventoryItem\/[0-9]+$/.test(inventoryItemId) ||
           !/^gid:\/\/shopify\/Location\/[0-9]+$/.test(locationId)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Confirm exact Shopify item and location mappings before publication.',
           );
 
@@ -331,9 +310,7 @@ export function createCorrectionQuery(
         stockAuthority?.connectionId !== target.sourceConnectionId ||
         (!protection && sellingAuthority?.connectionId !== target.connectionId)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Source authority changed or is inconclusive. Review the workspace source authority before correcting stock.',
         );
       const sources = await rows(context, target.positionId);
@@ -344,19 +321,13 @@ export function createCorrectionQuery(
         (r) => r.connectionId === target.sourceConnectionId,
       );
       if (!shopify || !erp)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Stock sources not found for this position.',
-        );
+        throw notFound('Stock sources not found for this position.');
       if (
         shopify.provider !== 'shopify' ||
         !['jtl', 'cin7'].includes(erp.provider) ||
         shopify.connectionId === erp.connectionId
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Only a confirmed ERP source can authorize a Shopify correction.',
         );
       if (
@@ -371,9 +342,7 @@ export function createCorrectionQuery(
         shopify.skuId !== erp.skuId ||
         shopify.locationId !== erp.locationId
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Sources must be active, installed and mapped to the same SKU, location and whole-unit stock.',
         );
       const owned = await database.transaction(
@@ -387,9 +356,7 @@ export function createCorrectionQuery(
           ).rowCount,
       );
       if (owned)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This location uses native stock. Publish a reviewed native allocation instead of applying an ERP correction.',
         );
       exact(erp, 'sku');
@@ -400,9 +367,7 @@ export function createCorrectionQuery(
         !/^gid:\/\/shopify\/InventoryItem\/[0-9]+$/.test(inventoryItemId) ||
         !/^gid:\/\/shopify\/Location\/[0-9]+$/.test(locationId)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Shopify requires an exact inventory item and location mapping.',
         );
       const quantity = erp.available === null ? NaN : Number(erp.available);
@@ -411,9 +376,7 @@ export function createCorrectionQuery(
         quantity < 0 ||
         quantity > 2147483647
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The ERP available quantity must be a known, nonnegative whole number.',
         );
 
