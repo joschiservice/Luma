@@ -18,7 +18,7 @@ import type { TenantContext } from '@luma/identity';
 import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
-import { createPolicies } from '@luma/policies/composition';
+import { createPolicies, policyAudit } from '@luma/policies/composition';
 import { z } from 'zod';
 
 import {
@@ -49,28 +49,7 @@ export function createStarshipitUpdates(
   const policies = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
   );
   const enabled = async (tenantId: string) =>
     !!(await context.featureEnabled?.(tenantId, 'starshipit-fulfillment')) &&

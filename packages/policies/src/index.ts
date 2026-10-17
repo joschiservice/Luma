@@ -6,7 +6,6 @@ export {
 export type {
   Approval,
   PolicyDecision,
-  PolicyEvidence,
   ProposedAction,
   Provenance,
 } from './domain/action.js';

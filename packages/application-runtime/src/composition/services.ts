@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 
-import type { AuditLog } from '@luma/audit';
 import { createAuditLog } from '@luma/audit/composition';
 import { createCommerceIngestion } from '@luma/commerce-ingestion';
 import type { AuthorityReader, EffectRegistry } from '@luma/connections';
@@ -29,7 +28,6 @@ import { createCommerceProjections as createOrderProjections } from '@luma/order
 import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import type {
-  PolicyEvidence,
   ProposedAction,
   ScopedAutonomy,
   ScopedResponsibilityFacts,
@@ -38,6 +36,7 @@ import {
   completeAutonomy,
   createPersistentScopedAutonomy,
   createPolicies,
+  policyAudit,
   reserveAutonomy,
 } from '@luma/policies/composition';
 import type { DeskDependencies } from '@luma/resolution';
@@ -403,39 +402,7 @@ export function createDeskServices(
   });
 }
 
-/**
- * Returns an audit writer for policy decisions and approvals, preserving their actor and
- * proposal references.
- */
-export function policyAudit(audit: AuditLog) {
-  return async (evidence: PolicyEvidence) => {
-    const item = evidence.document;
-    await audit.append({
-      id: item.id,
-      tenantId: item.tenantId,
-      eventKey: item.id,
-      eventType: evidence.type,
-      schemaVersion: 1,
-      occurredAt: 'evaluatedAt' in item ? item.evaluatedAt : item.createdAt,
-      actor: {
-        kind: 'user',
-        id: 'actorId' in item ? item.actorId : item.approverId,
-      },
-      correlationId: item.correlationId,
-      proposalId: item.proposalId,
-      actionHash: item.actionHash,
-      policyDecisionId: 'actorId' in item ? item.id : item.decisionId,
-      evidenceRefs: [],
-      details: {
-        outcome: item.outcome,
-        policyVersion: item.policyVersion,
-        ...('reason' in item
-          ? { reason: item.reason }
-          : { requesterId: item.requesterId, expiresAt: item.expiresAt }),
-      },
-    });
-  };
-}
+export { policyAudit };
 
 /** Trusted composition publishes and activates playbooks; activities receive only the service. */
 export function createResolutionPlaybooks(

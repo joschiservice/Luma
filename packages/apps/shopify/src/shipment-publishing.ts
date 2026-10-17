@@ -20,7 +20,7 @@ import {
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
-import { createPolicies } from '@luma/policies/composition';
+import { createPolicies, policyAudit } from '@luma/policies/composition';
 
 import {
   createShipmentPublishing,
@@ -56,28 +56,7 @@ export function createShopifyPublishing(
   const policies = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
   );
 
   async function credential(
