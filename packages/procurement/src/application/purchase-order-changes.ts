@@ -2,6 +2,7 @@ import type {
   EffectIntent,
   PurchaseOrderRevisionInput,
   VerificationResult,
+  WriteAcceptance,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
@@ -31,6 +32,8 @@ import type { PurchasingSystem, SubmissionExecution } from './commitments.js';
 import {
   type PurchasingReadEvidence,
   purchasingReadEvidence,
+  type PurchasingWriteReceipt,
+  purchasingWriteReceipt,
 } from './purchasing-reads.js';
 
 export interface PurchaseOrderChangeStore {
@@ -64,6 +67,8 @@ export interface PurchaseOrderChangeStore {
       ): Promise<void>;
       /** Stores a cited purchasing-system read; an already stored read is kept unchanged. */
       recordRead(evidence: PurchasingReadEvidence): Promise<void>;
+      /** Stores a write receipt; an already stored receipt is kept unchanged. */
+      recordWriteReceipt(receipt: PurchasingWriteReceipt): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
 }
@@ -818,6 +823,39 @@ export function createPurchaseOrderChangeService(deps: {
           canonicalJson(intent)
         ? { change, input: change.provider }
         : null;
+    },
+    /**
+     * Stores the purchasing system's acceptance of an order change as procurement's write
+     * receipt and returns its ID, which execution cites. It records what already happened, so it
+     * does not recheck authority. Throws when the change is unknown or the acceptance belongs to
+     * another connection; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      changeId: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, true, async (tx) => {
+        const change = await tx.change(changeId);
+        if (
+          !change ||
+          change.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'purchase-orders.revise'
+        )
+          throw conflict('The receipt does not belong to this order change.');
+        const receipt = purchasingWriteReceipt(
+          context.tenantId,
+          change.purchaseOrderId,
+          { purpose: 'revision', id: change.id },
+          deps.uuid(
+            `write-receipt:${context.tenantId}:${acceptance.idempotencyKey}`,
+          ),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
     /** Independently reads and then commits the new local revision, keeping the old revision immutable. */
     async verify(

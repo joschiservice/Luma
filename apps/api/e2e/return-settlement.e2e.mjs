@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 
 import {
   citedReturnReads,
+  returnWriteReceipts,
   settlementFixture,
 } from './return-settlement-fixture.mjs';
 
@@ -223,6 +224,12 @@ it('separately verifies resale stock and a lost-response refund without restocki
         completeness: 'complete',
       },
     });
+  // Both responses were lost, so neither write has a receipt and neither attempt cites one.
+  const receipts = await returnWriteReceipts(f, detail.case.id);
+  expect(receipts.map((attempt) => [attempt.cited, attempt.stored])).toEqual([
+    [[], []],
+    [[], []],
+  ]);
   // The same identity in another tenant cannot reveal or execute this action.
   const other = await f.pilot.app.inject({
     method: 'POST',

@@ -11,6 +11,7 @@ import type {
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
+  acceptedRecordsSchema,
   exchangePriceSchema,
   returnExchangeProofSchema,
   returnExchangeQuotedSchema,
@@ -931,6 +932,7 @@ export function createShopifyExchangeCapabilities(
             status: z.literal('accepted'),
             evidenceRefs: z.array(z.string().uuid()).min(1),
             providerRequestId: z.string().nullable(),
+            records: acceptedRecordsSchema,
           })
           .strict()
           .parse(v),
@@ -1037,6 +1039,16 @@ export function createShopifyExchangeCapabilities(
             providerRequestId:
               value.return?.id ?? value.fulfillmentOrder?.id ?? null,
             evidenceRefs: current.evidenceRefs,
+            records: value.return
+              ? [{ resource: 'return', externalId: value.return.id }]
+              : value.fulfillmentOrder
+                ? [
+                    {
+                      resource: 'fulfillment_order',
+                      externalId: value.fulfillmentOrder.id,
+                    },
+                  ]
+                : [],
           };
         } catch (error) {
           if (

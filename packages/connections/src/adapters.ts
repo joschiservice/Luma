@@ -20,3 +20,5 @@ export {
 } from './infrastructure/return-exchange-contracts.js';
 
 export { boundedReadTransport } from './infrastructure/bounded-read.js';
+
+export { acceptedRecordsSchema } from './infrastructure/write-receipt-contracts.js';

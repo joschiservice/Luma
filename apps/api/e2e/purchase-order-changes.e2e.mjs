@@ -5,6 +5,7 @@ import { createObservability } from '@luma/platform/composition';
 import { expect, it } from 'vitest';
 
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 const flags = {
@@ -243,6 +244,23 @@ it('applies one approved JTL position revision, preserves earlier lines and surv
         completeness: 'complete',
       },
     });
+
+  // The accepted revision's write receipt resolves to one stored receipt for the change.
+  const [attempt] = await expectStoredWriteReceipts(f.db.owner, org, [
+    stored.actionId,
+  ]);
+  expect(attempt.stored).toEqual([
+    expect.objectContaining({
+      owner: 'procurement',
+      document: expect.objectContaining({
+        purchaseOrderId: order.id,
+        purpose: 'revision',
+        subjectId: change.id,
+        capability: 'purchase-orders.revise',
+        source: { provider: 'jtl', connectionId: expect.any(String) },
+      }),
+    }),
+  ]);
   await call(
     `/purchase-orders/${order.id}/changes`,
     {

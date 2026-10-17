@@ -11,6 +11,7 @@ import type {
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
+  acceptedRecordsSchema,
   returnSettlementProofSchema,
   returnSettlementQuotedSchema,
   returnSettlementQuoteSchema,
@@ -263,6 +264,7 @@ export function createJtlSettlementCapabilities(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().uuid()),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(v),
@@ -339,6 +341,10 @@ export function createJtlSettlementCapabilities(
           )
         ).evidenceRefs,
         providerRequestId,
+        records: [
+          { resource: 'item', externalId: accepted.data.itemId },
+          { resource: 'warehouse', externalId: accepted.data.warehouseId },
+        ],
       };
     },
   };

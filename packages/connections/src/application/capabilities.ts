@@ -13,6 +13,7 @@ import type {
 } from '../domain/capabilities.js';
 import { ConnectorError } from '../domain/capabilities.js';
 import { equalJson } from '../domain/equal-json.js';
+import type { WriteAcceptance } from '../domain/write-receipts.js';
 import type {
   EffectAdapter,
   EffectIntent,
@@ -317,6 +318,17 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
         context: TenantContext,
         intent: EffectIntent,
       ): Promise<VerificationResult>;
+      /**
+       * Stores the provider's acceptance as the owner's write receipt in the tenant's
+       * transaction and returns its ID, which execution then cites instead of the adapter's
+       * references. A failed store throws; the write then counts as dispatched with an unknown
+       * outcome and cites nothing. Absent only for adapters that store their own receipts.
+       */
+      storeReceipt?(
+        context: TenantContext,
+        intent: EffectIntent,
+        acceptance: WriteAcceptance,
+      ): Promise<string>;
     }): EffectRegistry {
       return {
         async resolve(context, intent) {
@@ -375,11 +387,37 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
                 beforeDispatch,
               );
               if (!result.ok) throw new ConnectorError(result.error);
+              const { providerRequestId } = result.value;
+              if (!binding.storeReceipt)
+                return {
+                  evidenceRefs: result.value.evidenceRefs,
+                  providerRequestId,
+                };
+              let receiptId: string;
+              try {
+                receiptId = await binding.storeReceipt(context, action, {
+                  provider: connection.provider,
+                  connectionId: connection.id,
+                  capability: binding.capability,
+                  adapterVersion: connection.adapterVersion,
+                  dispatchIdentity: expectedIdentity,
+                  idempotencyKey,
+                  acceptedAt: new Date().toISOString(),
+                  providerRequestId,
+                  records: result.value.records ?? [],
+                });
+              } catch {
+                // The provider accepted the write, but an unstored receipt must not be cited.
+                throw new ConnectorError({
+                  code: 'internal',
+                  effect: 'unknown',
+                  retry: 'reconcile',
+                  dispatch: 'dispatched',
+                  ...(providerRequestId ? { providerRequestId } : {}),
+                });
+              }
 
-              return {
-                evidenceRefs: result.value.evidenceRefs,
-                providerRequestId: result.value.providerRequestId,
-              };
+              return { evidenceRefs: [receiptId], providerRequestId };
             },
             verify: (action) => binding.verify(context, action),
           };

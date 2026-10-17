@@ -7,7 +7,7 @@ import type {
 } from '../application/return-actions.js';
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
-import { insertReturnRead } from './return-reads.js';
+import { insertReturnRead, insertReturnWriteReceipt } from './return-reads.js';
 
 /** Persists tenant-scoped settlement requests and reads explicitly mapped Wawi item identities. */
 export function createReturnActionStore(
@@ -106,6 +106,8 @@ export function createReturnActionStore(
             },
             audit: (entry) => log.append(entry),
             recordRead: (evidence) => insertReturnRead(tx, tenantId, evidence),
+            recordWriteReceipt: (receipt) =>
+              insertReturnWriteReceipt(tx, tenantId, receipt),
             targets: async (value) => {
               const rows = await tx.query<
                 Omit<ReturnStockTarget, 'warehouse'> & Record<string, unknown>

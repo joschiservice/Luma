@@ -1,5 +1,5 @@
 import type { AuditEntry } from '@luma/audit';
-import type { ActionDiff } from '@luma/connections';
+import type { ActionDiff, WriteAcceptance } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -7,7 +7,12 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson, forbidden, ServiceError } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  ServiceError,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type {
@@ -30,6 +35,11 @@ import type {
   ReturnCaseDependencies,
   ReturnCaseStore,
 } from './return-cases.js';
+import {
+  type ReturnWriteReceipt,
+  returnWriteReceipt,
+  returnWriteReceiptName,
+} from './return-write-receipts.js';
 
 /** One explicit mapping from a case line's canonical SKU to a Wawi warehouse position. */
 export interface ReturnStockTarget {
@@ -64,6 +74,8 @@ export interface ReturnActionStore {
       audit(entry: AuditEntry): Promise<void>;
       /** Stores a cited provider read; an already stored read is kept unchanged. */
       recordRead(evidence: ReturnReadEvidence): Promise<void>;
+      /** Stores a write receipt; an already stored receipt is kept unchanged. */
+      recordWriteReceipt(receipt: ReturnWriteReceipt): Promise<void>;
     }) => Promise<T>,
     options?: { readOnlySnapshot: true },
   ): Promise<T>;
@@ -1061,6 +1073,38 @@ export function createReturnActions(deps: Dependencies) {
         outcome: cited.proof.outcome,
         observationRefs: cited.proof.evidenceRefs,
       };
+    },
+    /**
+     * Stores the provider's acceptance of a settlement as orders' write receipt and returns its
+     * ID, which execution cites. It records what already happened, so it does not recheck
+     * authority. Throws when the settlement is unknown or the acceptance belongs to another
+     * connection or capability; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      id: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const value = await tx.get(id);
+        if (
+          !value ||
+          value.connectionId !== acceptance.connectionId ||
+          acceptance.capability !==
+            (value.kind === 'refund' ? 'returns.refund' : 'returns.restock')
+        )
+          throw conflict('The receipt does not belong to this settlement.');
+        const receipt = returnWriteReceipt(
+          context.tenantId,
+          value.caseId,
+          { purpose: 'settlement', id: value.id },
+          deps.uuid(returnWriteReceiptName(context.tenantId, acceptance)),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
   };
 }

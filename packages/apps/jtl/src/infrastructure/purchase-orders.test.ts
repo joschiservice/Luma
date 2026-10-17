@@ -524,6 +524,7 @@ describe('JTL purchase-order submission', () => {
         status: 'accepted',
         evidenceRefs: [acceptanceId('tenant-a', 'connection-a', '62')],
         providerRequestId: null,
+        records: [{ resource: 'purchase_order', externalId: '62' }],
       },
     });
     expect(f.posts).toHaveLength(1);

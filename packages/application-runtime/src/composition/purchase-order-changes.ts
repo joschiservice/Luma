@@ -56,6 +56,8 @@ export function createPurchaseOrderChangeEffects(
       }),
     verify: async (context, intent) =>
       service().verify(context, intent.target.id),
+    storeReceipt: (context, intent, acceptance) =>
+      service().storeWriteReceipt(context, intent.target.id, acceptance),
   });
 }
 

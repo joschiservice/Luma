@@ -1,6 +1,6 @@
-import type { ExternalId } from '@luma/connections';
+import type { ExternalId, WriteAcceptance } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict } from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 
 import type {
@@ -12,7 +12,10 @@ import type { PurchaseOrder } from '../domain/procurement.js';
 import { matchesSubmission } from '../domain/submissions.js';
 import { type CommitmentContext, hour } from './commitment-context.js';
 import type { PurchasingOrder, SubmissionExecution } from './commitments.js';
-import { purchasingReadEvidence } from './purchasing-reads.js';
+import {
+  purchasingReadEvidence,
+  purchasingWriteReceipt,
+} from './purchasing-reads.js';
 
 /**
  * Executes admitted submissions exactly once and verifies them by reading the purchasing system:
@@ -454,6 +457,39 @@ export function createSubmissionExecution({
           : ('failed' as const),
         ...cited,
       };
+    },
+    /**
+     * Stores the purchasing system's acceptance of a submission as procurement's write receipt
+     * and returns its ID, which execution cites. One attempt has one receipt, so a repeated
+     * store returns the same ID. Throws when the submission is unknown or the acceptance belongs
+     * to another connection; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      submissionId: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, true, async (tx) => {
+        const submission = await tx.submission(submissionId);
+        if (
+          !submission ||
+          submission.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'purchase-orders.submit'
+        )
+          throw conflict('The receipt does not belong to this submission.');
+        const receipt = purchasingWriteReceipt(
+          context.tenantId,
+          submission.purchaseOrderId,
+          { purpose: 'submission', id: submission.id },
+          deps.uuid(
+            `write-receipt:${context.tenantId}:${acceptance.idempotencyKey}`,
+          ),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
     /** The submission an action belongs to, for execution adapters. */
     async submissionForAction(context: TenantContext, submissionId: string) {

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 
@@ -241,6 +242,28 @@ it('places an approved order once, follows supplier confirmation and receipt, an
     String(o.internalComment ?? '').includes(order.id),
   );
   expect(placed).toHaveLength(1);
+
+  // The attempt cites one stored write receipt naming the JTL order it created.
+  const [attempt] = await expectStoredWriteReceipts(f.db.owner, org, [
+    requested.actionId,
+  ]);
+  expect(attempt.stored).toEqual([
+    expect.objectContaining({
+      owner: 'procurement',
+      document: expect.objectContaining({
+        purchaseOrderId: order.id,
+        purpose: 'submission',
+        subjectId: requested.id,
+        source: { provider: 'jtl', connectionId: f.manifest.connections.jtl },
+        records: [
+          {
+            resource: 'purchase_order',
+            externalId: approved.externalOrder.externalId,
+          },
+        ],
+      }),
+    }),
+  ]);
 
   record = await call(`/purchase-orders/${order.id}/record`);
   expect(record.order.status).toBe('open');

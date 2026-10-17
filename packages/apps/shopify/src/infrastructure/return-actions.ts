@@ -10,6 +10,7 @@ import {
   type Observation,
   type ReturnOptionSnapshot,
 } from '@luma/connections';
+import { acceptedRecordsSchema } from '@luma/connections/adapters';
 import { API_VERSION, createClient, parse } from '@luma/connector-shopify';
 import { z } from 'zod';
 
@@ -360,6 +361,7 @@ export function createShopifyReturnCapabilities(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().uuid()).length(1),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(v),
@@ -520,6 +522,7 @@ export function createShopifyReturnCapabilities(
           status: 'accepted',
           evidenceRefs: [evidence.items[0]!.id],
           providerRequestId: null,
+          records: [{ resource: 'return', externalId: receipt.return.id }],
         };
       } catch (error) {
         if (

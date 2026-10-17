@@ -1,4 +1,5 @@
 import type { AuditEntry } from '@luma/audit';
+import type { WriteAcceptance } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -55,6 +56,11 @@ import {
 } from '../domain/return-reads.js';
 import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type { ReturnData } from '../domain/returns.js';
+import {
+  type ReturnWriteReceipt,
+  returnWriteReceipt,
+  returnWriteReceiptName,
+} from './return-write-receipts.js';
 
 /** One source's current order: its connection, number and lines. */
 export interface OrderSource {
@@ -174,6 +180,8 @@ export interface ReturnCaseTransaction {
   audit(entry: AuditEntry): Promise<void>;
   /** Stores a cited provider read; an already stored read is kept unchanged. */
   recordRead(evidence: ReturnReadEvidence): Promise<void>;
+  /** Stores a write receipt; an already stored receipt is kept unchanged. */
+  recordWriteReceipt(receipt: ReturnWriteReceipt): Promise<void>;
 }
 
 export interface ReturnCaseStore {
@@ -2275,6 +2283,38 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           : ('failed' as const),
         observationRefs: [found[0]!.observationId],
       };
+    },
+
+    /**
+     * Stores the provider's acceptance of a return creation as orders' write receipt and
+     * returns its ID, which execution cites. It records what already happened, so it does not
+     * recheck authority. Throws when the creation is unknown or the acceptance belongs to
+     * another connection; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      creationId: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, true, async (tx) => {
+        const creation = await tx.creation(creationId);
+        if (
+          !creation ||
+          creation.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'returns.create'
+        )
+          throw conflict('The receipt does not belong to this return request.');
+        const receipt = returnWriteReceipt(
+          context.tenantId,
+          creation.caseId,
+          { purpose: 'creation', id: creation.id },
+          deps.uuid(returnWriteReceiptName(context.tenantId, acceptance)),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
 
     /** The creation an action belongs to, for execution adapters. */

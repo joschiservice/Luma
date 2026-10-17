@@ -1,3 +1,4 @@
+import type { WriteAcceptance } from '@luma/connections';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +18,7 @@ import {
   createReturnExchanges,
   type ReturnExchangeStore,
 } from './return-exchanges.js';
+import type { ReturnWriteReceipt } from './return-write-receipts.js';
 
 const now = new Date('2026-10-12T12:00:00Z');
 const context = makeTenantContext(
@@ -197,6 +199,11 @@ function fixture(kind: 'settlement' | 'exchange') {
     if (storage === 'failing') throw new Error('storage unavailable');
     if (!stored.some((s) => s.id === evidence.id)) stored.push(evidence);
   };
+  const receipts: ReturnWriteReceipt[] = [];
+  const recordWriteReceipt = async (receipt: ReturnWriteReceipt) => {
+    if (storage === 'failing') throw new Error('storage unavailable');
+    if (!receipts.some((r) => r.id === receipt.id)) receipts.push(receipt);
+  };
   const reads = { locks: 0, snapshots: 0 };
   const actionStore: ReturnActionStore = {
     transaction: async (_tenant, fn, options) => {
@@ -219,6 +226,7 @@ function fixture(kind: 'settlement' | 'exchange') {
         targets: async () => [],
         audit: async () => {},
         recordRead,
+        recordWriteReceipt,
       });
     },
   };
@@ -250,6 +258,7 @@ function fixture(kind: 'settlement' | 'exchange') {
         finishCase: unavailable,
         audit: async () => {},
         recordRead,
+        recordWriteReceipt,
       });
     },
   };
@@ -367,7 +376,10 @@ function fixture(kind: 'settlement' | 'exchange') {
     current: () => (kind === 'settlement' ? action : step),
     root: () => root,
     verify: () => service.verify(context, 'effect'),
+    storeReceipt: (acceptance: WriteAcceptance) =>
+      service.storeWriteReceipt(context, 'effect', acceptance),
     stored,
+    receipts,
     setStorage: (next: typeof storage) => {
       storage = next;
     },
@@ -622,6 +634,70 @@ describe.each(['settlement', 'exchange'] as const)(
       await expect(f.verify()).rejects.toThrow('storage unavailable');
       await expect(f.check()).rejects.toThrow('storage unavailable');
       expect(f.current()).toMatchObject({ state: 'uncertain', proof: null });
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s write receipts',
+  (kind) => {
+    const acceptance: WriteAcceptance = {
+      provider: 'shopify',
+      connectionId: 'shopify',
+      capability:
+        kind === 'settlement' ? 'returns.restock' : 'returns.exchange.process',
+      adapterVersion: 'shopify-returns/1',
+      dispatchIdentity: '["shopify","shopify-returns/1"]',
+      idempotencyKey: 'v0:action',
+      acceptedAt: now.toISOString(),
+      providerRequestId: 'request-1',
+      records: [{ resource: 'return', externalId: 'gid://shopify/Return/1' }],
+    };
+
+    it('stores the accepted write once and returns the ID execution cites', async () => {
+      const f = fixture(kind);
+      const id = await f.storeReceipt(acceptance);
+      expect(await f.storeReceipt(acceptance)).toBe(id);
+      expect(f.receipts).toEqual([
+        {
+          kind: 'write_receipt',
+          id,
+          tenantId: 'tenant',
+          caseId: 'case',
+          purpose: kind,
+          subjectId: 'effect',
+          source: { provider: 'shopify', connectionId: 'shopify' },
+          capability: acceptance.capability,
+          adapterVersion: 'shopify-returns/1',
+          dispatchIdentity: acceptance.dispatchIdentity,
+          idempotencyKey: 'v0:action',
+          observedAt: now.toISOString(),
+          status: 'accepted',
+          providerRequestId: 'request-1',
+          records: acceptance.records,
+        },
+      ]);
+    });
+
+    it('refuses an acceptance from another connection or capability', async () => {
+      const f = fixture(kind);
+      for (const other of [
+        { ...acceptance, connectionId: 'other' },
+        { ...acceptance, capability: 'returns.create' as const },
+      ])
+        await expect(f.storeReceipt(other)).rejects.toThrow(
+          'The receipt does not belong',
+        );
+      expect(f.receipts).toEqual([]);
+    });
+
+    it('throws when the receipt cannot be stored, so nothing is cited', async () => {
+      const f = fixture(kind);
+      f.setStorage('failing');
+      await expect(f.storeReceipt(acceptance)).rejects.toThrow(
+        'storage unavailable',
+      );
+      expect(f.receipts).toEqual([]);
     });
   },
 );

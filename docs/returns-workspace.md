@@ -155,7 +155,8 @@ one return for the case with the approved lines and units; more than one, or dif
 fails the request and nothing is sent again. Orders stores every read that verification or the
 creation audit cites, with the connection, source record, read time and completeness, so each
 cited ID resolves to that read. A read that cannot be stored is not cited, and the outcome
-stays unknown. An uncertain dispatch only reconciles by
+stays unknown. The provider's acceptance is stored with the reads as the
+[write receipt](execution.md#runtimes) execution cites; a lost response has no receipt. An uncertain dispatch only reconciles by
 reading, through a manual check or the [background follow-up](#background-follow-up). One request
 per case can be live or created. Approvals expire after 24 hours; an approved request that was
 not sent by then shows as expired. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
@@ -216,7 +217,8 @@ operation marker, approved units and physical stock total. Concurrent unrelated 
 stock step uncertain. Financial proof requires successful transactions for the whole approved amount
 and currency. Pending, failed and partial payments never establish settlement. Quotes, proofs,
 verification and the settlement audit cite only reads that orders stored, in the same
-transaction, as for creation; a partial read never verifies a step. Case completion still
+transaction, as for creation; a partial read never verifies a step. Settlement and exchange
+write receipts are stored as for creation. Case completion still
 requires the other steps; neither accepted mutation nor one verified step closes a case.
 
 An admission rejection alone does not release a send fence: another caller may already have reserved

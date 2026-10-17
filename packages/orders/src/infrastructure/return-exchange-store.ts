@@ -11,7 +11,7 @@ import type {
   ExchangeStep,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
-import { insertReturnRead } from './return-reads.js';
+import { insertReturnRead, insertReturnWriteReceipt } from './return-reads.js';
 
 /** Persists immutable provider plans and one case operation behind forced tenant RLS. */
 export function createReturnExchangeStore(
@@ -237,6 +237,8 @@ export function createReturnExchangeStore(
             },
             audit: (entry) => log.append(entry),
             recordRead: (evidence) => insertReturnRead(tx, tenantId, evidence),
+            recordWriteReceipt: (receipt) =>
+              insertReturnWriteReceipt(tx, tenantId, receipt),
           });
         },
         options,

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createAuditLog } from '@luma/audit/composition';
+import type { WriteAcceptance } from '@luma/connections';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
 import {
   createReturnActionService,
@@ -223,16 +224,77 @@ describe.skipIf(!databaseUrl)('return read evidence on PostgreSQL', () => {
         ]);
       });
 
-      // The runtime role may append reads but never change or remove them.
-      for (const statement of [
-        'DELETE FROM orders_return_read_evidence WHERE id=$1',
-        "UPDATE orders_return_read_evidence SET purpose='creation' WHERE id=$1",
-      ])
-        await expect(
-          database.transaction(tenantId, (tx) =>
-            tx.query(statement, [readId]).then(() => {}),
-          ),
-        ).rejects.toThrow('permission denied');
+      // The refund's write receipt is stored beside the reads under the ID execution cites.
+      const acceptance: WriteAcceptance = {
+        provider: 'shopify',
+        connectionId,
+        capability: 'returns.refund',
+        adapterVersion: 'shopify-returns/1',
+        dispatchIdentity: '["shopify","shopify-returns/1"]',
+        idempotencyKey: `v0:${action.actionId}`,
+        acceptedAt: new Date().toISOString(),
+        providerRequestId: null,
+        records: [{ resource: 'refund', externalId: 'gid://shopify/Refund/1' }],
+      };
+      const receiptId = await actions.storeWriteReceipt(
+        context,
+        actionId,
+        acceptance,
+      );
+      expect(
+        await actions.storeWriteReceipt(context, actionId, acceptance),
+      ).toBe(receiptId);
+      await expect(
+        actions.storeWriteReceipt(context, actionId, {
+          ...acceptance,
+          connectionId: randomUUID(),
+        }),
+      ).rejects.toThrow('The receipt does not belong to this settlement.');
+      await database.transaction(tenantId, async (tx) => {
+        const stored = await tx.query(
+          'SELECT id,kind,case_id,purpose,subject_id,document FROM orders_return_read_evidence WHERE id=$1',
+          [receiptId],
+        );
+        expect(stored.rows).toEqual([
+          {
+            id: receiptId,
+            kind: 'write_receipt',
+            case_id: caseId,
+            purpose: 'settlement',
+            subject_id: actionId,
+            document: {
+              kind: 'write_receipt',
+              id: receiptId,
+              tenantId,
+              caseId,
+              purpose: 'settlement',
+              subjectId: actionId,
+              source: { provider: 'shopify', connectionId },
+              capability: 'returns.refund',
+              adapterVersion: acceptance.adapterVersion,
+              dispatchIdentity: acceptance.dispatchIdentity,
+              idempotencyKey: acceptance.idempotencyKey,
+              observedAt: acceptance.acceptedAt,
+              status: 'accepted',
+              providerRequestId: null,
+              records: acceptance.records,
+            },
+          },
+        ]);
+      });
+
+      // The runtime role may append reads and receipts but never change or remove them.
+      for (const id of [readId, receiptId])
+        for (const statement of [
+          'DELETE FROM orders_return_read_evidence WHERE id=$1',
+          "UPDATE orders_return_read_evidence SET purpose='creation' WHERE id=$1",
+          "UPDATE orders_return_read_evidence SET kind='read' WHERE id=$1",
+        ])
+          await expect(
+            database.transaction(tenantId, (tx) =>
+              tx.query(statement, [id]).then(() => {}),
+            ),
+          ).rejects.toThrow('permission denied');
 
       // Another tenant sees nothing and cannot store a read against this tenant's case.
       await database.transaction(otherTenant, async (tx) => {
