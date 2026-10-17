@@ -852,6 +852,8 @@ async function installedWrite(
   const registry = createInstalledShippingMethodEffects(options, {
     map: async () => request.input,
     checkPreconditions: async () => true,
+    storeRead: async () => undefined,
+    storeReceipt: async () => randomUUID(),
   });
   const intent = {
     tenantId: context.tenantId,

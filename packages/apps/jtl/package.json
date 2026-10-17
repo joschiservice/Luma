@@ -22,6 +22,7 @@
     "@luma/connector-jtl": "workspace:*",
     "@luma/i18n": "workspace:*",
     "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "catalog:",
     "react": "catalog:",

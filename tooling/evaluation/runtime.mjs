@@ -207,6 +207,20 @@ export function createWorker(
         : null,
     checkPreconditions: async () =>
       incident.authority.authoritative && incident.diagnosis.status === 'ready',
+    // Cited reads and receipts are kept in the checkpoint, as an owner keeps them in its tables.
+    // A receipt's acceptance time is the wall clock, so it is left out of the replayable trace.
+    storeRead: async (_c, _intent, read) => {
+      (checkpoint.evidence ??= []).push(structuredClone(read));
+    },
+    storeReceipt: async (_c, _intent, acceptance) => {
+      const evidence = (checkpoint.evidence ??= []);
+      const receiptId = `00000000-0000-4000-9000-${String(evidence.length + 1).padStart(12, '0')}`;
+      const receipt = { id: receiptId, ...structuredClone(acceptance) };
+      delete receipt.acceptedAt;
+      evidence.push(receipt);
+
+      return receiptId;
+    },
   });
   const policies = createPolicyService({
     repository: state.policies,

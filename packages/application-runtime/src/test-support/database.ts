@@ -6,6 +6,38 @@ import { readRegionConfig } from '@luma/config';
 import { Pool } from 'pg';
 
 /**
+ * Lists core migrations in filename order, then each app's migrations in app directory and
+ * filename order, as the migration runner applies them.
+ */
+async function migrationFiles() {
+  const core = new URL('../../migrations/', import.meta.url);
+  const apps = new URL('../../../apps/', import.meta.url);
+  const files = (await readdir(core))
+    .filter((file) => file.endsWith('.sql'))
+    .sort()
+    .map((file) => new URL(file, core));
+  for (const app of (await readdir(apps, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()) {
+    const directory = new URL(`${app}/migrations/`, apps);
+    const names = await readdir(directory).catch((error: unknown) => {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        return [];
+      throw error;
+    });
+    files.push(
+      ...names
+        .filter((file) => file.endsWith('.sql'))
+        .sort()
+        .map((file) => new URL(file, directory)),
+    );
+  }
+
+  return files;
+}
+
+/**
  * Creates a database on the `TEST_DATABASE_URL` cluster with every migration applied and
  * returns its owner pool. Migrations create shared roles, so they run under the cluster-wide
  * setup lock. `drop` closes the pool and removes the database.
@@ -25,16 +57,8 @@ export async function createMigratedDatabase(
     await setup.query(
       "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
     );
-    for (const file of (
-      await readdir(new URL('../../migrations/', import.meta.url))
-    ).sort())
-      if (file.endsWith('.sql'))
-        await owner.query(
-          await readFile(
-            new URL(`../../migrations/${file}`, import.meta.url),
-            'utf8',
-          ),
-        );
+    for (const url of await migrationFiles())
+      await owner.query(await readFile(url, 'utf8'));
     await owner.query('SELECT luma_provision_cell_region($1)', [region]);
   } finally {
     await setup.query(

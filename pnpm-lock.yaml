@@ -1160,6 +1160,9 @@ importers:
       '@luma/orders':
         specifier: workspace:*
         version: link:../../orders
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../../platform
       '@luma/ui':
         specifier: workspace:*
         version: link:../../ui

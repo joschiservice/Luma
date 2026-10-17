@@ -1,6 +1,8 @@
 import {
+  type CitedRead,
   createShippingMethodEffects,
   type EffectIntent,
+  type WriteAcceptance,
 } from '@luma/connections';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import type { TenantContext } from '@luma/identity';
@@ -119,9 +121,27 @@ function fixture(cloud = false) {
     },
     expectedPostcondition: { shippingMethodId: ids.after },
   };
+  const reads: CitedRead[] = [];
+  const receipts: WriteAcceptance[] = [];
   const binding = {
     map: vi.fn(async () => input),
     checkPreconditions: vi.fn(async () => true),
+    storeRead: vi.fn(
+      async (_context: TenantContext, _intent: EffectIntent, read: CitedRead) => {
+        reads.push(read);
+      },
+    ),
+    storeReceipt: vi.fn(
+      async (
+        _context: TenantContext,
+        _intent: EffectIntent,
+        acceptance: WriteAcceptance,
+      ) => {
+        receipts.push(acceptance);
+
+        return `receipt-${receipts.length}`;
+      },
+    ),
     now: () => date,
   };
   const effectsRegistry = () => createShippingMethodEffects(runtime(), binding);
@@ -137,6 +157,8 @@ function fixture(cloud = false) {
     recordObservations,
     intent,
     binding,
+    reads,
+    receipts,
     effectsRegistry,
     effects: () => effects,
   };
@@ -183,6 +205,52 @@ describe('JTL shipping-method correction', () => {
       expect(f.effects()).toBe(2);
     },
   );
+  it('cites only the receipt and the verification read the binding stored', async () => {
+    const f = fixture();
+    const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
+    expect(await effect.execute(f.intent, 'first')).toEqual({
+      evidenceRefs: ['receipt-1'],
+      providerRequestId: null,
+    });
+    expect(f.receipts).toEqual([
+      expect.objectContaining({
+        provider: 'jtl',
+        connectionId: 'connection-a',
+        capability: 'orders.shipping-method.write',
+        idempotencyKey: 'first',
+        records: [{ resource: 'order', externalId: f.ids.order }],
+      }),
+    ]);
+    const verification = await effect.verify(f.intent);
+    expect(verification).toMatchObject({ outcome: 'passed' });
+    expect(f.reads).toEqual([
+      expect.objectContaining({
+        id: verification.observationRefs[0],
+        completeness: 'complete',
+        source: expect.objectContaining({
+          connectionId: 'connection-a',
+          resource: 'order',
+          externalId: f.ids.order,
+        }),
+      }),
+    ]);
+  });
+  it('cites nothing when the receipt or the verification read cannot be stored', async () => {
+    const f = fixture();
+    f.binding.storeReceipt.mockRejectedValueOnce(new Error('store down'));
+    f.binding.storeRead.mockRejectedValueOnce(new Error('store down'));
+    const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
+    await expect(effect.execute(f.intent, 'first')).rejects.toMatchObject({
+      failure: { effect: 'unknown', retry: 'reconcile', dispatch: 'dispatched' },
+    });
+    expect(f.effects()).toBe(1);
+    expect(await effect.verify(f.intent)).toMatchObject({
+      outcome: 'inconclusive',
+      observationRefs: [],
+    });
+    expect(await effect.verify(f.intent)).toMatchObject({ outcome: 'passed' });
+    expect(f.effects()).toBe(1);
+  });
   it('accepts reordered mapping and intent fields throughout execution', async () => {
     const f = fixture();
     const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
