@@ -9,6 +9,7 @@ import {
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { actorLabel } from '@luma/ui/lib/actor';
 
+import { permissionLabel } from '../../kit/identity/permission-text';
 import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { commitmentKinds, statusLabels } from './presentation';
 
@@ -48,13 +49,19 @@ const sources = {
   inventory: m.procurement_timeline_inventory,
 };
 
-/** Presents recorded decisions, provider observations and independent verification together without conflating them. */
+/**
+ * Presents recorded decisions, provider observations and independent verification together
+ * without conflating them. A restricted entry shows only its step and time, names the
+ * permission its details need, and still opens its evidence, which lists as restricted.
+ */
 export function PurchasingTimeline({
   organizationId,
-  record,
+  orderId,
+  timeline,
 }: {
   organizationId: string;
-  record: PurchaseOrderRecord;
+  orderId: string;
+  timeline: PurchaseOrderRecord['timeline'];
 }) {
   return (
     <Card
@@ -66,13 +73,13 @@ export function PurchasingTimeline({
         <h2 id="purchasing-timeline-title">{m.procurement_timeline_title()}</h2>
       </div>
       <p className="procurement-note">{m.procurement_timeline_note()}</p>
-      {!record.timeline.complete ? (
+      {!timeline.complete ? (
         <p role="status" className="procurement-note">
           {m.procurement_timeline_truncated()}
         </p>
       ) : null}
       <ol className="procurement-commitments">
-        {record.timeline.entries.map((entry) => {
+        {timeline.entries.map((entry) => {
           const stage = stages[entry.stage];
           const transition =
             entry.kind === 'lifecycle' ? entry.detail?.split('->') : undefined;
@@ -113,6 +120,16 @@ export function PurchasingTimeline({
                   </span>
                 ) : null}
                 {entry.reason ? <p>{entry.reason}</p> : null}
+                {entry.restricted ? (
+                  <p>
+                    {m.procurement_timeline_restricted({
+                      permission: permissionLabel(
+                        entry.restricted.permission,
+                        entry.restricted.permission,
+                      ),
+                    })}
+                  </p>
+                ) : null}
                 {entry.actorId ? (
                   <small>
                     {m.procurement_timeline_actor({
@@ -125,7 +142,7 @@ export function PurchasingTimeline({
                 {entry.evidenceRefs.length ? (
                   <EvidenceDisclosure
                     organizationId={organizationId}
-                    subject={{ kind: 'purchase_order', id: record.order.id }}
+                    subject={{ kind: 'purchase_order', id: orderId }}
                     refs={entry.evidenceRefs}
                     count={entry.evidenceRefs.length}
                   />

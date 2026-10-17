@@ -465,7 +465,8 @@ function PurchaseOrderRecordView({
               <CommitmentHistory record={record} open={setDialog} />
               <PurchasingTimeline
                 organizationId={organizationId}
-                record={record}
+                orderId={record.order.id}
+                timeline={record.timeline}
               />
             </div>
             <aside className="procurement-record-aside">
