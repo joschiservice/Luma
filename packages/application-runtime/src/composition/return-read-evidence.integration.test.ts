@@ -320,6 +320,48 @@ describe.skipIf(!databaseUrl)('return read evidence on PostgreSQL', () => {
             .then(() => {}),
         ),
       ).rejects.toThrow('row-level security');
+
+      // A document missing a required field is refused, not let through by a null check.
+      const withoutCompleteness = Object.fromEntries(
+        Object.entries(read).filter(([key]) => key !== 'completeness'),
+      );
+      const withoutKey = {
+        kind: 'write_receipt',
+        source: { provider: 'shopify', connectionId },
+        status: 'accepted',
+      };
+      for (const [kind, document] of [
+        ['read', withoutCompleteness],
+        ['write_receipt', withoutKey],
+      ] as const) {
+        const id = randomUUID();
+        await expect(
+          database.transaction(tenantId, (tx) =>
+            tx
+              .query(
+                `INSERT INTO orders_return_read_evidence(tenant_id,id,kind,case_id,connection_id,purpose,subject_id,observed_at,document)
+                 VALUES($1,$2,$3,$4,$5,'settlement',$6,now(),$7)`,
+                [
+                  tenantId,
+                  id,
+                  kind,
+                  caseId,
+                  connectionId,
+                  actionId,
+                  {
+                    ...document,
+                    id,
+                    tenantId,
+                    caseId,
+                    purpose: 'settlement',
+                    subjectId: actionId,
+                  },
+                ],
+              )
+              .then(() => {}),
+          ),
+        ).rejects.toThrow('orders_return_read_evidence_document');
+      }
     } finally {
       await runtime?.end();
       await db.drop();
