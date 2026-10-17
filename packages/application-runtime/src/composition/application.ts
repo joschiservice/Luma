@@ -75,6 +75,7 @@ import {
   appDecisionProvider,
   createActionDiffReader,
   createSourceOrderLines,
+  readNativePurchaseIncoming,
 } from '@luma/read-models/composition';
 import {
   createReturnStepFollowUp,
@@ -134,7 +135,6 @@ import {
   createReplyAdmission,
   createReplyEffects,
 } from './messaging-replies.js';
-import { readNativePurchaseIncoming } from './native-purchase-incoming.js';
 import { createNativeStockRuntime } from './native-stock.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';

@@ -27,6 +27,7 @@ import {
   createExceptionWorker,
   createProcessClient,
 } from '@luma/workflow-temporal';
+import { advanceWorkflowSchedules } from '@luma/workflows/composition';
 import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
@@ -375,7 +376,7 @@ export async function createDefaultExceptionWorker(
     async function advanceSchedules() {
       while (!stopSchedules.signal.aborted) {
         try {
-          await pool.query('SELECT advance_workflow_schedules()');
+          await advanceWorkflowSchedules(pool);
         } catch (error) {
           console.error(
             'Scheduled workflow starts could not be advanced; retrying.',

@@ -38,6 +38,12 @@ export type { PurchaseOrderChange } from './domain/purchase-order-changes.js';
 
 export { defaultSupplierTerms, orderProgress } from './domain/commitments.js';
 
+export {
+  type IncomingLineExpectation,
+  incomingLineExpectations,
+  incomingSubmissionSettled,
+} from './domain/incoming-expectations.js';
+
 export type { FollowUp, Submission } from './domain/commitments.js';
 
 export type { PurchaseOrder } from './domain/procurement.js';

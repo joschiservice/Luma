@@ -45,6 +45,7 @@ import {
   upgradeAdaptiveViewQuery,
 } from '@luma/api-contract';
 import { createAuditLog } from '@luma/audit/composition';
+import { createConnectionDirectory } from '@luma/connections/composition';
 import type { CaseService } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
@@ -1014,13 +1015,14 @@ export function createAdaptiveWorkspaceRuntime(options: {
         if (!(await released(c, key))) missing.push(`${key} is not enabled.`);
       const reason = await followUp.available(c);
       if (reason) missing.push(reason);
-      const list = await options.database.transaction(c.tenantId, (tx) =>
-        tx.query<{ document: unknown }>(
-          'SELECT document FROM connector_installations WHERE tenant_id=$1 AND id=$2',
-          [c.tenantId, config.parameters.mailboxId],
-        ),
-      );
-      const mailbox = list.rows[0]?.document;
+      const mailboxId = config.parameters.mailboxId;
+      const mailbox =
+        typeof mailboxId === 'string'
+          ? await createConnectionDirectory(options.database).installation(
+              c.tenantId,
+              mailboxId,
+            )
+          : undefined;
       const ready = z
         .object({ status: z.literal('active'), granted: z.array(z.string()) })
         .safeParse(mailbox);

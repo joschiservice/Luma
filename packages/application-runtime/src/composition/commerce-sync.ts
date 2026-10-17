@@ -36,7 +36,10 @@ import {
   createModelGateway,
   createTenantDatabase,
 } from '@luma/platform/composition';
-import { createSupplierTerms } from '@luma/procurement/composition';
+import {
+  createPurchasingTermsImporter,
+  createSupplierTerms,
+} from '@luma/procurement/composition';
 import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
@@ -47,7 +50,6 @@ import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
-import { createPurchasingTermsImporter } from './supplier-terms-sync.js';
 
 const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex');

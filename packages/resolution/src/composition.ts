@@ -32,6 +32,8 @@ export { createDeskStore } from './infrastructure/persistence/desk.js';
 
 export { createDetectionSources } from './infrastructure/persistence/detection-sources.js';
 
+export { createStockProtectionHoldReader } from './infrastructure/persistence/stock-protection-holds.js';
+
 /** Composes explicit review-only discovery from authoritative retained learning and environment facts. */
 export function createResolutionImprovementDiscovery(
   db: TenantDatabase,

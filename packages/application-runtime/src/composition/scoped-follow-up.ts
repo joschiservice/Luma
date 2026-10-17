@@ -9,6 +9,7 @@ import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { canonicalJson } from '@luma/platform';
 import type { ProposedAction, ScopedResponsibilityFacts } from '@luma/policies';
+import { createLatestPolicyDecisionReader } from '@luma/policies/composition';
 import {
   createGovernedFollowUps,
   type FollowUpPlan,
@@ -202,17 +203,7 @@ export function createScopedSupplierFollowUp(options: {
       };
     },
   };
-  const latestDecision = (context: TenantContext, proposalId: string) =>
-    options.database.transaction(
-      context.tenantId,
-      async (tx) =>
-        (
-          await tx.query<{ id: string }>(
-            'SELECT id FROM policy_decisions WHERE tenant_id=$1 AND proposal_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1',
-            [context.tenantId, proposalId],
-          )
-        ).rows[0]?.id ?? null,
-    );
+  const latestDecision = createLatestPolicyDecisionReader(options.database);
   const service = createGovernedFollowUps({
     store,
     managed: options.safety.autonomy.managed,

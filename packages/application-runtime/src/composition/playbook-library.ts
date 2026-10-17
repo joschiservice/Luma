@@ -11,6 +11,7 @@ import {
   createPlaybookLibrary,
   createPlaybookLibraryStore,
   createPlaybookStore,
+  lockPlaybookManagement,
 } from '@luma/workflows/composition';
 
 /** Composes atomic reviewed activations with the existing admission artifact store. */
@@ -36,9 +37,7 @@ export function createPersistentPlaybookLibrary(
     approvalPolicy,
     transaction: (context, operation) =>
       db.transaction(context.tenantId, async (tx) => {
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-          `playbook-management:${context.tenantId}`,
-        ]);
+        await lockPlaybookManagement(tx, context.tenantId);
         const scoped: TenantDatabase = {
           transaction: async (tenantId, work) => {
             requireTenant(context, tenantId);

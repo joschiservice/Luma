@@ -5,6 +5,7 @@ import type { DiagnosisRereader } from '@luma/exceptions';
 import {
   createDiagnoses,
   createExceptions,
+  tryLeaseDiagnosisInvestigation,
 } from '@luma/exceptions/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
@@ -109,15 +110,13 @@ export function createActiveDiagnosisRereader(options: {
 
       return options.database.transaction(context.tenantId, async (tx) => {
         signal.throwIfAborted();
-        const lock = (
-          await tx.query<{ admitted: boolean }>(
-            'SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS admitted',
-            [
-              `diagnosis-investigation:${context.tenantId}:${snapshot.exceptionId}`,
-            ],
-          )
-        ).rows[0];
-        if (!lock?.admitted)
+        if (
+          !(await tryLeaseDiagnosisInvestigation(
+            tx,
+            context.tenantId,
+            snapshot.exceptionId,
+          ))
+        )
           return {
             status: 'rate_limited' as const,
             retryAfter: new Date(now().getTime() + 5000).toISOString(),

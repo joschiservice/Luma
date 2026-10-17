@@ -53,3 +53,12 @@ export { createAdaptiveViewIdentities } from './infrastructure/adaptive-identiti
 export { createActionDiffReader } from './infrastructure/action-diffs.js';
 
 export { governedFollowUpDecisionProvider } from './infrastructure/decisions/governed-follow-ups.js';
+
+export {
+  createMessageDocumentDirectory,
+  createMessageRecordDirectory,
+} from './infrastructure/message-records.js';
+
+export { readNativePurchaseIncoming } from './infrastructure/procurement/native-purchase-incoming.js';
+
+export { readNativePurchaseReceipt } from './infrastructure/procurement/native-purchase-receipts.js';

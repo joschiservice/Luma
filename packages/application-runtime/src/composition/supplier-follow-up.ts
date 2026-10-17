@@ -7,6 +7,10 @@ import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
+import {
+  listSubmissionScopes,
+  purgeExpiredSupplierMessages,
+} from '@luma/procurement/composition';
 import type { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
@@ -57,24 +61,17 @@ export function createSupplierFollowUpWorker(options: {
   /** Runs one pass over every principal with live submissions. */
   async function pass() {
     try {
-      await options.pool.query(
-        'SELECT purge_expired_procurement_communications(200)',
-      );
+      await purgeExpiredSupplierMessages(options.pool);
     } catch (error) {
       log('Supplier message retention could not run; retrying.', error);
     }
-    const scopes = (
-      await options.pool.query<{ tenant_id: string; principal_id: string }>(
-        'SELECT tenant_id,principal_id FROM procurement_submission_scopes()',
-      )
-    ).rows;
-    for (const scope of scopes) {
+    for (const scope of await listSubmissionScopes(options.pool)) {
       if (stop.signal.aborted) return;
       try {
         await commitments.tick(
           await options.identity.resolveWorkflowContext(
-            scope.principal_id,
-            scope.tenant_id,
+            scope.principalId,
+            scope.tenantId,
             'supplier-follow-up',
           ),
         );

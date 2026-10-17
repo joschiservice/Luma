@@ -16,6 +16,10 @@ import { LedgerError, nextStockVersion } from '../domain/ledger.js';
 import { createLedgerStore, stockEvidenceSchema } from './ledger-store.js';
 import { ledgerReceiptSchema } from './ledger-validation.js';
 import {
+  lockNativeStockOrder,
+  lockStockOwnership,
+} from './native-stock-locks.js';
+import {
   ownershipReviewSchema,
   reservationSchema,
   scopeSchema,
@@ -216,22 +220,9 @@ export function createNativeStockStore(
             };
             const port: NativeStockTransaction = {
               ledger,
-              lockOwnership: async () => {
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-                  [`sales:${tenant}`],
-                );
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
-                  [`commerce-ingestion:${tenant}`],
-                );
-              },
-              lockOrder: async (orderId) => {
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-                  [`native-stock-order:${tenant}:${orderId}`],
-                );
-              },
+              lockOwnership: () => lockStockOwnership(sql, tenant),
+              lockOrder: (orderId) =>
+                lockNativeStockOrder(sql, tenant, orderId),
               demand: (orderId, requireAuthority = true) =>
                 owners.demand(scoped, context, orderId, requireAuthority),
               authorityRevision: () =>

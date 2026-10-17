@@ -145,3 +145,7 @@ export function createSourceEnvironmentService(
     now: () => new Date(),
   });
 }
+
+export { createConnectionDirectory } from './infrastructure/connection-directory.js';
+
+export { connectionRuntimeReady } from './infrastructure/runtime-readiness.js';

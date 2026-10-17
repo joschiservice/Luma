@@ -40,6 +40,7 @@ import {
   createPolicies,
   reserveAutonomy,
 } from '@luma/policies/composition';
+import { createReplenishmentApprovalCoverage } from '@luma/procurement/composition';
 import type { DeskDependencies } from '@luma/resolution';
 import { createDetectionPipeline } from '@luma/resolution';
 import {
@@ -48,8 +49,6 @@ import {
   createPlaybooks,
 } from '@luma/resolution/composition';
 import { Pool } from 'pg';
-
-import { createReplenishmentApprovalCoverage } from './replenishment-approval.js';
 
 /** Creates the policy and execution services used by workflow activities. */
 export function createSafetyServices(

@@ -1,6 +1,7 @@
 import type { CapabilityReader } from '@luma/connections';
 import type { AttachmentReader, DocumentDirectory } from '@luma/messaging';
 import type { TenantDatabase } from '@luma/platform';
+import { createMessageDocumentDirectory } from '@luma/read-models/composition';
 
 /**
  * Reads attachment content through the installation-gated capability runtime. Content arrives
@@ -35,34 +36,5 @@ export function createAttachmentReader(
 export function createDocumentDirectory(
   database: TenantDatabase,
 ): DocumentDirectory {
-  return {
-    async skus(context, codes) {
-      return database.transaction(
-        context.tenantId,
-        async (tx) =>
-          new Set(
-            (
-              await tx.query<{ code: string }>(
-                `SELECT DISTINCT upper(btrim(code)) AS code FROM inventory_product_skus
-                WHERE tenant_id=$1 AND code_key=ANY($2::text[])`,
-                [context.tenantId, codes.map((code) => code.toLowerCase())],
-              )
-            ).rows.map((row) => row.code),
-          ),
-      );
-    },
-    async suppliers(context, names) {
-      return database.transaction(
-        context.tenantId,
-        async (tx) =>
-          (
-            await tx.query<{ id: string; key: string }>(
-              `SELECT id,lower(btrim(document->>'name')) AS key FROM procurement_suppliers
-              WHERE tenant_id=$1 AND lower(btrim(document->>'name'))=ANY($2::text[])`,
-              [context.tenantId, names],
-            )
-          ).rows,
-      );
-    },
-  };
+  return createMessageDocumentDirectory(database);
 }

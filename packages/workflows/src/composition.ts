@@ -124,7 +124,10 @@ export { createPlaybookLibrary } from './application/playbook-library.js';
 
 export { createWorkflowTemplates } from './application/templates.js';
 
-export { createPlaybookLibraryStore } from './infrastructure/playbooks/library.js';
+export {
+  createPlaybookLibraryStore,
+  lockPlaybookManagement,
+} from './infrastructure/playbooks/library.js';
 
 export { createPlaybookActivations } from './application/playbook-activations.js';
 
@@ -634,3 +637,9 @@ export function createCoordination(
 export { createWorkflowEventSink } from './infrastructure/coordination.js';
 
 export { createPackageWorkflowArchive } from './infrastructure/package-definitions.js';
+
+export {
+  advanceWorkflowSchedules,
+  listCaseWorkflowScopes,
+  listCodeProcessScopes,
+} from './infrastructure/background-scopes.js';

@@ -164,4 +164,6 @@ export { builtInMembership, makeTenantContext } from './domain/context.js';
 
 export { createRoleIdentityReader } from './infrastructure/role-identities.js';
 
+export { createDetectionSettingsReader } from './infrastructure/detection-settings.js';
+
 export { createMorningBriefReader } from './application/morning-brief.js';

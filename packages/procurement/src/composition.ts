@@ -287,3 +287,13 @@ export function createPurchaseOrderChanges(
 export { createFollowUpPlanStore } from './infrastructure/governed-follow-up.js';
 
 export { createPurchasingTimelineActors } from './infrastructure/timeline-actors.js';
+
+export { createPurchasingTermsImporter } from './infrastructure/purchasing-terms-import.js';
+
+export { createReplenishmentApprovalCoverage } from './infrastructure/replenishment-approval-coverage.js';
+
+export {
+  listReplenishmentScopes,
+  listSubmissionScopes,
+  purgeExpiredSupplierMessages,
+} from './infrastructure/background-scopes.js';

@@ -60,3 +60,5 @@ export {
 export { createStockProtectionConsent } from './infrastructure/stock-protection.js';
 
 export { createStockProtectionAdmission } from './infrastructure/stock-protection.js';
+
+export { createLatestPolicyDecisionReader } from './infrastructure/latest-decision.js';
