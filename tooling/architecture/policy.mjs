@@ -85,6 +85,18 @@ export const layers = {
   'composition.ts': ['domain', 'application', 'infrastructure', 'index.ts'],
 };
 
+// Layers inside `packages/apps/<app>/src` and the app layers each may import. Root files
+// (index.ts, config.ts and feature compositions) and test support wire layers and are
+// unrestricted inside their app; `config.ts` is the app's validated settings.
+export const appLayers = {
+  domain: ['domain'],
+  application: ['domain', 'application'],
+  infrastructure: ['domain', 'application', 'infrastructure', 'config.ts'],
+  api: ['domain', 'application', 'api'],
+  // Browser code: never server layers.
+  web: ['domain', 'web'],
+};
+
 export const domainPackages = {
   adaptive: 'adaptive',
   platform: 'platform',
