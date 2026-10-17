@@ -16,6 +16,7 @@ import {
   buildQuery,
   composeMessage,
   createClient,
+  createCursorCodec,
   decodeBase64,
   describeAttachment,
   encodeRaw,
@@ -82,6 +83,7 @@ const cursorSchema = z
     page: z.union([z.string().min(1).max(4096), z.number().int().min(1)]),
   })
   .strict();
+const cursorCodec = createCursorCodec(cursorSchema);
 
 const readDescriptor: CapabilityDescriptor = {
   version: '0',
@@ -156,23 +158,14 @@ export function createGmailConnector(
 
   function readCursor(value: string | undefined, expected: string) {
     if (!value) return null;
-    let cursor: z.infer<typeof cursorSchema>;
-    try {
-      cursor = cursorSchema.parse(
-        JSON.parse(Buffer.from(value, 'base64url').toString('utf8')),
-      );
-    } catch {
-      fail('invalid_input');
-    }
+    const cursor = cursorCodec.decode(value);
     if (cursor.binding !== expected) fail('invalid_input');
 
     return cursor.page;
   }
 
   const writeCursor = (expected: string, page: string | number) =>
-    Buffer.from(JSON.stringify({ binding: expected, page })).toString(
-      'base64url',
-    );
+    cursorCodec.encode({ binding: expected, page });
 
   async function labelNames(gmail: GmailClient) {
     const result = await gmail.labels();
@@ -491,6 +484,10 @@ export function createGmailConnector(
               sentEvidenceId(options.tenantId, options.connectionId, sent.id),
             ],
             providerRequestId: null,
+            records: [
+              { resource: 'message', externalId: sent.id },
+              { resource: 'thread', externalId: sent.threadId },
+            ],
           } satisfies WriteReceipt;
         },
       ),

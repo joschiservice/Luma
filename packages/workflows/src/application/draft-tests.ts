@@ -1,9 +1,12 @@
 import type { Permission, TenantContext } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import {
   type CodeActivityResult,
@@ -148,10 +151,6 @@ const interrupted = 'The test run was interrupted. Run it again.';
 const reload = 'Reload the draft and run the test again.';
 const maxActive = 2;
 const maxCases = 20;
-
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
 
 /**
  * Runs a Code Step in the sandbox against example replies, with the same capability rules as
@@ -383,7 +382,7 @@ export function createDraftTests(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -391,7 +390,7 @@ export function createDraftTests(deps: {
   async function open(context: TenantContext, id: string) {
     const draft = await deps.drafts.get(context, id);
     if (!draft || draft.state === 'discarded')
-      throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+      throw notFound('Draft not found.');
 
     return draft;
   }
@@ -588,11 +587,7 @@ export function createDraftTests(deps: {
 
   function claimSlot() {
     if (active >= maxActive)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'The test runner is busy. Try again shortly.',
-      );
+      throw unavailable('The test runner is busy. Try again shortly.');
     active++;
   }
 
@@ -678,7 +673,7 @@ export function createDraftTests(deps: {
 
   async function get(context: TenantContext, draftId: string, id: string) {
     const item = await deps.store.get(context, draftId, id);
-    if (!item) throw new IdentityError(404, 'NOT_FOUND', 'Test run not found.');
+    if (!item) throw notFound('Test run not found.');
 
     return view(item);
   }
@@ -702,13 +697,13 @@ export function createDraftTests(deps: {
       context = await authorize(context, 'workflows.author');
       const draft = await open(context, draftId);
       if (input.cases.length > maxCases)
-        conflict(`Save at most ${maxCases} test cases.`);
+        throw conflict(`Save at most ${maxCases} test cases.`);
       if (
         new Set(input.cases.map((item) => item.id)).size !== input.cases.length
       )
-        conflict('Give each test case a unique ID.');
+        throw conflict('Give each test case a unique ID.');
       if (input.cases.some((item) => !item.name.trim()))
-        conflict('Name every test case.');
+        throw conflict('Name every test case.');
       const saved = await deps.store.saveCases(
         context,
         draftId,
@@ -721,7 +716,7 @@ export function createDraftTests(deps: {
         current.revision !== input.revision + 1 ||
         deps.hash(current.cases) !== deps.hash(input.cases)
       )
-        conflict(
+        throw conflict(
           'Someone else changed these test cases. Reload them before saving.',
         );
 
@@ -739,7 +734,7 @@ export function createDraftTests(deps: {
     ) {
       context = await authorize(context, 'workflows.author');
       const draft = await open(context, draftId);
-      if (draft.revision !== input.revision) conflict(reload);
+      if (draft.revision !== input.revision) throw conflict(reload);
       const saved = await deps.store.cases(context, draftId);
       const { version } = compile(context, draft);
       if (!version) return summary(context, draft, saved);
@@ -790,7 +785,7 @@ export function createDraftTests(deps: {
             if (reserved.created) jobs.push({ item, testCase: entry.testCase });
           } catch (error) {
             // Another person started the same saved case first; their run is in the summary.
-            if (!(error instanceof IdentityError && error.statusCode === 409))
+            if (!(error instanceof ServiceError && error.statusCode === 409))
               throw error;
           }
         }
@@ -859,7 +854,7 @@ export function createDraftTests(deps: {
     ) {
       context = await authorize(context, 'workflows.author');
       if (!input.caseId === !input.case)
-        conflict('Choose a saved test case or supply one.');
+        throw conflict('Choose a saved test case or supply one.');
       const requestDigest = deps.hash({
         draftId,
         input,
@@ -868,26 +863,25 @@ export function createDraftTests(deps: {
       const existing = await deps.store.get(context, draftId, input.id);
       if (existing) {
         if (existing.requestDigest !== requestDigest)
-          conflict(
+          throw conflict(
             'This test run ID was already used with different inputs. Reuse the original request.',
           );
 
         return view(existing);
       }
       const draft = await open(context, draftId);
-      if (draft.revision !== input.revision) conflict(reload);
+      if (draft.revision !== input.revision) throw conflict(reload);
       let testCase = input.case;
       if (input.caseId) {
         testCase = (await deps.store.cases(context, draftId)).cases.find(
           (item) => item.id === input.caseId,
         );
-        if (!testCase)
-          throw new IdentityError(404, 'NOT_FOUND', 'Test case not found.');
+        if (!testCase) throw notFound('Test case not found.');
       }
       const { version, problem } = compile(context, draft);
-      if (!version) return conflict(problem!);
+      if (!version) throw conflict(problem!);
       const unfit = checkTestCase(version, testCase!)[0];
-      if (unfit) conflict(unfit.message);
+      if (unfit) throw conflict(unfit.message);
       claimSlot();
       let reserved: { item: StoredDraftTestRun; created: boolean };
       try {

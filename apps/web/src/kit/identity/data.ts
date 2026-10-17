@@ -10,7 +10,7 @@ import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { privateQueryDefaults } from '../../lib/private-query';
 
 export const auth = createAuthClient({
@@ -44,7 +44,7 @@ export function usePasskeySupport() {
   );
 }
 
-export { IdentityError };
+export { ApiError };
 
 /**
  * Returns a local application path, falling back to /app for external, malformed, or
@@ -170,8 +170,7 @@ export const sessionOptions = () =>
       const result = await auth.getSession({
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.error)
-        throw new IdentityError(result.error.status, result.error);
+      if (result.error) throw new ApiError(result.error.status, result.error);
 
       return result.data
         ? {
@@ -216,8 +215,7 @@ export const contextOptions = (organizationId: string) =>
     ...privateOptions,
     queryKey: ['private', 'organization', organizationId, 'context'],
     queryFn: async ({ signal }) => {
-      if (!z.uuid().safeParse(organizationId).success)
-        throw new IdentityError(404);
+      if (!z.uuid().safeParse(organizationId).success) throw new ApiError(404);
 
       return api.identity.context({ params: { organizationId } }, { signal });
     },
@@ -256,7 +254,7 @@ export const regionOptions = () =>
         signal,
         cache: 'no-store',
       });
-      if (!response.ok) throw new IdentityError(response.status);
+      if (!response.ok) throw new ApiError(response.status);
 
       return regionConfigSchema.parse(await response.json());
     },

@@ -7,6 +7,7 @@ import { expect, it, vi } from 'vitest';
 import { until } from './helpers.mjs';
 import { purchasingWorker } from './purchasing-worker-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 const flags = {
@@ -960,6 +961,12 @@ for (const channel of ['jtl', 'email'])
         ),
       ).toBe(true);
     }
+    // Every write receipt the cycle's provider writes cite resolves to one stored receipt.
+    const receipts = await expectStoredWriteReceipts(
+      f.f.db.owner,
+      f.f.manifest.organizationId,
+    );
+    expect(receipts.length).toBeGreaterThan(0);
   }, 120_000);
 
 for (const channel of ['jtl', 'email'])

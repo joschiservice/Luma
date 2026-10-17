@@ -20,8 +20,8 @@ import {
   sendScope,
 } from '@luma/connector-gmail';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, notFound, ServiceError } from '@luma/platform';
 import { z } from 'zod';
 
 import type { GmailConfig } from '../config.js';
@@ -31,10 +31,10 @@ import {
   gmailReads,
   type StoredCredentials,
   storedCredentials,
-} from './installation-validation.js';
+} from '../domain/installation-validation.js';
 
 const invalid = () =>
-  new IdentityError(
+  new ServiceError(
     422,
     'CONFLICT',
     'Gmail authorization expired or is invalid. Connect again.',
@@ -169,11 +169,7 @@ export function createGmailOAuth(
         event,
       ))
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Connection changed. Connect again.',
-      );
+      throw conflict('Connection changed. Connect again.');
   }
 
   function next(
@@ -229,11 +225,7 @@ export function createGmailOAuth(
           (installationVersion !== undefined &&
             record.connection.appInstallationVersion !== installationVersion)
         )
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Gmail connection not found',
-          );
+          throw notFound('Gmail connection not found');
         mailbox = record.connection.target.emailAddress ?? null;
         if (record.secret) {
           const credentials = storedCredentials.parse(
@@ -344,9 +336,7 @@ export function createGmailOAuth(
           (c) => c.target.kind === 'gmail' && c.target.emailAddress === address,
         );
         if (existing.length > 1)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Disconnect duplicate Gmail connections before reconnecting.',
           );
         const id = existing[0]?.id ?? randomUUID();
@@ -360,11 +350,7 @@ export function createGmailOAuth(
           [fresh.tenantId, app, address],
         );
         if (binding.rows[0]?.connection_id !== id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This mailbox is already connected to a workspace.',
-          );
+          throw conflict('This mailbox is already connected to a workspace.');
         const record = await repo.get(fresh.tenantId, id);
         const timestamp = now().toISOString();
         const connection: InstalledConnection = {

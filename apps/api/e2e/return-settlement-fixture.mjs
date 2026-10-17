@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
+import { expect } from 'vitest';
+
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 /** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
 export async function settlementFixture(
@@ -264,4 +267,77 @@ export async function settlementFixture(
     lines,
     evidence,
   };
+}
+
+/**
+ * Asserts that every write receipt a return case's creation, settlement and exchange attempts
+ * and their completion audit cite resolves to exactly one receipt orders stored for the case,
+ * and returns the attempts.
+ */
+export async function returnWriteReceipts(f, caseId) {
+  const org = f.manifest.organizationId;
+  const proposals = await f.db.owner.query(
+    `SELECT document->>'actionId' AS id FROM orders_return_creations WHERE tenant_id=$1 AND case_id=$2
+     UNION SELECT document->>'actionId' FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+     UNION SELECT document->>'actionId' FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2`,
+    [org, caseId],
+  );
+  const attempts = await expectStoredWriteReceipts(
+    f.db.owner,
+    org,
+    proposals.rows.map((row) => row.id),
+  );
+  for (const attempt of attempts)
+    for (const row of attempt.stored)
+      expect(row).toMatchObject({
+        owner: 'orders',
+        document: { caseId, source: { connectionId: expect.any(String) } },
+      });
+
+  return attempts;
+}
+
+/**
+ * Every provider read that a return case's verifications, audit entries, stored quotes and
+ * proofs, exchange checks and deadline waits cite, with the stored orders evidence each ID
+ * resolves to. References to the case, its revisions and canonical records such as the store
+ * return it works name Luma's own records and are left out.
+ */
+export async function citedReturnReads(f, caseId) {
+  const org = f.manifest.organizationId;
+  const refs = await f.db.owner.query(
+    `WITH proposals AS (
+       SELECT (document->>'actionId')::uuid AS id FROM orders_return_creations WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT (document->>'actionId')::uuid FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT (document->>'actionId')::uuid FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+     ), waits AS (
+       SELECT id::text AS id,document FROM orders_return_waits WHERE tenant_id=$1 AND case_id=$2
+     ), cited AS (
+       SELECT jsonb_array_elements_text(document->'attempt'->'verification'->'observationRefs') AS id
+         FROM executed_actions WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
+       UNION SELECT jsonb_array_elements_text(document->'result'->'observationRefs')
+         FROM execution_verifications WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
+       UNION SELECT jsonb_array_elements_text(document->'evidenceRefs') FROM audit_entries
+         WHERE tenant_id=$1 AND document->>'eventType' LIKE 'return%'
+           AND (document->>'correlationId'=$2::text OR document->>'correlationId' IN (SELECT id FROM waits))
+       UNION SELECT jsonb_array_elements_text(document->'evidenceRefs') FROM waits
+       UNION SELECT jsonb_array_elements_text(document->'quote'->'evidenceRefs') FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'proof'->'evidenceRefs') FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'quote'->'evidenceRefs') FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'proof'->'evidenceRefs') FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'availability'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'completion'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
+     )
+     SELECT id FROM cited WHERE id<>$2::text AND id NOT LIKE 'case:%'
+       AND NOT EXISTS (SELECT 1 FROM orders_entities e WHERE e.tenant_id=$1 AND e.id::text=cited.id)
+     ORDER BY id`,
+    [org, caseId],
+  );
+  const cited = refs.rows.map((row) => row.id);
+  const stored = await f.db.owner.query(
+    'SELECT id,case_id,purpose,subject_id,document FROM orders_return_read_evidence WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id',
+    [org, cited],
+  );
+
+  return { cited, stored: stored.rows };
 }

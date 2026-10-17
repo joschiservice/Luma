@@ -30,7 +30,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   autoLinkOptions,
   previewAutoLinks,
@@ -575,9 +575,9 @@ function RuleEditor({
 }
 
 function saveError(error: unknown) {
-  if (error instanceof IdentityError && error.status === 403)
+  if (error instanceof ApiError && error.status === 403)
     return m.sync_autolink_error_role();
-  if (error instanceof IdentityError && error.status === 409)
+  if (error instanceof ApiError && error.status === 409)
     return m.sync_autolink_error_conflict();
 
   return m.sync_autolink_error_save();

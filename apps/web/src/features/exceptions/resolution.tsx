@@ -15,7 +15,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import type { CaseObservation } from './observation';
 import {
   decisionCommand,
@@ -160,7 +160,7 @@ export function CaseResolution({
         setReceipt(await sendDecision(organizationId, exceptionId, command));
       } catch (error) {
         if (
-          !(error instanceof IdentityError) ||
+          !(error instanceof ApiError) ||
           error.status !== 409 ||
           !review.refreshable ||
           kind === 'close'
@@ -190,7 +190,7 @@ export function CaseResolution({
       if (
         command &&
         !(
-          error instanceof IdentityError &&
+          error instanceof ApiError &&
           [400, 401, 403, 404, 409, 422].includes(error.status)
         )
       ) {
@@ -235,12 +235,12 @@ export function CaseResolution({
     } catch (error) {
       if (
         retry &&
-        error instanceof IdentityError &&
+        error instanceof ApiError &&
         [400, 401, 403, 404, 409, 422].includes(error.status)
       )
         setUncertain(undefined);
       setMessage(
-        !retry && error instanceof IdentityError && error.status === 404
+        !retry && error instanceof ApiError && error.status === 404
           ? m.exceptions_resolution_no_receipt()
           : decisionError(error),
       );
@@ -282,7 +282,7 @@ export function CaseResolution({
       const refreshed = await refreshResolution(organizationId, exceptionId);
       if (data?.review) retainPrevious(data.review, refreshed);
     } catch (error) {
-      if (!(error instanceof IdentityError) || error.status !== 503)
+      if (!(error instanceof ApiError) || error.status !== 503)
         automaticCheck.current.attempts = 3;
       automaticCheck.current.retryAt = Date.now() + 15_000;
       setCheckError(

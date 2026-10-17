@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import {
   type ListField,
@@ -122,11 +122,7 @@ export function readableCustomFields(
     const found = definitions.find((definition) => definition.id === id);
     if (!found) throw listQueryError('A custom field is unavailable.');
     if (!found.readPermission || !context.permissions.has(found.readPermission))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role cannot use one of these custom fields.',
-      );
+      throw forbidden('Your role cannot use one of these custom fields.');
 
     return { id: found.id, type: found.type };
   });

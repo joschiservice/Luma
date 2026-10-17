@@ -24,7 +24,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
-import { IdentityError, onClearPrivate } from '../../../kit/identity/data';
+import { ApiError, onClearPrivate } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import {
   acceptProposal,
@@ -135,8 +135,7 @@ export function DescribeDialog({
       if (abort.current?.signal.aborted) return;
       setError(workflowError(failure));
       // A definite rejection can be edited; an uncertain one is retried unchanged.
-      if (failure instanceof IdentityError && failure.status < 500)
-        setRequest(null);
+      if (failure instanceof ApiError && failure.status < 500) setRequest(null);
     } finally {
       setPending(false);
     }

@@ -1,6 +1,6 @@
 import type { Incident } from '@luma/exceptions';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, notFound, unavailable } from '@luma/platform';
 
 import {
   type MeasurementStore,
@@ -14,10 +14,7 @@ import type {
 import { summarizeResolutionMetrics } from '../../domain/measurement.js';
 import { readPeople } from './actors.js';
 
-const missing = () =>
-  new IdentityError(404, 'NOT_FOUND', 'Incident or evidence not found');
-const conflict = (message: string) =>
-  new IdentityError(409, 'CONFLICT', message);
+const missing = () => notFound('Incident or evidence not found');
 
 /** Creates append-only measurement commands with immutable environment, optimistic revisions and tenant-owned evidence. */
 export function createMeasurementStore(
@@ -228,9 +225,7 @@ export function createResolutionMetricReader(
         )
       ).rows;
       if (rows.length > 10000)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'The resolution cohort exceeds 10,000 incidents. Choose a shorter window.',
         );
 

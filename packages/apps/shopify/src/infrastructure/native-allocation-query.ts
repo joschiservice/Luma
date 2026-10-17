@@ -2,13 +2,9 @@ import { createHash } from 'node:crypto';
 
 import { nativePublicationBindingSchema } from '@luma/api-contract';
 import type { AuthoritySnapshot } from '@luma/connections';
-import {
-  IdentityError,
-  requirePermission,
-  type TenantContext,
-} from '@luma/identity';
+import { requirePermission, type TenantContext } from '@luma/identity';
 import { quantityUnits } from '@luma/inventory';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 import type { z } from 'zod';
 
 import type { correctionTarget } from '../domain/inventory-correction.js';
@@ -49,9 +45,7 @@ export function createNativeAllocationQuery(database: TenantDatabase) {
       source.deleted ||
       source.unit !== 'each'
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'Choose the owned Shopify channel and a whole-unit allocation.',
       );
     const selling = authority.groups.find(
@@ -61,9 +55,7 @@ export function createNativeAllocationQuery(database: TenantDatabase) {
       selling?.connectionId !== target.connectionId ||
       selling.state !== 'resolved'
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'The selling source changed or is inconclusive. Review source authority.',
       );
     const native = await database.transaction(
@@ -79,9 +71,7 @@ export function createNativeAllocationQuery(database: TenantDatabase) {
           )
         ).rows[0];
         if (!scope)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Review native ownership for this exact location before publishing stock.',
           );
         const accounts = (
@@ -106,22 +96,13 @@ export function createNativeAllocationQuery(database: TenantDatabase) {
           )
         ).rows.map((row) => row.id);
         if (!Array.isArray(accounts) || !openings.length)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This stock pool needs a reviewed native opening.',
-          );
+          throw conflict('This stock pool needs a reviewed native opening.');
         const parsedAccounts =
           nativePublicationBindingSchema.shape.accounts.parse(accounts);
         const availableRow = parsedAccounts.find(
           (value) => value.address.state === 'available',
         );
-        if (!availableRow)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Native availability is unknown.',
-          );
+        if (!availableRow) throw conflict('Native availability is unknown.');
 
         return nativePublicationBindingSchema.parse({
           scope: scope.scope,
@@ -137,16 +118,10 @@ export function createNativeAllocationQuery(database: TenantDatabase) {
       { readOnlySnapshot: true },
     );
     if (BigInt(choice.available) * 1000000n > quantityUnits(native.available))
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'The allocation exceeds current native availability.',
-      );
+      throw conflict('The allocation exceeds current native availability.');
     const age = Date.now() - Date.parse(source.observedAt);
     if (!Number.isFinite(age) || age < 0 || age >= 300000)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'Read this stock source independently before publishing an allocation.',
       );
 

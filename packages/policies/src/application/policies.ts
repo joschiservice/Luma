@@ -1,12 +1,11 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   isAppPermission,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { measure } from '@luma/platform';
+import { conflict, forbidden, measure, notFound } from '@luma/platform';
 
 import type {
   Approval,
@@ -90,7 +89,7 @@ export function createPolicyService(deps: PolicyDependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
   }
 
   async function readDecision(tenantId: string, id: string) {
@@ -313,26 +312,14 @@ export function createPolicyService(deps: PolicyDependencies) {
         decisionId,
       );
       if (!decision || decision.outcome !== 'approval_required')
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Approval decision not found.',
-        );
+        throw notFound('Approval decision not found.');
       if (decision.policyVersion !== policyVersion)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Approval policy changed. Refresh the review.',
-        );
+        throw conflict('Approval policy changed. Refresh the review.');
       if (
         workspace.requireIndependentApproval &&
         fresh.actor.id === decision.actorId
       )
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'A different approver is required.',
-        );
+        throw forbidden('A different approver is required.');
       // Capabilities with their own app permission need it to approve, too.
       if (decision.permission && isAppPermission(decision.permission))
         requirePermission(fresh, decision.permission);

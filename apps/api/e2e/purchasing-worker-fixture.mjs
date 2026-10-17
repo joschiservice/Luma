@@ -64,5 +64,13 @@ export async function purchasingWorker(t, configuration) {
   await request({ type: 'start', ...configuration });
   assert.ok(child.pid);
 
-  return { pid: child.pid, pass: () => request({ type: 'pass' }), stop };
+  return {
+    pid: child.pid,
+    pass: () => request({ type: 'pass' }),
+    /** Runs one return write follow-up pass, as the commerce sync worker does. */
+    returnWrites: () => request({ type: 'returnWrites' }),
+    /** Runs one return step follow-up pass. */
+    returns: () => request({ type: 'returns' }),
+    stop,
+  };
 }

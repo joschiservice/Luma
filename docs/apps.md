@@ -24,6 +24,15 @@ An **app installation** belongs to one workspace. A connector app can create mul
 a process and React runtime: there is no remote code download, iframe sandbox or
 independent deployment. Keep server-only imports out of `src/web`.
 
+Inside an app, `src/domain` holds pure rules and installation validation,
+`src/application` use cases, `src/infrastructure` provider adapters and storage, `src/api`
+HTTP routes and `src/web` UI. Each layer imports only inner layers of its own app:
+application uses domain; infrastructure uses domain, application and the app's
+`config.ts`; api uses domain and application; web uses domain only. Root files such as
+`index.ts` compose the layers, and tests may also import them and `src/test-support`.
+Apps never import another app's source. `pnpm lint` enforces import direction only; unlike
+domain packages, it does not restrict which libraries an app's inner layers use.
+
 ## Install and uninstall
 
 People with `apps.manage` install an app after reviewing the access it requests, and

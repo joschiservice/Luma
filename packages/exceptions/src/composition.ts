@@ -99,3 +99,9 @@ export {
 export { createOrderAttentionBoundaryReader } from './infrastructure/cases.js';
 
 export { createCaseMetricReader } from './infrastructure/cases.js';
+
+export { createPendingStockSyncReader } from './infrastructure/pending-sync.js';
+
+export { tryLeaseDiagnosisInvestigation } from './infrastructure/investigation-lease.js';
+
+export { listDetectionScopes } from './infrastructure/detection-scopes.js';

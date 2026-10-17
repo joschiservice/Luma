@@ -24,6 +24,8 @@ export { orderStateQueries } from './infrastructure/order-state.js';
 
 export { createOrderListRebuilder } from './infrastructure/list-projection.js';
 
+export { listReturnWriteScopes } from './infrastructure/return-write-scopes.js';
+
 const digest = (value: unknown) =>
   createHash('sha256').update(canonicalJson(value)).digest('hex');
 
@@ -66,6 +68,8 @@ export type {
 } from './application/return-cases.js';
 
 export type { FoundReturn } from './domain/return-creations.js';
+
+export type { ReturnRead } from './domain/return-reads.js';
 
 /** Composes governed settlement with orders-owned storage and audited provider ports. */
 export function createReturnActionService(
@@ -136,3 +140,11 @@ export function createReturnDeadlineService(
 }
 
 export type { ReturnDeadlines } from './application/return-deadlines.js';
+
+export { createReturnMoneySource } from './application/return-money-source.js';
+
+export {
+  returnWriteCitations,
+  returnWriteEvidence,
+  type ReturnWriteKind,
+} from './infrastructure/return-evidence.js';

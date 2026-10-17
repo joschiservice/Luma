@@ -8,10 +8,10 @@ import type {
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import type {
   PlaybookDependencies,
@@ -196,18 +196,14 @@ export function createReplenishmentService(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
-  function conflict(message: string): never {
-    throw new IdentityError(409, 'CONFLICT', message);
-  }
-
   function assertAvailable() {
     if (!available)
-      throw new IdentityError(
+      throw new ServiceError(
         503,
         'SERVICE_UNAVAILABLE',
         'Replenishment execution is unavailable. Check the workflow worker connection.',
@@ -240,19 +236,14 @@ export function createReplenishmentService(deps: {
 
   async function activation(context: TenantContext, id: string) {
     const item = (await store.list(context)).find((r) => r.id === id);
-    if (!item)
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Replenishment activation not found.',
-      );
+    if (!item) throw notFound('Replenishment activation not found.');
 
     return item;
   }
 
   function requireStock(result: ReplenishmentStock | undefined) {
     if (!result)
-      conflict(
+      throw conflict(
         'The configured stock position is unavailable. Refresh inventory before retrying.',
       );
 
@@ -333,7 +324,7 @@ export function createReplenishmentService(deps: {
       run.definitionId !== definitionId ||
       run.versionDigest !== version.digest
     )
-      throw new IdentityError(404, 'NOT_FOUND', 'Replenishment run not found.');
+      throw notFound('Replenishment run not found.');
 
     return run;
   }
@@ -842,7 +833,9 @@ export function createReplenishmentService(deps: {
       assertAvailable();
       const request = deps.parseRule(input);
       if (request.reviewedDigest !== version.digest)
-        conflict('The workflow version changed. Refresh before activating.');
+        throw conflict(
+          'The workflow version changed. Refresh before activating.',
+        );
       const prior = (await store.list(context)).find(
         (r) => r.id === request.id,
       );
@@ -855,7 +848,7 @@ export function createReplenishmentService(deps: {
               prior[key as keyof ReplenishmentActivation] !== value,
           )
         )
-          conflict(
+          throw conflict(
             'This activation ID was already used with a different rule.',
           );
         await recordAudit(context, prior);
@@ -870,11 +863,11 @@ export function createReplenishmentService(deps: {
         request.supplierId,
       );
       if (!inventory || !supplier)
-        conflict(
+        throw conflict(
           'Choose an available stock position and supplier in this workspace.',
         );
       if (inventory.sku.length > 200 || inventory.unit.length > 40)
-        conflict(
+        throw conflict(
           'The inventory SKU or unit exceeds the purchase-order field length. Update its mapping first.',
         );
       await catalog.publish(context, version);
@@ -925,7 +918,7 @@ export function createReplenishmentService(deps: {
         deps.procurement.supplier(context, input.supplierId),
         deps.procurement.orders(context),
       ]);
-      if (!supplier) conflict('Choose a supplier in this workspace.');
+      if (!supplier) throw conflict('Choose a supplier in this workspace.');
       const now = Date.now();
 
       return {
@@ -1051,11 +1044,11 @@ export function createReplenishmentService(deps: {
           );
         } catch (error) {
           if (
-            error instanceof IdentityError &&
+            error instanceof ServiceError &&
             (error.statusCode === 401 || error.statusCode === 403)
           )
             throw error;
-          if (error instanceof IdentityError && error.statusCode < 500)
+          if (error instanceof ServiceError && error.statusCode < 500)
             result('failed', 'rejected', error.message);
           else
             result(
@@ -1083,8 +1076,7 @@ export function createReplenishmentService(deps: {
         ? findStock(stocks, rule)
         : (stocks.find((s) => s.positionId === positionId && !s.deleted) ??
           stocks.find((s) => s.positionId === positionId));
-      if (!rule && !stock)
-        throw new IdentityError(404, 'NOT_FOUND', 'Stock position not found.');
+      if (!rule && !stock) throw notFound('Stock position not found.');
       const active = rule?.active ? rule : null;
       const now = Date.now();
       const reason = active ? stockUnusableReason(stock, now) : null;
@@ -1181,7 +1173,9 @@ export function createReplenishmentService(deps: {
       context = await authorize(context, true);
       const rule = await activation(context, id);
       if (rule.artifactDigest !== digest)
-        conflict('The reviewed activation changed. Refresh before revoking.');
+        throw conflict(
+          'The reviewed activation changed. Refresh before revoking.',
+        );
       const revoked = await store.revoke(context, id);
       await deps.safety.provisioning.revoke(context, id, version.version);
       await recordAudit(context, revoked, true);
@@ -1193,7 +1187,9 @@ export function createReplenishmentService(deps: {
       assertAvailable();
       const rule = await activation(context, input.activationId);
       if (rule.principalId !== context.actor.id)
-        conflict('Only the principal who activated this rule can start it.');
+        throw conflict(
+          'Only the principal who activated this rule can start it.',
+        );
       // The request key is independent of changing stock so a lost start response can be recovered.
       const sourceId = input.id;
       const key = deps.hash([
@@ -1206,18 +1202,18 @@ export function createReplenishmentService(deps: {
       ]);
       let run = await runs.find(context, key);
       if (run && run.context.inputs.activationId !== rule.id)
-        conflict('This start ID is already bound to another activation.');
+        throw conflict('This start ID is already bound to another activation.');
       if (!run) {
         if (!rule.active)
-          conflict('This replenishment activation was revoked.');
+          throw conflict('This replenishment activation was revoked.');
         const inventory = await stock(context, rule);
         const current = await plan(context, rule, inventory);
         if (!current.fresh)
-          conflict(
+          throw conflict(
             'Inventory is older than five minutes or unavailable. Refresh the source before starting.',
           );
         if (!current.belowMinimum)
-          conflict(
+          throw conflict(
             'Stock is at or above the configured minimum. No replenishment is needed.',
           );
         const now = inventory.observedAt;
@@ -1356,7 +1352,7 @@ export function createReplenishmentService(deps: {
       context = await authorize(context, true);
       const review = await api.review(context, id);
       if (!review.canRespond || review.decisionId !== input.decisionId)
-        conflict(
+        throw conflict(
           'This proposal changed, expired, or needs a different approver. Refresh its review.',
         );
       const binding = await deps.safety.provisioning.step(
@@ -1496,9 +1492,7 @@ export function createReplenishmentService(deps: {
       if (!inventory || !proposal || !proposal.values.eligible)
         throw new Error('Replenishment proposal is unavailable');
       if (!(await store.claim(context, rule.positionId, rule.sku, run.id)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Another replenishment run is already handling this stock position.',
         );
       const id = deps.id(`${run.id}:order`);

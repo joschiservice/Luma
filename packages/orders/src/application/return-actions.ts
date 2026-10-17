@@ -1,14 +1,18 @@
 import type { AuditEntry } from '@luma/audit';
-import type { ActionDiff } from '@luma/connections';
+import type { ActionDiff, WriteAcceptance } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  ServiceError,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type {
@@ -18,11 +22,24 @@ import type {
 } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
 import type { SourceRef } from '../domain/return-creations.js';
+import {
+  citedReads,
+  completeReads,
+  type ReturnRead,
+  type ReturnReadEvidence,
+  returnReadEvidence,
+} from '../domain/return-reads.js';
+import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type {
   CreationExecution,
   ReturnCaseDependencies,
   ReturnCaseStore,
 } from './return-cases.js';
+import {
+  type ReturnWriteReceipt,
+  returnWriteReceipt,
+  returnWriteReceiptName,
+} from './return-write-receipts.js';
 
 /** One explicit mapping from a case line's canonical SKU to a Wawi warehouse position. */
 export interface ReturnStockTarget {
@@ -47,16 +64,27 @@ export interface ReturnActionStore {
       read(caseId: string): Promise<ReturnCase | null>;
       get(id: string): Promise<ReturnAction | null>;
       list(caseId: string): Promise<ReturnAction[]>;
+      /** One requester's writes that may need a background step, oldest first, at most 100. */
+      live(requestedBy: string): Promise<ReturnAction[]>;
       save(value: ReturnAction): Promise<void>;
       insert(value: ReturnAction): Promise<void>;
       targets(
         value: ReturnCase,
       ): Promise<Omit<ReturnStockTarget, 'warehouse'>[]>;
       audit(entry: AuditEntry): Promise<void>;
+      /** Stores a cited provider read; an already stored read is kept unchanged. */
+      recordRead(evidence: ReturnReadEvidence): Promise<void>;
+      /** Stores a write receipt; an already stored receipt is kept unchanged. */
+      recordWriteReceipt(receipt: ReturnWriteReceipt): Promise<void>;
     }) => Promise<T>,
     options?: { readOnlySnapshot: true },
   ): Promise<T>;
 }
+
+/** A fresh settlement proof with the provider reads its `evidenceRefs` name. */
+export type ReturnActionProofRead = Omit<ReturnActionProof, 'complete'> & {
+  reads: ReturnRead[];
+};
 
 /** Installed source reads; quoting and verification never write to providers. */
 export interface ReturnSettlementSystem {
@@ -83,11 +111,13 @@ export interface ReturnSettlementSystem {
     plan: ReturnActionPlan;
     observedAt: string;
     evidenceRefs: string[];
+    /** The reads `evidenceRefs` names. */
+    reads: ReturnRead[];
   }>;
   proof(
     context: TenantContext,
     action: ReturnAction,
-  ): Promise<ReturnActionProof>;
+  ): Promise<ReturnActionProofRead>;
 }
 
 /** Binds a settlement to shared policy, independent approval, admission and execution. */
@@ -120,6 +150,8 @@ export interface ReturnSettlementAdmission {
     context: TenantContext,
     value: ReturnAction,
   ): Promise<CreationExecution>;
+  /** The execution ledger's record; `not_started` means nothing was reserved or dispatched. */
+  get(context: TenantContext, value: ReturnAction): Promise<CreationExecution>;
   writeMode(
     context: TenantContext,
     id: string,
@@ -144,7 +176,7 @@ interface Dependencies extends Pick<
 }
 
 function fail(status: 404 | 409 | 503, message: string): never {
-  throw new IdentityError(
+  throw new ServiceError(
     status,
     status === 404
       ? 'NOT_FOUND'
@@ -201,7 +233,7 @@ export function createReturnActions(deps: Dependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue');
+      throw forbidden('Sign in again to continue');
     requirePermission(fresh, write ? 'returns.manage' : 'returns.read');
 
     return fresh;
@@ -298,6 +330,13 @@ export function createReturnActions(deps: Dependencies) {
 
     return {
       ...value,
+      // An unsent approval ends with its window; the background pass records it soon after.
+      state:
+        !live &&
+        !value.sent &&
+        ['approval_required', 'approved'].includes(value.state)
+          ? ('expired' as const)
+          : value.state,
       ...(diff ? { diff } : {}),
       canApprove:
         manage &&
@@ -320,11 +359,26 @@ export function createReturnActions(deps: Dependencies) {
     };
   }
 
+  /** The stored evidence for a read a settlement cites. */
+  function evidence(value: ReturnAction, read: ReturnRead) {
+    return returnReadEvidence(
+      value.tenantId,
+      value.caseId,
+      { purpose: 'settlement', id: value.id },
+      read,
+    );
+  }
+
+  /**
+   * Applies a patch unless a newer proof or send fence supersedes it. `reads` are the provider
+   * reads the patch cites; they are stored in the same transaction.
+   */
   async function save(
     context: TenantContext,
     value: ReturnAction,
     patch: Partial<ReturnAction>,
     event?: string,
+    reads: ReturnRead[] = [],
   ) {
     return deps.store.transaction(context.tenantId, async (tx) => {
       await tx.lock(value.caseId);
@@ -349,11 +403,41 @@ export function createReturnActions(deps: Dependencies) {
         ...patch,
         updatedAt: deps.now().toISOString(),
       };
+      for (const read of reads) await tx.recordRead(evidence(next, read));
       await tx.save(next);
       if (event) await tx.audit(auditEntry(context, next, event));
 
       return next;
     });
+  }
+
+  /**
+   * Accepts a fresh proof only when every reference names a returned read; a partial read
+   * cannot pass. Returns null when the proof cannot be cited.
+   */
+  function citedProof(value: ReturnAction, read: ReturnActionProofRead) {
+    const time = Date.parse(read.observedAt);
+    const reads = citedReads(read.evidenceRefs, read.reads);
+    if (
+      !reads ||
+      !read.evidenceRefs.length ||
+      !Number.isFinite(time) ||
+      time < Date.parse(value.requestedAt) ||
+      time > deps.now().getTime() ||
+      deps.now().getTime() - time > 300_000
+    )
+      return null;
+    const complete = completeReads(reads);
+    const proof: ReturnActionProof = {
+      outcome:
+        read.outcome === 'passed' && !complete ? 'inconclusive' : read.outcome,
+      payment: read.payment,
+      observedAt: read.observedAt,
+      evidenceRefs: read.evidenceRefs,
+      complete,
+    };
+
+    return { proof, reads };
   }
 
   function auditEntry(
@@ -383,27 +467,22 @@ export function createReturnActions(deps: Dependencies) {
 
   async function check(context: TenantContext, value: ReturnAction) {
     if (!value.sent || !deps.system) return value;
-    let proof: ReturnActionProof;
+    let read: ReturnActionProofRead;
     try {
-      proof = await deps.system.proof(context, value);
+      read = await deps.system.proof(context, value);
     } catch {
       return save(context, value, {
         state: 'uncertain',
         failure: 'source_unavailable',
       });
     }
-    const time = Date.parse(proof.observedAt);
-    if (
-      !Number.isFinite(time) ||
-      time < Date.parse(value.requestedAt) ||
-      time > deps.now().getTime() ||
-      deps.now().getTime() - time > 300_000 ||
-      !proof.evidenceRefs.length
-    )
+    const cited = citedProof(value, read);
+    if (!cited)
       return save(context, value, {
         state: 'uncertain',
         failure: 'stale_evidence',
       });
+    const { proof } = cited;
     const state =
       proof.outcome === 'passed'
         ? 'verified'
@@ -421,6 +500,7 @@ export function createReturnActions(deps: Dependencies) {
         failure: proof.outcome === 'failed' ? 'provider_failed' : null,
       },
       state === 'verified' ? 'return.settlement.verified' : undefined,
+      cited.reads,
     );
     await deps.admission?.reconcile(context, result).catch(() => undefined);
 
@@ -683,6 +763,9 @@ export function createReturnActions(deps: Dependencies) {
         deps.now().getTime() - Date.parse(quoted.observedAt) > 300_000
       )
         fail(409, 'Read fresh settlement evidence first');
+      const quoteReads = citedReads(quoted.evidenceRefs, quoted.reads);
+      if (!quoteReads || !completeReads(quoteReads))
+        fail(409, 'Read fresh settlement evidence first');
       const now = deps.now();
       const value: ReturnAction = {
         id: input.id,
@@ -739,6 +822,8 @@ export function createReturnActions(deps: Dependencies) {
               });
           }
         await tx.insert(value);
+        for (const read of quoteReads)
+          await tx.recordRead(evidence(value, read));
         await tx.audit(auditEntry(context, value, 'return.settlement.quoted'));
       });
 
@@ -817,6 +902,79 @@ export function createReturnActions(deps: Dependencies) {
 
       return value.proof;
     },
+    /**
+     * Background step for one requester, run as them: applies approvals the owner never stored,
+     * sends approved settlements within their approval, expires unsent ones after it, resumes a
+     * send the execution ledger never reserved, and checks sent ones by reading. It never sends
+     * a reserved or expired write again. Without `returns.manage` it only records expiry.
+     */
+    async recover(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      context = await deps.refreshContext(context);
+      const manage = hasPermission(context, 'returns.manage');
+      const values = await deps.store.transaction(context.tenantId, (tx) =>
+        tx.live(context.actor.id),
+      );
+      const failures: unknown[] = [];
+      for (let value of values) {
+        try {
+          let step = returnRecoveryStep(value, deps.now());
+          if (step === 'expire') {
+            await save(
+              context,
+              value,
+              { state: 'expired' },
+              'return.settlement.expired',
+            );
+            continue;
+          }
+          if (!step || !manage || !deps.admission) continue;
+          if (step === 'decision') {
+            const approval = (
+              await deps.admission.decision(context, value.decisionId!)
+            )?.approval;
+            if (!approval) continue;
+            value = await save(context, value, {
+              state: approval.outcome,
+              decidedBy: approval.approverId,
+              decidedAt: deps.now().toISOString(),
+            });
+            step = value.state === 'approved' ? 'send' : null;
+          }
+          if (step === 'send') await dispatch(context, value);
+          else if (step === 'reconcile') {
+            if (
+              (await deps.admission.get(context, value)).state !== 'not_started'
+            )
+              await check(context, value);
+            else if (Date.parse(value.expiresAt) > deps.now().getTime())
+              // Never reserved: resume the same execution identity under its approval.
+              await dispatch(
+                context,
+                value.state === 'sending'
+                  ? value
+                  : await save(context, value, { state: 'sending' }),
+              );
+            // The approval ended before anything was reserved, so nothing can be dispatched.
+            else
+              await save(
+                context,
+                value,
+                { state: 'expired', sent: false, failure: null },
+                'return.settlement.expired',
+              );
+          }
+        } catch (error) {
+          // A refused step stays for the next pass; other failures must not hold up the rest.
+          if (!(error instanceof ServiceError)) failures.push(error);
+        }
+      }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          'Some return settlements could not be followed up',
+        );
+    },
     /** Resolves only a tenant-owned exact intent for the execution gateway. */
     async forAction(context: TenantContext, id: string) {
       context = await authorize(context, true);
@@ -892,27 +1050,61 @@ export function createReturnActions(deps: Dependencies) {
         );
       });
     },
-    /** Supplies fresh business verification to the execution engine. */
+    /**
+     * Supplies fresh business verification to the execution engine. Every read it cites is
+     * stored first, so its observation IDs resolve to orders evidence. A partial read cannot
+     * pass; a storage failure throws, which execution treats as unknown.
+     */
     async verify(context: TenantContext, id: string) {
       const value = await deps.store.transaction(context.tenantId, (tx) =>
         tx.get(id),
       );
       if (!value || !deps.system)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const proof = await deps.system.proof(context, value);
-
-      const time = Date.parse(proof.observedAt);
-      const fresh =
-        Number.isFinite(time) &&
-        time >= Date.parse(value.requestedAt) &&
-        time <= deps.now().getTime() &&
-        deps.now().getTime() - time <= 300_000 &&
-        proof.evidenceRefs.length > 0;
+      const cited = citedProof(value, await deps.system.proof(context, value));
+      if (!cited)
+        return { outcome: 'inconclusive' as const, observationRefs: [] };
+      await deps.store.transaction(context.tenantId, async (tx) => {
+        for (const read of cited.reads)
+          await tx.recordRead(evidence(value, read));
+      });
 
       return {
-        outcome: fresh ? proof.outcome : ('inconclusive' as const),
-        observationRefs: fresh ? proof.evidenceRefs : [],
+        outcome: cited.proof.outcome,
+        observationRefs: cited.proof.evidenceRefs,
       };
+    },
+    /**
+     * Stores the provider's acceptance of a settlement as orders' write receipt and returns its
+     * ID, which execution cites. It records what already happened, so it does not recheck
+     * authority. Throws when the settlement is unknown or the acceptance belongs to another
+     * connection or capability; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      id: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const value = await tx.get(id);
+        if (
+          !value ||
+          value.connectionId !== acceptance.connectionId ||
+          acceptance.capability !==
+            (value.kind === 'refund' ? 'returns.refund' : 'returns.restock')
+        )
+          throw conflict('The receipt does not belong to this settlement.');
+        const receipt = returnWriteReceipt(
+          context.tenantId,
+          value.caseId,
+          { purpose: 'settlement', id: value.id },
+          deps.uuid(returnWriteReceiptName(context.tenantId, acceptance)),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
   };
 }

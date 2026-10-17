@@ -346,13 +346,18 @@ requests with 503.
 
 Execution reserves `v0:<action ID>` before the single dispatch, and the mailbox app refuses
 to send when the mailbox already holds a message with the reply's Message-ID
-(`luma.<reply ID>@<mailbox domain>`). A provider acceptance is not the outcome: a complete fresh read
+(`luma.<reply ID>@<mailbox domain>`). Messaging stores the mailbox's acceptance with the
+reply as the [send receipt](execution.md#runtimes) execution cites: provider message and thread
+IDs, never recipients or content. A provider acceptance is not the outcome: a complete fresh read
 of the thread must find the exact Message-ID with provider-confirmed sent metadata, the
 reviewed recipients, body, threading headers and attachment bytes. Cached messages and
 partial reads never establish acceptance. The found message is marked as sent by Luma and
 linked from the reply, the thread's reply deadline clears as for any reply, and records
 linked to the thread show it there. Approvals, rejections, withheld sends and requests are
-thread events and audit entries.
+thread events and audit entries. A reply's evidence resolves through the
+[evidence reader](execution.md#reading-cited-evidence) to its send receipt and the stored message
+the verifying read found, without addresses, subject or text; an inconclusive check cites the
+reply itself.
 
 ### Uncertain sends
 

@@ -5,9 +5,9 @@ import type { PurchaseIncomingSource } from '@luma/inventory';
 import { canonicalJson, type TenantDatabase } from '@luma/platform';
 import {
   type Commitment,
-  defaultSupplierTerms,
   type FollowUp,
-  orderProgress,
+  incomingLineExpectations,
+  incomingSubmissionSettled,
   type PurchaseOrder,
   type Submission,
 } from '@luma/procurement';
@@ -34,18 +34,7 @@ export function readNativePurchaseIncoming(
     ).rows[0]?.document;
     if (!submission) return null;
     // Submitted state is persisted only after independently reading the purchasing order or mail acceptance.
-    if (
-      submission.state === 'submitted' &&
-      (submission.channel === 'email'
-        ? !submission.outgoing?.sentMessageId
-        : !submission.externalOrder)
-    )
-      return null;
-    if (
-      submission.state !== 'submitted' &&
-      !['failed', 'rejected', 'expired'].includes(submission.state)
-    )
-      return null;
+    if (!incomingSubmissionSettled(submission)) return null;
     const commitments = (
       await tx.query<{ document: Commitment }>(
         'SELECT document FROM procurement_commitments WHERE tenant_id=$1 AND purchase_order_id=$2 ORDER BY recorded_at,id',
@@ -64,14 +53,11 @@ export function readNativePurchaseIncoming(
         [context.tenantId],
       )
     ).rows;
-    const progress = orderProgress({
+    const expectations = incomingLineExpectations({
       order,
       submission,
       commitments,
       followUps,
-      terms: defaultSupplierTerms,
-      draftVerified: false,
-      supplierLinked: false,
       now: new Date(),
     });
     const lines: PurchaseIncomingSource['lines'] = [];
@@ -91,76 +77,18 @@ export function readNativePurchaseIncoming(
         complete = false;
         continue;
       }
-      const lineProgress = progress.lines.find(
-        (value) => value.lineId === line.id,
-      )!;
-      const shortage = commitments
-        .filter(
-          (value) =>
-            value.lineId === line.id &&
-            value.kind === 'shortage' &&
-            value.status === 'confirmed',
-        )
-        .at(-1);
-      const disposition = shortage
-        ? followUps
-            .filter(
-              (value) =>
-                value.key === `receipt_difference:${shortage.id}` ||
-                value.key.startsWith(`receipt_difference:${shortage.id}:`),
-            )
-            .at(-1)
-        : null;
-      const settled =
-        disposition &&
-        ['accepted', 'credited', 'written_off'].includes(disposition.response)
-          ? (shortage?.quantity ?? 0)
-          : 0;
-      const providerReceived =
-        commitments
-          .filter(
-            (value) =>
-              value.lineId === line.id &&
-              value.kind === 'received' &&
-              value.status === 'confirmed' &&
-              value.source.kind === 'purchasing_system',
-          )
-          .at(-1)?.quantity ?? 0;
-      const expectedQuantity =
-        submission.state === 'submitted' && order.status === 'open'
-          ? Math.max(0, (lineProgress.confirmed ?? line.quantity) - settled)
-          : 0;
-      const facts = commitments.filter(
-        (value) =>
-          value.status === 'confirmed' &&
-          (value.lineId === line.id || value.lineId === null),
-      );
-      const observedAt =
-        facts
-          .map((value) =>
-            value.source.kind === 'purchasing_system'
-              ? value.source.observedAt
-              : value.recordedAt,
-          )
-          .sort()
-          .at(-1) ??
-        submission.submittedAt ??
-        submission.updatedAt;
+      const expectation = expectations.get(line.id)!;
       lines.push({
         lineId: line.id,
         skuId: sku[0]!.id,
         locationId: line.locationId,
         unit: line.unit,
-        expectedQuantity: String(expectedQuantity),
-        providerReceivedQuantity: String(providerReceived),
+        expectedQuantity: String(expectation.expectedQuantity),
+        providerReceivedQuantity: String(expectation.providerReceivedQuantity),
         scopeVersion: scope.version,
-        observedAt,
-        expectedDate: lineProgress.expectedDate,
-        dateConfidence: lineProgress.promisedDate
-          ? 'confirmed'
-          : lineProgress.requestedDate
-            ? 'requested'
-            : 'unknown',
+        observedAt: expectation.observedAt,
+        expectedDate: expectation.expectedDate,
+        dateConfidence: expectation.dateConfidence,
       });
     }
     const evidenceRefs = [

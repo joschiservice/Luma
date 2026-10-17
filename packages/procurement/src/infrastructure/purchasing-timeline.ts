@@ -227,11 +227,21 @@ export async function readPurchasingActionTimeline(
     for (const { document: execution } of executions) {
       const action = actions.get(execution.proposalId);
       if (!action) continue;
-      if (
-        action.kind === 'revision' ||
-        (action.kind === 'submission' && action.channel === 'email')
-      )
+      if (action.kind === 'revision') {
+        // The verified revision also cites the purchasing system's acceptance of the change.
+        const verified = entries.find(
+          (entry) => entry.id === `revision:${action.id}:verified`,
+        );
+        if (verified)
+          verified.evidenceRefs = [
+            ...new Set([
+              ...verified.evidenceRefs,
+              ...(execution.attempt.effectEvidenceRefs ?? []),
+            ]),
+          ];
         continue;
+      }
+      if (action.kind === 'submission' && action.channel === 'email') continue;
       const proof = execution.attempt.verification;
       const verified = purchasingExecutionVerified(execution.attempt);
       if (action.kind === 'submission' && !verified) continue;
@@ -256,8 +266,13 @@ export async function readPurchasingActionTimeline(
             : action.kind === 'submission'
               ? 'purchasing_system'
               : 'luma',
-        evidenceRefs:
-          proof?.observationRefs ?? execution.attempt.effectEvidenceRefs ?? [],
+        // The fresh reads that verified the action, then the provider's acceptance of the write.
+        evidenceRefs: [
+          ...new Set([
+            ...(proof?.observationRefs ?? []),
+            ...(execution.attempt.effectEvidenceRefs ?? []),
+          ]),
+        ],
         actorId: execution.attempt.requestedBy,
         quantity: action.quantity,
         revision: action.revision,

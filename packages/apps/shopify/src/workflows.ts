@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { AppFactoryContext } from '@luma/app-host';
 import type { InstallationService } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import { compileProcessWorkflow } from '@luma/workflows/composition';
 
 import { createShopifyCaseWorkflows } from './application/case-workflows.js';
@@ -49,7 +49,7 @@ export function createShopifyWorkflows(
       );
     } catch (error) {
       if (
-        error instanceof IdentityError &&
+        error instanceof ServiceError &&
         [403, 404, 409].includes(error.statusCode)
       )
         return [];

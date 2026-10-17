@@ -6,8 +6,8 @@ import {
   decisionListSchema,
   decisionsCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type {
@@ -29,30 +29,16 @@ export function decisionRoutes(
   return os.router({
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!queue)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Needs you is unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!queue) throw unavailable('Needs you is unavailable');
 
       return queue.find(request.tenantContext, params.decisionId);
     }),
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!queue)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Needs you is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!queue) throw unavailable('Needs you is unavailable');
 
         validateCollectionQuery(decisionsCatalog, query);
 
@@ -64,17 +50,8 @@ export function decisionRoutes(
     assign: os.assign.handler(
       async ({ context: { request }, input: { body } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!assignments)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Assignments are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!assignments) throw unavailable('Assignments are unavailable');
 
         return decisionAssignResultSchema.parse(
           await assignments.assign(request.tenantContext, body),

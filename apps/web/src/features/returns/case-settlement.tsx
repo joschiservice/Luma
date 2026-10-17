@@ -21,6 +21,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useNow } from '../../kit/live/now';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { formatMoney } from '../../shared/orders/presentation';
 import {
   returnCaseError,
@@ -203,6 +204,12 @@ export function ReturnSettlement({
                     ) : (
                       <span>{m.returns_settlement_no_proof()}</span>
                     )}
+                    {action.sent || action.proof ? (
+                      <EvidenceDisclosure
+                        organizationId={organizationId}
+                        subject={{ kind: 'return_settlement', id: action.id }}
+                      />
+                    ) : null}
                     {action.observeOnly ? (
                       <span>{m.returns_settlement_observe_only()}</span>
                     ) : null}

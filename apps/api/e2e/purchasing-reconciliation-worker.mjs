@@ -41,6 +41,12 @@ process.on('message', (message) => {
         // the persisted message requester and refreshes their current permissions before a read.
         await pilot.messaging.replies.pass(await pilot.context());
         await pilot.messaging.replies.pass(await pilot.operator());
+      } else if (message.type === 'returnWrites') {
+        // The commerce sync worker's return follow-up: sends approved writes, reads uncertain ones.
+        await pilot.returnFollowUp();
+      } else if (message.type === 'returns') {
+        // The return step follow-up's bounded pass, as its workflow activity runs it.
+        await pilot.returnDeadlines.tick(await pilot.operator());
       }
       process.send({ id: message.id, ready: true });
     })

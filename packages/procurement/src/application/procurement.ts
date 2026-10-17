@@ -2,10 +2,10 @@ import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, notFound, unavailable } from '@luma/platform';
 
 import {
   type Commitment,
@@ -194,13 +194,9 @@ export function createProcurementService(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
-  }
-
-  function conflict(message: string): never {
-    throw new IdentityError(409, 'CONFLICT', message);
   }
 
   async function command<T extends Supplier | PurchaseOrder>(
@@ -215,7 +211,7 @@ export function createProcurementService(deps: {
       const prior = await tx.command(id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -320,9 +316,7 @@ export function createProcurementService(deps: {
         ) &&
         !options.confirmationOverdue
       )
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'Confirmation status is unavailable. Try again later.',
         );
       const customIds = customFieldIds(query.where, query.sort);
@@ -332,20 +326,12 @@ export function createProcurementService(deps: {
         false,
         async (tx) => {
           if (!tx.supplierPage || !tx.countSuppliers)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Supplier lists are unavailable',
-            );
+            throw unavailable('Supplier lists are unavailable');
           // Custom field definitions come from the snapshot whose values they filter.
           let custom: ListCustomField[] = [];
           if (customIds.length) {
             if (!tx.customFields)
-              throw new IdentityError(
-                503,
-                'SERVICE_UNAVAILABLE',
-                'Custom fields are unavailable.',
-              );
+              throw unavailable('Custom fields are unavailable.');
             custom = readableCustomFields(
               context,
               customIds,
@@ -397,11 +383,7 @@ export function createProcurementService(deps: {
     ) {
       context = await authorize(context, true);
       if (!deps.parseSupplierContact)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Supplier contact editing is unavailable',
-        );
+        throw unavailable('Supplier contact editing is unavailable');
       const request = deps.parseSupplierContact(input);
 
       return command(
@@ -410,16 +392,13 @@ export function createProcurementService(deps: {
         { kind: 'supplier_contact', supplierId, ...request },
         async (tx) => {
           const supplier = await tx.supplier(supplierId);
-          if (!supplier)
-            throw new IdentityError(404, 'NOT_FOUND', 'Supplier not found');
+          if (!supplier) throw notFound('Supplier not found');
           if ((supplier.revision ?? 1) !== request.expectedRevision)
-            conflict('This supplier changed. Refresh and review it again.');
-          if (!tx.updateSupplier)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Supplier contact editing is unavailable',
+            throw conflict(
+              'This supplier changed. Refresh and review it again.',
             );
+          if (!tx.updateSupplier)
+            throw unavailable('Supplier contact editing is unavailable');
           const updated: Supplier = {
             ...supplier,
             email: request.email ?? undefined,
@@ -520,7 +499,7 @@ export function createProcurementService(deps: {
       context = await authorize(context, true);
       const request = deps.parseOrder(input);
       const problem = purchaseOrderProblem(request);
-      if (problem) conflict(problem);
+      if (problem) throw conflict(problem);
 
       return command(
         context,
@@ -528,8 +507,7 @@ export function createProcurementService(deps: {
         { kind: 'order', ...request },
         async (tx) => {
           const supplier = await tx.supplier(request.supplierId);
-          if (!supplier)
-            throw new IdentityError(404, 'NOT_FOUND', 'Supplier not found');
+          if (!supplier) throw notFound('Supplier not found');
           if (request.origin.sourcePurchaseOrderId) {
             const source = await tx.shortfallState?.(
               request.origin.sourcePurchaseOrderId,
@@ -539,7 +517,7 @@ export function createProcurementService(deps: {
               !request.origin.sourceAttentionKey ||
               source.order.supplierId === request.supplierId
             )
-              conflict(
+              throw conflict(
                 'Review the source shortfall and choose another supplier.',
               );
             const progress = orderProgress({
@@ -558,7 +536,7 @@ export function createProcurementService(deps: {
                   ),
               )
             )
-              conflict(
+              throw conflict(
                 'This difference already has a decision. Refresh the source order.',
               );
           }
@@ -574,7 +552,7 @@ export function createProcurementService(deps: {
                 ),
             )
           )
-            conflict(
+            throw conflict(
               'An existing draft or open purchase order already covers this SKU.',
             );
           const lines = await Promise.all(
@@ -614,8 +592,7 @@ export function createProcurementService(deps: {
 
       return deps.store.transaction(context.tenantId, false, async (tx) => {
         const order = await tx.order(id);
-        if (!order)
-          throw new IdentityError(404, 'NOT_FOUND', 'Purchase order not found');
+        if (!order) throw notFound('Purchase order not found');
         const canManage = hasPermission(context, 'procurement.manage');
         const nativeSubmitted = !!(await tx.submittedNativeOrder?.(id));
 
@@ -643,29 +620,24 @@ export function createProcurementService(deps: {
         { kind: 'transition', purchaseOrderId: id, ...request },
         async (tx) => {
           const order = await tx.order(id);
-          if (!order)
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
-              'Purchase order not found',
-            );
+          if (!order) throw notFound('Purchase order not found');
           if (
             request.status === 'cancelled' &&
             (await tx.submittedNativeOrder?.(id))
           )
-            conflict(
+            throw conflict(
               'Submitted purchasing-system orders require verified source cancellation. This connection does not support cancellation.',
             );
           if (await tx.pendingOrderChange?.(id))
-            conflict(
+            throw conflict(
               'An order change still needs approval or verification. Resolve it before changing the order lifecycle.',
             );
           if (order.revision !== request.expectedRevision)
-            conflict(
+            throw conflict(
               'This purchase order changed. Refresh and review its current status.',
             );
           if (!nextStatuses(order).includes(request.status))
-            conflict(
+            throw conflict(
               'This status change is not available for this purchase order.',
             );
           const updated = {

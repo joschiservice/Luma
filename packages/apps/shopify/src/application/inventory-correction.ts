@@ -7,12 +7,17 @@ import type {
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
@@ -108,16 +113,14 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     await deps.permission.require(fresh);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again.');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Sign in again.');
 
     return fresh;
   }
 
   async function load(context: TenantContext, id: string) {
     const run = await deps.store.get(context, id);
-    if (!run)
-      throw new IdentityError(404, 'NOT_FOUND', 'Correction not found.');
+    if (!run) throw notFound('Correction not found.');
     await deps.authorize(context, run.target.connectionId);
 
     return run;
@@ -154,7 +157,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       } catch (error) {
         if (
           run.target.receipt &&
-          error instanceof IdentityError &&
+          error instanceof ServiceError &&
           [404, 409].includes(error.statusCode)
         )
           sourceChanged = true;
@@ -378,11 +381,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
           JSON.stringify(existing.choice) !== JSON.stringify(choice) ||
           existing.action.proposedBy.id !== context.actor.id
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This request already belongs to another correction.',
-          );
+          throw conflict('This request already belongs to another correction.');
 
         const run = await load(context, requestId);
 
@@ -398,15 +397,13 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
           !execution.record.attempt.effectEvidenceRefs?.length &&
           execution.record.state !== 'succeeded'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A previous write is uncertain. Reconcile that correction before starting another.',
           );
       }
       const before = await deps.read(context, target);
       const blocker = correctionBlocker(before, choice, granted, deps.now());
-      if (blocker) throw new IdentityError(409, 'CONFLICT', blocker);
+      if (blocker) throw conflict(blocker);
       // People get a decision window; evidence freshness is checked again on a fresh read before
       // the write, so the approval binds this exact change, not this read.
       const expiresAt = new Date(
@@ -478,20 +475,14 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         requireChangesAllowed(context);
       }
       if (context.actor.id !== run.action.proposedBy.id)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only the requester can run this action.',
-        );
+        throw forbidden('Only the requester can run this action.');
       const previous = await deps.admission.get(context, id);
       if (previous?.state === 'not_executed')
         return view(context, run, previous);
       if (!previous || !('record' in previous)) {
         const current = await view(context, run);
         if (!current.canExecute && !current.observeOnly)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This action needs current approval before it can run.',
           );
         if (!current.observeOnly) await deps.store.claim(context, run);
@@ -523,11 +514,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         requireChangesAllowed(context);
       }
       if (!run.decisionId || !(await view(context, run)).canApprove)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This action cannot be approved by you.',
-        );
+        throw conflict('This action cannot be approved by you.');
       await deps.policies.respond(
         context,
         run.decisionId,

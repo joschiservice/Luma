@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { resolutionReview } from '../../../../../packages/ui/src/components/issues/resolution-fixtures';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   decisionCommand,
   decisionError,
@@ -106,7 +106,7 @@ it.each([401, 403, 404, 409])(
         decisionCommand(resolutionReview, 'approve', 'Checked'),
       ),
     ).rejects.toMatchObject({ status });
-    expect(decisionError(new IdentityError(status))).not.toContain('uncertain');
+    expect(decisionError(new ApiError(status))).not.toContain('uncertain');
   },
 );
 

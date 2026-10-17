@@ -12,11 +12,8 @@ import type {
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  WorkspaceInactiveError,
-} from '@luma/identity';
+import { requirePermission, WorkspaceInactiveError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 
 import {
   failureMessage,
@@ -463,7 +460,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         });
         if (!stream?.scan) return true;
       }
-      const scan = stream.scan!;
+      const scan = stream.scan;
       const result = await deps.reader.read(tenant, {
         readPurpose: scan.kind === 'incremental' ? 'incremental' : 'history',
         connectionId: claimed.connectionId,
@@ -673,9 +670,9 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     } catch (error) {
       log('Sync page failed', error);
       await fail(
-        error instanceof IdentityError ? 'principal_unavailable' : 'internal',
+        error instanceof ServiceError ? 'principal_unavailable' : 'internal',
         {
-          ...(error instanceof IdentityError
+          ...(error instanceof ServiceError
             ? {
                 block: 'principal_unavailable',
                 message: principalMessage,
@@ -729,14 +726,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           return;
         }
         const expected =
-          error instanceof LinkError || error instanceof IdentityError;
+          error instanceof LinkError || error instanceof ServiceError;
         if (!expected) log('Link request failed', error);
         await deps.store.finishLink(tenantId, request.id, {
           state: 'failed',
           message:
             error instanceof LinkError
               ? error.message
-              : error instanceof IdentityError
+              : error instanceof ServiceError
                 ? 'You no longer have permission to link records in this workspace.'
                 : 'Luma could not apply this change. No records were merged or split; try again.',
         });
@@ -949,7 +946,7 @@ function redact(
 function isRecordProblem(error: unknown) {
   return (
     error instanceof Error &&
-    !(error instanceof IdentityError) &&
+    !(error instanceof ServiceError) &&
     // The connection changed state during the page; retry the page instead.
     error.message !== 'Connection unavailable' &&
     (error.name === 'ZodError' ||

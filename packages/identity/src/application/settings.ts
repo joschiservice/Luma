@@ -1,10 +1,17 @@
+import {
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
+
 import type {
   Membership,
   SessionIdentity,
   TenantContext,
 } from '../domain/context.js';
 import {
-  IdentityError,
   requireActiveMembership,
   requireChangesAllowed,
 } from '../domain/context.js';
@@ -121,17 +128,10 @@ export interface SettingsDependencies {
   hash(value: string): string;
 }
 
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
-function unavailable(): never {
-  throw new IdentityError(
-    503,
-    'SERVICE_UNAVAILABLE',
+const emailUnavailable = () =>
+  unavailable(
     'Email delivery is unavailable. Ask your administrator to configure email.',
   );
-}
 
 function publicInvitation(value: InvitationRecord): WorkspaceInvitation {
   return {
@@ -158,13 +158,10 @@ export function createSettingsService(deps: SettingsDependencies) {
       context.actor.id,
       async (tx) => {
         const actor = await tx.member(context.actor.id);
-        if (!actor)
-          throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        if (!actor) throw notFound('Workspace not found');
         requireActiveMembership(actor);
         if (permission && !actor.permissions.has(permission))
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
+          throw forbidden(
             'Your role does not allow this. Ask a workspace admin for access.',
           );
 
@@ -188,7 +185,7 @@ export function createSettingsService(deps: SettingsDependencies) {
           previous.actorId !== context.actor.id ||
           previous.request !== request
         )
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -223,28 +220,24 @@ export function createSettingsService(deps: SettingsDependencies) {
           invitation.status !== 'pending' ||
           Date.parse(invitation.expiresAt) <= deps.now().getTime()
         ) {
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
+          throw notFound(
             'This invitation is unavailable for your account. Check the email address or ask for a new invitation.',
           );
         }
         if (invitation.role.archived)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
+          throw notFound(
             'The role in this invitation is no longer available. Ask for a new invitation.',
           );
         if (accept) {
           // An unconfirmed address may belong to someone else; joining would hand them access.
           if (!account.verified)
-            throw new IdentityError(
+            throw new ServiceError(
               403,
               'EMAIL_NOT_VERIFIED',
               'Confirm your email address before you join a workspace. Use the link Luma sent you, or send a new one from this page.',
             );
           if (await tx.member(session.userId))
-            conflict('You already belong to this workspace.');
+            throw conflict('You already belong to this workspace.');
           await tx.accept(invitation, session.userId);
           await tx.audit(
             session.userId,
@@ -306,7 +299,9 @@ export function createSettingsService(deps: SettingsDependencies) {
         async (tx) => {
           const before = (await tx.snapshot(context.actor.id)).workspace;
           if (before.revision !== input.revision)
-            conflict('Workspace settings changed. Refresh before saving.');
+            throw conflict(
+              'Workspace settings changed. Refresh before saving.',
+            );
           const after = {
             ...before,
             name: input.name,
@@ -352,21 +347,17 @@ export function createSettingsService(deps: SettingsDependencies) {
 
       return command(context, null, input, 'write_mode', async (tx, actor) => {
         if (actor.role.key !== 'owner')
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
-            'Only workspace owners can change write mode.',
-          );
+          throw forbidden('Only workspace owners can change write mode.');
         const before = (await tx.snapshot(context.actor.id)).workspace;
         if (before.revision !== input.revision)
-          conflict('Write settings changed. Refresh before saving.');
+          throw conflict('Write settings changed. Refresh before saving.');
         if (
           input.writeMode === 'observe_only' &&
           before.writeMode !== 'observe_only' &&
           (await tx.activeStockHolds?.()) &&
           !input.acknowledgeStockHolds
         )
-          conflict(
+          throw conflict(
             'Active stock holds exist. Release them first or acknowledge that observe-only also blocks releases.',
           );
         if (before.writeMode !== input.writeMode) {
@@ -407,7 +398,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         async (tx) => {
           const before = (await tx.snapshot(context.actor.id)).workspace;
           if (before.policyRevision !== input.revision)
-            conflict('Approval settings changed. Refresh before saving.');
+            throw conflict('Approval settings changed. Refresh before saving.');
           const independent =
             input.requireIndependentApproval ??
             before.requireIndependentApproval;
@@ -465,7 +456,7 @@ export function createSettingsService(deps: SettingsDependencies) {
       return command(context, null, input, 'notifications', async (tx) => {
         const before = (await tx.snapshot(context.actor.id)).preferences;
         if (before.revision !== input.revision)
-          conflict('Email preferences changed. Refresh before saving.');
+          throw conflict('Email preferences changed. Refresh before saving.');
         await tx.savePreferences(context.actor.id, {
           issues: input.issues,
           connections: input.connections,
@@ -488,7 +479,7 @@ export function createSettingsService(deps: SettingsDependencies) {
       return authorized(context, null, async (tx) => {
         const before = await tx.layout(context.actor.id);
         if (before.revision !== input.revision)
-          conflict(
+          throw conflict(
             'Your layout changed in another session. Refresh before saving.',
           );
         const after: WorkspaceLayout = {
@@ -504,10 +495,10 @@ export function createSettingsService(deps: SettingsDependencies) {
     /** Queues one test message per command; current membership is rechecked before sending. */
     testEmail(context: TenantContext, input: { commandId: string }) {
       return command(context, null, input, 'test', async (tx) => {
-        if (!deps.deliveryAvailable) unavailable();
+        if (!deps.deliveryAvailable) throw emailUnavailable();
         const last = (await tx.snapshot(context.actor.id)).lastTest;
         if (last?.state === 'queued')
-          conflict('A test email is already queued.');
+          throw conflict('A test email is already queued.');
         await tx.queueTest(context.actor.id, input.commandId);
 
         return tx.snapshot(context.actor.id);
@@ -536,7 +527,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         async (tx) => {
           const before = await tx.supportAccess();
           if (before.revision !== input.revision)
-            conflict('Support access changed. Refresh before saving.');
+            throw conflict('Support access changed. Refresh before saving.');
           const allowedUntil = new Date(
             deps.now().getTime() + input.durationHours * 3600000,
           ).toISOString();
@@ -569,7 +560,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         async (tx) => {
           const before = await tx.supportAccess();
           if (before.revision !== input.revision)
-            conflict('Support access changed. Refresh before saving.');
+            throw conflict('Support access changed. Refresh before saving.');
           if (before.allowedUntil) {
             await tx.saveSupportAccess(
               { allowedUntil: null, revision: before.revision + 1 },
@@ -605,7 +596,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         async (tx) => {
           const request = await tx.supportAccessRequest(requestId);
           if (!request?.pending)
-            conflict(
+            throw conflict(
               'This request was already answered or has lapsed. Refresh the page.',
             );
           await tx.decideSupportAccessRequest(
@@ -668,7 +659,7 @@ export function createSettingsService(deps: SettingsDependencies) {
             context.actor.id,
           );
           if (!answered)
-            conflict(
+            throw conflict(
               'This request was already answered or has lapsed. Refresh the page.',
             );
 
@@ -692,7 +683,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         'support_inspection.revoke',
         async (tx) => {
           if (!(await tx.revokeInspection(requestId, context.actor.id)))
-            conflict(
+            throw conflict(
               'This access already ended or can’t be revoked. Refresh the page.',
             );
 
@@ -719,30 +710,28 @@ export function createSettingsService(deps: SettingsDependencies) {
         input,
         'invite',
         async (tx, actor) => {
-          if (!deps.deliveryAvailable) unavailable();
+          if (!deps.deliveryAvailable) throw emailUnavailable();
           const role = await tx.role(input.roleId);
           if (!role || role.archived)
-            conflict(
+            throw conflict(
               'This role is no longer available. Refresh and choose another role.',
             );
           if (role.reference.key === 'owner')
-            conflict(
+            throw conflict(
               'Invite people with another role, then make them an owner after they join.',
             );
           if (
             actor.role.key !== 'owner' &&
             !actor.permissions.covers(role.permissions)
           )
-            throw new IdentityError(
-              403,
-              'FORBIDDEN',
+            throw forbidden(
               'You can only invite people with roles whose permissions you hold.',
             );
           if (await tx.memberWithEmail(input.email))
-            conflict('This person is already a member.');
+            throw conflict('This person is already a member.');
           const existing = await tx.pendingInvitation(input.email);
           if (existing)
-            conflict(
+            throw conflict(
               'An invitation already exists. Resend it to provide a new link.',
             );
           const id = deps.id();
@@ -795,18 +784,18 @@ export function createSettingsService(deps: SettingsDependencies) {
             !['pending', 'expired'].includes(before.status) ||
             before.generation !== input.generation
           )
-            conflict('The invitation changed. Refresh the team list.');
+            throw conflict('The invitation changed. Refresh the team list.');
           if (input.action === 'resend' && !deps.deliveryAvailable)
-            unavailable();
+            throw emailUnavailable();
           if (input.action === 'resend' && before.role.archived)
-            conflict(
+            throw conflict(
               'The role in this invitation was archived. Revoke it and invite again with another role.',
             );
           if (
             input.action === 'resend' &&
             (await tx.memberWithEmail(before.email))
           )
-            conflict('This person is already a member.');
+            throw conflict('This person is already a member.');
           const after = {
             ...before,
             status:

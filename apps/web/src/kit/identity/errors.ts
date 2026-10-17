@@ -1,6 +1,6 @@
 import { m } from '@luma/i18n/messages';
 
-import { IdentityError } from './data';
+import { ApiError } from './data';
 
 const unavailableCodes = new Set([
   'SERVICE_UNAVAILABLE',
@@ -14,7 +14,7 @@ function isOffline() {
 }
 
 function statusOf(error: unknown) {
-  if (error instanceof IdentityError) return error.status;
+  if (error instanceof ApiError) return error.status;
   if (
     error &&
     typeof error === 'object' &&
@@ -36,7 +36,7 @@ function statusOf(error: unknown) {
  */
 export function requestErrorMessage(error: unknown, fallback?: string) {
   const status = statusOf(error);
-  const code = error instanceof IdentityError ? error.code : undefined;
+  const code = error instanceof ApiError ? error.code : undefined;
 
   if (isOffline() || status === 0 || error instanceof TypeError)
     return m.identity_error_network();
@@ -57,8 +57,7 @@ export function requestErrorMessage(error: unknown, fallback?: string) {
     unavailableCodes.has(code ?? '')
   )
     return m.identity_error_unavailable();
-  if (error instanceof IdentityError && code && error.message)
-    return error.message;
+  if (error instanceof ApiError && code && error.message) return error.message;
 
   return fallback ?? m.identity_error_unavailable();
 }

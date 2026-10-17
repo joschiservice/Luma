@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createJtlConnector } from '@luma/app-jtl';
 import {
+  applicationOptionsFor,
   buildApp,
   createApplicationServices,
   createCommerceServices,
@@ -38,10 +39,14 @@ import {
 import { createCustomerProfiles } from '@luma/customers/composition';
 import { defaultConfiguration } from '@luma/exceptions';
 import { parseAction } from '@luma/execution/composition';
-import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
-import { createFailureLog } from '@luma/platform';
+import {
+  conflict,
+  createFailureLog,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createProposalRefresher,
@@ -57,9 +62,6 @@ import { Pool } from 'pg';
 import {
   createInstallationVerifier,
   createInstalledConnections,
-  createInstalledMessageRuntime,
-  createInstalledPurchaseOrderRuntime,
-  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
@@ -187,7 +189,7 @@ export async function createPilot(
           actor.tenantId !== manifest.organizationId ||
           !Object.values(manifest.connections).includes(connectionId)
         )
-          throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+          throw notFound('Connection not found');
 
         return installations.check(actor, connectionId, version);
       },
@@ -496,16 +498,14 @@ export async function createPilot(
         )
       : undefined;
     if (processClient) resources.add(processClient.close);
-    const mailboxRuntime = simulation
-      ? createInstalledMessageRuntime({
-          ...installedOptions,
-          record: async () => undefined,
-        })
-      : undefined;
+    // The same app-host options the API and workers derive. Purchase orders, returns and mailboxes
+    // need simulated providers; the plain pilot keeps them local, like an API without connections.
+    const shared = applicationOptionsFor(installations, {
+      providerRuntimes: !!simulation,
+      ...(observability ? { observability } : {}),
+    });
     const application = createApplicationServices({
-      observability,
-      connectionEnvironment: installations.connectionEnvironment,
-
+      ...shared,
       ...(modelGateway ? { modelGateway } : {}),
       ...(supplierExtraction ? { supplierExtraction } : {}),
       ...(processClient ? { replenishmentTransport: processClient } : {}),
@@ -513,38 +513,12 @@ export async function createPilot(
       identity: identity.service,
       execution: { kind: 'enabled', effects },
       verifier,
-      decisionSources: installations.decisionSources(),
-      providerCatalog: installations.providerCatalog,
-      workflowSources: installations.registry.workflowSources(),
-      actionPermission: installations.registry.actionPermission,
       ...(detectionTiming.followUps
         ? { followUps: detectionTiming.followUps }
         : {}),
       ...(simulation ? { refreshStock } : {}),
-      ...(simulation
-        ? {
-            purchasing: {
-              runtime: createInstalledPurchaseOrderRuntime(installedOptions),
-
-              installations,
-            },
-            returns: {
-              runtime: createInstalledReturnRuntime(installedOptions),
-              installations,
-            },
-          }
-        : {}),
-      // Simulated mailboxes are read through the installed capability runtime, as in the worker.
-      ...(simulation
-        ? {
-            messaging: {
-              installations,
-              // Replies are sent through the same runtime, as in the API and worker.
-              reader: mailboxRuntime,
-              sender: mailboxRuntime,
-              log: failureLog,
-            },
-          }
+      ...(shared.messaging
+        ? { messaging: { ...shared.messaging, log: failureLog } }
         : {}),
       desk: {
         capability: supported,
@@ -684,7 +658,7 @@ export async function createPilot(
               try {
                 await deskService.refresh(actor, exceptionId);
               } catch (error) {
-                if (error instanceof IdentityError && error.statusCode === 409)
+                if (error instanceof ServiceError && error.statusCode === 409)
                   return null;
                 throw error;
               }
@@ -803,11 +777,7 @@ export async function createPilot(
 
     async function refreshProposal(exceptionId) {
       if (exceptionId !== id || !runtime)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This case needs a new investigation.',
-        );
+        throw conflict('This case needs a new investigation.');
 
       return createProposalRefresher({
         desk: deskService,
@@ -900,6 +870,25 @@ export async function createPilot(
         );
     };
     /**
+     * Runs one return follow-up pass, as the sync worker does: approved return writes are sent
+     * as their requester and uncertain ones are checked by reading.
+     */
+    const returnFollowUp = async () => {
+      const { rows } = await pool.query(
+        'SELECT tenant_id,principal_id FROM orders_return_write_scopes()',
+      );
+      for (const row of rows) {
+        const requester = await identity.service.resolveWorkflowContext(
+          row.principal_id,
+          row.tenant_id,
+          'return-follow-up',
+        );
+        await application.returnCases.recover(requester);
+        await application.returnActions.recover(requester);
+        await application.returnExchanges.recover(requester);
+      }
+    };
+    /**
      * Runs mailbox reading passes as the sync worker does, until no mailbox is due or `passes`
      * ran. Message text past its retention is removed first.
      */
@@ -926,6 +915,12 @@ export async function createPilot(
         );
       }, 10_000);
       resources.add(() => clearInterval(mailboxTimer));
+      const returnTimer = setInterval(() => {
+        returnFollowUp().catch((error) =>
+          console.error('Return follow-up failed; retrying.', error),
+        );
+      }, 10_000);
+      resources.add(() => clearInterval(returnTimer));
     }
 
     return {
@@ -941,6 +936,9 @@ export async function createPilot(
       procurementContext: application.http.procurementContext,
       decisions: application.http.decisions,
       followUp,
+      returnFollowUp,
+      /** Return deadline checks, as the return step follow-up runs them in the workflow worker. */
+      returnDeadlines: application.returnDeadlines,
       /** The operations inbox, its replies and a `sync()` that reads due mailboxes now. */
       messaging: {
         service: application.messaging.service,

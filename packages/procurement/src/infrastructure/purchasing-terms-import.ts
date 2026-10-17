@@ -4,7 +4,8 @@ import type { Observation, ProductSnapshot } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { hasPermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import type { SupplierTermsService } from '@luma/procurement';
+
+import type { SupplierTermsService } from '../application/supplier-terms.js';
 
 /** Imports purchasing metadata only after SKU projection, through explicit supplier and SKU links. */
 export function createPurchasingTermsImporter(

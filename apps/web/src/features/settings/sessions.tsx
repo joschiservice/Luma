@@ -13,7 +13,7 @@ import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { auth, clearPrivate, IdentityError } from '../../kit/identity/data';
+import { ApiError, auth, clearPrivate } from '../../kit/identity/data';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { securityActivityKey } from './security-activity';
 
@@ -43,8 +43,7 @@ const accountSessionsOptions = () =>
       const result = await auth.listSessions({
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.error)
-        throw new IdentityError(result.error.status, result.error);
+      if (result.error) throw new ApiError(result.error.status, result.error);
 
       return sessionsSchema.parse(result.data);
     },

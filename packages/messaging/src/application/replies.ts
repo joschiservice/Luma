@@ -1,12 +1,18 @@
 import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   MembershipSuspendedError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import { consequentialReasons } from '../domain/consequential.js';
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
@@ -22,6 +28,7 @@ import {
   replySubject,
   stateMessages,
 } from '../domain/replies.js';
+import { type SendAcceptance, sendReceipt } from '../domain/send-receipts.js';
 import type { Address } from '../domain/threads.js';
 import type { AttachmentReader } from './document-ports.js';
 import type { Ingest } from './ingest.js';
@@ -99,18 +106,6 @@ const sendingGraceMs = 2 * 60_000;
 
 const observeOnlyReason =
   'Observe-only. Writes are off for this workspace or mailbox, so nothing was sent. Draft a new reply once writes are enabled.';
-
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
-function notFound(message: string): never {
-  throw new IdentityError(404, 'NOT_FOUND', message);
-}
-
-function unavailable(message: string): never {
-  throw new IdentityError(503, 'SERVICE_UNAVAILABLE', message);
-}
 
 /** The exact content a requested reply binds; any change makes it a different reply. */
 function replyContent(outbound: OutboundRow, providerThreadId: string) {
@@ -198,7 +193,7 @@ export function createReplies(deps: ReplyDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -278,9 +273,9 @@ export function createReplies(deps: ReplyDependencies) {
     const outbound = await deps.store.transaction(tenantId, (tx) =>
       tx.outbound.get(outboundId),
     );
-    if (!outbound) notFound('Reply not found');
+    if (!outbound) throw notFound('Reply not found');
 
-    return outbound!;
+    return outbound;
   }
 
   async function present(context: TenantContext, outboundId: string) {
@@ -295,7 +290,7 @@ export function createReplies(deps: ReplyDependencies) {
       (c) => c.id === connectionId,
     );
     if (!connection || connection.status !== 'active' || !connection.canSend)
-      conflict(
+      throw conflict(
         'This mailbox can’t send replies. Reconnect it with permission to send in Apps.',
       );
   }
@@ -311,7 +306,7 @@ export function createReplies(deps: ReplyDependencies) {
     const prior = await tx.commands.get(id);
     if (prior) {
       if (prior.digest !== digest)
-        conflict(
+        throw conflict(
           'This request ID was already used for another change. Refresh and try again.',
         );
 
@@ -436,7 +431,7 @@ export function createReplies(deps: ReplyDependencies) {
       await deps.settled(context, outbound);
     } catch (error) {
       if (
-        !(error instanceof IdentityError) ||
+        !(error instanceof ServiceError) ||
         error.statusCode !== 409 ||
         outbound.state !== 'sent'
       )
@@ -511,7 +506,7 @@ export function createReplies(deps: ReplyDependencies) {
       .resolveContext(outbound.requestedBy, tenantId, requestId)
       .catch((error: unknown) => {
         if (error instanceof MembershipSuspendedError)
-          conflict(
+          throw conflict(
             'The person who requested this reply can’t access this workspace right now. Luma checks it after their access is restored.',
           );
         throw error;
@@ -640,13 +635,13 @@ export function createReplies(deps: ReplyDependencies) {
       await sendingConnection(context, input.connectionId);
       const labels = await deps.directory.labels(context, input.records);
       if (input.records.some((ref) => !labels.has(recordKey(ref))))
-        notFound('Linked record not found');
+        throw notFound('Linked record not found');
       if (
         !input.to.length ||
         input.to.some((a) => !/^[^\s@<>]+@[^\s@<>]+$/.test(a.address)) ||
         /[\r\n]/.test(input.subject)
       )
-        conflict('Invalid message');
+        throw conflict('Invalid message');
       const requestDigest = deps.digest({
         ...input,
         actorId: context.actor.id,
@@ -658,12 +653,12 @@ export function createReplies(deps: ReplyDependencies) {
             !(await once(tx, context, input.id, { compose: requestDigest }))
           ) {
             const prior = await tx.outbound.get(input.id);
-            if (!prior) conflict('Message draft not found');
+            if (!prior) throw conflict('Message draft not found');
 
-            return prior!;
+            return prior;
           }
           const mailbox = await tx.mailboxes.get(input.connectionId);
-          if (!mailbox) notFound('Mailbox not found');
+          if (!mailbox) throw notFound('Mailbox not found');
           const at = deps.now().toISOString();
           const rules = await tx.rules.active(input.connectionId);
           const supplierAddress = input.to[0]!.address.toLowerCase();
@@ -677,7 +672,7 @@ export function createReplies(deps: ReplyDependencies) {
               (rule.kind === 'sender_domain' &&
                 (domain === rule.value || domain.endsWith(`.${rule.value}`))) ||
               (rule.kind === 'recipient_address' &&
-                rule.value === mailbox!.address),
+                rule.value === mailbox.address),
           );
           if (!covered) {
             requirePermission(context, 'messages.manage');
@@ -695,7 +690,7 @@ export function createReplies(deps: ReplyDependencies) {
               createdAt: at,
             });
             await tx.mailboxes.update({
-              ...mailbox!,
+              ...mailbox,
               hintAt: at,
               dueAt: at,
               updatedAt: at,
@@ -709,7 +704,7 @@ export function createReplies(deps: ReplyDependencies) {
             input.threadId &&
             (!thread || thread.connectionId !== input.connectionId)
           )
-            notFound('Thread not found');
+            throw notFound('Thread not found');
           if (!thread) {
             thread = {
               id: threadId,
@@ -748,7 +743,7 @@ export function createReplies(deps: ReplyDependencies) {
           const recipient =
             lastInbound?.document.replyTo[0] ?? lastInbound?.document.from;
           const to =
-            recipient && recipient.address !== mailbox!.address
+            recipient && recipient.address !== mailbox.address
               ? [recipient]
               : input.to;
           const row: OutboundRow = {
@@ -794,7 +789,7 @@ export function createReplies(deps: ReplyDependencies) {
             const existing = await tx.links.latest(threadId, ref.kind, ref.id);
             if (existing?.state === 'active') continue;
             if (existing)
-              conflict(
+              throw conflict(
                 'The operational record was removed from this thread. Link it again before drafting.',
               );
             await tx.links.insert({
@@ -854,9 +849,9 @@ export function createReplies(deps: ReplyDependencies) {
           row.document.procurement?.purchaseOrderId !== purchaseOrderId ||
           !attached
         )
-          notFound('Order document not found');
+          throw notFound('Order document not found');
 
-        return attached!;
+        return attached;
       });
     },
     /** Reads stored supplier work on threads linked to one purchase order, for its owner. */
@@ -909,7 +904,9 @@ export function createReplies(deps: ReplyDependencies) {
           prior.threadId !== threadId ||
           prior.requestedBy !== context.actor.id
         )
-          conflict('This request ID was already used. Refresh and try again.');
+          throw conflict(
+            'This request ID was already used. Refresh and try again.',
+          );
 
         return outboundView(prior, context);
       }
@@ -917,24 +914,24 @@ export function createReplies(deps: ReplyDependencies) {
         context.tenantId,
         async (tx) => {
           const thread = await tx.threads.get(threadId);
-          if (!thread) notFound('Thread not found');
+          if (!thread) throw notFound('Thread not found');
 
           return {
-            thread: thread!,
+            thread: thread,
             messages: await tx.messages.forThread(threadId),
             links: (await tx.links.forThreads([threadId])).filter(
               (link) => link.state === 'active',
             ),
-            mailbox: await tx.mailboxes.get(thread!.connectionId),
+            mailbox: await tx.mailboxes.get(thread.connectionId),
           };
         },
       );
-      if (!data.mailbox) notFound('Mailbox not found');
+      if (!data.mailbox) throw notFound('Mailbox not found');
       await sendingConnection(context, data.thread.connectionId);
       const inbound = data.messages.filter((m) => m.direction === 'inbound');
       const latestInbound = inbound.at(-1);
       if (!latestInbound)
-        conflict('There is no message to reply to in this thread.');
+        throw conflict('There is no message to reply to in this thread.');
       const refs = data.links.map((link) => ({
         kind: link.kind,
         id: link.recordId,
@@ -947,9 +944,9 @@ export function createReplies(deps: ReplyDependencies) {
         : [new Map<string, string>(), new Map<string, RecordState>()];
       const now = deps.now();
       const composed = composeReply({
-        latestInbound: basis(latestInbound!),
+        latestInbound: basis(latestInbound),
         latest: basis(data.messages.at(-1)!),
-        mailboxAddress: data.mailbox!.address,
+        mailboxAddress: data.mailbox.address,
         records: refs.map((ref) => ({
           ...ref,
           label: labels.get(recordKey(ref)) ?? null,
@@ -958,7 +955,7 @@ export function createReplies(deps: ReplyDependencies) {
         now,
       });
       if (!composed.to.length)
-        conflict('The message has no address Luma can reply to.');
+        throw conflict('The message has no address Luma can reply to.');
       const at = now.toISOString();
       const outbound: OutboundRow = {
         id: input.id,
@@ -976,7 +973,7 @@ export function createReplies(deps: ReplyDependencies) {
           consequential: consequentialReasons({
             subject: composed.subject,
             text: composed.text,
-            approveAll: data.mailbox!.settings.approveAll,
+            approveAll: data.mailbox.settings.approveAll,
           }),
           language: composed.language,
           inReplyTo: composed.inReplyTo,
@@ -1022,18 +1019,20 @@ export function createReplies(deps: ReplyDependencies) {
       context = await authorize(context, 'messages.send');
       await deps.store.transaction(context.tenantId, async (tx) => {
         const outbound = await tx.outbound.get(outboundId, true);
-        if (!outbound) notFound('Reply not found');
-        if (outbound!.requestedBy !== context.actor.id)
-          conflict('Only the person who drafted this reply can change it.');
-        if (outbound!.state !== 'draft')
-          conflict('Only drafts can change. Draft a new reply instead.');
-        if (outbound!.revision !== input.expectedRevision)
-          conflict('This reply changed. Refresh and try again.');
-        if (outbound!.document.procurement)
+        if (!outbound) throw notFound('Reply not found');
+        if (outbound.requestedBy !== context.actor.id)
+          throw conflict(
+            'Only the person who drafted this reply can change it.',
+          );
+        if (outbound.state !== 'draft')
+          throw conflict('Only drafts can change. Draft a new reply instead.');
+        if (outbound.revision !== input.expectedRevision)
+          throw conflict('This reply changed. Refresh and try again.');
+        if (outbound.document.procurement)
           requirePermission(context, 'procurement.manage');
-        const mailbox = await tx.mailboxes.get(outbound!.connectionId);
+        const mailbox = await tx.mailboxes.get(outbound.connectionId);
         const known = new Map(
-          [...outbound!.document.to, ...outbound!.document.cc].map((a) => [
+          [...outbound.document.to, ...outbound.document.cc].map((a) => [
             a.address,
             a.name,
           ]),
@@ -1052,23 +1051,23 @@ export function createReplies(deps: ReplyDependencies) {
         const seen = new Set<string>();
         const to = addresses(input.to, seen);
         const cc = addresses(input.cc, seen);
-        if (!to.length) conflict('Add at least one recipient.');
+        if (!to.length) throw conflict('Add at least one recipient.');
         const subject = input.subject.replace(/[\r\n]+/g, ' ').trim();
         const text = input.text.trim();
-        const saved = await save(tx, outbound!, {
+        const saved = await save(tx, outbound, {
           document: {
             to,
             cc,
             subject,
             text,
-            citations: (outbound!.document.citations ?? []).filter((c) =>
+            citations: (outbound.document.citations ?? []).filter((c) =>
               text.includes(c.statement),
             ),
             consequential: consequentialReasons({
               subject,
               text,
               approveAll:
-                !!outbound!.document.procurement ||
+                !!outbound.document.procurement ||
                 (mailbox?.settings.approveAll ?? false),
             }),
           },
@@ -1096,7 +1095,7 @@ export function createReplies(deps: ReplyDependencies) {
     ) {
       context = await authorize(context, 'messages.send');
       if (!deps.admission)
-        unavailable('Sending replies is unavailable on this server.');
+        throw unavailable('Sending replies is unavailable on this server.');
       const outbound = await load(context.tenantId, outboundId);
       if (outbound.document.procurement)
         requirePermission(context, 'procurement.manage');
@@ -1112,33 +1111,35 @@ export function createReplies(deps: ReplyDependencies) {
           )
             return null;
           const current = await tx.outbound.get(outboundId, true);
-          if (!current) notFound('Reply not found');
-          if (current!.requestedBy !== context.actor.id)
-            conflict('Only the person who drafted this reply can send it.');
-          if (current!.state !== 'draft')
-            conflict('This reply was already requested. Refresh it.');
-          const thread = await tx.threads.get(current!.threadId);
-          const mailbox = await tx.mailboxes.get(current!.connectionId);
-          if (!thread || !mailbox) notFound('Thread not found');
+          if (!current) throw notFound('Reply not found');
+          if (current.requestedBy !== context.actor.id)
+            throw conflict(
+              'Only the person who drafted this reply can send it.',
+            );
+          if (current.state !== 'draft')
+            throw conflict('This reply was already requested. Refresh it.');
+          const thread = await tx.threads.get(current.threadId);
+          const mailbox = await tx.mailboxes.get(current.connectionId);
+          if (!thread || !mailbox) throw notFound('Thread not found');
           const reasons = consequentialReasons({
-            subject: current!.document.subject,
-            text: current!.document.text,
+            subject: current.document.subject,
+            text: current.document.text,
             approveAll:
-              !!current!.document.procurement || mailbox!.settings.approveAll,
+              !!current.document.procurement || mailbox.settings.approveAll,
           });
           const now = deps.now();
-          if (!mailbox!.address)
-            conflict(
+          if (!mailbox.address)
+            throw conflict(
               'The mailbox address is unavailable. Reconnect it before sending.',
             );
           const pending: OutboundRow = {
-            ...current!,
-            document: { ...current!.document, fromAddress: mailbox!.address! },
+            ...current,
+            document: { ...current.document, fromAddress: mailbox.address },
             actionId: deps.uuid(
-              `reply-action:${context.tenantId}:${current!.id}`,
+              `reply-action:${context.tenantId}:${current.id}`,
             ),
           };
-          const saved = await save(tx, current!, {
+          const saved = await save(tx, current, {
             state: 'approval_required',
             actionId: pending.actionId,
             document: {
@@ -1146,7 +1147,7 @@ export function createReplies(deps: ReplyDependencies) {
               consequential: reasons,
               risk: reasons.length ? 'high' : 'low',
               contentDigest: deps.digest(
-                replyContent(pending, thread!.providerThreadId),
+                replyContent(pending, thread.providerThreadId),
               ),
               requestedAt: now.toISOString(),
               expiresAt: new Date(now.getTime() + 24 * hour).toISOString(),
@@ -1180,13 +1181,13 @@ export function createReplies(deps: ReplyDependencies) {
             }),
           );
 
-          return { outbound: saved, thread: thread! };
+          return { outbound: saved, thread: thread };
         },
       );
       if (!prepared) return present(context, outboundId);
       let decision;
       try {
-        decision = await deps.admission!.prepare(
+        decision = await deps.admission.prepare(
           context,
           outboundId,
           replyAction(prepared.outbound, prepared.thread, context.tenantId),
@@ -1204,7 +1205,7 @@ export function createReplies(deps: ReplyDependencies) {
               },
             });
         });
-        unavailable(
+        throw unavailable(
           'Sending could not be requested. Nothing was sent. Try again.',
         );
       }
@@ -1235,7 +1236,7 @@ export function createReplies(deps: ReplyDependencies) {
       if (
         saved.state === 'approved' ||
         (saved.state === 'approval_required' &&
-          (await deps.admission!.writeMode(context, saved.connectionId)) ===
+          (await deps.admission.writeMode(context, saved.connectionId)) ===
             'observe_only')
       )
         await dispatch(context, outboundId);
@@ -1254,14 +1255,14 @@ export function createReplies(deps: ReplyDependencies) {
     ) {
       context = await authorize(context, 'decisions.respond');
       if (!deps.admission)
-        unavailable('Sending replies is unavailable on this server.');
+        throw unavailable('Sending replies is unavailable on this server.');
       const outbound = await load(context.tenantId, outboundId);
       const view = outboundView(outbound, context);
       if (!view.canApprove || outbound.document.decisionId !== input.decisionId)
-        conflict(
+        throw conflict(
           'This reply changed, expired or needs a different approver. Refresh it.',
         );
-      await deps.admission!.respond(
+      await deps.admission.respond(
         context,
         input.decisionId,
         input.outcome,
@@ -1321,12 +1322,12 @@ export function createReplies(deps: ReplyDependencies) {
     ) {
       context = await authorize(context, 'messages.send');
       if (!deps.admission)
-        unavailable('Sending replies is unavailable on this server.');
+        throw unavailable('Sending replies is unavailable on this server.');
       const outbound = await load(context.tenantId, outboundId);
       if (['sending', 'uncertain', 'sent'].includes(outbound.state))
         return outboundView(outbound, context);
       if (!outboundView(outbound, context).canSend)
-        conflict('Only the requester can send an approved reply.');
+        throw conflict('Only the requester can send an approved reply.');
       await deps.store.transaction(context.tenantId, (tx) =>
         once(tx, context, input.id, { command: 'send', outboundId }),
       );
@@ -1341,7 +1342,7 @@ export function createReplies(deps: ReplyDependencies) {
     async check(context: TenantContext, outboundId: string) {
       context = await authorize(context, 'messages.send');
       if (!deps.admission)
-        unavailable('Sending replies is unavailable on this server.');
+        throw unavailable('Sending replies is unavailable on this server.');
       const outbound = await load(context.tenantId, outboundId);
       if (!['sending', 'uncertain'].includes(outbound.state))
         return outboundView(outbound, context);
@@ -1389,18 +1390,20 @@ export function createReplies(deps: ReplyDependencies) {
           )
             return null;
           const current = await tx.outbound.get(outboundId, true);
-          if (!current) notFound('Reply not found');
-          if (!current!.document.procurement)
-            conflict('Only supplier emails can be marked as delivered or not.');
-          if (current!.state !== 'uncertain')
-            conflict(
+          if (!current) throw notFound('Reply not found');
+          if (!current.document.procurement)
+            throw conflict(
+              'Only supplier emails can be marked as delivered or not.',
+            );
+          if (current.state !== 'uncertain')
+            throw conflict(
               'This email no longer waits for a delivery decision. Refresh it.',
             );
-          if (current!.revision !== input.expectedRevision)
-            conflict('This email changed. Refresh and try again.');
+          if (current.revision !== input.expectedRevision)
+            throw conflict('This email changed. Refresh and try again.');
           const at = deps.now().toISOString();
           const delivered = input.outcome === 'delivered';
-          const saved = await save(tx, current!, {
+          const saved = await save(tx, current, {
             state: delivered ? 'sent' : 'failed',
             document: {
               stateReason: delivered
@@ -1422,7 +1425,7 @@ export function createReplies(deps: ReplyDependencies) {
             outcome: input.outcome,
             source: 'person',
             previousState: 'uncertain',
-            unverifiedReport: current!.document.unverifiedDeliveryReport
+            unverifiedReport: current.document.unverifiedDeliveryReport
               ? 'yes'
               : 'no',
           };
@@ -1478,12 +1481,14 @@ export function createReplies(deps: ReplyDependencies) {
       context = await authorize(context, 'messages.send');
       await deps.store.transaction(context.tenantId, async (tx) => {
         const outbound = await tx.outbound.get(outboundId, true);
-        if (!outbound) notFound('Reply not found');
-        if (outbound!.state === 'discarded') return;
-        if (outbound!.requestedBy !== context.actor.id)
-          conflict('Only the person who drafted this reply can discard it.');
-        if (!['draft', 'approval_required'].includes(outbound!.state))
-          conflict(
+        if (!outbound) throw notFound('Reply not found');
+        if (outbound.state === 'discarded') return;
+        if (outbound.requestedBy !== context.actor.id)
+          throw conflict(
+            'Only the person who drafted this reply can discard it.',
+          );
+        if (!['draft', 'approval_required'].includes(outbound.state))
+          throw conflict(
             'Only drafts and replies waiting for approval can be discarded.',
           );
         if (
@@ -1493,7 +1498,7 @@ export function createReplies(deps: ReplyDependencies) {
           }))
         )
           return;
-        const saved = await save(tx, outbound!, {
+        const saved = await save(tx, outbound, {
           state: 'discarded',
           document: { stateReason: null },
         });
@@ -1502,7 +1507,7 @@ export function createReplies(deps: ReplyDependencies) {
             type: 'reply.discarded',
             key: input.id,
             outbound: saved,
-            details: { from: outbound!.state },
+            details: { from: outbound.state },
           }),
         );
       });
@@ -1707,6 +1712,38 @@ export function createReplies(deps: ReplyDependencies) {
       );
     },
     forAction,
+    /**
+     * Stores the mailbox's acceptance of a reply send as messaging's send receipt and returns
+     * its ID, which execution cites. It records what already happened, so it does not recheck
+     * authority. Throws when the reply is unknown or the acceptance belongs to another mailbox;
+     * execution then cites nothing and the send stays uncertain until the thread is read.
+     */
+    async storeSendReceipt(
+      context: TenantContext,
+      outboundId: string,
+      acceptance: SendAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const outbound = await tx.outbound.get(outboundId);
+        if (
+          !outbound ||
+          outbound.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'messages.send'
+        )
+          throw conflict('The receipt does not belong to this reply.');
+        const receipt = sendReceipt(
+          context.tenantId,
+          outbound,
+          deps.uuid(
+            `send-receipt:${context.tenantId}:${acceptance.idempotencyKey}`,
+          ),
+          acceptance,
+        );
+        await tx.outbound.recordSendReceipt(receipt);
+
+        return receipt.id;
+      });
+    },
     /**
      * Verification for the execution adapter: reads the thread again and looks for the message
      * with the Message-ID derived from the reply. New messages are stored as any thread read.

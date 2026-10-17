@@ -9,8 +9,8 @@ import {
   transferListSchema,
   transfersCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { InventoryWorkspace } from '../application/inventory.js';
@@ -24,17 +24,8 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
     transfers: os.transfers.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Transfers are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Transfers are unavailable');
         validateCollectionQuery(transfersCatalog, query);
 
         return transferListSchema.parse(
@@ -45,24 +36,14 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
     transfer: os.transfer.handler(
       async ({ context: { request }, input: { params } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Transfer details are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Transfer details are unavailable');
         const detail = await service.getTransfer(
           request.tenantContext,
           params.transferId,
           params.connectionId,
         );
-        if (!detail)
-          throw new IdentityError(404, 'NOT_FOUND', 'Transfer not found');
+        if (!detail) throw notFound('Transfer not found');
 
         return transferDetailSchema.parse(detail);
       },
@@ -70,17 +51,8 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Inventory is unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Inventory is unavailable');
         validateCollectionQuery(inventoryCatalog, query);
 
         return inventoryListSchema.parse(
@@ -90,19 +62,13 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Inventory details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Inventory details are unavailable');
       const detail = await service.get(
         request.tenantContext,
         params.positionId,
       );
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Inventory not found');
+      if (!detail) throw notFound('Inventory not found');
 
       return inventoryDetailSchema.parse(detail);
     }),

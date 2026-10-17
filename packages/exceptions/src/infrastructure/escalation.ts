@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 /** Escalation retains the incident and its evidence; it never claims resolution. */
 export function createEscalationRepository(db: TenantDatabase) {
@@ -16,11 +16,7 @@ export function createEscalationRepository(db: TenantDatabase) {
         [context.tenantId, id, revision],
       );
       if (!result.rows[0])
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The case changed. Refresh before escalating.',
-        );
+        throw conflict('The case changed. Refresh before escalating.');
       await tx.query(
         'INSERT INTO exception_outbox(id,tenant_id,exception_id,document) VALUES($1,$2,$3,$4)',
         [

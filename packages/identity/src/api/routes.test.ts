@@ -1,4 +1,5 @@
 import { apiContract } from '@luma/api-contract';
+import { ServiceError } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -10,7 +11,6 @@ import type {
 import { createIdentityService } from '../application/identity.js';
 import type { SupportViewCredentials } from '../application/support-view.js';
 import type { Membership, Organization } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
 import type { BuiltInRoleKey } from '../domain/roles.js';
 import { builtInReference, PermissionSet } from '../domain/roles.js';
 import { registerAuthHandler } from './auth-handler.js';
@@ -165,7 +165,7 @@ function fixture() {
   apps.push(app);
   registerIdentityGuards(app, service, [origin]);
   app.setErrorHandler((error, _request, reply) => {
-    if (error instanceof IdentityError)
+    if (error instanceof ServiceError)
       return reply.status(error.statusCode).send({ code: error.code });
     throw error;
   });

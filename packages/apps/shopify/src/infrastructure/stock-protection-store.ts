@@ -4,8 +4,12 @@ import type {
 } from '@luma/api-contract';
 import { stockProtectionIncidentSchema } from '@luma/api-contract';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  notFound,
+  type TenantDatabase,
+} from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 
 import type { CorrectionSnapshot } from '../domain/inventory-correction.js';
@@ -146,12 +150,7 @@ export function createProtectionStore(database: TenantDatabase) {
             [context.tenantId, id],
           )
         ).rows[0];
-        if (!row)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Stock protection incident not found.',
-          );
+        if (!row) throw notFound('Stock protection incident not found.');
         change(row.document);
         stockProtectionIncidentSchema.parse(row.document.view);
         await tx.query(
@@ -186,9 +185,7 @@ export function createProtectionStore(database: TenantDatabase) {
           ],
         );
         if (pending.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A stock correction owns this position. Reconcile it first.',
           );
         const owners = await tx.query(
@@ -203,9 +200,7 @@ export function createProtectionStore(database: TenantDatabase) {
           ],
         );
         if (owners.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another stock protection incident owns this position.',
           );
         await tx.query(
@@ -229,9 +224,7 @@ export function createProtectionStore(database: TenantDatabase) {
           !stored ||
           canonicalJson(stored.action) !== canonicalJson(action.action)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This stock protection action already has immutable intent.',
           );
 

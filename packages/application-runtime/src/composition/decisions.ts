@@ -1,13 +1,10 @@
 import type { createAdaptiveFieldWorkflows } from '@luma/adaptive/composition';
 import { caseDecisionQuery } from '@luma/exceptions/composition';
-import {
-  hasPermission,
-  IdentityError,
-  type IdentityService,
-} from '@luma/identity';
+import { hasPermission, type IdentityService } from '@luma/identity';
 import type { createMessaging } from '@luma/messaging/composition';
 import type { ReturnCases, ReturnDeadlines } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
+import { notFound } from '@luma/platform';
 import type {
   createPurchaseOrderChanges,
   createPurchasing,
@@ -21,6 +18,7 @@ import {
   governedFollowUpDecisionProvider,
   humanTaskDecisionProvider,
   messageReplyDecisionProvider,
+  nativeReceiptDecision,
   procurementActionDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
@@ -106,24 +104,7 @@ export function createDecisionServices(
             quantity: p.order.lines.reduce((sum, l) => sum + l.quantity, 0),
           })),
           ...revisions,
-          ...receipts.map((r) => ({
-            id: r.id,
-            kind: 'native_receipt' as const,
-            orderId: r.command.purchaseReceipt!.purchaseOrderId,
-            reference: 'Received native stock',
-            state:
-              r.state === 'approved'
-                ? ('approved' as const)
-                : ('approval_required' as const),
-            requestedBy: r.preparedBy,
-            requestedAt: r.createdAt,
-            expiresAt: null,
-            canApprove:
-              r.preparedBy !== context.actor.id &&
-              hasPermission(context, 'inventory.approve') &&
-              hasPermission(context, 'procurement.manage'),
-            quantity: Number(r.command.purchaseReceipt!.cumulativeGood),
-          })),
+          ...receipts.map((r) => nativeReceiptDecision(context, r)),
         ];
       }),
       returnCaseDecisionProvider(async (context) => {
@@ -235,11 +216,7 @@ export function createDecisionServices(
         return queueAssignments.assign(context, input);
       const item = await decisions.find(context, input.decisionId);
       if (!item || item.outcome || item.owner.kind !== 'case')
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'This decision no longer needs a person.',
-        );
+        throw notFound('This decision no longer needs a person.');
       const owner = await owners.cases.assignOwner(
         context,
         item.owner.exceptionId,

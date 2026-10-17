@@ -1,10 +1,17 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import type { InstalledConnection } from '../domain/installation.js';
 import type {
@@ -64,8 +71,7 @@ export function createSourceEnvironments(deps: {
   async function fresh(context: TenantContext, write = false) {
     const current = await deps.refreshContext(context);
     requireTenant(current, context.tenantId);
-    if (current.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (current.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(current, 'connections.manage');
     if (write) requireChangesAllowed(current);
 
@@ -76,8 +82,7 @@ export function createSourceEnvironments(deps: {
     const owned = (await deps.connections.list(context)).find(
       (item) => item.id === id,
     );
-    if (!owned)
-      throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+    if (!owned) throw notFound('Connection not found');
 
     return owned;
   }
@@ -161,11 +166,7 @@ export function createSourceEnvironments(deps: {
 
   async function enabled(tenantId: string) {
     if (!(await deps.enabled(tenantId)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Source declarations are unavailable',
-      );
+      throw forbidden('Source declarations are unavailable');
   }
 
   return {
@@ -199,11 +200,7 @@ export function createSourceEnvironments(deps: {
       await enabled(current.tenantId);
       const before = await connection(current, id);
       if (!(await reviewability(current, before)).reviewable)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This connection cannot be declared live',
-        );
+        throw conflict('This connection cannot be declared live');
       const deadline = AbortSignal.any([
         AbortSignal.timeout(10_000),
         ...(signal ? [signal] : []),
@@ -212,13 +209,7 @@ export function createSourceEnvironments(deps: {
         SourceEnvironmentReview['observations']
       >((resolve, reject) => {
         const abort = () =>
-          reject(
-            new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Source review was interrupted',
-            ),
-          );
+          reject(unavailable('Source review was interrupted'));
         if (deadline.aborted) {
           abort();
 
@@ -230,19 +221,10 @@ export function createSourceEnvironments(deps: {
           .then(resolve, reject)
           .finally(() => deadline.removeEventListener('abort', abort));
       }).catch((error: unknown) => {
-        if (error instanceof IdentityError) throw error;
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Source evidence is unavailable',
-        );
+        if (error instanceof ServiceError) throw error;
+        throw unavailable('Source evidence is unavailable');
       });
-      if (deadline.aborted)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Source review was interrupted',
-        );
+      if (deadline.aborted) throw unavailable('Source review was interrupted');
       const after = await connection(current, id);
       const observedAt = deps.now().toISOString();
       if (
@@ -257,11 +239,7 @@ export function createSourceEnvironments(deps: {
             Date.parse(observedAt) - Date.parse(o.observedAt) > 300_000,
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Fresh source evidence is unavailable; inspect again',
-        );
+        throw conflict('Fresh source evidence is unavailable; inspect again');
       const review: SourceEnvironmentReview = {
         id: deps.id(),
         connectionId: id,
@@ -295,9 +273,7 @@ export function createSourceEnvironments(deps: {
         command.reason.length > 1000 ||
         command.liveOperationsConfirmed !== (command.reviewId !== null)
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'Confirm operational use with a review and reason, or revoke it',
         );
       const review = command.reviewId
@@ -319,11 +295,7 @@ export function createSourceEnvironments(deps: {
               !(await reviewability(current, c)).reviewable ||
               review.sourceBinding !== deps.binding(c))
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Reviewed source changed or expired; inspect again',
-            );
+            throw conflict('Reviewed source changed or expired; inspect again');
 
           return {
             connectionId: id,

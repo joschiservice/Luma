@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import type { IncomingStock, IncomingStockQuery } from '../domain/incoming.js';
 
@@ -24,7 +21,7 @@ export function createIncomingStock(deps: {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+        throw forbidden('Sign in again to continue.');
       requirePermission(fresh, 'inventory.read');
       const query = deps.parse(input);
       const enabled = await deps.enabled(fresh);

@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { notFound } from '@luma/platform';
 
 import type { WorkflowCatalogStore } from '../application/catalog.js';
 import type { PlaybookOutcome, PlaybookRun } from '../application/playbook.js';
@@ -41,7 +41,7 @@ export function createWorkflowCatalogStore(
               )
             : null;
         if (!step || step.kind !== 'code')
-          throw new IdentityError(404, 'NOT_FOUND', 'Code Step not found.');
+          throw notFound('Code Step not found.');
         await tx.query(
           "INSERT INTO workflow_code_records(tenant_id,run_id,step_id,record_key,document) VALUES($1,$2,$3,'cancelled',$4) ON CONFLICT DO NOTHING",
           [

@@ -158,3 +158,102 @@
     width: 100%;
   }
 }
+
+/* Cited evidence: the reads, write receipts and records one record cites. */
+.evidence-list > ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-entry {
+  display: grid;
+  gap: 6px;
+  padding-block: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.evidence-entry:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.evidence-entry-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.evidence-facts {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.evidence-facts dt {
+  color: var(--foreground-subtle);
+}
+
+.evidence-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.evidence-list code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.evidence-age,
+.evidence-note,
+.evidence-reference,
+.evidence-status {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.evidence-note,
+.evidence-reference,
+.evidence-subheading {
+  margin: 0;
+}
+
+.evidence-subheading {
+  color: var(--foreground-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.evidence-records {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.evidence-status p {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .evidence-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .evidence-facts dd {
+    margin-bottom: 6px;
+  }
+}

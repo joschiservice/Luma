@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 import type { ProcessActionResult } from '@luma/workflows';
 
 /** Immutable internal-note intent. Successors keep the same receipt ID and original workflow provenance. */
@@ -120,7 +120,7 @@ export function createGovernedFollowUps(deps: {
     requireTenant(fresh, context.tenantId);
     requireChangesAllowed(fresh);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, 'procurement.manage');
     if (respond) requirePermission(fresh, 'decisions.respond');
 
@@ -204,12 +204,7 @@ export function createGovernedFollowUps(deps: {
     ) {
       context = await authorize(context, true);
       const plan = await deps.store.get(context, proposalId);
-      if (!plan)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Follow-up proposal not found.',
-        );
+      if (!plan) throw notFound('Follow-up proposal not found.');
       await deps.admission.respond(context, plan, decisionId, outcome);
 
       return { proposalId, outcome };
@@ -228,12 +223,7 @@ export function createGovernedFollowUps(deps: {
     async reconcile(context: TenantContext, proposalId: string) {
       context = await authorize(context);
       const plan = await deps.store.get(context, proposalId);
-      if (!plan)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Follow-up proposal not found.',
-        );
+      if (!plan) throw notFound('Follow-up proposal not found.');
       await deps.admission.reconcile(context, plan);
 
       return { proposalId };
@@ -246,37 +236,21 @@ export function createGovernedFollowUps(deps: {
     ) {
       context = await authorize(context);
       const previous = await deps.store.get(context, proposalId);
-      if (!previous)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Follow-up proposal not found.',
-        );
+      if (!previous) throw notFound('Follow-up proposal not found.');
       if (previous.requestedBy !== context.actor.id)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'The workflow requester must refresh this proposal.',
-        );
+        throw forbidden('The workflow requester must refresh this proposal.');
       const eligibility = await deps.admission.refreshability(
         context,
         previous,
       );
       if (!eligibility.refreshable)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           eligibility.refreshBlock === 'workflow_inactive'
             ? 'The original workflow is inactive or finished. Review and start the current workflow; this proposal cannot be renewed.'
             : 'New scoped work is unavailable. Existing attempts can still be independently verified.',
         );
       const current = await deps.current(context, previous.orderId);
-      if (!current)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The order no longer needs this follow-up.',
-        );
+      if (!current) throw conflict('The order no longer needs this follow-up.');
       const id = deps.id();
       const next = await deps.store.renew(
         context,

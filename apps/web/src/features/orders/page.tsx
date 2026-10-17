@@ -62,7 +62,7 @@ import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { orderLabel } from '../../shared/orders/presentation';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
@@ -282,7 +282,7 @@ export function OrdersPage() {
   });
   // A 403 for a reader who can read orders means a field the view uses is closed to them.
   const fieldDenied =
-    list.error instanceof IdentityError &&
+    list.error instanceof ApiError &&
     list.error.status === 403 &&
     can('orders.read');
   const issues = [
@@ -450,7 +450,7 @@ export function OrdersPage() {
     onShowHelp: () => setHelp(true),
   });
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const link = (order: OrderListItem) => (

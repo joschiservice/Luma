@@ -24,16 +24,16 @@ import {
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, forbidden, notFound } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import {
   createPolicies,
   createStockProtectionAdmission,
   createStockProtectionConsent,
+  policyAudit,
 } from '@luma/policies/composition';
 import { z } from 'zod';
 
@@ -118,7 +118,7 @@ export function createShopifyStockProtection(
       fresh.tenantId !== tenant.tenantId ||
       fresh.actor.id !== tenant.actor.id
     )
-      throw new IdentityError(403, 'FORBIDDEN', 'Workspace access changed.');
+      throw forbidden('Workspace access changed.');
     if (manage) {
       requireChangesAllowed(fresh);
       requirePermission(fresh, 'workspace.approval_policy.manage');
@@ -223,28 +223,7 @@ export function createShopifyStockProtection(
   const policies: PolicyService = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
     undefined,
     async (tenant, action, version) => {
       const run = await store.action(tenant, action.id);
@@ -737,7 +716,7 @@ export function createShopifyStockProtection(
     let record = await store.get(tenant, id);
     if (!record || record.view.state === 'released') return { done: true };
     if (record.principalId !== tenant.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Use the incident principal.');
+      throw forbidden('Use the incident principal.');
     const settings = await configuration(tenant, record);
     const recovered = await query.recovered(tenant, id);
     const overdue = +now() >= Date.parse(record.view.deadline);
@@ -1052,7 +1031,7 @@ export function createShopifyStockProtection(
       !record.view.positions.some(
         (p) =>
           active.has(p.status) ||
-          (record!.view.mode === 'preview' && p.status === 'preview'),
+          (record.view.mode === 'preview' && p.status === 'preview'),
       ) &&
       (record.view.releaseRequested || recovered);
     if (done) {
@@ -1197,11 +1176,7 @@ export function createShopifyStockProtection(
     async save(tenant: TenantContext, input: unknown) {
       tenant = await scope(tenant, true);
       if (!(await released(tenant.tenantId)))
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Stock protection is not released for this workspace.',
-        );
+        throw forbidden('Stock protection is not released for this workspace.');
       const parsed = z
         .object({
           settings: stockProtectionSettingsSchema,
@@ -1214,11 +1189,7 @@ export function createShopifyStockProtection(
         authority?.groups.find((g) => g.group === 'inventory_stock')
           ?.connectionId !== parsed.settings.sourceConnectionId
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The stock authority changed. Refresh settings.',
-        );
+        throw conflict('The stock authority changed. Refresh settings.');
       await deps.authorize(tenant, parsed.settings.connectionId);
       const records = (await store.list(tenant)).filter(
         (r) =>
@@ -1233,9 +1204,7 @@ export function createShopifyStockProtection(
         ) &&
         !parsed.activeHolds
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Choose whether to release active holds or keep them until recovery.',
         );
       const saved = await consent.save(
@@ -1292,19 +1261,10 @@ export function createShopifyStockProtection(
         await context.requirePermission(tenant, operation);
       } else requirePermission(tenant, 'workspace.approval_policy.manage');
       const record = await store.get(tenant, parsed.id);
-      if (!record)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Stock protection incident not found.',
-        );
+      if (!record) throw notFound('Stock protection incident not found.');
       if (parsed.action === 'approve' || parsed.action === 'reject') {
         if (!record.view.decisionId)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This incident is not awaiting approval.',
-          );
+          throw conflict('This incident is not awaiting approval.');
         const response = await policies.respond(
           tenant,
           record.view.decisionId,
@@ -1338,7 +1298,7 @@ export function createShopifyStockProtection(
             r.view.state = 'active';
           } else if (parsed.holdId) {
             if (!r.view.positions.some((p) => p.id === parsed.holdId))
-              throw new IdentityError(404, 'NOT_FOUND', 'Hold not found.');
+              throw notFound('Hold not found.');
             r.releaseHoldIds = [
               ...new Set([...(r.releaseHoldIds ?? []), parsed.holdId]),
             ];

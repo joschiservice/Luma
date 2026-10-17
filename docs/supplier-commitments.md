@@ -56,9 +56,13 @@ Approval dispatches immediately as the requester through a resolved workflow con
 approver gains no execution authority. The background pass also dispatches approved
 submissions. Execution reserves `v0:<action ID>` before dispatch; the JTL adapter derives
 its `Idempotency-Key` from it and refuses to post while an order with the same marker
-exists. Adapter acceptance is not the outcome: verification reads JTL independently. An
-uncertain dispatch stays `uncertain` and only ever reconciles by reading. A verified draft
-moves to open with an audited reason.
+exists. Adapter acceptance is not the outcome: verification reads JTL independently. Only a
+complete read that finds exactly one matching order passes; two matching orders fail, and a
+partial read is inconclusive. Procurement stores every read that verification or the
+submission audit cites, with the connection, source order, read time and completeness, so
+each cited ID resolves to that read. It stores JTL's acceptance the same way, as the
+[write receipt](execution.md#runtimes) execution cites. An uncertain dispatch has no receipt,
+stays `uncertain` and only ever reconciles by reading. A verified draft moves to open with an audited reason.
 
 Live JTL installations are not granted `purchase-orders.submit` until a sandbox smoke test
 confirms the write; simulated installations are.
@@ -148,7 +152,8 @@ is Open or Released. These writes have no provider idempotency guarantee. An exe
 attempt is recorded before dispatch and sent once; after uncertainty or process restart,
 Luma reconciles through an independent read. It appends the previous and new local revisions
 only after the full requested source shape is verified. An incomplete or stale read does not
-advance the local revision. Local lifecycle transitions cannot run while a revision awaits
+advance the local revision. The read that verification, the revision and its audit cite, and
+the write receipt execution cites, are stored the same way as a submission's. Local lifecycle transitions cannot run while a revision awaits
 approval or verification.
 
 JTL-Wawi 2.2 does not expose purchase-order cancellation. Marking a source order Completed
@@ -164,3 +169,10 @@ A recorded manual receipt, an email sent and a supplier observation retain separ
 only independent verification establishes the action's result. Stock proof is visible only
 to readers with inventory access. The history is tenant-scoped and shows at most the latest
 500 events, with truncation reported rather than treated as complete evidence.
+Verified submissions and revisions cite their verifying reads and the stored write receipt
+together. Each entry's evidence resolves through the
+[evidence reader](execution.md#reading-cited-evidence) when opened. Purchasing-system
+observations behind commitment facts resolve as reads that record no completeness; plans,
+approvals, policy decisions, supplier messages and follow-ups show as Luma records. Shopify stock
+booking proof resolves only for readers with inventory access, like its timeline entries. Native
+stock receipt reviews and ledger proof are inventory records the evidence view does not show.

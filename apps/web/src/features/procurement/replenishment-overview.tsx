@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, Workflow } from 'lucide-react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { workflowError, workflowOptions } from '../workflows/data';
 import {
   coverageLabel,
@@ -25,7 +25,7 @@ export function ReplenishmentOverview({
 }) {
   const query = useQuery(workflowOptions(organizationId, definitionId));
   if (
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status)
   )
     return null;

@@ -65,7 +65,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { statuses } from '../../kit/connections/presentation';
 import { ProviderIcon } from '../../kit/connections/provider-icon';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { AutomaticLinks } from './automatic-links';
 import {
@@ -161,7 +161,7 @@ export function SyncPage() {
     });
   }, [query.data, search.connection, search.type, target, navigate]);
 
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
 
   async function run(
@@ -179,7 +179,7 @@ export function SyncPage() {
       setMessage({
         tone: 'danger',
         text:
-          error instanceof IdentityError && error.status === 403
+          error instanceof ApiError && error.status === 403
             ? m.sync_command_forbidden()
             : streamId
               ? m.sync_command_failed()

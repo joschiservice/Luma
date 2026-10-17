@@ -1,4 +1,4 @@
-import type { ExternalId } from './capabilities.js';
+import type { CitedRead, ExternalId } from './capabilities.js';
 
 /** A provider quote for refunded units, or the baseline of a warehouse stock addition. */
 export type ReturnSettlementPlan =
@@ -44,4 +44,6 @@ export interface ReturnSettlementProof {
   payment: 'pending' | 'failed' | 'partial' | 'paid' | null;
   observedAt: string;
   evidenceRefs: string[];
+  /** The reads `evidenceRefs` names; a partial read cannot establish the outcome. */
+  reads: CitedRead[];
 }

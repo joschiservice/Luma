@@ -1,6 +1,31 @@
 import type { TenantContext } from '@luma/identity';
+import { canReviewLedgerChange, type LedgerReview } from '@luma/inventory';
 
 import type { DecisionProvider } from '../../application/decisions.js';
+
+/**
+ * Presents a native purchase receipt waiting for stock review. Only another member with the
+ * inventory owner's review permissions can approve it.
+ */
+export function nativeReceiptDecision(
+  context: TenantContext,
+  review: LedgerReview,
+): ProcurementActionDecision {
+  const receipt = review.command.purchaseReceipt!;
+
+  return {
+    id: review.id,
+    kind: 'native_receipt',
+    orderId: receipt.purchaseOrderId,
+    reference: 'Received native stock',
+    state: review.state === 'approved' ? 'approved' : 'approval_required',
+    requestedBy: review.preparedBy,
+    requestedAt: review.createdAt,
+    expiresAt: null,
+    canApprove: canReviewLedgerChange(context, review),
+    quantity: Number(receipt.cumulativeGood),
+  };
+}
 
 export interface ProcurementActionDecision {
   id: string;

@@ -1,23 +1,13 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import {
   type CapabilityHandler,
   type CapabilityInput,
   type CapabilityOutput,
   type ConnectorConnection,
-  type CustomerSnapshot,
-  type ExternalId,
-  type FulfillmentSnapshot,
-  type HistoryLimit,
-  type MessageReadCapability,
   type Observation,
-  type OrderSnapshot,
   type Page,
-  type ProductSnapshot,
   type ReadCapability,
-  type RefundSnapshot,
-  type ReturnSnapshot,
-  type SourceIdentity,
 } from '@luma/connections';
 import type { ShopifyTransportOptions } from '@luma/connector-shopify';
 import {
@@ -26,207 +16,30 @@ import {
   fail,
   parse,
 } from '@luma/connector-shopify';
-import { z } from 'zod';
 
-import { readBulkHistory } from './bulk-history.js';
 import { createBundleReader } from './bundles.js';
+import { readCustomers } from './customer-reads.js';
+import { readFulfillments } from './fulfillment-reads.js';
+import { readInventoryItem } from './inventory-reads.js';
 import { createInventoryTransferCapabilities } from './inventory-transfers.js';
 import {
   attributeInventoryWrites,
   type InventoryWriteReceipt,
 } from './inventory-write-attribution.js';
-import { lineFacts, mailingAddress, orderFacts } from './order-facts.js';
-import {
-  discountApplication,
-  inventoryCompositionSelection,
-  orderLine,
-  orderSelection,
-  readPageSize,
-  readSelection,
-  shippingLine,
-  variantSelection,
-} from './read-selections.js';
+import { readOrder } from './order-reads.js';
+import { readProduct } from './product-reads.js';
+import { next, type ScanCapability } from './read-session.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
 import { createShopifyExchangeCapabilities } from './return-exchanges.js';
+import { readReturns } from './return-reads.js';
 import { createShopifySettlementCapabilities } from './return-settlement.js';
+import {
+  openReadSession,
+  readRoots,
+  readSelectedOrder,
+  type ScanSession,
+} from './scan-session.js';
 import * as s from './schemas.js';
-
-const pageFields = 'pageInfo { hasNextPage endCursor }';
-
-const ref = (externalId: string, scopeKey = ''): ExternalId => ({
-  externalId,
-  scopeKey,
-});
-
-const quantity = (value: number) => ({ amount: String(value), unit: 'each' });
-
-// Blank or oversized source text is treated as not provided rather than truncated.
-const text = (value: string | null | undefined, max = 512) => {
-  const trimmed = value?.trim();
-
-  return trimmed && trimmed.length <= max ? trimmed : null;
-};
-
-const record = z.record(z.string(), z.unknown());
-
-const statusFrom = <T extends string>(
-  mapping: Record<string, T>,
-  value: string,
-): T | 'unknown' =>
-  Object.hasOwn(mapping, value) ? (mapping[value] ?? 'unknown') : 'unknown';
-
-const paymentStatuses: Record<string, OrderSnapshot['paymentStatus']> = {
-  PENDING: 'pending',
-  AUTHORIZED: 'authorized',
-  PAID: 'paid',
-  PARTIALLY_REFUNDED: 'partially_refunded',
-  REFUNDED: 'refunded',
-};
-
-const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
-  OPEN: 'pending',
-  SCHEDULED: 'pending',
-  ON_HOLD: 'pending',
-  IN_PROGRESS: 'processing',
-  CLOSED: 'completed',
-  CANCELLED: 'cancelled',
-  INCOMPLETE: 'failed',
-};
-
-// Unlisted products stay unknown: they sell by direct link but are hidden from the storefront.
-const productStatuses: Record<string, ProductSnapshot['status']> = {
-  ACTIVE: 'active',
-  DRAFT: 'draft',
-  ARCHIVED: 'archived',
-};
-
-const returnStatuses: Record<string, ReturnSnapshot['status']> = {
-  REQUESTED: 'requested',
-  OPEN: 'open',
-  CLOSED: 'closed',
-  DECLINED: 'declined',
-  CANCELED: 'cancelled',
-};
-
-const declineReasons: Record<
-  string,
-  NonNullable<ReturnSnapshot['declineReason']>
-> = {
-  RETURN_PERIOD_ENDED: 'return_period_ended',
-  FINAL_SALE: 'final_sale',
-};
-
-const restockTypes: Record<string, RefundSnapshot['lines'][number]['restock']> =
-  {
-    RETURN: 'return',
-    CANCEL: 'cancel',
-    NO_RESTOCK: 'no_restock',
-  };
-
-// Only a successful refund transaction returned money; awaiting a response is still pending.
-const transactionStatuses: Record<
-  string,
-  RefundSnapshot['transactions'][number]['status']
-> = {
-  SUCCESS: 'success',
-  PENDING: 'pending',
-  AWAITING_RESPONSE: 'pending',
-  FAILURE: 'failed',
-  ERROR: 'failed',
-};
-
-const customerStates: Record<string, CustomerSnapshot['state']> = {
-  ENABLED: 'enabled',
-  DISABLED: 'disabled',
-  INVITED: 'invited',
-  DECLINED: 'declined',
-};
-
-// Without read_all_orders, Shopify returns orders created in the last 60 days.
-const recentOrderWindowMs = 60 * 24 * 60 * 60 * 1000;
-
-/** The order history Shopify hides from an installation without `read_all_orders`, if any. */
-const orderHistory = (
-  scopes: { handle: string }[],
-  at: Date,
-): HistoryLimit | null =>
-  scopes.some((scope) => scope.handle === 'read_all_orders')
-    ? null
-    : {
-        availableFrom: new Date(
-          at.getTime() - recentOrderWindowMs,
-        ).toISOString(),
-        requirement: 'read_all_orders',
-      };
-
-const counted = {
-  'orders.read': 'ordersCount',
-  'products.read': 'productsCount',
-  'customers.read': 'customersCount',
-} as const;
-
-const shipmentStatuses: Record<string, FulfillmentSnapshot['status']> = {
-  PENDING: 'pending',
-  OPEN: 'processing',
-  SUCCESS: 'shipped',
-  CANCELLED: 'cancelled',
-  ERROR: 'failed',
-  FAILURE: 'failed',
-};
-
-const holdReasons: Record<
-  string,
-  NonNullable<FulfillmentSnapshot['holds']>[number]['reason']
-> = {
-  AWAITING_PAYMENT: 'awaiting_payment',
-  HIGH_RISK_OF_FRAUD: 'high_risk_of_fraud',
-  INCORRECT_ADDRESS: 'incorrect_address',
-  INVENTORY_OUT_OF_STOCK: 'inventory_out_of_stock',
-  UNKNOWN_DELIVERY_DATE: 'unknown_delivery_date',
-  AWAITING_RETURN_ITEMS: 'awaiting_return_items',
-};
-
-const methodTypes: Record<
-  string,
-  NonNullable<FulfillmentSnapshot['method']>['type']
-> = {
-  SHIPPING: 'shipping',
-  PICK_UP: 'pick_up',
-  PICKUP_POINT: 'pickup_point',
-  LOCAL: 'local',
-  RETAIL: 'retail',
-  NONE: 'none',
-};
-
-// Label and confirmation states say nothing about the carrier; they stay unreported.
-const deliveryStates: Record<
-  string,
-  NonNullable<FulfillmentSnapshot['delivery']>
-> = {
-  LABEL_PRINTED: 'label_created',
-  LABEL_PURCHASED: 'label_created',
-  CARRIER_PICKED_UP: 'in_transit',
-  IN_TRANSIT: 'in_transit',
-  OUT_FOR_DELIVERY: 'out_for_delivery',
-  ATTEMPTED_DELIVERY: 'attempted_delivery',
-  DELAYED: 'delayed',
-  READY_FOR_PICKUP: 'ready_for_pickup',
-  DELIVERED: 'delivered',
-  PICKED_UP: 'delivered',
-  FAILURE: 'failed',
-  NOT_DELIVERED: 'failed',
-};
-
-// Only absolute web links are kept; anything else is treated as not provided.
-const trackingUrl = (value: string | null | undefined) => {
-  const url = text(value, 2048);
-  if (!url) return null;
-  try {
-    return ['http:', 'https:'].includes(new URL(url).protocol) ? url : null;
-  } catch {
-    return null;
-  }
-};
 
 interface ShopifyEvidence {
   tenantId: string;
@@ -279,29 +92,84 @@ export function createShopifyConnector(
   const readBundleRecipes = createBundleReader(request);
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
-  const orderCustomers = !!options.customerAccess && !!options.orderCustomers;
-  const orderAddresses = !!options.customerAccess?.address;
 
-  function handler<
-    K extends Exclude<
-      ReadCapability,
-      | 'orders.shipping-method.read'
-      | 'suppliers.read'
-      | 'purchase-orders.read'
-      | MessageReadCapability
-      | 'returns.options.read'
-      | 'returns.created.read'
-      | 'returns.exchange.options.read'
-      | 'returns.exchange.quote.read'
-      | 'returns.exchange.proof.read'
-      | 'returns.exchange.price.read'
-      | 'returns.exchange.reservation.read'
-      | 'returns.settlement.quote.read'
-      | 'returns.settlement.proof.read'
-      | 'inventory.transfers.read'
-      | 'inventory.shipments.read'
-    >,
-  >(capability: K): CapabilityHandler<K> {
+  /** Reads every record on a scan page and its nested pages, then builds the page result. */
+  const eachRoot =
+    (read: (scan: ScanSession, parent: { id: string }) => Promise<unknown>) =>
+    async (scan: ScanSession) => {
+      const page = await readRoots(scan);
+      for (const parent of page.roots) await read(scan, parent);
+
+      return scan.page(page);
+    };
+
+  // Keyed by every scan capability, so a capability without a reader fails to compile.
+  const readers: Record<
+    ScanCapability,
+    (scan: ScanSession) => Promise<Page<unknown>>
+  > = {
+    'orders.read': async (scan) => {
+      const page =
+        scan.selected && !scan.bulk
+          ? await readSelectedOrder(scan, scan.selected)
+          : await readRoots(scan);
+      for (const parent of page.roots)
+        await readOrder(scan, parent, {
+          orderCustomers: scan.orderCustomers,
+          orderAddresses: scan.orderAddresses,
+          bulk: !!scan.bulk,
+        });
+
+      return scan.page(page);
+    },
+    'products.read': eachRoot((scan, parent) =>
+      readProduct(scan, parent, { bulk: !!scan.bulk, readBundleRecipes }),
+    ),
+    'inventory.read': async (scan) => {
+      const result = await eachRoot((_, parent) =>
+        readInventoryItem(scan, parent, scan.filters),
+      )(scan);
+      if (options.inventoryWrites) {
+        const inventory = parse(s.outputs['inventory.read'], result);
+        const receipts = await options.inventoryWrites(
+          inventory.items.map((item) => ({
+            inventoryItemId: item.data.sku.externalId,
+            locationId: item.data.location.externalId,
+          })),
+        );
+        await attributeInventoryWrites(request, inventory.items, receipts);
+        for (const [index, item] of inventory.items.entries()) {
+          const original = result.items[index];
+          if (original) original.data = item.data;
+        }
+        result.retryAfterMs = request.nextReadDelay();
+      }
+
+      return result;
+    },
+    'fulfillment.read': eachRoot(readFulfillments),
+    'returns.read': eachRoot((scan, parent) => readReturns(scan, parent.id)),
+    'customers.read': async (scan) => {
+      const { bulk, after } = scan;
+      const page = await readCustomers(scan, {
+        options,
+        request,
+        bulk,
+        sorted: scan.sorted,
+        search: scan.search,
+        after,
+        input: scan.input,
+      });
+      const nextAfter = bulk ? bulk.cursor : next(page);
+      if (nextAfter && nextAfter === after) fail('invalid_response');
+
+      return scan.page({ nextAfter, total: scan.total, history: scan.history });
+    },
+  };
+
+  function handler<K extends ScanCapability>(
+    capability: K,
+  ): CapabilityHandler<K> {
     return {
       descriptor: {
         version: '0',
@@ -336,1097 +204,15 @@ export function createShopifyConnector(
       parseOutput: (output) =>
         s.outputs[capability].parse(output) as CapabilityOutput<K>,
       async run(context, input) {
-        if (
-          context.tenant.tenantId !== options.tenantId ||
-          context.connectionId !== options.connectionId ||
-          context.provider !== 'shopify'
-        )
-          fail('unavailable');
-        // A point read of one order is not a scan; it cannot page or filter.
-        if (
-          capability === 'orders.read' &&
-          'order' in input &&
-          input.order &&
-          (input.cursor ||
-            input.updatedSince ||
-            input.createdSince ||
-            input.historyImport ||
-            input.confirmMissing)
-        )
-          fail('invalid_input');
-        if ('confirmMissing' in input && input.confirmMissing) {
-          if (
-            input.cursor ||
-            input.updatedSince ||
-            input.createdSince ||
-            input.historyImport
-          )
-            fail('invalid_input');
-          const candidate = input.confirmMissing;
-          const observedAt = now().toISOString();
-          const access = parse(
-            s.scanStart,
-            await request(
-              'query LumaDeletionAccess { currentAppInstallation { accessScopes { handle } } }',
-              {},
-            ),
-          );
-          const scopes = access.currentAppInstallation.accessScopes.map(
-            (scope) => scope.handle,
-          );
-          const has = (scope: string) =>
-            scopes.includes(scope) ||
-            scopes.includes(scope.replace('read_', 'write_'));
-          const required =
-            capability === 'orders.read'
-              ? 'read_orders'
-              : capability === 'products.read'
-                ? 'read_products'
-                : 'read_inventory';
-          if (!has(required)) fail('permission_denied');
-          if (
-            capability === 'orders.read' &&
-            !has('read_all_orders') &&
-            (!candidate.createdAt ||
-              Date.parse(candidate.createdAt) <= +now() - recentOrderWindowMs)
-          )
-            return {
-              items: [],
-              nextCursor: null,
-              completeness: 'complete',
-              confirmation: 'history_limited',
-            } as CapabilityOutput<K>;
-          const type =
-            capability === 'orders.read'
-              ? 'Order'
-              : capability === 'products.read'
-                ? 'Product'
-                : 'InventoryItem';
-          const data = parse(
-            z.object({ node: z.object({ id: s.gid(type) }).nullable() }),
-            await request(
-              `query LumaDeletionNode($id: ID!) { node(id: $id) { ... on ${type} { id } } }`,
-              { id: candidate.externalId },
-            ),
-          );
-          let absent = data.node === null;
-          if (capability === 'inventory.read' && data.node) {
-            const level = parse(
-              z.object({
-                node: z.object({
-                  inventoryLevel: z
-                    .object({ id: s.gid('InventoryLevel') })
-                    .nullable(),
-                }),
-              }),
-              await request(
-                'query LumaDeletionLevel($id: ID!, $location: ID!) { node(id: $id) { ... on InventoryItem { inventoryLevel(locationId: $location) { id } } } }',
-                { id: candidate.externalId, location: candidate.scopeKey },
-              ),
-            );
-            absent = level.node.inventoryLevel === null;
-          }
-          if (!absent)
-            return {
-              items: [],
-              nextCursor: null,
-              completeness: 'complete',
-              confirmation: 'present',
-            } as CapabilityOutput<K>;
-          const tombstone: Observation<unknown> = {
-            id: id(),
-            source: {
-              tenantId: options.tenantId,
-              connectionId: options.connectionId,
-              provider: 'shopify',
-              resource:
-                capability === 'orders.read'
-                  ? 'order'
-                  : capability === 'products.read'
-                    ? 'product'
-                    : 'sku',
-              externalId: candidate.externalId,
-              scopeKey: candidate.scopeKey,
-            },
-            kind: 'tombstone',
-            observedAt,
-            sourceUpdatedAt: null,
-            sourceRevision: null,
-            adapterVersion: s.adapterVersion,
-            schemaVersion: 1,
-            data:
-              capability === 'orders.read'
-                ? {
-                    displayNumber: null,
-                    placedAt: null,
-                    total: null,
-                    status: 'unknown',
-                    paymentStatus: 'unknown',
-                    lines: [],
-                  }
-                : capability === 'products.read'
-                  ? {
-                      title: null,
-                      status: 'unknown',
-                      vendor: null,
-                      published: false,
-                      skus: [],
-                    }
-                  : {
-                      sku: ref(candidate.externalId),
-                      location: ref(candidate.scopeKey),
-                      unit: 'each',
-                      onHand: null,
-                      reserved: null,
-                      available: null,
-                      availabilityBasis: 'unknown',
-                    },
-          };
-          const result = parse<unknown>(s.outputs[capability], {
-            items: [tombstone],
-            nextCursor: null,
-            completeness: 'complete',
-            confirmation: 'deleted',
-          }) as CapabilityOutput<K>;
-          await options.recordObservations({
-            tenantId: options.tenantId,
-            connectionId: options.connectionId,
-            apiVersion: API_VERSION,
-            capability,
-            observations: [tombstone],
-          });
+        const opened = await openReadSession(capability, context, input, {
+          options,
+          request,
+          now,
+          id,
+        });
+        if ('output' in opened) return opened.output as CapabilityOutput<K>;
 
-          return result;
-        }
-        const filters = input as CapabilityInput<'inventory.read'> &
-          CapabilityInput<'fulfillment.read'>;
-        if (capability === 'inventory.read' && filters.includeComposition) {
-          const access = parse(
-            s.scanStart,
-            await request(
-              'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
-              {},
-            ),
-          );
-          if (
-            !access.currentAppInstallation.accessScopes.some((scope) =>
-              ['read_products', 'write_products'].includes(scope.handle),
-            )
-          )
-            fail('permission_denied');
-        }
-        const updatedSince =
-          'updatedSince' in input ? (input.updatedSince ?? null) : null;
-        const createdSince =
-          'createdSince' in input ? (input.createdSince ?? null) : null;
-        const historyImport =
-          'historyImport' in input ? input.historyImport : undefined;
-        const binding = createHash('sha256')
-          .update(
-            JSON.stringify([
-              options.tenantId,
-              options.connectionId,
-              options.shop,
-              API_VERSION,
-              capability,
-              // The effective page size, so cursors survive a larger requested page.
-              readPageSize(capability, input.limit),
-              filters.sku ?? null,
-              filters.location ?? null,
-              filters.includeComposition ?? false,
-              filters.order ?? null,
-              updatedSince,
-              createdSince,
-              historyImport?.key ?? null,
-              historyImport?.chunkSize ?? null,
-            ]),
-          )
-          .digest('hex');
-        let after: string | null = null;
-        if (input.cursor) {
-          try {
-            const cursor = z
-              .object({ binding: z.literal(binding), after: z.string().min(1) })
-              .strict()
-              .parse(
-                JSON.parse(
-                  Buffer.from(input.cursor, 'base64url').toString('utf8'),
-                ),
-              );
-            after = cursor.after;
-          } catch {
-            fail('invalid_input');
-          }
-        }
-        const payloads: unknown[] = [];
-        // Parse before capture so unexpected fields, customer details and provider errors cannot enter evidence.
-        const capture = <T>(schema: z.ZodType<T>, value: unknown): T => {
-          const parsed = parse(schema, value);
-          if (options.rawRetentionMs !== undefined) payloads.push(parsed);
-
-          return parsed;
-        };
-        let observedAt = now().toISOString();
-        const items: Observation<unknown>[] = [];
-
-        function emit(
-          resource: SourceIdentity['resource'],
-          external: ExternalId,
-          updatedAt: string | null,
-          data: unknown,
-        ) {
-          items.push({
-            id: id(),
-            source: {
-              ...external,
-              tenantId: options.tenantId,
-              connectionId: options.connectionId,
-              provider: 'shopify',
-              resource,
-            },
-            kind: 'snapshot',
-            observedAt,
-            sourceUpdatedAt: updatedAt,
-            sourceRevision: null,
-            adapterVersion: s.adapterVersion,
-            schemaVersion: 1,
-            data,
-          });
-        }
-
-        // Cache only this page. Consumers validate and allowlist each record before capture.
-        const nested = new Map<string, Record<string, unknown>>();
-
-        function remember(value: unknown): void {
-          if (Array.isArray(value)) {
-            for (const item of value) remember(item);
-          } else if (value && typeof value === 'object') {
-            const fields = parse(record, value);
-            if (typeof fields.id === 'string')
-              nested.set(fields.id, { ...nested.get(fields.id), ...fields });
-            for (const child of Object.values(fields)) remember(child);
-          }
-        }
-
-        async function node<T>(
-          externalId: string,
-          type: string,
-          fields: string,
-          schema: z.ZodType<T>,
-        ): Promise<T> {
-          const cached = nested.get(externalId);
-          // Overflow pages may cache an ID-only reference; fetch its full selection.
-          if (cached && Object.keys(cached).length > 1)
-            return capture(schema, cached);
-          const data = await request(
-            `query LumaNode($id: ID!) { node(id: $id) { ... on ${type} { ${fields} } } }`,
-            { id: externalId },
-          );
-          if (data.node === null) fail('not_found');
-          // Cached so protected fields can be read separately, without raw capture.
-          remember(data.node);
-
-          return capture(schema, data.node);
-        }
-
-        /**
-         * Reads a nested connection completely, starting from the cached first page. `size`
-         * bounds overflow pages so their requested cost stays under the query cost limit.
-         */
-        async function children<T>(
-          externalId: string,
-          type: string,
-          field: string,
-          fields: string,
-          schema: z.ZodType<T>,
-          { args = '', size = 100 }: { args?: string; size?: number } = {},
-        ): Promise<T[]> {
-          const result: T[] = [];
-          let cursor: string | null = null;
-          const initial = nested.get(externalId)?.[field];
-          if (initial !== undefined) {
-            const page = capture(s.connection(schema), initial);
-            result.push(...page.nodes);
-            cursor = next(page.pageInfo);
-            if (!cursor) return result;
-          }
-          const seen = new Set<string>(cursor ? [cursor] : []);
-          do {
-            const data = await request(
-              `query LumaChildren($id: ID!, $after: String) { node(id: $id) { ... on ${type} { children: ${field}(first: ${size}, after: $after${args ? `, ${args}` : ''}) { nodes { ${fields} } ${pageFields} } } } }`,
-              { id: externalId, after: cursor },
-            );
-            if (data.node === null) fail('not_found');
-            remember(data.node);
-            const parent = parse(record, data.node);
-            const page = capture(s.connection(schema), parent.children);
-            result.push(...page.nodes);
-            cursor = next(page.pageInfo);
-            if (cursor && seen.has(cursor)) fail('invalid_response');
-            if (cursor) seen.add(cursor);
-            // Bound malformed or unexpectedly large scans; never return a truncated snapshot.
-            if (seen.size > 1000) fail('invalid_response');
-          } while (cursor);
-
-          return result;
-        }
-
-        const root =
-          capability === 'products.read'
-            ? 'products'
-            : capability === 'inventory.read'
-              ? 'inventoryItems'
-              : capability === 'customers.read'
-                ? 'customers'
-                : 'orders';
-        const rootType =
-          root === 'products'
-            ? 'Product'
-            : root === 'inventoryItems'
-              ? 'InventoryItem'
-              : 'Order';
-        const selected = filters.sku ?? filters.order;
-        // Timestamps are validated ISO values, so quoting cannot add search operators.
-        const search =
-          [
-            updatedSince ? `updated_at:>='${updatedSince}'` : null,
-            createdSince ? `created_at:>='${createdSince}'` : null,
-          ]
-            .filter(Boolean)
-            .join(' ') || null;
-        const sorted = createdSince
-          ? ', sortKey: CREATED_AT, reverse: true'
-          : updatedSince
-            ? ', sortKey: UPDATED_AT'
-            : '';
-        let total: number | null | undefined;
-        let history: HistoryLimit | null | undefined;
-        const bulk = historyImport
-          ? await readBulkHistory({
-              request,
-              fetch: options.fetch ?? globalThis.fetch,
-              capability,
-              key: historyImport.key,
-              cursor: after,
-              limit: historyImport.chunkSize ?? input.limit,
-              ...(options.customerAccess
-                ? { customerAccess: options.customerAccess }
-                : {}),
-              orderCustomers,
-            })
-          : null;
-        const encode = (cursor: string | null) =>
-          cursor
-            ? Buffer.from(JSON.stringify({ binding, after: cursor })).toString(
-                'base64url',
-              )
-            : null;
-        if (bulk?.deferred)
-          return parse<unknown>(s.outputs[capability], {
-            items: [],
-            nextCursor: encode(bulk.cursor),
-            completeness: 'complete',
-            deferred: true,
-            retryAfterMs: 2000,
-          }) as CapabilityOutput<K>;
-        // Export records reflect the shop when the export started, not when Luma reads the file.
-        if (bulk?.snapshotAt) observedAt = bulk.snapshotAt;
-
-        // The first page of a scan reports the collection size and any history limit.
-        if (
-          (!after || bulk?.offset === 0) &&
-          !selected &&
-          capability !== 'inventory.read'
-        ) {
-          const countField =
-            capability in counted
-              ? counted[capability as keyof typeof counted]
-              : null;
-          const start = parse(
-            s.scanStart,
-            await request(
-              countField
-                ? `query LumaScanStart($query: String) { currentAppInstallation { accessScopes { handle } } count: ${countField}(query: $query, limit: null) { count precision } }`
-                : 'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
-              countField ? { query: search } : {},
-            ),
-          );
-          total = start.count?.count ?? null;
-          if (root === 'orders')
-            history = orderHistory(
-              start.currentAppInstallation.accessScopes,
-              now(),
-            );
-        }
-        let roots: { id: string }[];
-        let nextAfter: string | null = null;
-        if (capability === 'customers.read') {
-          const access = options.customerAccess;
-          if (!access) fail('unsupported_capability');
-          const fields = [
-            'id createdAt updatedAt state numberOfOrders amountSpent { amount currencyCode } tags',
-            access.contact
-              ? 'displayName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber }'
-              : '',
-            access.address
-              ? 'defaultAddress { address1 address2 city province zip countryCodeV2 }'
-              : '',
-          ].join(' ');
-          const data = bulk
-            ? {
-                page: {
-                  nodes: bulk.nodes,
-                  pageInfo: { hasNextPage: false, endCursor: null },
-                },
-              }
-            : await request(
-                `query LumaCustomers($first: Int!, $after: String, $query: String) { page: customers(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
-                {
-                  first: readPageSize(capability, input.limit),
-                  after,
-                  query: search,
-                },
-              );
-          const customers = capture(s.connection(s.customerNode), data.page);
-          for (const customer of customers.nodes) {
-            const address = access.address ? customer.defaultAddress : null;
-            const money = customer.amountSpent;
-            emit('customer', ref(customer.id), customer.updatedAt, {
-              displayName: access.contact ? text(customer.displayName) : null,
-              email: access.contact
-                ? text(customer.defaultEmailAddress?.emailAddress, 320)
-                : null,
-              phone: access.contact
-                ? text(customer.defaultPhoneNumber?.phoneNumber, 100)
-                : null,
-              address: address
-                ? {
-                    line1: text(address.address1),
-                    line2: text(address.address2),
-                    city: text(address.city, 256),
-                    region: text(address.province, 256),
-                    postalCode: text(address.zip, 64),
-                    country: text(address.countryCodeV2, 128),
-                  }
-                : null,
-              state: statusFrom(customerStates, customer.state),
-              createdAt: customer.createdAt,
-              orderCount: customer.numberOfOrders,
-              amountSpent:
-                /^-?\d{1,14}(\.\d{1,6})?$/.test(money.amount) &&
-                /^[A-Z]{3}$/.test(money.currencyCode)
-                  ? { amount: money.amount, currency: money.currencyCode }
-                  : null,
-              tags: customer.tags
-                .map((tag) => tag.trim())
-                .filter((tag) => tag.length > 0 && tag.length <= 255)
-                .slice(0, 250),
-              shared: { contact: access.contact, address: access.address },
-            } satisfies CustomerSnapshot);
-          }
-          roots = [];
-          nextAfter = bulk ? bulk.cursor : next(customers.pageInfo);
-          if (nextAfter && nextAfter === after) fail('invalid_response');
-        } else if (bulk) {
-          remember(bulk.nodes);
-          roots = bulk.nodes.map((value) => ({
-            id: parse(s.gid(rootType), value.id),
-          }));
-          nextAfter = bulk.cursor;
-          total = capability === 'inventory.read' ? undefined : bulk.total;
-        } else if (selected && capability === 'orders.read') {
-          // Same selection as an order page, so the observation matches a scan of this order.
-          const data = parse(
-            z.object({ node: record.nullable() }),
-            await request(
-              `query LumaOrder($id: ID!) { node(id: $id) { ... on Order { ${readSelection(capability, orderCustomers, orderAddresses)} } } }`,
-              { id: selected.externalId },
-            ),
-          );
-          roots = [];
-          if (data.node) {
-            if (parse(s.gid('Order'), data.node.id) !== selected.externalId)
-              fail('invalid_response');
-            remember(data.node);
-            roots.push({ id: selected.externalId });
-          } else {
-            // Without read_all_orders, older orders read as absent rather than missing.
-            const start = parse(
-              s.scanStart,
-              await request(
-                'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
-                {},
-              ),
-            );
-            history = orderHistory(
-              start.currentAppInstallation.accessScopes,
-              now(),
-            );
-          }
-        } else if (selected) {
-          if (after) fail('invalid_input');
-          roots = [{ id: selected.externalId }];
-        } else {
-          const fields = readSelection(
-            capability,
-            orderCustomers,
-            orderAddresses,
-            filters.includeComposition === true,
-          );
-          const data = await request(
-            root === 'inventoryItems'
-              ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { ${fields} } ${pageFields} } }`
-              : `query LumaPage($first: Int!, $after: String, $query: String) { page: ${root}(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
-            root === 'inventoryItems'
-              ? { first: readPageSize(capability, input.limit), after }
-              : {
-                  first: readPageSize(capability, input.limit),
-                  after,
-                  query: search,
-                },
-          );
-          const page = parse(s.connection(record), data.page);
-          remember(page.nodes);
-          roots = page.nodes.map((value) => ({
-            id: parse(s.gid(rootType), value.id),
-          }));
-          nextAfter = next(page.pageInfo);
-          if (nextAfter && nextAfter === after) fail('invalid_response');
-        }
-        for (const parent of roots) {
-          if (capability === 'orders.read') {
-            const order = await node(
-              parent.id,
-              'Order',
-              orderSelection(orderCustomers, orderAddresses),
-              s.order,
-            );
-            const lines = await children(
-              parent.id,
-              'Order',
-              'lineItems',
-              orderLine,
-              s.orderLine,
-              { size: 50 },
-            );
-            const shipping = await children(
-              parent.id,
-              'Order',
-              'shippingLines',
-              shippingLine,
-              s.shippingLine,
-              { args: 'includeRemovals: true', size: 50 },
-            );
-            // Exports cannot include discounts; they stay unread until an incremental read.
-            const discounts = bulk
-              ? undefined
-              : await children(
-                  parent.id,
-                  'Order',
-                  'discountApplications',
-                  discountApplication,
-                  s.discountApplication,
-                );
-            // Protected address fields are parsed from the page cache and never captured.
-            const addresses = orderAddresses
-              ? parse(s.orderAddresses, nested.get(order.id))
-              : null;
-            const total = order.currentTotalPriceSet?.shopMoney;
-            emit('order', ref(order.id), order.updatedAt, {
-              displayNumber: order.name,
-              placedAt: order.createdAt ?? null,
-              total: total
-                ? { amount: total.amount, currency: total.currencyCode }
-                : null,
-              ...(orderCustomers && order.customer !== undefined
-                ? {
-                    customer: order.customer ? ref(order.customer.id) : null,
-                  }
-                : {}),
-              addresses: addresses
-                ? {
-                    shared: true,
-                    shipping: mailingAddress(addresses.shippingAddress),
-                    billing: mailingAddress(addresses.billingAddress),
-                  }
-                : { shared: false },
-              status: order.cancelledAt
-                ? 'cancelled'
-                : order.closed
-                  ? 'completed'
-                  : 'open',
-              paymentStatus: statusFrom(
-                paymentStatuses,
-                order.displayFinancialStatus ?? '',
-              ),
-              ...orderFacts(order, shipping, discounts),
-              lines: lines.map((line) => ({
-                id: ref(line.id, order.id),
-                sku: line.variant ? ref(line.variant.inventoryItem.id) : null,
-                quantity: quantity(line.quantity),
-                currentQuantity: quantity(line.currentQuantity),
-                cancelledQuantity: quantity(
-                  line.quantity - line.currentQuantity,
-                ),
-                ...(line.originalUnitPriceSet?.shopMoney
-                  ? {
-                      unitPrice: {
-                        amount: line.originalUnitPriceSet.shopMoney.amount,
-                        currency:
-                          line.originalUnitPriceSet.shopMoney.currencyCode,
-                      },
-                      // The shop setting the order was placed under.
-                      taxIncluded: order.taxesIncluded ?? null,
-                    }
-                  : { unitPrice: null, taxIncluded: null }),
-                // Multiple tax jurisdictions do not establish one tax rate.
-                taxRate:
-                  line.taxLines?.length === 1 && line.taxLines[0]?.rate != null
-                    ? String(line.taxLines[0].rate)
-                    : line.taxLines?.length === 0
-                      ? '0'
-                      : null,
-                skuCode: text(line.sku),
-                title: text(line.name),
-                ...(line.lineItemGroup === undefined
-                  ? {}
-                  : {
-                      bundleGroup: line.lineItemGroup
-                        ? {
-                            id: ref(line.lineItemGroup.id),
-                            title: line.lineItemGroup.title,
-                            quantity: String(line.lineItemGroup.quantity),
-                            product: line.lineItemGroup.productId
-                              ? ref(line.lineItemGroup.productId)
-                              : null,
-                            variant: line.lineItemGroup.variantId
-                              ? ref(line.lineItemGroup.variantId)
-                              : null,
-                            skuCode: text(line.lineItemGroup.variantSku),
-                          }
-                        : null,
-                    }),
-                ...lineFacts(line),
-              })),
-            } satisfies OrderSnapshot);
-          } else if (capability === 'products.read') {
-            const product = await node(
-              parent.id,
-              'Product',
-              'id updatedAt title status vendor publishedAt priceRangeV2 { minVariantPrice { currencyCode } }',
-              s.product,
-            );
-            const variants = await children(
-              parent.id,
-              'Product',
-              'variants',
-              variantSelection,
-              s.variant,
-            );
-            // An export establishes older catalog facts, not a historical recipe read now.
-            const bundles = bulk
-              ? new Map(
-                  variants
-                    .filter((v) => v.requiresComponents !== undefined)
-                    .map((v) => [
-                      v.id,
-                      {
-                        variant: ref(v.id),
-                        requiresComponents: v.requiresComponents === true,
-                        components: null,
-                      },
-                    ]),
-                )
-              : await readBundleRecipes(variants);
-            const currency =
-              product.priceRangeV2?.minVariantPrice.currencyCode ?? null;
-            emit('product', ref(product.id), product.updatedAt, {
-              title: product.title,
-              status: statusFrom(productStatuses, product.status),
-              vendor: text(product.vendor),
-              // Only an Online Store publication has a publication time readable with read_products.
-              published: product.publishedAt != null,
-              skus: variants.map((variant) => ({
-                id: ref(variant.inventoryItem.id),
-                code: variant.sku,
-                unit: 'each',
-                // Shopify names the only variant of a product "Default Title".
-                title:
-                  variant.title === 'Default Title'
-                    ? null
-                    : text(variant.title),
-                price:
-                  variant.price == null
-                    ? null
-                    : { amount: variant.price, currency },
-                barcode: text(variant.barcode),
-                ...(bundles.has(variant.id)
-                  ? { bundle: bundles.get(variant.id)! }
-                  : {}),
-              })),
-            } satisfies ProductSnapshot);
-          } else if (capability === 'inventory.read') {
-            const item = await node(
-              parent.id,
-              'InventoryItem',
-              `id tracked ${filters.includeComposition ? inventoryCompositionSelection : ''}`,
-              s.inventoryItem,
-            );
-            const levels = await children(
-              parent.id,
-              'InventoryItem',
-              'inventoryLevels',
-              'id updatedAt isActive location { id isActive } quantities(names: ["on_hand", "committed", "reserved", "incoming", "damaged", "quality_control", "safety_stock", "available"]) { name quantity }',
-              s.level,
-            );
-            let composition;
-            if (filters.includeComposition) {
-              if (item.variant === undefined) fail('invalid_response');
-              if (
-                item.variant &&
-                item.variant.productVariantComponents.nodes.length === 0 &&
-                item.variant.productVariantComponents.pageInfo.hasNextPage
-              )
-                fail('invalid_response');
-              composition = item.variant
-                ? {
-                    variant: ref(item.variant.id),
-                    requiresComponents: item.variant.requiresComponents,
-                    hasComponents:
-                      item.variant.productVariantComponents.nodes.length > 0,
-                  }
-                : null;
-            }
-            for (const level of levels) {
-              if (
-                filters.location &&
-                filters.location.externalId !== level.location.id
-              )
-                continue;
-              const values = new Map(
-                level.quantities.map((value) => [
-                  value.name,
-                  String(value.quantity),
-                ]),
-              );
-              if (values.size !== level.quantities.length)
-                fail('invalid_response');
-              const value = (key: string) =>
-                item.tracked ? (values.get(key) ?? null) : null;
-              const available = value('available');
-              emit('sku', ref(item.id, level.location.id), level.updatedAt, {
-                ...(composition === undefined ? {} : { composition }),
-                sku: ref(item.id),
-                location: ref(level.location.id),
-                unit: 'each',
-                onHand: value('on_hand'),
-                reserved: value('reserved'),
-                committed: value('committed'),
-                incoming: value('incoming'),
-                damaged: value('damaged'),
-                qualityControl: value('quality_control'),
-                safetyStock: value('safety_stock'),
-                locationActive: level.location.isActive ?? null,
-                itemActive: level.isActive ?? null,
-                tracked: item.tracked,
-                inventorySemantics: 'shopify/1',
-                available,
-                availabilityBasis:
-                  available === null ? 'unknown' : 'provider_reported',
-              });
-            }
-          } else if (capability === 'returns.read') {
-            await readReturns(parent.id);
-          } else {
-            const work = await children(
-              parent.id,
-              'Order',
-              'fulfillmentOrders',
-              'id updatedAt status fulfillAt fulfillBy fulfillmentHolds { reason } assignedLocation { name location { id } } deliveryMethod { methodType presentedName }',
-              s.fulfillmentOrder,
-            );
-            for (const operation of work) {
-              const lines = await children(
-                operation.id,
-                'FulfillmentOrder',
-                'lineItems',
-                'id totalQuantity remainingQuantity lineItem { id }',
-                s.fulfillmentOrderLine,
-              );
-              const holds = (operation.fulfillmentHolds ?? []).map((hold) => ({
-                reason: holdReasons[hold.reason] ?? 'other',
-              }));
-              const assigned = operation.assignedLocation;
-              const method = operation.deliveryMethod;
-              emit('fulfillment', ref(operation.id), operation.updatedAt, {
-                order: ref(parent.id),
-                status: statusFrom(workStatuses, operation.status),
-                lines: lines.map((line) => ({
-                  orderLine: ref(line.lineItem.id, parent.id),
-                  quantity: quantity(line.totalQuantity),
-                  remainingQuantity: quantity(line.remainingQuantity),
-                })),
-                lastProgressAt: operation.updatedAt,
-                progressBasis: 'source_updated',
-                failureCode:
-                  operation.status === 'INCOMPLETE' ? 'incomplete' : null,
-                kind: 'fulfillment_order',
-                // An ON_HOLD status without a readable hold still blocks the work.
-                holds:
-                  !holds.length && operation.status === 'ON_HOLD'
-                    ? [{ reason: 'other' }]
-                    : holds,
-                location: assigned?.location
-                  ? {
-                      id: ref(assigned.location.id),
-                      name: text(assigned.name),
-                    }
-                  : null,
-                fulfillAt: operation.fulfillAt ?? null,
-                fulfillBy: operation.fulfillBy ?? null,
-                method: method
-                  ? {
-                      type: methodTypes[method.methodType] ?? 'unknown',
-                      name: text(method.presentedName),
-                    }
-                  : null,
-              } satisfies FulfillmentSnapshot);
-            }
-            // Order.fulfillments is an unpaginated list. Omit `first` to avoid silently truncating shipments.
-            const order = await node(
-              parent.id,
-              'Order',
-              'fulfillments { id updatedAt status deliveredAt inTransitAt displayStatus estimatedDeliveryAt location { id name } trackingInfo(first: 10) { company number url } }',
-              z.object({ fulfillments: z.array(s.fulfillment) }),
-            );
-            for (const shipment of order.fulfillments) {
-              const lines = await children(
-                shipment.id,
-                'Fulfillment',
-                'fulfillmentLineItems',
-                'id quantity lineItem { id }',
-                s.fulfillmentLine,
-              );
-              const status = statusFrom(shipmentStatuses, shipment.status);
-              emit('fulfillment', ref(shipment.id), shipment.updatedAt, {
-                order: ref(parent.id),
-                status:
-                  status === 'shipped' && shipment.deliveredAt
-                    ? 'delivered'
-                    : status,
-                milestones: { deliveredAt: shipment.deliveredAt ?? null },
-                lines: lines.map((line) => ({
-                  orderLine: ref(line.lineItem.id, parent.id),
-                  quantity: quantity(line.quantity),
-                })),
-                progressBasis: 'source_updated',
-                lastProgressAt:
-                  shipment.deliveredAt ??
-                  shipment.inTransitAt ??
-                  shipment.updatedAt,
-                failureCode: status === 'failed' ? 'fulfillment_failed' : null,
-                kind: 'shipment',
-                location: shipment.location
-                  ? {
-                      id: ref(shipment.location.id),
-                      name: text(shipment.location.name),
-                    }
-                  : null,
-                estimatedDeliveryAt: shipment.estimatedDeliveryAt ?? null,
-                tracking: (shipment.trackingInfo ?? [])
-                  .map((entry) => ({
-                    carrier: text(entry.company),
-                    number: text(entry.number),
-                    url: trackingUrl(entry.url),
-                  }))
-                  .filter((entry) => entry.number || entry.url),
-                delivery: shipment.deliveredAt
-                  ? 'delivered'
-                  : (deliveryStates[shipment.displayStatus ?? ''] ?? null),
-              } satisfies FulfillmentSnapshot);
-            }
-          }
-        }
-
-        /** Emits an order's returns, then its refunds, which may refer to them. */
-        async function readReturns(orderId: string) {
-          const order = ref(orderId);
-          const returns = await children(
-            orderId,
-            'Order',
-            'returns',
-            'id name status createdAt requestApprovedAt closedAt decline { reason }',
-            s.returnNode,
-          );
-          for (const item of returns) {
-            const lines = await children(
-              item.id,
-              'Return',
-              'returnLineItems',
-              'id quantity refundedQuantity returnReasonDefinition { name } ... on ReturnLineItem { fulfillmentLineItem { id lineItem { id } } withCodeDiscountedTotalPriceSet { shopMoney { amount currencyCode } } }',
-              s.returnLine,
-            );
-            // Dispositions record what came back; MISSING units were not received.
-            const receipts = new Map<
-              string,
-              { received: number; restocked: number }
-            >();
-            let receivedAt: string | null = null;
-            for (const reverse of await children(
-              item.id,
-              'Return',
-              'reverseFulfillmentOrders',
-              'id status',
-              s.reverseFulfillmentOrder,
-            ))
-              for (const line of await children(
-                reverse.id,
-                'ReverseFulfillmentOrder',
-                'lineItems',
-                'id fulfillmentLineItem { id } dispositions { type quantity createdAt }',
-                s.reverseLine,
-              )) {
-                if (!line.fulfillmentLineItem) continue;
-                const receipt = receipts.get(line.fulfillmentLineItem.id) ?? {
-                  received: 0,
-                  restocked: 0,
-                };
-                for (const disposition of line.dispositions) {
-                  if (disposition.type === 'MISSING') continue;
-                  receipt.received += disposition.quantity;
-                  if (disposition.type === 'RESTOCKED')
-                    receipt.restocked += disposition.quantity;
-                  if (
-                    !receivedAt ||
-                    Date.parse(disposition.createdAt) > Date.parse(receivedAt)
-                  )
-                    receivedAt = disposition.createdAt;
-                }
-                receipts.set(line.fulfillmentLineItem.id, receipt);
-              }
-            const status = statusFrom(returnStatuses, item.status);
-            emit('return', ref(item.id), null, {
-              type: 'return',
-              order,
-              name: text(item.name),
-              status,
-              requestedAt: item.createdAt ?? null,
-              approvedAt: item.requestApprovedAt ?? null,
-              closedAt: item.closedAt ?? null,
-              declineReason: item.decline
-                ? (declineReasons[item.decline.reason] ?? 'other')
-                : null,
-              receivedAt,
-              lines: lines
-                .filter((line) => line.quantity > 0)
-                .map((line) => {
-                  const fulfilled = line.fulfillmentLineItem;
-                  const receipt = fulfilled
-                    ? (receipts.get(fulfilled.id) ?? {
-                        received: 0,
-                        restocked: 0,
-                      })
-                    : null;
-                  const value = line.withCodeDiscountedTotalPriceSet?.shopMoney;
-
-                  return {
-                    orderLine: fulfilled
-                      ? ref(fulfilled.lineItem.id, orderId)
-                      : null,
-                    quantity: quantity(line.quantity),
-                    reason: text(line.returnReasonDefinition?.name),
-                    receivedQuantity: receipt ? String(receipt.received) : null,
-                    restockedQuantity: receipt
-                      ? String(receipt.restocked)
-                      : null,
-                    refundedQuantity:
-                      line.refundedQuantity == null
-                        ? null
-                        : String(line.refundedQuantity),
-                    value: value
-                      ? { amount: value.amount, currency: value.currencyCode }
-                      : null,
-                  };
-                }),
-            } satisfies ReturnSnapshot);
-          }
-          // Order.refunds is an unpaginated list. Omit `first` to avoid silently truncating refunds.
-          const { refunds } = await node(
-            orderId,
-            'Order',
-            'refunds { id createdAt updatedAt totalRefundedSet { shopMoney { amount currencyCode } } return { id } }',
-            z.object({ refunds: z.array(s.refundNode) }),
-          );
-          for (const refund of refunds) {
-            const lines = await children(
-              refund.id,
-              'Refund',
-              'refundLineItems',
-              'quantity restockType restocked lineItem { id }',
-              s.refundLine,
-            );
-            const transactions = await children(
-              refund.id,
-              'Refund',
-              'transactions',
-              'id kind status processedAt gateway amountSet { shopMoney { amount currencyCode } }',
-              s.refundTransaction,
-            );
-            const total = refund.totalRefundedSet?.shopMoney;
-            emit('refund', ref(refund.id), refund.updatedAt, {
-              type: 'refund',
-              order,
-              return: refund.return ? ref(refund.return.id) : null,
-              createdAt: refund.createdAt,
-              total: total
-                ? { amount: total.amount, currency: total.currencyCode }
-                : null,
-              lines: lines
-                .filter((line) => line.quantity > 0)
-                .map((line) => ({
-                  orderLine: ref(line.lineItem.id, orderId),
-                  quantity: quantity(line.quantity),
-                  restock: statusFrom(restockTypes, line.restockType),
-                  restocked: line.restocked,
-                })),
-              transactions: transactions
-                .filter((transaction) => transaction.kind === 'REFUND')
-                .map((transaction) => ({
-                  status: statusFrom(transactionStatuses, transaction.status),
-                  amount: {
-                    amount: transaction.amountSet.shopMoney.amount,
-                    currency: transaction.amountSet.shopMoney.currencyCode,
-                  },
-                  processedAt: transaction.processedAt,
-                  gateway: text(transaction.gateway),
-                })),
-            } satisfies RefundSnapshot);
-          }
-        }
-
-        const result: Page<unknown> = {
-          items,
-          nextCursor: encode(nextAfter),
-          completeness: 'complete',
-          retryAfterMs: request.nextReadDelay(),
-          ...(total === undefined ? {} : { total }),
-          ...(history === undefined ? {} : { history }),
-        };
-        if (capability === 'inventory.read' && options.inventoryWrites) {
-          const inventory = parse(s.outputs['inventory.read'], result);
-          const receipts = await options.inventoryWrites(
-            inventory.items.map((item) => ({
-              inventoryItemId: item.data.sku.externalId,
-              locationId: item.data.location.externalId,
-            })),
-          );
-          await attributeInventoryWrites(request, inventory.items, receipts);
-          for (const [index, item] of inventory.items.entries()) {
-            const original = result.items[index];
-            if (original) original.data = item.data;
-          }
-          result.retryAfterMs = request.nextReadDelay();
-        }
+        const result = await readers[capability](opened.session);
         const validated = parse<unknown>(
           s.outputs[capability],
           result,
@@ -1437,16 +223,7 @@ export function createShopifyConnector(
           apiVersion: API_VERSION,
           capability,
           observations: validated.items,
-          ...(options.rawRetentionMs === undefined
-            ? {}
-            : {
-                raw: {
-                  payloads,
-                  expiresAt: new Date(
-                    now().getTime() + options.rawRetentionMs,
-                  ).toISOString(),
-                },
-              }),
+          ...opened.session.raw(),
         });
 
         return validated;
@@ -1482,10 +259,4 @@ export function createShopifyConnector(
         : {}),
     },
   };
-}
-
-function next(page: z.infer<typeof s.pageInfo>): string | null {
-  if (page.hasNextPage && !page.endCursor) fail('invalid_response');
-
-  return page.hasNextPage ? page.endCursor : null;
 }

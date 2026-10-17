@@ -6,8 +6,8 @@ import {
   returnListSchema,
   returnsCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { ReturnWorkspace } from '../application/returns.js';
@@ -21,17 +21,8 @@ export function returnRoutes(service?: ReturnWorkspace) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         if (!request.tenantContext)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
-        if (!service)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Returns are unavailable',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        if (!service) throw unavailable('Returns are unavailable');
         validateCollectionQuery(returnsCatalog, query);
 
         return returnListSchema.parse(
@@ -41,16 +32,10 @@ export function returnRoutes(service?: ReturnWorkspace) {
     ),
     get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Return details are unavailable',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service) throw unavailable('Return details are unavailable');
       const detail = await service.get(request.tenantContext, params.returnId);
-      if (!detail)
-        throw new IdentityError(404, 'NOT_FOUND', 'Return not found');
+      if (!detail) throw notFound('Return not found');
 
       return returnDetailSchema.parse(detail);
     }),

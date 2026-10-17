@@ -24,7 +24,7 @@ import { Building2, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
 import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
@@ -47,7 +47,7 @@ export function SupplierPage() {
   });
   const record = useQuery(supplierRecordOptions(organizationId, supplierId));
   const context = useQuery(supplierContextOptions(organizationId, supplierId));
-  if (record.error instanceof IdentityError && record.error.status === 401)
+  if (record.error instanceof ApiError && record.error.status === 401)
     return <SignInRedirect />;
 
   return (
@@ -60,7 +60,7 @@ export function SupplierPage() {
       error={
         !record.error
           ? undefined
-          : record.error instanceof IdentityError && record.error.status === 404
+          : record.error instanceof ApiError && record.error.status === 404
             ? 'missing'
             : procurementError(record.error)
       }

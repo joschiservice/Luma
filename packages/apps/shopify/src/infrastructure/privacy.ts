@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { SecretCipher } from '@luma/connections';
 import { shopHostname, validMac } from '@luma/connector-shopify';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ShopifyAppConfig } from '../application/oauth.js';
@@ -50,18 +50,18 @@ export function createPrivacyIntake(
     topic: string,
   ) => {
     if (!validMac(config.clientSecret, body, signature, 'base64'))
-      throw new IdentityError(
+      throw new ServiceError(
         401,
         'UNAUTHENTICATED',
         'Invalid Shopify signature',
       );
     if (!Object.hasOwn(payloads, topic))
-      throw new IdentityError(422, 'CONFLICT', 'Invalid Shopify privacy topic');
+      throw new ServiceError(422, 'CONFLICT', 'Invalid Shopify privacy topic');
     let value: unknown;
     try {
       value = JSON.parse(body.toString('utf8'));
     } catch {
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'CONFLICT',
         'Invalid Shopify privacy request',
@@ -69,7 +69,7 @@ export function createPrivacyIntake(
     }
     const parsed = payloads[topic as keyof typeof payloads].safeParse(value);
     if (!parsed.success || parsed.data.shop_domain !== shop)
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'CONFLICT',
         'Invalid Shopify privacy request',
@@ -121,6 +121,3 @@ export function createPrivacyIntake(
     });
   };
 }
-
-/** Accepts the original JSON bytes and verified-delivery headers; resolves only after durable intake. */
-export type PrivacyIntake = ReturnType<typeof createPrivacyIntake>;

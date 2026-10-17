@@ -21,12 +21,12 @@ import {
   validMac,
 } from '@luma/connector-shopify';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ShopifyAppConfig as ShopifyConfig } from '../application/oauth.js';
-import { storedCredentials } from './installation-validation.js';
+import { storedCredentials } from '../domain/installation-validation.js';
 import { shopifyRequestBudget } from './request-budget.js';
 import {
   canSubscribe,
@@ -35,7 +35,7 @@ import {
 } from './webhooks.js';
 
 const invalid = () =>
-  new IdentityError(
+  new ServiceError(
     422,
     'CONFLICT',
     'Shopify authorization expired or is invalid. Connect again.',
@@ -160,11 +160,7 @@ export function createShopifyOAuth(
         event,
       ))
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Connection changed. Connect again.',
-      );
+      throw conflict('Connection changed. Connect again.');
   }
 
   function next(
@@ -357,11 +353,7 @@ export function createShopifyOAuth(
           (installationVersion !== undefined &&
             record.connection.appInstallationVersion !== installationVersion)
         )
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Shopify connection not found',
-          );
+          throw notFound('Shopify connection not found');
         if (record.secret) {
           const credentials = storedCredentials.parse(
             deps.cipher.open(record.secret, secretBinding(record.connection)),
@@ -575,9 +567,7 @@ export function createShopifyOAuth(
           (c) => c.target.kind === 'shopify' && c.target.shop === shop,
         );
         if (existing.length > 1)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Disconnect duplicate Shopify connections before reconnecting.',
           );
         const candidate = existing[0];
@@ -591,11 +581,7 @@ export function createShopifyOAuth(
           [fresh.tenantId, app, shop],
         );
         if (binding.rows[0]?.connection_id !== id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Shopify installation is already connected.',
-          );
+          throw conflict('Shopify installation is already connected.');
         const record = await repo.get(fresh.tenantId, id);
         const credentials = await client.token(shop, { code });
         const timestamp = now().toISOString();
@@ -743,7 +729,7 @@ export function createShopifyOAuth(
         !shopHostname.safeParse(shop).success ||
         !validMac(config.clientSecret, body, signature, 'base64')
       )
-        throw new IdentityError(
+        throw new ServiceError(
           401,
           'UNAUTHENTICATED',
           'Invalid Shopify signature',
@@ -810,7 +796,7 @@ export function createShopifyOAuth(
         !shopHostname.safeParse(shop).success ||
         !validMac(config.clientSecret, body, signature, 'base64')
       )
-        throw new IdentityError(
+        throw new ServiceError(
           401,
           'UNAUTHENTICATED',
           'Invalid Shopify signature',
@@ -948,7 +934,7 @@ export function createShopifyOAuth(
         !shopHostname.safeParse(shop).success ||
         !validMac(config.clientSecret, body, signature, 'base64')
       )
-        throw new IdentityError(403, 'FORBIDDEN', 'Invalid Shopify signature');
+        throw forbidden('Invalid Shopify signature');
       const payload = z
         .object({ myshopify_domain: z.literal(shop) })
         .safeParse(JSON.parse(body.toString('utf8')));

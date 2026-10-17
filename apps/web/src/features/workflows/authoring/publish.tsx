@@ -11,7 +11,7 @@ import {
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { type ReactNode, useState } from 'react';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import { publishDraft } from './data';
 
@@ -63,9 +63,7 @@ export function PublishDialog({
       );
     } catch (failure) {
       setError(workflowError(failure));
-      setUncertain(
-        !(failure instanceof IdentityError) || failure.status >= 500,
-      );
+      setUncertain(!(failure instanceof ApiError) || failure.status >= 500);
     } finally {
       setPending(false);
     }

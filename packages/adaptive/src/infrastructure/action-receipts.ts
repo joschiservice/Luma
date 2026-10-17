@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 import { z } from 'zod';
 
 import type { createViewActions } from '../application/actions.js';
@@ -36,11 +36,7 @@ export function createActionReceipts(
         ).rows[0];
         if (!row) return null;
         if (row.digest !== digest)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This command ID was used for another action.',
-          );
+          throw conflict('This command ID was used for another action.');
 
         return results.parse(row.results);
       }),
@@ -58,11 +54,7 @@ export function createActionReceipts(
           )
         ).rows[0];
         if (!row || row.digest !== digest)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This command ID was used for another action.',
-          );
+          throw conflict('This command ID was used for another action.');
 
         return results.parse(row.results);
       }),

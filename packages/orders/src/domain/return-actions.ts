@@ -23,7 +23,10 @@ export interface ReturnActionProof {
   outcome: 'passed' | 'failed' | 'inconclusive';
   payment: 'pending' | 'failed' | 'partial' | 'paid' | null;
   observedAt: string;
+  /** Observation IDs of stored reads. */
   evidenceRefs: string[];
+  /** Every cited read was complete. Proofs stored before reads were kept lack it. */
+  complete?: boolean;
 }
 
 /** One immutable settlement request; sent requests permanently hold their case/line slot. */

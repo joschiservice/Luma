@@ -10,7 +10,7 @@ import { z } from 'zod';
 import {
   installationCredentials,
   installationInput,
-} from '../infrastructure/installation-validation.js';
+} from '../domain/installation-validation.js';
 
 /** Presents secret-safe setup or the exact downstream correction supplied by a canonical order plan. */
 export default function StarshipitSettings(props: AppUiProps) {

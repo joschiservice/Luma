@@ -40,7 +40,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowUp, Ellipsis } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { ApiError } from '../identity/data';
 import { usePermissions } from '../identity/permissions';
 import { useWorkspaceLayout } from '../layout/data';
 import { rolesOptions } from '../settings/roles-data';
@@ -147,8 +147,7 @@ export function CollectionViewBar({
       view.open(result.id);
     },
     onError: (error) => {
-      if (error instanceof IdentityError && error.status === 409)
-        setConflict(true);
+      if (error instanceof ApiError && error.status === 409) setConflict(true);
     },
   });
   const archive = useMutation({
@@ -356,7 +355,7 @@ export function CollectionViewBar({
         </Alert>
       ) : exporting.isError ? (
         <Alert tone="danger" role="alert" className="collection-view-notice">
-          {exporting.error instanceof IdentityError
+          {exporting.error instanceof ApiError
             ? exporting.error.message
             : m.collections_export_failed()}
         </Alert>
@@ -477,7 +476,7 @@ export function CollectionViewBar({
             </DialogHeader>
             {archive.isError ? (
               <Alert tone="danger" role="alert">
-                {archive.error instanceof IdentityError
+                {archive.error instanceof ApiError
                   ? archive.error.message
                   : m.collections_view_save_failed()}
               </Alert>
@@ -554,7 +553,7 @@ function SaveViewDialog({
             setError(null);
             submit({ name: name.trim(), sharing }).catch((reason: unknown) => {
               setError(
-                reason instanceof IdentityError
+                reason instanceof ApiError
                   ? reason.message
                   : m.collections_view_save_failed(),
               );

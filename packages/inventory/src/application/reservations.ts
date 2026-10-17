@@ -1,10 +1,10 @@
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
+import { forbidden, notFound } from '@luma/platform';
 
 import {
   decimalQuantity,
@@ -37,8 +37,7 @@ export function createReservationService(deps: NativeStockDependencies) {
   async function access(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.read');
     requirePermission(fresh, 'inventory.manage');
     requirePermission(fresh, 'orders.read');
@@ -90,8 +89,7 @@ export function createReservationService(deps: NativeStockDependencies) {
     const previous = await tx.reservationReceipt(input.key, hash);
     if (previous) return previous;
     const initial = await tx.reservation(input.reservationId, false);
-    if (!initial)
-      throw new IdentityError(404, 'NOT_FOUND', 'Stock reservation not found');
+    if (!initial) throw notFound('Stock reservation not found');
     await tx.lockOrder(initial.orderId);
     const demand = await tx.demand(initial.orderId, false);
     const value = await tx.reservation(initial.id, true);
@@ -546,8 +544,7 @@ export function createReservationService(deps: NativeStockDependencies) {
         if (retry) return retry;
         await tx.lockOrder(value.orderId);
         const demand = await tx.demand(value.orderId, true);
-        if (!demand)
-          throw new IdentityError(404, 'NOT_FOUND', 'Luma order not found');
+        if (!demand) throw notFound('Luma order not found');
         if (demand.version !== value.orderVersion || demand.status !== 'open')
           throw new LedgerError(
             'stale',

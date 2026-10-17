@@ -23,6 +23,8 @@ export {
 
 export type { Configuration, Facts } from './domain/facts.js';
 
+export { workspaceDetectionConfiguration } from './domain/workspace-configuration.js';
+
 export type {
   DiagnosisOptions,
   DiagnosisRereader,
@@ -36,5 +38,7 @@ export type { CaseService } from './application/cases.js';
 export { evaluate as evaluateException } from './domain/evaluate.js';
 
 export { caseMetricDefinitions } from './domain/metrics.js';
+
+export { exceptionClassLabel } from './domain/labels.js';
 
 export type { CaseMetricItem } from './domain/metrics.js';

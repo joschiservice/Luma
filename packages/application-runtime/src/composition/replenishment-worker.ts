@@ -1,8 +1,10 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import type { AppDefinition } from '@luma/app-host';
+import { listDetectionScopes } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
+import { listReplenishmentScopes } from '@luma/procurement/composition';
 import {
   createProcessWorker,
   type StockProtectionWorkflowInput,
@@ -13,9 +15,11 @@ import type {
   ProcessActivities,
   ProcessRun,
 } from '@luma/workflows';
-import type {
-  createCodeProcesses,
-  createCoordination,
+import {
+  type createCodeProcesses,
+  type createCoordination,
+  listCaseWorkflowScopes,
+  listCodeProcessScopes,
 } from '@luma/workflows/composition';
 import type { Pool } from 'pg';
 
@@ -90,19 +94,15 @@ export async function createReplenishmentWorker(
   async function poll() {
     while (!stop.signal.aborted) {
       try {
-        const scopes = await pool.query<{
-          tenant_id: string;
-          principal_id: string;
-        }>('SELECT * FROM replenishment_worker_scopes()');
         // A workspace or member suspended after discovery is skipped quietly; discovery omits it
         // next time.
-        for (const scope of scopes.rows) {
+        for (const scope of await listReplenishmentScopes(pool)) {
           if (stop.signal.aborted) break;
           try {
             await runtime.tick(
               await identity.resolveWorkflowContext(
-                scope.principal_id,
-                scope.tenant_id,
+                scope.principalId,
+                scope.tenantId,
                 'replenishment-monitor',
               ),
             );
@@ -115,22 +115,18 @@ export async function createReplenishmentWorker(
           }
         }
         if (stockProtection) {
-          const scopes = await pool.query<{
-            tenant_id: string;
-            principal_id: string;
-          }>('SELECT * FROM detection_worker_scopes()');
-          for (const scope of scopes.rows) {
+          for (const scope of await listDetectionScopes(pool)) {
             try {
               const context = await identity.resolveWorkflowContext(
-                scope.principal_id,
-                scope.tenant_id,
+                scope.principalId,
+                scope.tenantId,
                 'stock-protection-discovery',
               );
               for (const service of stockProtection.services)
                 for (const incident of await service.discover(context)) {
                   const principal = await identity.resolveWorkflowContext(
                     incident.principalId,
-                    scope.tenant_id,
+                    scope.tenantId,
                     'stock-protection-start',
                   );
                   await stockProtection.start(principal, incident.id);
@@ -145,17 +141,13 @@ export async function createReplenishmentWorker(
           }
         }
         if (caseWorkflows) {
-          const caseScopes = await pool.query<{
-            tenant_id: string;
-            principal_id: string;
-          }>('SELECT * FROM case_workflow_worker_scopes()');
-          for (const scope of caseScopes.rows) {
+          for (const scope of await listCaseWorkflowScopes(pool)) {
             if (stop.signal.aborted) break;
             try {
               await caseWorkflows.tick(
                 await identity.resolveWorkflowContext(
-                  scope.principal_id,
-                  scope.tenant_id,
+                  scope.principalId,
+                  scope.tenantId,
                   'case-workflow-monitor',
                 ),
               );
@@ -169,21 +161,16 @@ export async function createReplenishmentWorker(
           }
         }
         if (codeProcesses) {
-          const codeScopes = await pool.query<{
-            tenant_id: string;
-            principal_id: string;
-            definition_id: string;
-          }>('SELECT * FROM code_process_worker_scopes()');
-          for (const scope of codeScopes.rows) {
+          for (const scope of await listCodeProcessScopes(pool)) {
             if (stop.signal.aborted) break;
             try {
               await codeProcesses.tick(
                 await identity.resolveWorkflowContext(
-                  scope.principal_id,
-                  scope.tenant_id,
+                  scope.principalId,
+                  scope.tenantId,
                   'code-process-monitor',
                 ),
-                scope.definition_id,
+                scope.definitionId,
               );
             } catch (error) {
               if (pausesBackgroundWork(error)) continue;

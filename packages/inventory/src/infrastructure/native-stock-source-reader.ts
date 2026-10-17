@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import type { CapabilityOutput, CapabilityReader } from '@luma/connections';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 
 import type { NativeStockStore } from '../application/native-stock.js';
 import { LedgerError } from '../domain/ledger.js';
@@ -35,8 +35,7 @@ export function createNativeStockSourceReader(deps: {
   ) => {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
     requirePermission(fresh, 'inventory.read');
     requirePermission(fresh, 'inventory.manage');
     requirePermission(fresh, 'sync.manage');

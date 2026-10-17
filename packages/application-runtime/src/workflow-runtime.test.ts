@@ -1,11 +1,11 @@
 import { createAdmissionEligibility } from '@luma/application-runtime';
 import type { Diagnosis, Incident } from '@luma/exceptions';
 import type { ExecutionRecord } from '@luma/execution';
-import { IdentityError } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
 } from '@luma/identity/composition';
+import { notFound } from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 import type {
   ExceptionWorkflowInput,
@@ -243,7 +243,7 @@ describe('durable activity boundaries', () => {
   it('rejects revoked access before loading or dispatching an action', async () => {
     const { deps, activities } = fixture();
     deps.identity.resolveWorkflowContext.mockRejectedValue(
-      new IdentityError(404, 'NOT_FOUND', 'Organization not found'),
+      notFound('Organization not found'),
     );
     await expect(
       activities.execute(input, 'incident', proposal),
@@ -365,7 +365,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     );
     expect(signals).toHaveLength(1);
     identity.refreshContext.mockRejectedValue(
-      new IdentityError(404, 'NOT_FOUND', 'Organization not found'),
+      notFound('Organization not found'),
     );
     await expect(client.notifyApproval(context, input.source)).rejects.toThrow(
       'Organization not found',

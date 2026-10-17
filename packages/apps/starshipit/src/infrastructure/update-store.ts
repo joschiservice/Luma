@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
 
 export interface UpdateRun {
@@ -68,20 +67,14 @@ export function createUpdateStore(database: TenantDatabase) {
           'code' in error &&
           error.code === '23505'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Check the existing order correction before reviewing another.',
           );
         throw error;
       }
       const saved = await get(tenant, run.id);
       if (!saved || canonicalJson(saved.document) !== canonicalJson(run))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This request belongs to another correction.',
-        );
+        throw conflict('This request belongs to another correction.');
 
       return saved;
     },

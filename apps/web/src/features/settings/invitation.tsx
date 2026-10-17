@@ -14,8 +14,8 @@ import { useState } from 'react';
 
 import { EntryFrame } from '../../kit/identity/common';
 import {
+  ApiError,
   auth,
-  IdentityError,
   organizationsOptions,
   sessionOptions,
 } from '../../kit/identity/data';
@@ -89,7 +89,7 @@ export function AcceptInvitation() {
         /* Keep the invitation available for a safe retry after connectivity returns. */
       }
       setUnconfirmed(
-        error instanceof IdentityError && error.code === 'EMAIL_NOT_VERIFIED',
+        error instanceof ApiError && error.code === 'EMAIL_NOT_VERIFIED',
       );
       setError(
         error instanceof Error

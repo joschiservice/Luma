@@ -23,7 +23,7 @@ import { UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { RecordAssistance } from '../../kit/record-assistance';
 import { RecordMessages } from '../../kit/record-messages';
 import { formatMoney } from '../../shared/orders/presentation';
@@ -59,9 +59,9 @@ export function CustomerPage() {
     onlineSnapshot,
     serverSnapshot,
   );
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
-  const status = query.error instanceof IdentityError ? query.error.status : 0;
+  const status = query.error instanceof ApiError ? query.error.status : 0;
   const detail = status === 403 ? undefined : query.data;
 
   return (

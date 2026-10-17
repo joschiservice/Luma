@@ -1,6 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import type {
   RecoveryRun,
@@ -46,9 +45,7 @@ export function createRecoveryStore(database: TenantDatabase): RecoveryStore & {
           )
         ).rows;
         if (pending.some((item) => item.run_id !== run.id))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another recovery is awaiting reconciliation. Check its outcome before another action.',
           );
         const values = [
@@ -68,9 +65,7 @@ export function createRecoveryStore(database: TenantDatabase): RecoveryStore & {
           )
         ).rows[0];
         if (row?.run_id !== run.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another recovery already reserved this fulfillment revision. Refresh to review it.',
           );
       }),
@@ -100,9 +95,7 @@ export function createRecoveryStore(database: TenantDatabase): RecoveryStore & {
         !stored ||
         canonicalJson({ ...stored, decisionId: null }) !== canonicalJson(run)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This fulfillment revision already has a recovery. Refresh to review it.',
         );
 

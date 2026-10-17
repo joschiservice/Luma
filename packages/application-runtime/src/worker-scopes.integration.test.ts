@@ -18,6 +18,7 @@ const scopeFunctions = [
   'code_process_worker_scopes',
   'procurement_submission_scopes',
   'messaging_sync_scopes',
+  'orders_return_write_scopes',
 ] as const;
 
 describe.skipIf(!databaseUrl)(
@@ -151,6 +152,7 @@ describe.skipIf(!databaseUrl)(
         ],
       );
       await mailbox(client, tenant, 'operator');
+      await returnWrites(client, tenant, 'operator');
       await version(client, tenant, 'compute', [{ kind: 'code' }]);
       await start(client, tenant, 'compute', { kind: 'manual' });
       await version(client, tenant, 'scheduled', [{ kind: 'end' }]);
@@ -166,6 +168,53 @@ describe.skipIf(!databaseUrl)(
         `INSERT INTO messaging_mailboxes(tenant_id,connection_id,principal_id,document,due_at,revision,created_at,updated_at)
         VALUES($1,$2,$3,'{}',now()-interval '1 minute',1,now(),now())`,
         [tenant, randomUUID(), principal],
+      );
+    }
+
+    /** An approved return creation and refund requested by `principal`, not yet sent. */
+    async function returnWrites(
+      client: PoolClient,
+      tenant: string,
+      principal: string,
+    ) {
+      const [creation, action, returnCase] = [
+        randomUUID(),
+        randomUUID(),
+        randomUUID(),
+      ];
+      await client.query(
+        "INSERT INTO orders_return_creations(tenant_id,id,case_id,connection_id,state,principal_id,document,created_at) VALUES($1,$2,$3,$4,'approved',$5,$6,now())",
+        [
+          tenant,
+          creation,
+          returnCase,
+          randomUUID(),
+          principal,
+          {
+            id: creation,
+            tenantId: tenant,
+            caseId: returnCase,
+            state: 'approved',
+          },
+        ],
+      );
+      await client.query(
+        "INSERT INTO orders_return_actions(tenant_id,id,case_id,connection_id,kind,state,sent,document,requested_at) VALUES($1,$2,$3,$4,'refund','approved',false,$5,now())",
+        [
+          tenant,
+          action,
+          returnCase,
+          randomUUID(),
+          {
+            id: action,
+            tenantId: tenant,
+            caseId: returnCase,
+            kind: 'refund',
+            state: 'approved',
+            sent: false,
+            requestedBy: principal,
+          },
+        ],
       );
     }
 
@@ -279,6 +328,7 @@ describe.skipIf(!databaseUrl)(
           ],
         );
         await mailbox(client, tenant, principal);
+        await returnWrites(client, tenant, principal);
         const run = randomUUID();
         await client.query(
           `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state)
@@ -374,6 +424,7 @@ describe.skipIf(!databaseUrl)(
         code_process_worker_scopes: expect.arrayContaining([member]),
         procurement_submission_scopes: expect.arrayContaining([member]),
         messaging_sync_scopes: expect.arrayContaining([member]),
+        orders_return_write_scopes: expect.arrayContaining([member]),
       });
       await owner.query(
         "UPDATE memberships SET status='suspended',suspended_at=now(),suspended_by_kind='customer',suspended_by=$2 WHERE tenant_id=$1 AND user_id=$2",

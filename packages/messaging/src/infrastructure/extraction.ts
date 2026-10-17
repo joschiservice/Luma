@@ -247,7 +247,7 @@ export function createFactExtractor(options: {
     reason: available
       ? null
       : (options.reason ??
-        'Reading documents automatically is not set up on this server.'),
+        'Reading documents automatically isn’t set up on this server.'),
     async extract(context, input) {
       if (!available || !options.gateway)
         return {

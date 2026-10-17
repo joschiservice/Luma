@@ -1,14 +1,22 @@
 import type { AuditEntry } from '@luma/audit';
+import type { WriteAcceptance } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   MembershipSuspendedError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import {
@@ -39,7 +47,20 @@ import {
   type ReturnCreation,
   type SourceRef,
 } from '../domain/return-creations.js';
+import {
+  citedReads,
+  completeReads,
+  type ReturnRead,
+  type ReturnReadEvidence,
+  returnReadEvidence,
+} from '../domain/return-reads.js';
+import { returnRecoveryStep } from '../domain/return-recovery.js';
 import type { ReturnData } from '../domain/returns.js';
+import {
+  type ReturnWriteReceipt,
+  returnWriteReceipt,
+  returnWriteReceiptName,
+} from './return-write-receipts.js';
 
 /** One source's current order: its connection, number and lines. */
 export interface OrderSource {
@@ -147,6 +168,8 @@ export interface ReturnCaseTransaction {
   creation(id: string): Promise<ReturnCreation | null>;
   insertCreation(value: ReturnCreation): Promise<void>;
   saveCreation(value: ReturnCreation): Promise<void>;
+  /** One requester's creations that may need a background step, oldest first, at most 100. */
+  liveCreations(requestedBy: string): Promise<ReturnCreation[]>;
   /** The connection's source IDs of the order and the given order lines, when mapped. */
   sourceIds(
     connectionId: string,
@@ -155,6 +178,10 @@ export interface ReturnCaseTransaction {
   ): Promise<{ order: SourceRef | null; lines: Map<string, SourceRef> }>;
   people(ids: string[]): Promise<Map<string, Person>>;
   audit(entry: AuditEntry): Promise<void>;
+  /** Stores a cited provider read; an already stored read is kept unchanged. */
+  recordRead(evidence: ReturnReadEvidence): Promise<void>;
+  /** Stores a write receipt; an already stored receipt is kept unchanged. */
+  recordWriteReceipt(receipt: ReturnWriteReceipt): Promise<void>;
 }
 
 export interface ReturnCaseStore {
@@ -194,7 +221,10 @@ export interface ReturnSystem {
   ): Promise<
     ReturnSystemResult<{ warehouses: ReturnOption[]; reasons: ReturnOption[] }>
   >;
-  /** Fresh read of the returns created for a case; `complete` is false when the scan was cut short. */
+  /**
+   * Fresh read of the returns created for a case; `complete` is false when the scan was cut
+   * short. `reads` holds the provider read behind each item, named by its observation ID.
+   */
   created(
     context: TenantContext,
     connectionId: string,
@@ -203,7 +233,13 @@ export interface ReturnSystem {
       lumaCaseId: string;
       requestedReturn?: SourceRef;
     },
-  ): Promise<ReturnSystemResult<{ items: FoundReturn[]; complete: boolean }>>;
+  ): Promise<
+    ReturnSystemResult<{
+      items: FoundReturn[];
+      complete: boolean;
+      reads: ReturnRead[];
+    }>
+  >;
 }
 
 /** Execution state of a creation action, as Action Admission recorded it. */
@@ -476,26 +512,11 @@ const auditSummaries: Record<ReturnCaseEventKind, string> = {
   exchange_reopened: 'Exchange reopened after an unresolved source check',
 };
 
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
-
-const notFound = (message: string): never => {
-  throw new IdentityError(404, 'NOT_FOUND', message);
-};
-
-const unavailable = (message: string): never => {
-  throw new IdentityError(503, 'SERVICE_UNAVAILABLE', message);
-};
-
-const invalidInput = (message: string): never => {
-  throw new IdentityError(422, 'VALIDATION_ERROR', message);
-};
-
-const unreadable = () =>
-  unavailable(
+function unreadable(): never {
+  throw unavailable(
     'The order’s system could not be read. Check the connection in Apps and try again.',
   );
+}
 
 /** Runs a domain rule and reports a broken rule as an HTTP error with its message. */
 function rule<T>(operation: () => T): T {
@@ -503,11 +524,9 @@ function rule<T>(operation: () => T): T {
     return operation();
   } catch (error) {
     if (!(error instanceof ReturnCaseError)) throw error;
-    if (error.code === 'invalid')
-      throw new IdentityError(422, 'VALIDATION_ERROR', error.message);
-    if (error.code === 'conflict')
-      throw new IdentityError(409, 'CONFLICT', error.message);
-    throw new IdentityError(404, 'NOT_FOUND', error.message);
+    if (error.code === 'invalid') throw invalid(error.message);
+    if (error.code === 'conflict') throw conflict(error.message);
+    throw notFound(error.message);
   }
 }
 
@@ -527,7 +546,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, write ? 'returns.manage' : 'returns.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -575,6 +594,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     kind: ReturnCaseEventKind,
     evidence: DecisionEvidence | null,
     details: ReturnCaseEvent['details'],
+    actorId = context.actor.id,
   ): ReturnCaseEvent {
     return {
       id: deps.uuid(`return-case-event:${context.tenantId}:${commandId}`),
@@ -583,7 +603,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       commandId,
       digest,
       kind,
-      actorId: context.actor.id,
+      actorId,
       revision: value.revision,
       occurredAt: deps.now().toISOString(),
       evidence,
@@ -606,7 +626,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const prior = await tx.event(commandId);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -638,21 +658,21 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       { caseId, request },
       async (tx, digest) => {
         const value = await tx.case(caseId);
-        if (!value) notFound('Return case not found');
-        if (value!.revision !== input.expectedRevision)
-          conflict('This return case changed. Refresh it and try again.');
-        await tx.lockOrder(value!.orderId);
+        if (!value) throw notFound('Return case not found');
+        if (value.revision !== input.expectedRevision)
+          throw conflict('This return case changed. Refresh it and try again.');
+        await tx.lockOrder(value.orderId);
         const current = await tx.case(caseId);
         if (!current || current.revision !== input.expectedRevision)
-          conflict('This return case changed. Refresh it and try again.');
-        const applied = await apply(current!, tx);
+          throw conflict('This return case changed. Refresh it and try again.');
+        const applied = await apply(current, tx);
         const next: ReturnCase = {
           ...applied.next,
-          revision: value!.revision + 1,
+          revision: value.revision + 1,
           updatedAt: deps.now().toISOString(),
         };
         if (!(await tx.saveCase(next)))
-          conflict('This return case changed. Refresh it and try again.');
+          throw conflict('This return case changed. Refresh it and try again.');
         const entry = event(
           context,
           next,
@@ -717,8 +737,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     const decision = creation.decisionId
       ? await reads.decision(creation.decisionId)
       : null;
+    // An unsent approval ends with its window; the background pass records it soon after.
     const expired =
-      creation.state === 'approval_required' &&
+      ['approval_required', 'approved'].includes(creation.state) &&
       Date.parse(creation.expiresAt) <= deps.now().getTime();
     const observeOnly =
       creation.state === 'not_executed' ||
@@ -896,13 +917,13 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         };
       },
     );
-    if (!data) notFound('Return case not found');
-    const { value, people } = data!;
+    if (!data) throw notFound('Return case not found');
+    const { value, people } = data;
     const person = (id: string): PersonView => ({
       id,
       name: people.get(id)?.name ?? null,
     });
-    const latest = data!.creations[0] ?? null;
+    const latest = data.creations[0] ?? null;
     const received = new Map(
       value.receipt?.lines.map((l) => [l.orderLineId, l.received]) ?? [],
     );
@@ -921,7 +942,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
 
     return {
       case: {
-        ...summary(value, data!.creations, people),
+        ...summary(value, data.creations, people),
         revision: value.revision,
         openedBy: person(value.openedBy),
         cancellation: value.cancellation
@@ -934,18 +955,18 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       },
       order: {
         id: value.orderId,
-        number: data!.source?.displayNumber ?? null,
+        number: data.source?.displayNumber ?? null,
         connection: {
           id: value.connectionId,
           label: connection?.label ?? null,
           provider: connection?.provider ?? null,
         },
       },
-      sourceReturn: data!.sourceReturn
+      sourceReturn: data.sourceReturn
         ? {
-            id: data!.sourceReturn.entityId,
-            name: data!.sourceReturn.name,
-            status: data!.sourceReturn.status,
+            id: data.sourceReturn.entityId,
+            name: data.sourceReturn.name,
+            status: data.sourceReturn.status,
           }
         : null,
       lines: value.lines.map((line) => {
@@ -988,7 +1009,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             evidence: value.proposal.evidence,
           }
         : null,
-      history: data!.events.map((e) => ({
+      history: data.events.map((e) => ({
         id: e.id,
         kind: e.kind,
         actor: person(e.actorId),
@@ -1010,8 +1031,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         connection,
         value,
         latest,
-        data!.mapped,
-        data!.sourceReturn,
+        data.mapped,
+        data.sourceReturn,
       ),
       canManage: hasPermission(context, 'returns.manage'),
       asOf: deps.now().toISOString(),
@@ -1041,23 +1062,35 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     kind: ReturnCaseEventKind,
     details: ReturnCaseEvent['details'] = {},
     evidenceRefs: string[] = [],
+    actorId = context.actor.id,
   ) {
     const value = (await tx.case(creation.caseId))!;
     const commandId = deps.uuid(
       `return-creation:${context.tenantId}:${kind}:${creation.id}`,
     );
     if (await tx.event(commandId)) return;
-    const entry = event(context, value, commandId, commandId, kind, null, {
-      creationId: creation.id,
-      ...details,
-    });
+    const entry = event(
+      context,
+      value,
+      commandId,
+      commandId,
+      kind,
+      null,
+      { creationId: creation.id, ...details },
+      actorId,
+    );
     await tx.insertEvent(entry);
     await tx.audit(audit(context, entry, value, evidenceRefs));
   }
 
-  /** A fresh read of the system; exactly one return carrying the case marker identifies it. */
+  /**
+   * A fresh read of the system; exactly one return carrying the case marker identifies it.
+   * `reads` holds the read behind every found return, or is null when one is missing, so none
+   * of them can be cited.
+   */
   async function locate(context: TenantContext, creation: ReturnCreation) {
-    if (!deps.system) return { found: [], complete: false };
+    const none = { found: [], complete: false, reads: null };
+    if (!deps.system) return none;
     const result = await deps.system.created(context, creation.connectionId, {
       order: creation.order,
       lumaCaseId: creation.caseId,
@@ -1065,10 +1098,35 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         ? { requestedReturn: creation.requestedReturn }
         : {}),
     });
+    if (!result.ok) return none;
+    const { items, reads } = result.value;
 
-    return result.ok
-      ? { found: result.value.items, complete: result.value.complete }
-      : { found: [], complete: false };
+    return {
+      found: items,
+      reads: citedReads(
+        items.map((f) => f.observationId),
+        reads,
+      ),
+      complete: result.value.complete && completeReads(reads),
+    };
+  }
+
+  /** Stores the reads a creation cites in the citing transaction. */
+  async function recordReads(
+    context: TenantContext,
+    tx: ReturnCaseTransaction,
+    creation: ReturnCreation,
+    reads: ReturnRead[],
+  ) {
+    for (const read of reads)
+      await tx.recordRead(
+        returnReadEvidence(
+          context.tenantId,
+          creation.caseId,
+          { purpose: 'creation', id: creation.id },
+          read,
+        ),
+      );
   }
 
   /** Applies an execution result; a verified creation is located again and recorded. */
@@ -1094,10 +1152,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     if (execution.state === 'withheld' || execution.state === 'failed')
       return save({ state: 'failed', failure: execution.failure });
     if (execution.state !== 'verified') return save({ state: 'uncertain' });
-    const { found, complete } = await locate(context, creation);
+    const { found, complete, reads } = await locate(context, creation);
     const match = found.length === 1 ? found[0]! : null;
     if (
       !complete ||
+      !reads ||
       !match ||
       !Number.isFinite(Date.parse(match.observedAt)) ||
       Date.parse(match.observedAt) < Date.parse(creation.requestedAt) ||
@@ -1108,6 +1167,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     await deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = (await tx.creation(creationId))!;
       if (current.state === 'created') return;
+      await recordReads(context, tx, current, reads);
       const saved = await saveCreation(tx, current, {
         state: 'created',
         createdAt: match.observedAt,
@@ -1156,9 +1216,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       (tx) => tx.creation(creationId),
     );
     if (!creation || creation.caseId !== caseId)
-      notFound('Return creation not found');
+      throw notFound('Return creation not found');
 
-    return creation!;
+    return creation;
   }
 
   async function viewOf(context: TenantContext, creation: ReturnCreation) {
@@ -1202,8 +1262,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           };
         },
       );
-      if (!data) notFound('Order not found');
-      const { sources, cases, storeReturns, people, creations } = data!;
+      if (!data) throw notFound('Order not found');
+      const { sources, cases, storeReturns, people, creations } = data;
 
       return {
         sources: sources.map((source) => {
@@ -1262,7 +1322,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         query.limit > 50 ||
         query.q.length > 120
       )
-        invalidInput(
+        throw invalid(
           'Choose a page size from 1 to 50 and a search up to 120 characters.',
         );
       const scope = deps.digest([
@@ -1294,7 +1354,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             throw new Error('Cursor');
           after = { at: decoded.at, id: decoded.id };
         } catch {
-          invalidInput(
+          throw invalid(
             'This page link no longer matches the case search. Start from the first page.',
           );
         }
@@ -1345,7 +1405,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             limit: 501,
           });
           if (rows.length > 500)
-            unavailable(
+            throw unavailable(
               'Return attention exceeds this view’s read limit. Open return cases from their orders or search.',
             );
           const items = rows.map((row) => ({
@@ -1439,15 +1499,17 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         { orderId, input },
         async (tx, digest) => {
           if (await tx.case(input.id))
-            conflict(
+            throw conflict(
               'This request ID was already used. Refresh before trying again.',
             );
           await tx.lockOrder(orderId);
           const sources = await tx.orderSources(orderId);
-          if (!sources.length) notFound('Order not found');
-          const source =
-            sources.find((s) => s.connectionId === input.connectionId) ??
-            invalidInput('Choose order lines from a source of this order.');
+          if (!sources.length) throw notFound('Order not found');
+          const source = sources.find(
+            (s) => s.connectionId === input.connectionId,
+          );
+          if (!source)
+            throw invalid('Choose order lines from a source of this order.');
           const cases = (await tx.cases(orderId)).filter(
             (c) => c.connectionId === input.connectionId,
           );
@@ -1458,9 +1520,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               linked.orderId !== orderId ||
               linked.connectionId !== input.connectionId
             )
-              notFound('Store return not found on this order');
-            if (['declined', 'cancelled'].includes(linked!.status))
-              conflict('This store return is declined or cancelled.');
+              throw notFound('Store return not found on this order');
+            if (['declined', 'cancelled'].includes(linked.status))
+              throw conflict('This store return is declined or cancelled.');
             if (
               cases.some(
                 (c) =>
@@ -1468,7 +1530,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
                   c.sourceReturnId === input.sourceReturnId,
               )
             )
-              conflict('Another return case already works this store return.');
+              throw conflict(
+                'Another return case already works this store return.',
+              );
           }
           const storeReturns = (await tx.storeReturns(orderId)).filter(
             (r) =>
@@ -1555,7 +1619,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           )
           .catch(() => null);
         if (!assignee || !hasPermission(assignee, 'returns.manage'))
-          conflict('Choose a current member who can manage returns.');
+          throw conflict('Choose a current member who can manage returns.');
       }
 
       return change(
@@ -1566,7 +1630,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         'assigned',
         async (value) => {
           if (value.state !== 'open')
-            conflict('This return case is cancelled. Open a new case instead.');
+            throw conflict(
+              'This return case is cancelled. Open a new case instead.',
+            );
 
           return {
             next: { ...value, assigneeId: input.assigneeId },
@@ -1697,7 +1763,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               ['approved', 'sending', 'uncertain'].includes(c.state),
             )
           )
-            conflict(
+            throw conflict(
               'The return is being created in the order’s system. Wait until Luma has checked the result.',
             );
           for (const creation of creations)
@@ -1726,14 +1792,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     async creationOptions(context: TenantContext, caseId: string) {
       context = await authorize(context, true);
       if (!deps.system || !deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const value = await deps.store.transaction(
         context.tenantId,
         false,
         (tx) => tx.case(caseId),
       );
-      if (!value) notFound('Return case not found');
-      const result = await deps.system!.options(context, value!.connectionId);
+      if (!value) throw notFound('Return case not found');
+      const result = await deps.system.options(context, value.connectionId);
 
       return result.ok ? result.value : unreadable();
     },
@@ -1749,7 +1815,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.system || !deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const existing = await deps.store.transaction(
         context.tenantId,
         false,
@@ -1772,7 +1838,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               input.reason.scopeKey,
             ])
         )
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -1783,11 +1849,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         false,
         (tx) => tx.case(caseId),
       );
-      if (!current) notFound('Return case not found');
-      const options = await deps.system!.options(
-        context,
-        current!.connectionId,
-      );
+      if (!current) throw notFound('Return case not found');
+      const options = await deps.system.options(context, current.connectionId);
       const choices = options.ok ? options.value : unreadable();
       const pick = (list: ReturnOption[], ref: SourceRef) =>
         list.find(
@@ -1796,16 +1859,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const warehouse = pick(choices.warehouses, input.warehouse);
       const reason = pick(choices.reasons, input.reason);
       if (!warehouse || !reason)
-        conflict(
+        throw conflict(
           'Choose a warehouse and a return reason from the current lists.',
         );
       if ((await detail(context, caseId)).creationAvailability.blocker)
-        conflict(
+        throw conflict(
           'The return can’t be created in the order’s system right now.',
         );
 
-      const connection = (await deps.system!.connections(context)).find(
-        (c) => c.id === current!.connectionId,
+      const connection = (await deps.system.connections(context)).find(
+        (c) => c.id === current.connectionId,
       );
       const creation = await deps.store.transaction(
         context.tenantId,
@@ -1813,59 +1876,63 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         async (tx) => {
           const value = await tx.case(caseId);
           if (!value || value.state !== 'open')
-            conflict('This return case is cancelled. Open a new case instead.');
+            throw conflict(
+              'This return case is cancelled. Open a new case instead.',
+            );
           const live = (await tx.creations(caseId)).find((c) =>
             liveCreationStates.includes(c.state),
           );
           if (
             live &&
             !(
-              live.state === 'approval_required' &&
+              ['approval_required', 'approved'].includes(live.state) &&
               Date.parse(live.expiresAt) <= deps.now().getTime()
             )
           )
-            conflict('This return is already being created or was created.');
+            throw conflict(
+              'This return is already being created or was created.',
+            );
           if (live) await saveCreation(tx, live, { state: 'expired' });
           const ids = await tx.sourceIds(
-            value!.connectionId,
-            value!.orderId,
-            value!.lines.map((l) => l.orderLineId),
+            value.connectionId,
+            value.orderId,
+            value.lines.map((l) => l.orderLineId),
           );
           if (
             !ids.order ||
-            value!.lines.some((l) => !ids.lines.has(l.orderLineId))
+            value.lines.some((l) => !ids.lines.has(l.orderLineId))
           )
-            conflict('Some lines are not linked to the order’s system.');
-          const sourceReturn = value!.sourceReturnId
-            ? await tx.sourceReturn(value!.sourceReturnId)
+            throw conflict('Some lines are not linked to the order’s system.');
+          const sourceReturn = value.sourceReturnId
+            ? await tx.sourceReturn(value.sourceReturnId)
             : null;
           if (
             connection?.provider === 'shopify' &&
             sourceReturn &&
             (sourceReturn.status !== 'requested' || !sourceReturn.source)
           )
-            conflict('Only a requested Shopify return can be approved.');
+            throw conflict('Only a requested Shopify return can be approved.');
           const now = deps.now();
           const created: ReturnCreation = {
             id: input.id,
             tenantId: context.tenantId,
             caseId,
-            connectionId: value!.connectionId,
-            order: ids.order!,
+            connectionId: value.connectionId,
+            order: ids.order,
             ...(connection?.provider === 'shopify' && sourceReturn?.source
               ? { requestedReturn: sourceReturn.source }
               : {}),
             warehouse: {
-              externalId: warehouse!.externalId,
-              scopeKey: warehouse!.scopeKey,
-              name: warehouse!.name,
+              externalId: warehouse.externalId,
+              scopeKey: warehouse.scopeKey,
+              name: warehouse.name,
             },
             reason: {
-              externalId: reason!.externalId,
-              scopeKey: reason!.scopeKey,
-              name: reason!.name,
+              externalId: reason.externalId,
+              scopeKey: reason.scopeKey,
+              name: reason.name,
             },
-            lines: value!.lines.map((l) => ({
+            lines: value.lines.map((l) => ({
               orderLineId: l.orderLineId,
               source: ids.lines.get(l.orderLineId)!,
               quantity: l.quantity,
@@ -1893,7 +1960,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       let decision: PolicyDecision;
       try {
-        decision = await deps.admission!.prepare(
+        decision = await deps.admission.prepare(
           context,
           creation,
           creationAction(creation),
@@ -1902,9 +1969,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         await deps.store.transaction(context.tenantId, true, async (tx) =>
           saveCreation(tx, creation, { state: 'failed', failure: 'not_sent' }),
         );
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'Approval could not be requested. Nothing was sent. Try again.',
         );
       }
@@ -1923,7 +1988,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (
         saved.state === 'approved' ||
-        (await deps.admission!.writeMode?.(context, saved.connectionId)) ===
+        (await deps.admission.writeMode?.(context, saved.connectionId)) ===
           'observe_only'
       )
         await dispatch(context, saved);
@@ -1944,14 +2009,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const creation = await loadCreation(context, caseId, creationId);
       const view = await viewOf(context, creation);
       if (!view.canApprove || creation.decisionId !== input.decisionId)
-        conflict(
+        throw conflict(
           'This request changed, expired or needs a different approver. Refresh it.',
         );
-      await deps.admission!.respond(
+      await deps.admission.respond(
         context,
         input.decisionId,
         input.outcome,
@@ -2006,7 +2071,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       const creation = await loadCreation(context, caseId, creationId);
       const view = await viewOf(context, creation);
       if (!view.canSend)
-        conflict('Only the requester can send an approved return.');
+        throw conflict('Only the requester can send an approved return.');
       await dispatch(context, creation);
 
       return detail(context, caseId);
@@ -2020,7 +2085,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.admission)
-        unavailable('Creating returns is unavailable on this server.');
+        throw unavailable('Creating returns is unavailable on this server.');
       const creation = await loadCreation(context, caseId, creationId);
       if (['uncertain', 'sending'].includes(creation.state)) {
         const principal = await deps
@@ -2031,7 +2096,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           )
           .catch((error: unknown) => {
             if (error instanceof MembershipSuspendedError)
-              conflict(
+              throw conflict(
                 'The person who requested this return can’t access this workspace right now. Luma checks it after their access is restored.',
               );
             throw error;
@@ -2039,11 +2104,108 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         await settle(
           principal,
           creationId,
-          await deps.admission!.reconcile(principal, creation),
+          await deps.admission.reconcile(principal, creation),
         );
       }
 
       return detail(context, caseId);
+    },
+
+    /**
+     * Background step for one requester, run as them: applies an approval the case never
+     * stored, sends an approved creation within its approval, expires an unsent one after it,
+     * resumes a send the execution ledger never reserved, and settles uncertain ones by reading.
+     * It never sends a reserved or expired creation again. Without `returns.manage` it only
+     * records expiry.
+     */
+    async recover(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      context = await deps.refreshContext(context);
+      const manage = hasPermission(context, 'returns.manage');
+      const creations = await deps.store.transaction(
+        context.tenantId,
+        false,
+        (tx) => tx.liveCreations(context.actor.id),
+      );
+      const save = (creation: ReturnCreation, patch: Partial<ReturnCreation>) =>
+        deps.store.transaction(context.tenantId, true, async (tx) => {
+          const current = await tx.creation(creation.id);
+          // Another pass or request moved it on; the next pass sees its new state.
+          if (!current || current.state !== creation.state) return null;
+
+          return saveCreation(tx, current, patch);
+        });
+      const failures: unknown[] = [];
+      for (let creation of creations) {
+        try {
+          let step = returnRecoveryStep(creation, deps.now());
+          if (step === 'expire') {
+            await save(creation, { state: 'expired' });
+            continue;
+          }
+          if (!step || !manage || !deps.admission) continue;
+          if (step === 'decision') {
+            const approval = (
+              await deps.admission.decision(context, creation.decisionId!)
+            )?.approval;
+            if (!approval) continue;
+            const decided = await deps.store.transaction(
+              context.tenantId,
+              true,
+              async (tx) => {
+                const current = await tx.creation(creation.id);
+                if (current?.state !== 'approval_required') return null;
+                const saved = await saveCreation(tx, current, {
+                  state: approval.outcome,
+                  decidedBy: approval.approverId,
+                  decidedAt: deps.now().toISOString(),
+                });
+                await creationEvent(
+                  context,
+                  tx,
+                  saved,
+                  approval.outcome === 'approved'
+                    ? 'creation_approved'
+                    : 'creation_rejected',
+                  {},
+                  [],
+                  approval.approverId,
+                );
+
+                return saved;
+              },
+            );
+            if (decided?.state !== 'approved') continue;
+            creation = decided;
+            step = 'send';
+          }
+          if (step === 'send') {
+            await dispatch(context, creation);
+            continue;
+          }
+          const execution = await deps.admission.reconcile(context, creation);
+          if (execution.state !== 'not_started')
+            await settle(context, creation.id, execution);
+          else if (Date.parse(creation.expiresAt) > deps.now().getTime()) {
+            // Never reserved: resume the same execution identity under its approval.
+            const resumed =
+              creation.state === 'sending'
+                ? creation
+                : await save(creation, { state: 'sending' });
+            if (resumed) await dispatch(context, resumed);
+          }
+          // The approval ended before anything was reserved, so nothing can be dispatched.
+          else await save(creation, { state: 'expired' });
+        } catch (error) {
+          // A refused step stays for the next pass; other failures must not hold up the rest.
+          if (!(error instanceof ServiceError)) failures.push(error);
+        }
+      }
+      if (failures.length)
+        throw new AggregateError(
+          failures,
+          'Some return creations could not be followed up',
+        );
     },
 
     /** Admission hook: the bound creation must still match its open case and approval. */
@@ -2079,7 +2241,12 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       });
     },
 
-    /** Verification for the execution adapter: a fresh read must find exactly this return. */
+    /**
+     * Verification for the execution adapter: a fresh read must find exactly this return. Every
+     * read it cites is stored first, so its observation IDs resolve to orders evidence. Only a
+     * complete read can pass or fail it; a storage failure throws, which execution treats as
+     * unknown.
+     */
     async verify(context: TenantContext, creationId: string) {
       const creation = await deps.store.transaction(
         context.tenantId,
@@ -2088,9 +2255,10 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (!creation)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const { found, complete } = await locate(context, creation);
+      const { found, complete, reads } = await locate(context, creation);
       if (
         !complete ||
+        !reads ||
         found.length === 0 ||
         found.some(
           (f) =>
@@ -2100,6 +2268,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         )
       )
         return { outcome: 'inconclusive' as const, observationRefs: [] };
+      await deps.store.transaction(context.tenantId, true, (tx) =>
+        recordReads(context, tx, creation, reads),
+      );
       if (found.length > 1)
         return {
           outcome: 'failed' as const,
@@ -2112,6 +2283,38 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           : ('failed' as const),
         observationRefs: [found[0]!.observationId],
       };
+    },
+
+    /**
+     * Stores the provider's acceptance of a return creation as orders' write receipt and
+     * returns its ID, which execution cites. It records what already happened, so it does not
+     * recheck authority. Throws when the creation is unknown or the acceptance belongs to
+     * another connection; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      creationId: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, true, async (tx) => {
+        const creation = await tx.creation(creationId);
+        if (
+          !creation ||
+          creation.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'returns.create'
+        )
+          throw conflict('The receipt does not belong to this return request.');
+        const receipt = returnWriteReceipt(
+          context.tenantId,
+          creation.caseId,
+          { purpose: 'creation', id: creation.id },
+          deps.uuid(returnWriteReceiptName(context.tenantId, acceptance)),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
     },
 
     /** The creation an action belongs to, for execution adapters. */

@@ -8,11 +8,8 @@ import { openApiDocument } from '@luma/api-contract/openapi';
 import { buildApp } from '@luma/application-runtime';
 import { createProviderCatalog } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import { createObservability } from '@luma/platform/composition';
 import {
   InMemorySpanExporter,
@@ -274,7 +271,7 @@ function fixture() {
     sweepSupportViews: vi.fn(),
     resolveTenant: vi.fn(async (credentials, tenantId, requestId) => {
       if (!credentials.cookie)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
       return makeTenantContext(
         { userId: 'private-user', sessionId: 'private-session' },

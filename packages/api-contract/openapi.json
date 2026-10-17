@@ -76543,6 +76543,9 @@
                                       "format": "uuid"
                                     }
                                   },
+                                  "complete": {
+                                    "type": "boolean"
+                                  },
                                   "returnId": {
                                     "anyOf": [
                                       {
@@ -78474,6 +78477,9 @@
                                 "type": "string",
                                 "format": "uuid"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             },
                             "returnId": {
                               "anyOf": [
@@ -81347,6 +81353,9 @@
                                 "format": "uuid"
                               }
                             },
+                            "complete": {
+                              "type": "boolean"
+                            },
                             "returnId": {
                               "anyOf": [
                                 {
@@ -82893,6 +82902,9 @@
                                 "type": "string",
                                 "format": "uuid"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             },
                             "returnId": {
                               "anyOf": [
@@ -84441,6 +84453,9 @@
                                 "format": "uuid"
                               }
                             },
+                            "complete": {
+                              "type": "boolean"
+                            },
                             "returnId": {
                               "anyOf": [
                                 {
@@ -85372,6 +85387,9 @@
                                     "items": {
                                       "type": "string"
                                     }
+                                  },
+                                  "complete": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
@@ -86198,6 +86216,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -86966,6 +86987,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -87723,6 +87747,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -88480,6 +88507,9 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "complete": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -136179,6 +136209,645 @@
           },
           "409": {
             "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/evidence/resolve": {
+      "post": {
+        "operationId": "evidence.resolve",
+        "summary": "Resolve the evidence a record cites",
+        "description": "Resolves the references a purchase order, return write, reply or case cites. Each reference is a stored provider read (source, record, read time, source update time and revision, completeness, adapter version and a normalized summary), a provider write receipt (capability, accepted time, provider records and request ID), a Luma record, `not_retained` when it was cited before Luma stored that kind of evidence, or `unresolved`. Without `refs`, resolves every reference the subject cites, up to 100. Needs the read permission of the subject: `procurement.read`, `returns.read`, `messages.read` or `issues.read`. Provider payloads and credentials are never returned.",
+        "tags": ["evidence"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "purchase_order"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "return_creation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "return_settlement"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "return_exchange_step"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "reply"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "case"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "refs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  }
+                },
+                "required": ["subject"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subject": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "purchase_order"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "return_creation"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "return_settlement"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "return_exchange_step"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "reply"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "case"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string"
+                          },
+                          "citedAs": {
+                            "anyOf": [
+                              {
+                                "enum": ["read", "write_receipt", "record"],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "citedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resolution": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "read"
+                                  },
+                                  "provider": {
+                                    "type": "string"
+                                  },
+                                  "connection": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "label": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "label"]
+                                  },
+                                  "record": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "resource": {
+                                            "type": "string"
+                                          },
+                                          "externalId": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["resource", "externalId"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "sourceUpdatedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "sourceRevision": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "completeness": {
+                                    "anyOf": [
+                                      {
+                                        "enum": ["complete", "partial"],
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "adapterVersion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "summary": {
+                                    "type": "array",
+                                    "maxItems": 15,
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "field": {
+                                          "enum": [
+                                            "status",
+                                            "state",
+                                            "outcome",
+                                            "payment",
+                                            "orderNumber",
+                                            "number",
+                                            "confirmed",
+                                            "requestedDeliveryDate",
+                                            "available",
+                                            "onHand",
+                                            "quantity",
+                                            "amount",
+                                            "currency",
+                                            "lines",
+                                            "complete"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": ["field", "value"]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "provider",
+                                  "connection",
+                                  "record",
+                                  "observedAt",
+                                  "sourceUpdatedAt",
+                                  "sourceRevision",
+                                  "completeness",
+                                  "adapterVersion",
+                                  "summary"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "write_receipt"
+                                  },
+                                  "provider": {
+                                    "type": "string"
+                                  },
+                                  "connection": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "label": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "label"]
+                                  },
+                                  "capability": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "acceptedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "records": {
+                                    "type": "array",
+                                    "maxItems": 20,
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "resource": {
+                                          "type": "string"
+                                        },
+                                        "externalId": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["resource", "externalId"]
+                                    }
+                                  },
+                                  "providerRequestId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "provider",
+                                  "connection",
+                                  "capability",
+                                  "acceptedAt",
+                                  "records",
+                                  "providerRequestId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "luma_record"
+                                  },
+                                  "record": {
+                                    "enum": [
+                                      "purchase_order",
+                                      "purchasing_plan",
+                                      "order_change",
+                                      "submission",
+                                      "commitment",
+                                      "supplier_message",
+                                      "follow_up",
+                                      "policy_decision",
+                                      "approval",
+                                      "return_case",
+                                      "return_creation",
+                                      "return_settlement",
+                                      "return_exchange",
+                                      "return_exchange_step",
+                                      "thread",
+                                      "reply",
+                                      "case",
+                                      "case_proposal"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["kind", "record", "id"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "not_retained"
+                                  },
+                                  "retentionStartedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": ["kind", "retentionStartedAt"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "unresolved"
+                                  }
+                                },
+                                "required": ["kind"]
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["ref", "citedAs", "citedAt", "resolution"]
+                      }
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["subject", "items", "truncated", "asOf"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
             "content": {
               "application/json": {
                 "schema": {

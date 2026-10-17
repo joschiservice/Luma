@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createQueryClient } from '../../lib/query-client';
 import {
+  ApiError,
   clearPrivate,
-  IdentityError,
   onClearPrivate,
   organizationSlug,
   returnPath,
@@ -87,7 +87,7 @@ describe('identity navigation', () => {
 
 describe('API errors', () => {
   it('keeps the error payload the server sent', () => {
-    const error = new IdentityError(409, {
+    const error = new ApiError(409, {
       code: 'CONFLICT',
       message: 'That workspace address is taken',
       requestId: 'req-1',
@@ -102,7 +102,7 @@ describe('API errors', () => {
 
   it('falls back to a generic message without a payload', () => {
     for (const body of [undefined, null, 'Bad gateway', { detail: 'x' }]) {
-      const error = new IdentityError(502, body);
+      const error = new ApiError(502, body);
       expect(error.status).toBe(502);
       expect(error.code).toBeUndefined();
       expect(error.requestId).toBeUndefined();
@@ -113,7 +113,7 @@ describe('API errors', () => {
   });
 
   it('keeps a server message but ignores codes outside the API contract', () => {
-    const error = new IdentityError(401, {
+    const error = new ApiError(401, {
       code: 'SESSION_EXPIRED',
       message: 'Session expired',
     });

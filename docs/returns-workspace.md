@@ -150,11 +150,16 @@ exactly one source mapping blocks it. It follows the purchase-order submission p
 high-risk action, another person with `decisions.respond` and the app permission approves,
 and Luma dispatches once as the requester. Observe-only records `not_executed`.
 
-Success needs an independent read through `returns.created.read` that finds exactly one
-return for the case with the approved lines and units; more than one, or different lines,
-fails the request and nothing is sent again. An uncertain dispatch only reconciles by
-reading. One request per case can be live or created. Approval requests expire after 24
-hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
+Success needs an independent, complete read through `returns.created.read` that finds exactly
+one return for the case with the approved lines and units; more than one, or different lines,
+fails the request and nothing is sent again. Orders stores every read that verification or the
+creation audit cites, with the connection, source record, read time and completeness, so each
+cited ID resolves to that read. A read that cannot be stored is not cited, and the outcome
+stays unknown. The provider's acceptance is stored with the reads as the
+[write receipt](execution.md#runtimes) execution cites; a lost response has no receipt. An uncertain dispatch only reconciles by
+reading, through a manual check or the [background follow-up](#background-follow-up). One request
+per case can be live or created. Approvals expire after 24 hours; an approved request that was
+not sent by then shows as expired. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
 create returns; see [JTL](jtl.md#returns) and [Shopify actions](shopify-actions.md#returns).
 
 For Shopify, a case linked to a requested return approves that exact request instead of
@@ -210,8 +215,17 @@ identity. An uncertain outcome is read again, never resent. Shopify uses native 
 Wawi stock changes have no provider idempotency guarantee. An independent read must find the exact
 operation marker, approved units and physical stock total. Concurrent unrelated movements leave the
 stock step uncertain. Financial proof requires successful transactions for the whole approved amount
-and currency. Pending, failed and partial payments never establish settlement. Case completion still
+and currency. Pending, failed and partial payments never establish settlement. Quotes, proofs,
+verification and the settlement audit cite only reads that orders stored, in the same
+transaction, as for creation; a partial read never verifies a step. Settlement and exchange
+write receipts are stored as for creation. Case completion still
 requires the other steps; neither accepted mutation nor one verified step closes a case.
+
+Creations, settlements and exchange steps show what they cite through the
+[evidence reader](execution.md#reading-cited-evidence): the reads their quote, proof and
+verification name and the write receipt, scoped to the case. Proofs recorded before orders stored
+reads show those reads as not retained; money evidence that names a case revision resolves to the
+return case.
 
 An admission rejection alone does not release a send fence: another caller may already have reserved
 the same execution. Only the durable execution ledger can establish non-dispatch. Concurrent late
@@ -248,6 +262,24 @@ handoff preserves inspected resale stock quantities and still requires separate 
 Wawi allocation remains owned work: native Shopify intent is not proof of an ERP reservation or
 replacement order. Neither prepared fulfillment nor a paid difference alone closes the case.
 
+### Background follow-up
+
+Approval sends at once from the API, as the requester. If that send never starts, for example
+because the API stopped after recording the approval, the commerce sync worker's return
+follow-up sends the creation, settlement or exchange step as the requester, with the same
+execution identity, while the approval is valid. It also stores an approval or rejection that
+policy recorded but the case did not. The approver never gains execution authority.
+
+- An unsent step whose approval ended is recorded as expired and frees its slot. A new request
+  needs a new approval.
+- A send fence without an execution reservation resumes under its approval. After the approval
+  ends it is released as expired, because execution refuses to dispatch an expired approval.
+- Reserved and uncertain steps are only read, never sent again: at most once a minute, and
+  pending refund money every five minutes. Only fresh independent proof verifies them.
+- Steps changed in the last two minutes are left to the request sending them.
+- Sending and reading need the requester's current `returns.manage` permission. Without it the
+  step waits and then expires. Suspended, disabled and erased requesters are skipped.
+
 ## Owned return deadlines
 
 Merchant deadline configuration is versioned and disabled until reviewed. Receipt waits start
@@ -258,12 +290,14 @@ Unobserved store transitions never supply an inferred timestamp.
 
 The return step follow-up must be activated in Workflows for automatic monitoring. Its bounded
 passes use a persisted cursor and reread each case no more than once per minute. Explicit progress checks use the same service and make no
-provider writes. Each phase has one live occurrence; repeated observations update it rather
+provider writes. Reading sent money also reconciles an uncertain refund or exchange processing
+attempt; it never sends one again. Each phase has one live occurrence; repeated observations update it rather
 than opening duplicate cases. Policy or anchor changes supersede earlier occurrences. Disabled
 policies and cancelled cases pause their waits without claiming verification.
 
 Pending, failed and partial money remain unresolved. Only complete independent evidence no more
-than five minutes old can verify financial progress. Unavailable access, missing evidence and
+than five minutes old can verify financial progress; money proof from a partial read, or from a
+proof recorded before its reads were stored, is incomplete. Unavailable access, missing evidence and
 stale observations remain separate waiting reasons. Later recurrence creates a new occurrence
 and preserves the earlier verified or escalated history. Case assignment controls ownership;
 the workflow hands overdue steps to that owner rather than duplicating the Needs you item.
@@ -288,7 +322,9 @@ that sales order. Reported item availability is never used as proof of reservati
 Order and reservation scans stop at 500 records, with complete pagination required to prove uniqueness.
 Missing access, incomplete scans, duplicate references, unsettled money, price disagreement and
 concurrent stock movements leave the case open with its current owner and a specific handover in
-Needs you. Each verdict retains source observation references in the audit log. Damaged units remain
+Needs you. Each verdict cites only source reads that orders stored with it, in the audit log
+and on the exchange; a partial read establishes no check. Exchange quotes, proofs and the
+availability an exchange records are stored the same way. Damaged units remain
 unresolved because this pair cannot independently prove disposal in the physical stock owner.
 
 Only a complete fresh verdict closes the case and retires its active return waits. A later explicit

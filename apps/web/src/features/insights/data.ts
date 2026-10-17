@@ -2,7 +2,7 @@ import { type InsightChart, type InsightRange } from '@luma/api-contract';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
@@ -216,7 +216,7 @@ export type InsightsError = 'access' | 'outdated' | 'preparing' | 'unavailable';
  */
 export function insightsError(error: unknown): InsightsError | undefined {
   if (!error) return undefined;
-  if (!(error instanceof IdentityError)) return 'unavailable';
+  if (!(error instanceof ApiError)) return 'unavailable';
   if ([401, 403, 404].includes(error.status)) return 'access';
   if (error.status === 400 && error.code === 'VALIDATION_ERROR')
     return 'outdated';

@@ -118,7 +118,10 @@ export function createSupplierCommitmentService(
     | 'additionalTimeline'
     | 'timelineActors'
   > & {
-    model: Omit<CommitmentDependencies['model'], 'output'>;
+    /** Supplier-message extraction; a missing `reason` explains that it isn't set up. */
+    model: Omit<CommitmentDependencies['model'], 'output' | 'reason'> & {
+      reason: string | null;
+    };
     retentionDays?: number;
     /** Publishes newly persisted provider observations atomically with procurement storage. */
     observed?: (
@@ -129,7 +132,13 @@ export function createSupplierCommitmentService(
 ) {
   return createSupplierCommitments({
     ...deps,
-    model: { ...deps.model, output: extractionOutput },
+    model: {
+      ...deps.model,
+      reason:
+        deps.model.reason ??
+        'Automatic extraction of supplier commitments isn’t set up on this server. Connected mailbox messages are still available in Inbox.',
+      output: extractionOutput,
+    },
     store: createCommitmentStore(db, audit, deps.observed),
     verifiedDrafts: (context, runIds) =>
       db.transaction(
@@ -194,6 +203,8 @@ export function createPurchasing(
 }
 
 export type { PurchasingAdmission } from './application/purchasing.js';
+
+export { createShortfallAcknowledgement } from './application/shortfall-acknowledgement.js';
 
 /** Composes validation for recorded recommendation decisions. */
 export function createPurchasingOutcomesService(
@@ -274,3 +285,20 @@ export function createPurchaseOrderChanges(
 }
 
 export { createFollowUpPlanStore } from './infrastructure/governed-follow-up.js';
+
+export { createPurchasingTimelineActors } from './infrastructure/timeline-actors.js';
+
+export { createPurchasingTermsImporter } from './infrastructure/purchasing-terms-import.js';
+
+export { createReplenishmentApprovalCoverage } from './infrastructure/replenishment-approval-coverage.js';
+
+export {
+  listReplenishmentScopes,
+  listSubmissionScopes,
+  purgeExpiredSupplierMessages,
+} from './infrastructure/background-scopes.js';
+
+export {
+  purchaseOrderCitations,
+  purchaseOrderEvidence,
+} from './infrastructure/purchase-order-evidence.js';

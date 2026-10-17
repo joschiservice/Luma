@@ -105,7 +105,7 @@ For an order from JTL-Wawi, a case can create the return in JTL-Wawi, so your wa
 2. Someone else approves the request on the case. They need **Manage returns**, **Approve or reject changes** and **Create returns in JTL**. Luma then creates the return once.
 3. Luma reads JTL-Wawi again and shows the return number once it finds exactly the approved return.
 
-Luma creates the return without a credit; a refund stays a separate decision in JTL-Wawi. A request expires after 24 hours. If JTL-Wawi doesn’t confirm the request, the case shows **Not confirmed**: select **Check**, followed by your connection’s name, to read it again. Luma never sends the request a second time. In an observe-only workspace, Luma records the request and sends nothing.
+Luma creates the return without a credit; a refund stays a separate decision in JTL-Wawi. A request expires after 24 hours. If Luma can’t send an approved request right away, it sends it later while the approval is still valid; a request that wasn’t sent in time shows **Expired**, and you request it again. If JTL-Wawi doesn’t confirm the request, the case shows **Not confirmed**: select **Check**, followed by your connection’s name, to read it again. Luma never sends the request a second time. In an observe-only workspace, Luma records the request and sends nothing.
 
 The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify can also create returns when the connection has return write access. A case linked to a customer’s requested return asks for approval of that exact request; an unlinked case creates a new return. Luma checks the lines and quantities before sending and reads Shopify independently to verify the result. Missing or uncertain results stay **Not confirmed**, and Luma never sends them again. This action does not refund or restock items. Cin7 Core cannot create returns from Luma.
 
@@ -143,7 +143,8 @@ warehouse for each restock. Damaged and missing units cannot be restocked; missi
 refunded through this case action.
 
 Someone else approves each request with the relevant app permission. Luma sends the approved action
-once and reads the system again. **Refund processing** means the money is still processing. **Failed**
+once and reads the system again. If it can’t send right away, it sends later while the approval is
+valid; an action not sent within 24 hours shows **Expired** and needs a new request. **Refund processing** means the money is still processing. **Failed**
 means the payment did not succeed. Use **Check source** when a response or payment is uncertain.
 Checking never issues a second refund or stock addition.
 
@@ -152,6 +153,8 @@ was paid. Review both results and their read times. An old check needs a new rea
 the result to the customer. Once an action was sent, receipt, inspection and the proposal stay fixed;
 you can still hand the case to another owner. Wawi stock settlement is available in the simulator;
 your live connection must support the action before it can be used.
+
+To see what a creation, refund, restock or exchange step relied on, open **Evidence** on it. It shows the reads and the system’s write receipt, when Luma read them and whether the reads were complete. See [Read the evidence](/docs/issues/resolve#read-the-evidence).
 
 ## Coordinate an exchange
 

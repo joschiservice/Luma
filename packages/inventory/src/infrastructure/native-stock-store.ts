@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { requireTenant } from '@luma/identity';
+import { canonicalJson, notFound, type TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -24,6 +24,10 @@ import {
   stockEvidenceSchema,
 } from './ledger-store.js';
 import { ledgerReceiptSchema } from './ledger-validation.js';
+import {
+  lockNativeStockOrder,
+  lockStockOwnership,
+} from './native-stock-locks.js';
 import {
   ownershipReviewSchema,
   reservationSchema,
@@ -237,22 +241,9 @@ export function createNativeStockStore(
             };
             const port: NativeStockTransaction = {
               ledger,
-              lockOwnership: async () => {
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-                  [`sales:${tenant}`],
-                );
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
-                  [`commerce-ingestion:${tenant}`],
-                );
-              },
-              lockOrder: async (orderId) => {
-                await sql.query(
-                  'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-                  [`native-stock-order:${tenant}:${orderId}`],
-                );
-              },
+              lockOwnership: () => lockStockOwnership(sql, tenant),
+              lockOrder: (orderId) =>
+                lockNativeStockOrder(sql, tenant, orderId),
               demand: (orderId, requireAuthority = true) =>
                 owners.demand(scoped, context, orderId, requireAuthority),
               authorityRevision: () =>
@@ -291,11 +282,7 @@ export function createNativeStockStore(
                   return scope(row);
                 }
                 if (!connectionId)
-                  throw new IdentityError(
-                    404,
-                    'NOT_FOUND',
-                    'Stock ownership scope not found',
-                  );
+                  throw notFound('Stock ownership scope not found');
 
                 return {
                   connectionId,

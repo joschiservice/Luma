@@ -1,10 +1,7 @@
 import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, invalid, notFound } from '@luma/platform';
 
 import type { ReadOutcome } from '../domain/documents.js';
 import {
@@ -90,18 +87,6 @@ export interface FactReviewInput {
   correction?: { value: FactValue; record: FactRecord | null } | undefined;
 }
 
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
-function invalid(message: string): never {
-  throw new IdentityError(422, 'VALIDATION_ERROR', message);
-}
-
-function notFound(message: string): never {
-  throw new IdentityError(404, 'NOT_FOUND', message);
-}
-
 /** Only content errors are logged, by name; documents and model text never reach logs. */
 const safeError = (error: unknown) =>
   new Error(error instanceof Error ? error.name : 'Error');
@@ -122,7 +107,7 @@ export function createDocuments(deps: DocumentDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -139,7 +124,7 @@ export function createDocuments(deps: DocumentDependencies) {
       const prior = await tx.commands.get(id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used for another change. Refresh and try again.',
           );
 
@@ -549,17 +534,17 @@ export function createDocuments(deps: DocumentDependencies) {
   ): Promise<DocumentDetail> {
     const data = await deps.store.transaction(context.tenantId, async (tx) => {
       const document = await tx.reading.get(documentId);
-      if (!document) notFound('Document not found');
-      const message = await tx.messages.get(document!.messageId);
+      if (!document) throw notFound('Document not found');
+      const message = await tx.messages.get(document.messageId);
       const facts = await tx.reading.facts([documentId]);
-      const previous = document!.previousId
-        ? await tx.reading.facts([document!.previousId])
+      const previous = document.previousId
+        ? await tx.reading.facts([document.previousId])
         : [];
 
       return {
-        document: document!,
-        receivedAt: message?.receivedAt ?? document!.createdAt,
-        stored: document!.purgedAt
+        document: document,
+        receivedAt: message?.receivedAt ?? document.createdAt,
+        stored: document.purgedAt
           ? null
           : await tx.reading.representation(documentId),
         facts,
@@ -601,7 +586,7 @@ export function createDocuments(deps: DocumentDependencies) {
     }
     const record = correction.record;
     if (recordKindFor(correction.value) !== record.kind)
-      invalid('This record cannot be what the fact refers to.');
+      throw invalid('This record cannot be what the fact refers to.');
     const candidate = [
       ...fact.document.match.candidates,
       ...(fact.document.match.record ? [fact.document.match.record] : []),
@@ -609,7 +594,8 @@ export function createDocuments(deps: DocumentDependencies) {
     if (!candidate) {
       requirePermission(context, recordPermission[record.kind]);
       const labels = await deps.directory.labels(context, [record]);
-      if (!labels.has(recordKey(record))) notFound('The record was not found.');
+      if (!labels.has(recordKey(record)))
+        throw notFound('The record was not found.');
     }
 
     return { state: 'matched', record, candidates: [] };
@@ -651,19 +637,19 @@ export function createDocuments(deps: DocumentDependencies) {
           { command: 'read_document', documentId },
           async (tx) => {
             const document = await tx.reading.get(documentId, true);
-            if (!document) notFound('Document not found');
-            if (document!.state === 'pending' || document!.state === 'reading')
+            if (!document) throw notFound('Document not found');
+            if (document.state === 'pending' || document.state === 'reading')
               return;
-            if (document!.state !== 'failed')
-              conflict(
+            if (document.state !== 'failed')
+              throw conflict(
                 'Only documents that could not be read can be read again.',
               );
-            if (document!.purgedAt)
-              conflict(
+            if (document.purgedAt)
+              throw conflict(
                 'The document’s content was removed, so it cannot be read again.',
               );
             await tx.reading.update({
-              ...document!,
+              ...document,
               state: 'pending',
               failure: null,
               attempts: 0,
@@ -674,7 +660,7 @@ export function createDocuments(deps: DocumentDependencies) {
                 type: 'document.read_requested',
                 commandId,
                 subjectId: documentId,
-                details: { documentId, threadId: document!.threadId },
+                details: { documentId, threadId: document.threadId },
               }),
             );
           },
@@ -692,26 +678,28 @@ export function createDocuments(deps: DocumentDependencies) {
         input: FactInput,
       ) {
         context = await authorize(context, 'messages.manage');
-        if (!validValue(input.value)) invalid('This fact is not complete.');
+        if (!validValue(input.value))
+          throw invalid('This fact is not complete.');
         const source = await deps.store.transaction(
           context.tenantId,
           async (tx) => {
             const document = await tx.reading.get(documentId);
-            if (!document) notFound('Document not found');
+            if (!document) throw notFound('Document not found');
 
             return {
-              document: document!,
-              stored: document!.purgedAt
+              document: document,
+              stored: document.purgedAt
                 ? null
                 : await tx.reading.representation(documentId),
             };
           },
         );
         if (source.document.state !== 'ready')
-          conflict('Facts can be added only to documents Luma has read.');
-        if (!source.stored) conflict('The document’s content was removed.');
-        const quote = quoteAt(source.stored!.representation, input.locator);
-        if (!quote) invalid('The selection is not in the document.');
+          throw conflict('Facts can be added only to documents Luma has read.');
+        if (!source.stored)
+          throw conflict('The document’s content was removed.');
+        const quote = quoteAt(source.stored.representation, input.locator);
+        if (!quote) throw invalid('The selection is not in the document.');
         const match = matchFact(
           input.value,
           await lookups(context, source.document.threadId, [input.value]),
@@ -728,10 +716,10 @@ export function createDocuments(deps: DocumentDependencies) {
           async (tx) => {
             const document = await tx.reading.get(documentId, true);
             if (!document || document.state !== 'ready' || document.purgedAt)
-              conflict('This document changed. Refresh and try again.');
+              throw conflict('This document changed. Refresh and try again.');
             const facts = await tx.reading.facts([documentId]);
-            const previous = document!.previousId
-              ? await tx.reading.facts([document!.previousId])
+            const previous = document.previousId
+              ? await tx.reading.facts([document.previousId])
               : null;
             const added = { value: input.value, locator: input.locator };
             const ordered = [...facts.map((f) => f.document), added].sort(
@@ -754,7 +742,7 @@ export function createDocuments(deps: DocumentDependencies) {
               document: {
                 value: input.value,
                 locator: input.locator,
-                quote: quote!,
+                quote: quote,
                 confidence: 'high',
                 match,
                 origin: 'manual',
@@ -803,8 +791,8 @@ export function createDocuments(deps: DocumentDependencies) {
             return fact && document ? { fact, document } : null;
           },
         );
-        if (!loaded) notFound('Fact not found');
-        const { fact, document } = loaded!;
+        if (!loaded) throw notFound('Fact not found');
+        const { fact, document } = loaded;
         const match =
           input.outcome === 'correct' && input.correction
             ? await correctionMatch(
@@ -820,10 +808,10 @@ export function createDocuments(deps: DocumentDependencies) {
           { command: 'review_fact', factId, ...input },
           async (tx) => {
             const current = await tx.reading.fact(factId, true);
-            if (!current) notFound('Fact not found');
+            if (!current) throw notFound('Fact not found');
             const at = deps.now().toISOString();
             const result = reviewFact(
-              current!,
+              current,
               input.outcome === 'correct'
                 ? {
                     outcome: 'correct',
@@ -836,21 +824,23 @@ export function createDocuments(deps: DocumentDependencies) {
             );
             if (!result.ok) {
               if (result.refusal === 'already_reviewed')
-                conflict('This fact was already reviewed. Refresh to see it.');
+                throw conflict(
+                  'This fact was already reviewed. Refresh to see it.',
+                );
               if (result.refusal === 'needs_correction')
-                conflict(
+                throw conflict(
                   match?.state === 'ambiguous'
                     ? 'Several records match. Choose the one this fact refers to.'
                     : 'This fact needs a correction before it can be confirmed.',
                 );
-              invalid(
+              throw invalid(
                 result.refusal === 'kind_changed'
                   ? 'A correction must keep the kind of fact.'
                   : 'This fact is not complete.',
               );
             }
             await tx.reading.updateFact({
-              ...current!,
+              ...current,
               document: result.document,
               status: result.status,
               updatedAt: at,
@@ -864,7 +854,7 @@ export function createDocuments(deps: DocumentDependencies) {
               details: {
                 documentId: document.id,
                 factId,
-                kind: current!.document.value.kind,
+                kind: current.document.value.kind,
                 outcome,
               },
               occurredAt: at,
@@ -878,7 +868,7 @@ export function createDocuments(deps: DocumentDependencies) {
                   documentId: document.id,
                   factId,
                   outcome,
-                  kind: current!.document.value.kind,
+                  kind: current.document.value.kind,
                 },
               }),
             );

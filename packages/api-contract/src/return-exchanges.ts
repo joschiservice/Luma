@@ -118,6 +118,8 @@ const exchangeProofSchema = z
     outcome: z.enum(['passed', 'failed', 'inconclusive']),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()).min(1),
+    // Every cited read was complete; proofs recorded before reads were stored omit it.
+    complete: z.boolean().optional(),
     returnId: z.string().nullable(),
     processLines: z
       .object({

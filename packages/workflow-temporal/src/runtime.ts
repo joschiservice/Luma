@@ -8,12 +8,12 @@ import type {
   TenantContext,
 } from '@luma/identity';
 import {
-  IdentityError,
   MembershipSuspendedError,
   requirePermission,
   WorkspaceInactiveError,
 } from '@luma/identity';
 import type { Observability } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -165,7 +165,7 @@ export function temporalActivities<T extends object>(
             log.warn('Workflow activity error reporting failed');
           }
           if (
-            (error instanceof IdentityError && error.statusCode !== 503) ||
+            (error instanceof ServiceError && error.statusCode !== 503) ||
             error instanceof WorkflowInputError
           )
             throw ApplicationFailure.nonRetryable(

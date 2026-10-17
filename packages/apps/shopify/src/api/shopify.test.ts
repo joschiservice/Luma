@@ -1,4 +1,4 @@
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 
@@ -30,7 +30,7 @@ it.each([401, 403, 404] as const)(
       resolveTenant: vi
         .fn()
         .mockRejectedValue(
-          new IdentityError(status, 'UNAUTHENTICATED', 'Sign in again'),
+          new ServiceError(status, 'UNAUTHENTICATED', 'Sign in again'),
         ),
     });
     try {

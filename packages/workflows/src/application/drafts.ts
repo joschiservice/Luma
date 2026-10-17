@@ -1,9 +1,6 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 
 import {
   type AuthoringMode,
@@ -124,10 +121,6 @@ const maxContentBytes = 262_144;
 // Workflow pages use these path segments, so no definition may take them.
 const pageNames = new Set(['new', 'drafts']);
 
-const conflict = (message: string): never => {
-  throw new IdentityError(409, 'CONFLICT', message);
-};
-
 /** Reads code view text, reporting a problem with its line and column. */
 function readCode(
   code: string,
@@ -189,21 +182,23 @@ export function createWorkflowDrafts(deps: {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function readable(input: unknown): WorkflowDraftContent {
     if (Buffer.byteLength(JSON.stringify(input ?? null)) > maxContentBytes)
-      conflict('This draft is too large. Remove steps or shorten Code Steps.');
+      throw conflict(
+        'This draft is too large. Remove steps or shorten Code Steps.',
+      );
     const parsed = deps.parseShape(input);
     if (!parsed.content)
-      conflict(
+      throw conflict(
         `This draft can't be read as a workflow. ${parsed.diagnostics[0]?.message ?? ''}`.trim(),
       );
 
-    return parsed.content!;
+    return parsed.content;
   }
 
   async function vocabulary(context: TenantContext) {
@@ -491,7 +486,7 @@ export function createWorkflowDrafts(deps: {
   async function open(context: TenantContext, id: string) {
     const draft = await deps.store.get(context, id);
     if (!draft || draft.state === 'discarded')
-      throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+      throw notFound('Draft not found.');
 
     return draft;
   }
@@ -538,20 +533,15 @@ export function createWorkflowDrafts(deps: {
       if (input.start.kind === 'version') {
         const { definitionId, version } = input.start;
         if ((await deps.reserved(context)).has(definitionId))
-          conflict(
+          throw conflict(
             'Built-in workflows can’t be edited directly. Customize a copy from the template gallery instead.',
           );
         const published = (await deps.versions(context, definitionId)).find(
           (item) => item.version === version,
         );
-        if (!published)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Workflow version not found.',
-          );
+        if (!published) throw notFound('Workflow version not found.');
         if (published.format !== 'workflow/2')
-          conflict(
+          throw conflict(
             'This version uses an older format. Start a new workflow instead.',
           );
         const process = published as ProcessWorkflowVersion;
@@ -566,8 +556,7 @@ export function createWorkflowDrafts(deps: {
           version: nextVersion(all.map((item) => item.version)),
         };
       } else if (input.start.kind === 'template') {
-        if (!deps.template)
-          throw new IdentityError(404, 'NOT_FOUND', 'Template not found.');
+        if (!deps.template) throw notFound('Template not found.');
         const template = deps.template(input.start.templateId);
         const suffix = deps.id().replaceAll('-', '').slice(0, 6);
         // A customized copy is a new workflow; the published template is never changed.
@@ -612,9 +601,9 @@ export function createWorkflowDrafts(deps: {
         }
         const existing = await tx.lock(input.id);
         if (!existing || existing.createDigest !== createDigest)
-          conflict('This draft ID was already used. Start a new draft.');
+          throw conflict('This draft ID was already used. Start a new draft.');
 
-        return view(existing!);
+        return view(existing);
       });
     },
     /**
@@ -636,9 +625,9 @@ export function createWorkflowDrafts(deps: {
       const content = readable(input.content);
       if (input.codeView) {
         const code = readCode(input.codeView);
-        if (!code.content) conflict(code.diagnostics[0]!.message);
+        if (!code.content) throw conflict(code.diagnostics[0]!.message);
         if (deps.hash(code.content) !== deps.hash(content))
-          conflict(
+          throw conflict(
             'The code view and the draft content differ. Reload the draft and try again.',
           );
       }
@@ -653,19 +642,21 @@ export function createWorkflowDrafts(deps: {
       return deps.store.transaction(context, async (tx) => {
         const current = await tx.lock(id);
         if (!current || current.state === 'discarded')
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+          throw notFound('Draft not found.');
         if (current.lastSave?.id === input.saveId) {
           if (current.lastSave.digest !== digest)
-            conflict('This save ID was already used with different content.');
+            throw conflict(
+              'This save ID was already used with different content.',
+            );
 
           return view(current);
         }
         if (current.state !== 'draft')
-          conflict(
+          throw conflict(
             'This draft was already published. Edit the workflow to start a new draft.',
           );
         if (current.revision !== input.revision)
-          conflict(
+          throw conflict(
             'Someone else saved this draft. Reload it to see their changes before editing.',
           );
         const next: StoredWorkflowDraft = {
@@ -719,9 +710,9 @@ export function createWorkflowDrafts(deps: {
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);
         if (!draft || draft.state === 'discarded')
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+          throw notFound('Draft not found.');
         if (draft.revision !== input.revision)
-          conflict(
+          throw conflict(
             'This draft changed after you reviewed it. Review the latest revision before publishing.',
           );
         const result = await validation(
@@ -732,17 +723,17 @@ export function createWorkflowDrafts(deps: {
         );
         if (draft.state === 'published') {
           if (draft.published?.digest !== result.version?.digest)
-            conflict('This draft was already published.');
+            throw conflict('This draft was already published.');
 
           return { draft: view(draft), version: result.version! };
         }
         if (!result.version || !result.validation.publishable)
-          conflict(
+          throw conflict(
             `Fix ${result.validation.diagnostics.filter((item) => item.severity === 'error').length} problem(s) before publishing.`,
           );
         const blocked = await deps.publicationGuard?.(context, view(draft));
-        if (blocked) conflict(blocked);
-        await tx.publish(result.version!);
+        if (blocked) throw conflict(blocked);
+        await tx.publish(result.version);
         const now = deps.now().toISOString();
         const published: StoredWorkflowDraft = {
           ...draft,
@@ -750,8 +741,8 @@ export function createWorkflowDrafts(deps: {
           updatedAt: now,
           updatedBy: context.actor.id,
           published: {
-            version: result.version!.version,
-            digest: result.version!.digest,
+            version: result.version.version,
+            digest: result.version.digest,
             publishedAt: now,
             publishedBy: context.actor.id,
           },
@@ -759,12 +750,12 @@ export function createWorkflowDrafts(deps: {
         await tx.update(published);
         await tx.audit(
           audit(context, published, 'published', {
-            version: result.version!.version,
-            digest: result.version!.digest,
+            version: result.version.version,
+            digest: result.version.digest,
           }),
         );
 
-        return { draft: view(published), version: result.version! };
+        return { draft: view(published), version: result.version };
       });
     },
     /** Discards an unpublished draft. Discarding it again is safe. */
@@ -777,13 +768,12 @@ export function createWorkflowDrafts(deps: {
 
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);
-        if (!draft)
-          throw new IdentityError(404, 'NOT_FOUND', 'Draft not found.');
+        if (!draft) throw notFound('Draft not found.');
         if (draft.state === 'discarded') return { discarded: true as const };
         if (draft.state === 'published')
-          conflict('Published drafts are kept as provenance.');
+          throw conflict('Published drafts are kept as provenance.');
         if (draft.revision !== input.revision)
-          conflict(
+          throw conflict(
             'Someone else changed this draft. Reload it before discarding.',
           );
         const discarded: StoredWorkflowDraft = {

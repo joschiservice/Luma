@@ -4,9 +4,15 @@ import type { ConnectionMetricItem, CoverageReader } from '@luma/connections';
 import { summarizeConnectionMetrics } from '@luma/connections';
 import type { CaseMetricItem } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, requireTenant } from '@luma/identity';
 import type { OperationalMetricRead, TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  invalid,
+  unavailable,
+} from '@luma/platform';
 import type {
   PurchaseOrderMetricItem,
   StockMetricItem,
@@ -117,23 +123,13 @@ export function createOperationalSummary(
       reporting &&
       !(await readers.resolutionInsightsEnabled?.(context.tenantId))
     )
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
+      throw unavailable(
         'Resolution reporting is not enabled in this workspace.',
       );
     if (request.scope.end && Date.parse(request.scope.end) > Date.parse(readAt))
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'The reporting interval cannot end in the future.',
-      );
+      throw invalid('The reporting interval cannot end in the future.');
     if (request.scope.artifactId && !hasPermission(context, 'workflows.read'))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role does not allow reading workflow versions.',
-      );
+      throw forbidden('Your role does not allow reading workflow versions.');
     const hash = (value: unknown) =>
       createHash('sha256').update(canonicalJson(value)).digest('hex');
     const queryHash = hash([
@@ -173,9 +169,7 @@ export function createOperationalSummary(
           token: value.token,
         };
       } catch {
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'This page no longer matches the reporting filters. Start from the first page.',
         );
       }
@@ -210,11 +204,7 @@ export function createOperationalSummary(
         );
         if (families.has('resolution')) {
           if (!readers.resolution)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
-              'Resolution measurements are unavailable',
-            );
+            throw unavailable('Resolution measurements are unavailable');
           results.push(
             ...(await readers.resolution(scoped)(
               context.tenantId,
@@ -282,9 +272,7 @@ export function createOperationalSummary(
               cursor?.metric === metric.definition.id &&
               reportCursor.cohortHash !== cohortHash
             )
-              throw new IdentityError(
-                409,
-                'CONFLICT',
+              throw conflict(
                 'The incident cohort changed. Refresh the report before continuing.',
               );
             const page = pageCohort(

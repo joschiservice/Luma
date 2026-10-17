@@ -2,10 +2,16 @@ import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 
 import type { RecordKind } from '../domain/linking.js';
 import type {
@@ -97,14 +103,6 @@ const maxThreadGroups = 50;
 /** Threads due within this window count for Needs you, as its ranking treats them as urgent. */
 const dueSoonMs = 30 * 60_000;
 
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
-function notFound(message: string): never {
-  throw new IdentityError(404, 'NOT_FOUND', message);
-}
-
 /** A thread's place in the list's sort; threads without a deadline come last for `due`. */
 function threadPosition(thread: ThreadRow, sort: ThreadSort): ThreadPosition {
   if (sort === 'activity')
@@ -144,15 +142,7 @@ function decodeCursor(
   } catch {
     // Reported below.
   }
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
-    'This list position is not valid. Start from the first page.',
-  );
-}
-
-function invalid(message: string): never {
-  throw new IdentityError(422, 'VALIDATION_ERROR', message);
+  throw invalid('This list position is not valid. Start from the first page.');
 }
 
 /**
@@ -167,7 +157,7 @@ export function createMessagingService(deps: MessagingDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -184,7 +174,7 @@ export function createMessagingService(deps: MessagingDependencies) {
       const prior = await tx.commands.get(id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used for another change. Refresh and try again.',
           );
 
@@ -301,10 +291,10 @@ export function createMessagingService(deps: MessagingDependencies) {
         rules: await tx.rules.active(connectionId),
       }),
     );
-    if (!mailbox) notFound('Mailbox not found');
+    if (!mailbox) throw notFound('Mailbox not found');
 
     return mailboxView(
-      mailbox!,
+      mailbox,
       connections.get(connectionId),
       rules,
       await ruleLabels(context, rules),
@@ -319,12 +309,12 @@ export function createMessagingService(deps: MessagingDependencies) {
     const mailbox = await deps.store.transaction(context.tenantId, (tx) =>
       tx.mailboxes.get(connectionId),
     );
-    if (!mailbox) notFound('Mailbox not found');
-    if (mailbox!.principalId === context.actor.id) return false;
+    if (!mailbox) throw notFound('Mailbox not found');
+    if (mailbox.principalId === context.actor.id) return false;
 
     return (
-      mailbox!.blocked === 'principal_unavailable' ||
-      !(await deps.members.canReadMessages(context, mailbox!.principalId))
+      mailbox.blocked === 'principal_unavailable' ||
+      !(await deps.members.canReadMessages(context, mailbox.principalId))
     );
   }
 
@@ -353,16 +343,16 @@ export function createMessagingService(deps: MessagingDependencies) {
     connectionId: string,
   ) {
     const mailbox = await tx.mailboxes.get(connectionId, true);
-    if (!mailbox) notFound('Mailbox not found');
+    if (!mailbox) throw notFound('Mailbox not found');
 
-    return mailbox!;
+    return mailbox;
   }
 
   async function requireThread(tx: MessagingTransaction, threadId: string) {
     const thread = await tx.threads.get(threadId, true);
-    if (!thread) notFound('Thread not found');
+    if (!thread) throw notFound('Thread not found');
 
-    return thread!;
+    return thread;
   }
 
   async function present(
@@ -419,21 +409,21 @@ export function createMessagingService(deps: MessagingDependencies) {
   ): Promise<ThreadDetail> {
     const data = await deps.store.transaction(context.tenantId, async (tx) => {
       const thread = await tx.threads.get(threadId);
-      if (!thread) notFound('Thread not found');
+      if (!thread) throw notFound('Thread not found');
       const messages = await tx.messages.forThread(threadId);
       const links = await tx.links.forThreads([threadId]);
       const notes = await tx.notes.forThread(threadId);
       const events = await tx.events.forThread(threadId);
       const documents = await tx.documents.forThreads([threadId]);
       const outbound = await tx.outbound.forThread(threadId);
-      const mailbox = await tx.mailboxes.get(thread!.connectionId);
+      const mailbox = await tx.mailboxes.get(thread.connectionId);
       const threadFacts = await tx.facts.toReview([threadId]);
       const documentFacts = await tx.facts.toReviewByDocument(
         documents.map((d) => d.id),
       );
 
       return {
-        thread: thread!,
+        thread: thread,
         messages,
         links: links.filter((link) => link.state !== 'removed'),
         notes,
@@ -494,9 +484,9 @@ export function createMessagingService(deps: MessagingDependencies) {
     const thread = await deps.store.transaction(context.tenantId, (tx) =>
       tx.threads.get(threadId),
     );
-    if (!thread) notFound('Thread not found');
+    if (!thread) throw notFound('Thread not found');
 
-    return (await present(context, [thread!]))[0]!;
+    return (await present(context, [thread]))[0]!;
   }
 
   /** Applies a thread change with its timeline event, audit and new revision. */
@@ -546,7 +536,7 @@ export function createMessagingService(deps: MessagingDependencies) {
 
   function checkRevision(thread: ThreadRow, expected: number) {
     if (thread.revision !== expected)
-      conflict('This thread changed. Refresh and try again.');
+      throw conflict('This thread changed. Refresh and try again.');
   }
 
   async function requireRecord(
@@ -559,7 +549,7 @@ export function createMessagingService(deps: MessagingDependencies) {
       { kind, id: recordId },
     ]);
     if (!labels.has(recordKey({ kind, id: recordId })))
-      notFound('The record was not found.');
+      throw notFound('The record was not found.');
   }
 
   return {
@@ -686,7 +676,9 @@ export function createMessagingService(deps: MessagingDependencies) {
       await deps.store.transaction(context.tenantId, async (tx) => {
         const mailbox = await requireMailbox(tx, connectionId);
         if (mailbox.revision !== input.expectedRevision)
-          conflict('These mailbox settings changed. Refresh and try again.');
+          throw conflict(
+            'These mailbox settings changed. Refresh and try again.',
+          );
         const now = deps.now().toISOString();
         const settings = {
           backfillDays: input.backfillDays,
@@ -730,7 +722,7 @@ export function createMessagingService(deps: MessagingDependencies) {
     ) {
       context = await authorize(context, 'messages.manage');
       if (input.kind === 'label' && input.party.kind === 'supplier')
-        conflict('Label rules cannot name a supplier.');
+        throw conflict('Label rules cannot name a supplier.');
       if (input.party.kind === 'supplier') {
         const supplier = recordKey({
           kind: 'supplier',
@@ -743,7 +735,7 @@ export function createMessagingService(deps: MessagingDependencies) {
             ])
           ).has(supplier)
         )
-          notFound('The supplier was not found.');
+          throw notFound('The supplier was not found.');
       }
       const value =
         input.kind === 'label'
@@ -767,7 +759,7 @@ export function createMessagingService(deps: MessagingDependencies) {
             createdBy: context.actor.id,
             createdAt: now,
           });
-          if (!added) conflict('This mailbox already has this rule.');
+          if (!added) throw conflict('This mailbox already has this rule.');
           await tx.mailboxes.update({
             ...takeOver(mailbox, context, gone),
             hintAt: now,
@@ -812,8 +804,8 @@ export function createMessagingService(deps: MessagingDependencies) {
           const mailbox = await requireMailbox(tx, connectionId);
           const rule = await tx.rules.get(ruleId);
           if (!rule || rule.connectionId !== connectionId)
-            notFound('Rule not found');
-          if (rule!.removedAt) return;
+            throw notFound('Rule not found');
+          if (rule.removedAt) return;
           const now = deps.now().toISOString();
           await tx.rules.remove(ruleId, context.actor.id, now);
           await tx.mailboxes.update({
@@ -827,7 +819,7 @@ export function createMessagingService(deps: MessagingDependencies) {
               commandId,
               subjectId: connectionId,
               connectionId,
-              details: { ruleId, kind: rule!.kind, value: rule!.value },
+              details: { ruleId, kind: rule.kind, value: rule.value },
             }),
           );
         },
@@ -868,18 +860,19 @@ export function createMessagingService(deps: MessagingDependencies) {
     async threads(context: TenantContext, query: ThreadQuery) {
       context = await authorize(context, 'messages.read');
       if (query.groupKey !== undefined && !query.group)
-        invalid('Choose a grouping to read one group.');
-      if (query.group?.granularity) invalid('This field cannot be grouped.');
+        throw invalid('Choose a grouping to read one group.');
+      if (query.group?.granularity)
+        throw invalid('This field cannot be grouped.');
       const groupKey = query.groupKey;
       if (
         groupKey !== undefined &&
         groupKey !== null &&
         typeof groupKey !== 'string'
       )
-        invalid('This group does not exist.');
+        throw invalid('This group does not exist.');
       const grouped = !!query.group && groupKey === undefined;
       if (grouped && query.cursor)
-        invalid('Use a group’s page link together with its group key.');
+        throw invalid('Use a group’s page link together with its group key.');
       const sort = query.sort ?? 'activity';
       const direction =
         query.direction ?? (sort === 'activity' ? 'desc' : 'asc');
@@ -1036,7 +1029,7 @@ export function createMessagingService(deps: MessagingDependencies) {
         input.ownerId &&
         !(await deps.members.canReadMessages(context, input.ownerId))
       )
-        conflict('This person cannot read messages in this workspace.');
+        throw conflict('This person cannot read messages in this workspace.');
       await changeThread(
         context,
         threadId,
@@ -1133,7 +1126,7 @@ export function createMessagingService(deps: MessagingDependencies) {
       context = await authorize(context, 'messages.manage');
       const body = input.body.trim();
       if (!body || body.length > 5000)
-        conflict('A note needs between 1 and 5,000 characters.');
+        throw conflict('A note needs between 1 and 5,000 characters.');
       await command(
         context,
         input.id,
@@ -1262,11 +1255,12 @@ export function createMessagingService(deps: MessagingDependencies) {
         async (tx) => {
           const thread = await requireThread(tx, threadId);
           const link = await tx.links.get(linkId);
-          if (!link || link.threadId !== threadId) notFound('Link not found');
-          if (link!.state === 'removed') return;
+          if (!link || link.threadId !== threadId)
+            throw notFound('Link not found');
+          if (link.state === 'removed') return;
           const at = deps.now().toISOString();
           await tx.links.update({
-            ...link!,
+            ...link,
             state: 'removed',
             removedBy: context.actor.id,
             removedAt: at,
@@ -1276,7 +1270,7 @@ export function createMessagingService(deps: MessagingDependencies) {
             threadId,
             type: 'unlinked',
             actor: { kind: 'user', id: context.actor.id },
-            details: { linkId, kind: link!.kind, recordId: link!.recordId },
+            details: { linkId, kind: link.kind, recordId: link.recordId },
             occurredAt: at,
           });
           await tx.audit(
@@ -1288,8 +1282,8 @@ export function createMessagingService(deps: MessagingDependencies) {
               details: {
                 threadId,
                 linkId,
-                kind: link!.kind,
-                recordId: link!.recordId,
+                kind: link.kind,
+                recordId: link.recordId,
               },
             }),
           );
@@ -1314,8 +1308,8 @@ export function createMessagingService(deps: MessagingDependencies) {
           const thread = await requireThread(tx, threadId);
           const message = await tx.messages.get(messageId);
           if (!message || message.threadId !== threadId)
-            notFound('Message not found');
-          if (message!.purgedAt) return;
+            throw notFound('Message not found');
+          if (message.purgedAt) return;
           const at = deps.now().toISOString();
           await tx.messages.purge(messageId, 'request', at);
           await tx.documents.purgeForMessage(messageId, at);
@@ -1348,25 +1342,21 @@ export function createMessagingService(deps: MessagingDependencies) {
     async refreshThread(context: TenantContext, threadId: string) {
       context = await authorize(context, 'messages.read');
       if (!deps.reader)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Reading mailboxes is unavailable. Try again later.',
-        );
+        throw unavailable('Reading mailboxes is unavailable. Try again later.');
       const { thread, mailbox, rules } = await deps.store.transaction(
         context.tenantId,
         async (tx) => {
           const thread = await tx.threads.get(threadId);
-          if (!thread) notFound('Thread not found');
+          if (!thread) throw notFound('Thread not found');
 
           return {
-            thread: thread!,
-            mailbox: await tx.mailboxes.get(thread!.connectionId),
-            rules: await tx.rules.active(thread!.connectionId),
+            thread: thread,
+            mailbox: await tx.mailboxes.get(thread.connectionId),
+            rules: await tx.rules.active(thread.connectionId),
           };
         },
       );
-      if (!mailbox) notFound('Mailbox not found');
+      if (!mailbox) throw notFound('Mailbox not found');
       let cursor: string | null = null;
       let inserted = 0;
       for (let page = 0; page < 10; page++) {
@@ -1375,12 +1365,8 @@ export function createMessagingService(deps: MessagingDependencies) {
           cursor,
         });
         if (!result.ok)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'The mailbox could not be read. Try again later.',
-          );
-        inserted += await deps.ingest(context, mailbox!, rules, result.items);
+          throw unavailable('The mailbox could not be read. Try again later.');
+        inserted += await deps.ingest(context, mailbox, rules, result.items);
         if (!result.nextCursor) return { inserted, complete: true };
         cursor = result.nextCursor;
       }

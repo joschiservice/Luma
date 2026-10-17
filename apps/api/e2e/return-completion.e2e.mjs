@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 
 import { completionFixture } from './return-completion-fixture.mjs';
+import { citedReturnReads } from './return-settlement-fixture.mjs';
 
 it('independently completes stock, one reserved replacement and a settled net refund across Shopify and Wawi after lost write responses', async (t) => {
   const f = await completionFixture(t);
@@ -209,9 +210,26 @@ it('independently completes stock, one reserved replacement and a settled net re
     ownerId: f.detail.case.openedBy.id,
   });
   expect((await request(path)).case.state).toBe('open');
-  expect((await request(`${path}/exchange/complete`, {})).state).toBe(
-    'verified',
+  const final = await request(`${path}/exchange/complete`, {});
+  expect(final.state).toBe('verified');
+
+  // Every read the verdicts, steps, settlements, waits and audit cite is stored once; each
+  // verdict's Wawi and Shopify reads are stored under the exchange operation.
+  const reads = await citedReturnReads(f, f.detail.case.id);
+  expect(reads.stored.map((row) => row.id)).toEqual(reads.cited);
+  expect(reads.cited).toEqual(expect.arrayContaining(final.evidenceRefs));
+  const verdict = reads.stored.filter((row) =>
+    final.evidenceRefs.includes(row.id),
   );
+  expect(verdict.map((row) => row.document.source.provider).sort()).toEqual(
+    expect.arrayContaining(['jtl', 'shopify']),
+  );
+  for (const row of verdict.filter((r) => r.purpose === 'completion'))
+    expect(row).toMatchObject({
+      subject_id: operationId,
+      document: { completeness: 'complete' },
+    });
+  expect(verdict.some((row) => row.purpose === 'completion')).toBe(true);
   const history = (await request(path)).history.map((e) => e.kind);
   expect(history.filter((k) => k === 'exchange_completed')).toHaveLength(2);
   expect(history.filter((k) => k === 'exchange_reopened')).toHaveLength(1);

@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 
+import { exceptionClassLabel } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { forbidden } from '@luma/platform';
 import { z } from 'zod';
 
 import { canReadRecord } from '../../application/access.js';
@@ -195,7 +197,7 @@ export function createDecisionQueue(
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     if (query.groupKey !== undefined && !query.group)
       throw collectionQueryError('Choose a grouping to read one group.');
     if (query.group?.granularity)
@@ -314,7 +316,12 @@ export function createDecisionQueue(
         const queue = result.items.flatMap(
           (row): (RankedDecision & { row: QueueRow })[] => {
             const candidate = row.facts
-              ? presentCase(row.facts, reader, asOf)
+              ? presentCase(
+                  row.facts,
+                  reader,
+                  asOf,
+                  exceptionClassLabel(row.facts.class),
+                )
               : external.get(row.id);
             if (!candidate) return [];
             const { actionReference, ...visible } = candidate;
@@ -565,7 +572,7 @@ export function createDecisionQueue(
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+        throw forbidden('Sign in again to continue.');
 
       return readDecisionHistory(db, fresh, id);
     },

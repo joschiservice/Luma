@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { conflict, notFound, ServiceError } from '@luma/platform';
 import { APIError } from 'better-auth/api';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -7,7 +8,6 @@ import type { Pool } from 'pg';
 
 import type { IdentityRepository, MemberDto } from '../application/identity.js';
 import type { Organization } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
 import {
   builtInReference,
   isBuiltInRole,
@@ -38,7 +38,7 @@ const organizationDto = (
     !['EU', 'AU', 'US'].includes(row.dataRegion) ||
     !['active', 'suspended', 'closed'].includes(row.status)
   )
-    throw new IdentityError(
+    throw new ServiceError(
       503,
       'REGION_UNAVAILABLE',
       'Organization placement is unavailable',
@@ -58,11 +58,7 @@ function normalizeDatabaseError(error: unknown): never {
     error instanceof APIError &&
     error.body?.code === 'ORGANIZATION_ALREADY_EXISTS'
   ) {
-    throw new IdentityError(
-      409,
-      'CONFLICT',
-      'Organization or membership already exists',
-    );
+    throw conflict('Organization or membership already exists');
   }
   const cause = error instanceof Error && error.cause ? error.cause : error;
   const code =
@@ -70,13 +66,8 @@ function normalizeDatabaseError(error: unknown): never {
       ? cause.code
       : undefined;
   if (code === '23505')
-    throw new IdentityError(
-      409,
-      'CONFLICT',
-      'Organization or membership already exists',
-    );
-  if (code === '23503')
-    throw new IdentityError(404, 'NOT_FOUND', 'User or member not found');
+    throw conflict('Organization or membership already exists');
+  if (code === '23503') throw notFound('User or member not found');
   throw error;
 }
 
@@ -146,8 +137,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
               sql`${sql.raw(membershipSelect)} WHERE m.tenant_id=${organizationId} AND m.id=${memberId}`,
             );
             const row = result.rows[0];
-            if (!row)
-              throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+            if (!row) throw notFound('Member not found');
 
             return membershipFromRow(row);
           };
@@ -382,8 +372,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   ),
                 )
                 .returning({ id: schema.member.id });
-              if (!row)
-                throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+              if (!row) throw notFound('Member not found');
 
               return readMember(organizationId, row.id);
             },

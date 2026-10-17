@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   CapabilityHandler,
+  CitedRead,
   ConnectorConnection,
   InvocationContext,
   ReturnExchangePlan,
@@ -10,6 +11,7 @@ import type {
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
+  acceptedRecordsSchema,
   exchangePriceSchema,
   returnExchangeProofSchema,
   returnExchangeQuotedSchema,
@@ -103,6 +105,7 @@ export function createShopifyExchangeCapabilities(
       withheld();
   }
 
+  /** Records one normalized read and returns it with the evidence reference that names it. */
   async function evidence(
     capability:
       | 'returns.exchange.options.read'
@@ -112,37 +115,41 @@ export function createShopifyExchangeCapabilities(
     externalId: string,
     data: unknown,
     observedAt: string,
+    completeness: CitedRead['completeness'],
   ) {
-    const observationId = id();
+    const observation = {
+      id: id(),
+      source: {
+        tenantId: options.tenantId,
+        connectionId: options.connectionId,
+        provider: 'shopify',
+        resource:
+          capability === 'returns.exchange.options.read'
+            ? ('sku' as const)
+            : ('order' as const),
+        externalId,
+        scopeKey: '',
+      },
+      kind: 'snapshot' as const,
+      observedAt,
+      sourceUpdatedAt: null,
+      sourceRevision: null,
+      adapterVersion,
+      schemaVersion: 1 as const,
+      data,
+    };
     await options.recordObservations({
       tenantId: options.tenantId,
       connectionId: options.connectionId,
       apiVersion: API_VERSION,
       capability,
-      observations: [
-        {
-          id: observationId,
-          source: {
-            tenantId: options.tenantId,
-            connectionId: options.connectionId,
-            provider: 'shopify',
-            resource:
-              capability === 'returns.exchange.options.read' ? 'sku' : 'order',
-            externalId,
-            scopeKey: '',
-          },
-          kind: 'snapshot',
-          observedAt,
-          sourceUpdatedAt: null,
-          sourceRevision: null,
-          adapterVersion,
-          schemaVersion: 1,
-          data,
-        },
-      ],
+      observations: [observation],
     });
 
-    return [observationId];
+    return {
+      evidenceRefs: [observation.id],
+      reads: [{ ...observation, completeness }],
+    };
   }
 
   async function variant(inventoryItem: string) {
@@ -436,12 +443,14 @@ export function createShopifyExchangeCapabilities(
       plan: quoted,
       available,
       observedAt,
-      evidenceRefs: await evidence(
+      // Any incomplete read is withheld above, so a returned quote read is complete.
+      ...(await evidence(
         'returns.exchange.quote.read',
         plan.order.externalId,
         { operationId: input.operationId, plan: quoted, available },
         observedAt,
-      ),
+        'complete',
+      )),
     };
   }
 
@@ -665,7 +674,7 @@ export function createShopifyExchangeCapabilities(
   async function proof(input: ReturnExchangeRead) {
     const observedAt = now().toISOString(),
       plan = input.plan;
-    const result: Omit<ReturnExchangeProof, 'evidenceRefs'> = {
+    const result: Omit<ReturnExchangeProof, 'evidenceRefs' | 'reads'> = {
       outcome: 'inconclusive',
       observedAt,
       returnId: null,
@@ -681,6 +690,7 @@ export function createShopifyExchangeCapabilities(
     };
     const found = await find(plan),
       r = found.items[0];
+    let complete = found.complete;
     if (found.complete && found.items.length > 1) result.outcome = 'failed';
     if (found.complete && found.items.length === 1 && r) {
       result.returnId = r.id;
@@ -754,6 +764,7 @@ export function createShopifyExchangeCapabilities(
       } else {
         const e = r.exchangeLineItems.nodes[0],
           f = await fulfillment(r);
+        complete &&= f.complete;
         const processed =
           r.exchangeLineItems.nodes.length === 1 &&
           e?.processedQuantity === e?.quantity &&
@@ -808,12 +819,13 @@ export function createShopifyExchangeCapabilities(
 
     return {
       ...result,
-      evidenceRefs: await evidence(
+      ...(await evidence(
         'returns.exchange.proof.read',
         plan.order.externalId,
         { operationId: input.operationId, ...result },
         observedAt,
-      ),
+        complete ? 'complete' : 'partial',
+      )),
     };
   }
 
@@ -920,6 +932,7 @@ export function createShopifyExchangeCapabilities(
             status: z.literal('accepted'),
             evidenceRefs: z.array(z.string().uuid()).min(1),
             providerRequestId: z.string().nullable(),
+            records: acceptedRecordsSchema,
           })
           .strict()
           .parse(v),
@@ -1026,6 +1039,16 @@ export function createShopifyExchangeCapabilities(
             providerRequestId:
               value.return?.id ?? value.fulfillmentOrder?.id ?? null,
             evidenceRefs: current.evidenceRefs,
+            records: value.return
+              ? [{ resource: 'return', externalId: value.return.id }]
+              : value.fulfillmentOrder
+                ? [
+                    {
+                      resource: 'fulfillment_order',
+                      externalId: value.fulfillmentOrder.id,
+                    },
+                  ]
+                : [],
           };
         } catch (error) {
           if (
@@ -1135,12 +1158,15 @@ export function createShopifyExchangeCapabilities(
       return {
         total,
         observedAt,
-        evidenceRefs: await evidence(
+        ...(await evidence(
           'returns.exchange.price.read',
           plan.order.externalId,
           { operationId: input.operationId, total },
           observedAt,
-        ),
+          result.exchangeLineItems.pageInfo.hasNextPage
+            ? 'partial'
+            : 'complete',
+        )),
       };
     },
   };
@@ -1231,12 +1257,17 @@ export function createShopifyExchangeCapabilities(
         choices: items,
         observedAt,
         complete: items.length === input.inventoryItems.length,
-        evidenceRefs: await evidence(
-          'returns.exchange.options.read',
-          input.inventoryItems[0]!.externalId,
-          { items },
-          observedAt,
-        ),
+        evidenceRefs: (
+          await evidence(
+            'returns.exchange.options.read',
+            input.inventoryItems[0]!.externalId,
+            { items },
+            observedAt,
+            items.length === input.inventoryItems.length
+              ? 'complete'
+              : 'partial',
+          )
+        ).evidenceRefs,
       };
     },
   };

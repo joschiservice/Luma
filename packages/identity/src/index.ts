@@ -4,7 +4,6 @@ export {
   builtInMembership,
   hasPermission,
   isOwner,
-  IdentityError,
   makeTenantContext,
   MembershipSuspendedError,
   pausesBackgroundWork,

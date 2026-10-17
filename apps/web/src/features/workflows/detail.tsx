@@ -48,7 +48,7 @@ import {
 import { type ReactNode, useEffect, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
-import { contextOptions, IdentityError } from '../../kit/identity/data';
+import { ApiError, contextOptions } from '../../kit/identity/data';
 import { ActivationForm } from './activation';
 import { EditWorkflowButton } from './authoring/edit-workflow';
 import { WorkflowCodeSteps } from './code-steps';
@@ -193,9 +193,9 @@ function WorkflowDetailPage({
     await refresh();
   };
   const accessError = [query.error, runs.error].find(
-    (e) => e instanceof IdentityError && [401, 403, 404].includes(e.status),
+    (e) => e instanceof ApiError && [401, 403, 404].includes(e.status),
   );
-  if (accessError instanceof IdentityError && accessError.status === 401)
+  if (accessError instanceof ApiError && accessError.status === 401)
     return <SignInRedirect />;
 
   return (
@@ -360,7 +360,7 @@ export function WorkflowDetailView({
       await refresh();
     } catch (error) {
       setError(workflowError(error));
-      if (error instanceof IdentityError && [401, 403].includes(error.status))
+      if (error instanceof ApiError && [401, 403].includes(error.status))
         await accessLost();
     } finally {
       setPending(false);

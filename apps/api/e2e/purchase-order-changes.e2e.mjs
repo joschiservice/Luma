@@ -5,6 +5,7 @@ import { createObservability } from '@luma/platform/composition';
 import { expect, it } from 'vitest';
 
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 const flags = {
@@ -198,19 +199,68 @@ it('applies one approved JTL position revision, preserves earlier lines and surv
   );
   expect(history).toHaveLength(1);
   expect(history[0].data.lineItems[0].quantity).toBe(6);
+  const stored = (
+    await f.db.owner.query(
+      'SELECT document FROM procurement_order_changes WHERE tenant_id=$1 AND id=$2',
+      [org, change.id],
+    )
+  ).rows[0].document;
   const attempts = await f.db.owner.query(
     'SELECT count(*)::int AS n FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
-    [
-      org,
-      (
-        await f.db.owner.query(
-          'SELECT document FROM procurement_order_changes WHERE tenant_id=$1 AND id=$2',
-          [org, change.id],
-        )
-      ).rows[0].document.actionId,
-    ],
+    [org, stored.actionId],
   );
   expect(attempts.rows[0].n).toBe(1);
+
+  // The reads that verification, the revision and its audit cite resolve to stored evidence.
+  const cited = (
+    await f.db.owner.query(
+      `SELECT jsonb_array_elements_text(document->'attempt'->'verification'->'observationRefs') AS id
+         FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'result'->'observationRefs')
+         FROM execution_verifications WHERE tenant_id=$1 AND proposal_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'observationRefs')
+         FROM procurement_order_revisions WHERE tenant_id=$1 AND purchase_order_id=$3
+       UNION SELECT jsonb_array_elements_text(document->'evidenceRefs')
+         FROM audit_entries WHERE tenant_id=$1 AND proposal_id=$3
+          AND document->>'eventType'='purchase_order.revised'`,
+      [org, stored.actionId, order.id],
+    )
+  ).rows
+    .map((row) => row.id)
+    .filter((id) => id !== change.id);
+  expect(cited).toContain(stored.observationRefs[0]);
+  const reads = await f.db.owner.query(
+    'SELECT id,purpose,subject_id,document FROM procurement_read_evidence WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+    [org, cited],
+  );
+  expect(reads.rows.map((row) => row.id).sort()).toEqual([...cited].sort());
+  for (const row of reads.rows)
+    expect(row).toMatchObject({
+      purpose: 'revision',
+      subject_id: change.id,
+      document: {
+        purchaseOrderId: order.id,
+        source: { provider: 'jtl', resource: 'purchase_order' },
+        completeness: 'complete',
+      },
+    });
+
+  // The accepted revision's write receipt resolves to one stored receipt for the change.
+  const [attempt] = await expectStoredWriteReceipts(f.db.owner, org, [
+    stored.actionId,
+  ]);
+  expect(attempt.stored).toEqual([
+    expect.objectContaining({
+      owner: 'procurement',
+      document: expect.objectContaining({
+        purchaseOrderId: order.id,
+        purpose: 'revision',
+        subjectId: change.id,
+        capability: 'purchase-orders.revise',
+        source: { provider: 'jtl', connectionId: expect.any(String) },
+      }),
+    }),
+  ]);
   await call(
     `/purchase-orders/${order.id}/changes`,
     {

@@ -4,10 +4,11 @@ import type { AppFactoryContext } from '@luma/app-host';
 import { secretBinding } from '@luma/connections';
 import { createInstallationRepository } from '@luma/connections/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireChangesAllowed } from '@luma/identity';
+import { requireChangesAllowed } from '@luma/identity';
+import { notFound, ServiceError } from '@luma/platform';
 import { z } from 'zod';
 
-import { installationCredentials } from './infrastructure/installation-validation.js';
+import { installationCredentials } from './domain/installation-validation.js';
 
 const request = z
   .object({
@@ -54,7 +55,7 @@ export function createWebhookSecrets(
       });
       const parsed = request.safeParse(body);
       if (!parsed.success)
-        throw new IdentityError(422, 'CONFLICT', 'Select a connection.');
+        throw new ServiceError(422, 'CONFLICT', 'Select a connection.');
       const { connectionId, version } = parsed.data;
       const record = await repository.get(fresh.tenantId, connectionId);
       if (
@@ -64,7 +65,7 @@ export function createWebhookSecrets(
         record.connection.appId !== 'starshipit' ||
         record.connection.target.kind !== 'starshipit'
       )
-        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found.');
+        throw notFound('Connection not found.');
       if (record.connection.version !== version) throw conflict();
       const credentials = installationCredentials.parse(
         context.cipher.open(record.secret, secretBinding(record.connection)),
@@ -100,4 +101,4 @@ export function createWebhookSecrets(
 }
 
 const conflict = () =>
-  new IdentityError(409, 'CONFLICT', 'Connection changed; reload and retry.');
+  new ServiceError(409, 'CONFLICT', 'Connection changed; reload and retry.');

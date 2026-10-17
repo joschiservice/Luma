@@ -105,7 +105,7 @@ Für eine Bestellung aus JTL-Wawi kann ein Fall die Retoure in JTL-Wawi anlegen,
 2. Eine andere Person gibt die Anfrage im Fall frei. Sie braucht **Retouren bearbeiten**, **Änderungen genehmigen oder ablehnen** und **Retouren in JTL anlegen**. Luma legt die Retoure dann einmal an.
 3. Luma liest JTL-Wawi erneut und zeigt die Retourennummer, sobald es genau die freigegebene Retoure findet.
 
-Luma legt die Retoure ohne Gutschrift an; eine Erstattung bleibt eine eigene Entscheidung in JTL-Wawi. Eine Anfrage läuft nach 24 Stunden ab. Bestätigt JTL-Wawi die Anfrage nicht, zeigt der Fall **Nicht bestätigt**: Wähle **… prüfen** mit dem Namen deiner Verbindung, um erneut zu lesen. Luma sendet die Anfrage nie ein zweites Mal. In einem Workspace, der nur beobachtet, erfasst Luma die Anfrage und sendet nichts.
+Luma legt die Retoure ohne Gutschrift an; eine Erstattung bleibt eine eigene Entscheidung in JTL-Wawi. Eine Anfrage läuft nach 24 Stunden ab. Kann Luma eine freigegebene Anfrage nicht sofort senden, sendet Luma sie später, solange die Freigabe gilt; eine Anfrage, die nicht rechtzeitig gesendet wurde, zeigt **Abgelaufen**, und du forderst sie erneut an. Bestätigt JTL-Wawi die Anfrage nicht, zeigt der Fall **Nicht bestätigt**: Wähle **… prüfen** mit dem Namen deiner Verbindung, um erneut zu lesen. Luma sendet die Anfrage nie ein zweites Mal. In einem Workspace, der nur beobachtet, erfasst Luma die Anfrage und sendet nichts.
 
 Die Verbindung zu JTL-Wawi braucht Zugriff auf Retouren. Eine Verbindung, die eingerichtet wurde, bevor Retouren verfügbar waren, muss neu verbunden werden; siehe [Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify kann ebenfalls Retouren anlegen, wenn die Verbindung Schreibzugriff auf Retouren hat. Ein Fall mit einer bestehenden Kundenanfrage fordert die Freigabe genau dieser Anfrage an; ein Fall ohne verknüpfte Retoure legt eine neue Retoure an. Luma prüft Positionen und Mengen vor dem Senden und bestätigt das Ergebnis durch einen unabhängigen Shopify-Abruf. Fehlende oder unklare Ergebnisse bleiben **Nicht bestätigt** und werden nie erneut gesendet. Diese Aktion erstattet kein Geld und bucht keine Ware ein. Cin7 Core kann keine Retouren aus Luma anlegen.
 
@@ -146,7 +146,9 @@ fehlende Einheiten dürfen nicht eingelagert werden. Fehlende Einheiten werden �
 erstattet.
 
 Eine andere Person genehmigt jede Anfrage mit der passenden App-Berechtigung. Luma sendet die Aktion
-einmal und liest das System danach erneut. Eine ausstehende Zahlung ist noch in Bearbeitung. Eine
+einmal und liest das System danach erneut. Kann Luma nicht sofort senden, sendet Luma später, solange
+die Freigabe gilt; eine Aktion, die nicht innerhalb von 24 Stunden gesendet wurde, zeigt **Abgelaufen**
+und braucht eine neue Anfrage. Eine ausstehende Zahlung ist noch in Bearbeitung. Eine
 fehlgeschlagene Zahlung bestätigt keine Erstattung. Prüfen Sie bei einer unklaren Antwort das Ergebnis
 erneut. Diese Prüfung sendet keine zweite Erstattung oder Bestandsbuchung.
 
@@ -155,6 +157,8 @@ neue Abfrage, bevor Sie das Ergebnis dem Kunden bestätigen. Nach dem Versand ei
 Wareneingang, Prüfung und Vorschlag fest. Die Zuständigkeit kann weiterhin wechseln. Die
 Wawi-Bestandsabwicklung ist im Simulator verfügbar. Ihre Live-Verbindung muss die Aktion unterstützen,
 bevor sie verwendet werden kann.
+
+Um zu sehen, worauf sich eine Anlage, Erstattung, Wiedereinlagerung oder ein Umtauschschritt stützt, öffne dort **Nachweise**. Du siehst die Lesevorgänge und die Schreibbestätigung des Systems, wann Luma sie gelesen hat und ob die Lesevorgänge vollständig waren. Siehe [Nachweise lesen](/docs/issues/resolve#read-the-evidence).
 
 ## Einen Umtausch koordinieren
 

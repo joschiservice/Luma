@@ -18,7 +18,7 @@ import {
   connectionError,
   installConnection,
 } from '../../kit/connections/data';
-import { IdentityError, sessionOptions } from '../../kit/identity/data';
+import { ApiError, sessionOptions } from '../../kit/identity/data';
 import { NoAccess, usePermissions } from '../../kit/identity/permissions';
 
 const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
@@ -80,11 +80,11 @@ export function AppExtension({
       rotate: (current, credentials) =>
         changeConnection(organizationId, current, 'rotate', credentials),
       error: (error) =>
-        slot === 'inventory' && error instanceof IdentityError && error.code
+        slot === 'inventory' && error instanceof ApiError && error.code
           ? error.message
           : connectionError(error),
       uncertain: (error) =>
-        !(error instanceof IdentityError) ||
+        !(error instanceof ApiError) ||
         error.status >= 500 ||
         (slot !== 'inventory' && error.status === 409),
       async request(path, body) {
@@ -101,7 +101,7 @@ export function AppExtension({
           },
         );
         if (!response.ok)
-          throw new IdentityError(
+          throw new ApiError(
             response.status,
             await response.json().catch(() => undefined),
           );

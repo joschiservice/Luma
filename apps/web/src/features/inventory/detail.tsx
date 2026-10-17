@@ -22,7 +22,7 @@ import { type ReactNode, useContext } from 'react';
 
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { RecordAssistance } from '../../kit/record-assistance';
 import {
   connectionStatusLabel,
@@ -60,7 +60,7 @@ export function StockPage() {
   });
   const apps = useQuery(appsOptions(organizationId));
   const query = useQuery(stockOptions(organizationId, positionId));
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
 
   return (

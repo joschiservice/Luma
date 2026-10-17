@@ -1,4 +1,4 @@
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import type {
   PlaybookOutcome,
@@ -96,4 +96,17 @@ export function createPlaybookLibraryStore(
         );
       }),
   };
+}
+
+/**
+ * Serializes playbook management for one workspace until the transaction ends, so activation
+ * reviews and library changes see each other's committed state.
+ */
+export async function lockPlaybookManagement(
+  tx: SqlTransaction,
+  tenantId: string,
+) {
+  await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+    `playbook-management:${tenantId}`,
+  ]);
 }

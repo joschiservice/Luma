@@ -1,10 +1,16 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 
 import type { PlaybookSnapshot } from '../domain/playbook.js';
 import { validateTriggerSignal } from '../domain/trigger.js';
@@ -71,16 +77,14 @@ export function createWorkflowTriggers(deps: {
     if (permission === 'workflows.triggers.manage')
       requireChangesAllowed(fresh);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
 
   function same(run: WorkflowTriggerRun, digest: string) {
     if (run.requestDigest !== digest)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'This source already started a run with different evidence. Reuse the original request.',
       );
 
@@ -92,11 +96,7 @@ export function createWorkflowTriggers(deps: {
     async subscriptions(context: TenantContext, id: string) {
       context = await authorize(context, 'workflows.read');
       if (!deps.store.subscriptions)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Subscriptions are unavailable.',
-        );
+        throw unavailable('Subscriptions are unavailable.');
 
       return deps.store.subscriptions(context, id);
     },
@@ -115,27 +115,15 @@ export function createWorkflowTriggers(deps: {
     ) {
       context = await authorize(context, 'workflows.triggers.manage');
       if (!deps.store.saveSubscription)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Subscriptions are unavailable.',
-        );
+        throw unavailable('Subscriptions are unavailable.');
       const version = await deps.store.version(context, id, input.version);
       if (!version || version.digest !== input.reviewedDigest)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Review the current workflow version.',
-        );
+        throw conflict('Review the current workflow version.');
       if (
         version.format !== 'workflow/2' ||
         version.applicability.trigger.kind === 'exception'
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This workflow uses its domain activation.',
-        );
+        throw conflict('This workflow uses its domain activation.');
       if (
         input.trigger.kind === 'exception' ||
         (input.trigger.kind === 'condition' &&
@@ -146,9 +134,7 @@ export function createWorkflowTriggers(deps: {
         (input.trigger.kind === 'schedule' &&
           Date.parse(input.trigger.at) <= deps.now().getTime())
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'The subscription does not match this workflow’s context or schedule.',
         );
 
@@ -176,18 +162,9 @@ export function createWorkflowTriggers(deps: {
     ) {
       context = await authorize(context, 'workflows.triggers.manage');
       const version = await deps.store.version(context, id, request.version);
-      if (!version)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Workflow version not found.',
-        );
+      if (!version) throw notFound('Workflow version not found.');
       if (version.digest !== request.reviewedDigest)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The reviewed version changed. Reload the workflow.',
-        );
+        throw conflict('The reviewed version changed. Reload the workflow.');
       const subscription = request.subscription
         ? await deps.store.subscription?.(context, request.subscription.id)
         : null;
@@ -199,11 +176,7 @@ export function createWorkflowTriggers(deps: {
           subscription.revision !== request.subscription.revision ||
           subscription.versionDigest !== version.digest)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This subscription changed. Review it again.',
-        );
+        throw conflict('This subscription changed. Review it again.');
       const trigger = subscription?.trigger ?? version.applicability.trigger;
       const key = deps.hash([
         context.tenantId,
@@ -237,9 +210,7 @@ export function createWorkflowTriggers(deps: {
           now.getTime(),
         );
       } catch (error) {
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           error instanceof Error
             ? error.message
             : 'Trigger evidence is invalid.',
@@ -283,9 +254,7 @@ export function createWorkflowTriggers(deps: {
         runId,
       );
       if (!run)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This scheduled start is no longer pending. Refresh its status.',
         );
 

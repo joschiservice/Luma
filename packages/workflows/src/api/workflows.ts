@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -12,13 +12,9 @@ import type { WorkflowCatalog } from '../application/catalog.js';
 export function workflowRoutes(service?: WorkflowCatalog) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Workflows are unavailable. Try again later.',
-      );
+      throw unavailable('Workflows are unavailable. Try again later.');
 
     return { context: request.tenantContext, service };
   }
@@ -28,11 +24,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
   function coordinator(request: FastifyRequest) {
     const s = use(request);
     if (!s.service.coordination)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Workflow coordination is unavailable.',
-      );
+      throw unavailable('Workflow coordination is unavailable.');
 
     return { context: s.context, service: s.service.coordination };
   }
@@ -65,7 +57,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
           params.stepId,
         );
         if (task.definitionId !== params.definitionId)
-          throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+          throw notFound('Human task not found.');
 
         return task;
       },
@@ -79,7 +71,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
           params.stepId,
         );
         if (task.definitionId !== params.definitionId)
-          throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+          throw notFound('Human task not found.');
 
         return s.service.answer(s.context, params.runId, params.stepId, body);
       },

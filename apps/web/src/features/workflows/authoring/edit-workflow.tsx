@@ -6,7 +6,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { FilePenLine } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import { createDraft, draftsKey } from './data';
 
@@ -54,8 +54,7 @@ export function EditWorkflowButton({
       });
     } catch (failure) {
       setError(workflowError(failure));
-      if (failure instanceof IdentityError && failure.status < 500)
-        setRequest(null);
+      if (failure instanceof ApiError && failure.status < 500) setRequest(null);
     } finally {
       setPending(false);
     }

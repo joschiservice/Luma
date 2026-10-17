@@ -93,8 +93,9 @@ export function createPurchasingSystem(
       };
     },
     async orders(context, connectionId, query) {
-      const items: PurchasingOrder[] = [];
+      const items: Omit<PurchasingOrder, 'completeness'>[] = [];
       let cursor: string | undefined;
+      let completeness: PurchasingOrder['completeness'] = 'complete';
       // A created-order lookup scans a bounded recent window; ten pages is ample.
       for (let page = 0; page < 10; page++) {
         const result = await runtime.read(context, {
@@ -111,16 +112,25 @@ export function createPurchasingSystem(
               },
         });
         if (!result.ok) return { ok: false, reason: reason(result.error) };
+        if (result.value.completeness !== 'complete') completeness = 'partial';
         for (const o of result.value.items)
           if (o.kind === 'snapshot')
             items.push({
               observationId: o.id,
               observedAt: o.observedAt,
+              provider: o.source.provider,
+              adapterVersion: o.adapterVersion,
+              sourceUpdatedAt: o.sourceUpdatedAt,
+              sourceRevision: o.sourceRevision,
               externalId: o.source.externalId,
               scopeKey: o.source.scopeKey,
               data: o.data,
             });
-        if (!result.value.nextCursor) return { ok: true, value: items };
+        if (!result.value.nextCursor)
+          return {
+            ok: true,
+            value: items.map((item) => ({ ...item, completeness })),
+          };
         cursor = result.value.nextCursor;
       }
 
@@ -179,9 +189,10 @@ export function createSubmissionEffects(
           },
           verify: async (current) => ({
             ...(await commitments().verify(current, submission.id)),
-            observedAt: new Date().toISOString(),
             evaluatorVersion: 'purchase-order-submission/1',
           }),
+          storeReceipt: (current, _action, acceptance) =>
+            commitments().storeWriteReceipt(current, submission.id, acceptance),
         })
         .resolve(context, intent);
     },

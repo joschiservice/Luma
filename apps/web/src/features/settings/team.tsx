@@ -20,7 +20,7 @@ import { Mail, MoreHorizontal, Search, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { Failure } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { roleName } from '../../kit/identity/permission-text';
 import { isOwnerRole, usePermissions } from '../../kit/identity/permissions';
 import {
@@ -73,7 +73,7 @@ export function TeamSettings({
   const [nextRole, setNextRole] = useState('member');
   const blocked = !online || command.locked;
   const error = members.error ?? invitations.error;
-  if (error instanceof IdentityError && [401, 404].includes(error.status))
+  if (error instanceof ApiError && [401, 404].includes(error.status))
     return <Failure error={error} retry={() => void members.refetch()} />;
   const active = roles.data?.roles.filter((role) => !role.archived) ?? [];
   const visible = members.data?.filter((member) =>

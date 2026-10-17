@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -16,13 +16,9 @@ export function workflowDraftRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service || !templates)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Workflow authoring is unavailable. Try again later.',
-      );
+      throw unavailable('Workflow authoring is unavailable. Try again later.');
 
     return { context: request.tenantContext, service, templates };
   }

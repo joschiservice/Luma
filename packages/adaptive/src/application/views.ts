@@ -1,7 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requireTenant,
 } from '@luma/identity';
@@ -9,7 +8,12 @@ import type { ModelGateway, ModelSchema, TraceContext } from '@luma/platform';
 import {
   authoringModelProfile,
   canonicalJson,
+  conflict,
+  invalid,
   ModelGatewayError,
+  notFound,
+  ServiceError,
+  unavailable,
 } from '@luma/platform';
 
 import type { CustomField } from '../domain/fields.js';
@@ -277,7 +281,7 @@ function requireSharingAllowed(
         (next.scope === 'workspace' ||
           next.roleIds.every((role) => current.roleIds.includes(role)))));
   if (!narrower)
-    throw new IdentityError(
+    throw new ServiceError(
       403,
       'FORBIDDEN',
       'Sharing a view with the workspace or with roles requires permission to manage views.',
@@ -291,10 +295,10 @@ export function createViewsService(deps: ViewsDependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw new ServiceError(403, 'FORBIDDEN', 'Sign in again to continue.');
     if (write) requireChangesAllowed(fresh);
     if (!(await deps.released(fresh, 'adaptive-saved-views')))
-      throw new IdentityError(404, 'NOT_FOUND', 'Saved views are unavailable.');
+      throw notFound('Saved views are unavailable.');
 
     return fresh;
   }
@@ -314,9 +318,9 @@ export function createViewsService(deps: ViewsDependencies) {
   ) {
     const value = await tx.get(id);
     if (!value || !canReadView(context, value))
-      throw new IdentityError(404, 'NOT_FOUND', 'View not found.');
+      throw notFound('View not found.');
     if (edit && !canEditView(context, value))
-      throw new IdentityError(
+      throw new ServiceError(
         403,
         'FORBIDDEN',
         'Only the owner or a view manager can change this view.',
@@ -342,12 +346,7 @@ export function createViewsService(deps: ViewsDependencies) {
     const execution = deps.validation.execution(query, fields);
     const compiled = execution.query;
     const reader = deps.readers[compiled.domain];
-    if (!reader)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'This record source is unavailable.',
-      );
+    if (!reader) throw unavailable('This record source is unavailable.');
     const customSort = !!compiled.sort?.field.startsWith('custom:');
     if (
       (compiled.customFilters.length > 0 ||
@@ -355,18 +354,14 @@ export function createViewsService(deps: ViewsDependencies) {
         compiled.groupBy?.startsWith('custom:')) &&
       !reader.supportsCustomQueries
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
+      throw invalid(
         'This record source cannot yet combine custom field filters or ordering with its live query.',
       );
     if (
       (compiled.groupBy || compiled.metrics.length || compiled.charts.length) &&
       !reader.supportsAggregates
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
+      throw invalid(
         'Grouping and metrics require a complete query adapter for this source.',
       );
     deps.validation.ownerQuery(
@@ -386,7 +381,7 @@ export function createViewsService(deps: ViewsDependencies) {
   ) {
     const query = deps.validation.query(raw);
     if (!canReadDomain(context, query))
-      throw new IdentityError(
+      throw new ServiceError(
         403,
         'FORBIDDEN',
         'Your role cannot read this record source.',
@@ -397,11 +392,9 @@ export function createViewsService(deps: ViewsDependencies) {
       customFields: fields,
     });
     const forbidden = issues.find((issue) => issue.forbidden);
-    if (forbidden) throw new IdentityError(403, 'FORBIDDEN', forbidden.message);
+    if (forbidden) throw new ServiceError(403, 'FORBIDDEN', forbidden.message);
     if (issues.length)
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
+      throw invalid(
         `This view needs repair. ${issues
           .slice(0, 5)
           .map((issue) => issue.message)
@@ -410,12 +403,7 @@ export function createViewsService(deps: ViewsDependencies) {
     if (query.metrics.length || query.charts.length || query.actions.length)
       engine(query, fields);
     if (query.actions.length) {
-      if (!deps.validateActions)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'View actions are unavailable.',
-        );
+      if (!deps.validateActions) throw invalid('View actions are unavailable.');
       await deps.validateActions(context, query);
     }
 
@@ -490,12 +478,7 @@ export function createViewsService(deps: ViewsDependencies) {
     const input = deps.validation.input(raw);
     await validateQuery(context, input.query);
     if (input.sharing.scope === 'roles') {
-      if (!deps.validateRoles)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Role sharing is unavailable.',
-        );
+      if (!deps.validateRoles) throw invalid('Role sharing is unavailable.');
       await deps.validateRoles(context, input.sharing.roleIds);
     }
 
@@ -545,11 +528,7 @@ export function createViewsService(deps: ViewsDependencies) {
         const existing = await tx.get(value.id);
         if (existing) {
           if (existing.ownerId !== fresh.actor.id)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This command identity was already used.',
-            );
+            throw conflict('This command identity was already used.');
           const first = (await tx.history(value.id)).items.find(
             (item) => item.revision === 1,
           );
@@ -568,9 +547,7 @@ export function createViewsService(deps: ViewsDependencies) {
                 query: input.query,
               })
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This command identity was already used for another view.',
             );
 
@@ -593,11 +570,7 @@ export function createViewsService(deps: ViewsDependencies) {
       return deps.store.transaction(fresh.tenantId, async (tx) => {
         const current = await find(tx, fresh, id, true);
         if (current.archived)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Archived views cannot be revised.',
-          );
+          throw conflict('Archived views cannot be revised.');
         requireSharingAllowed(fresh, input.sharing, current.sharing);
         const value: StoredAdaptiveView = {
           ...current,
@@ -809,7 +782,7 @@ export function createViewsService(deps: ViewsDependencies) {
 
         return { ...draft, preview };
       } catch (error) {
-        if (error instanceof IdentityError) {
+        if (error instanceof ServiceError) {
           if (error.statusCode === 403 || error.statusCode === 404) throw error;
 
           return {

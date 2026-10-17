@@ -1,4 +1,4 @@
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 
@@ -49,7 +49,7 @@ it('redirects to recovery when the session cannot be resolved', async () => {
       resolveTenant: vi
         .fn()
         .mockRejectedValue(
-          new IdentityError(401, 'UNAUTHENTICATED', 'Sign in again'),
+          new ServiceError(401, 'UNAUTHENTICATED', 'Sign in again'),
         ),
     },
     vi.fn(),

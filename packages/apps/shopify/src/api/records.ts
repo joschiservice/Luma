@@ -1,7 +1,7 @@
 import '@luma/identity/http';
 
 import { ConnectorError } from '@luma/connections';
-import { IdentityError } from '@luma/identity';
+import { forbidden, notFound, ServiceError, unavailable } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 
 import type { createRecordService } from '../application/records.js';
@@ -18,7 +18,7 @@ export function registerRecordRoutes(
     async (request, reply) => {
       reply.header('cache-control', 'no-store');
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
       const stop = new AbortController();
       const aborted = () => stop.abort();
       const closed = () => {
@@ -37,20 +37,14 @@ export function registerRecordRoutes(
             String(Math.ceil(error.failure.retryAfterMs / 1000)),
           );
         if (code === 'not_found')
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
+          throw notFound(
             'Shopify record was not found or is outside the granted order history window.',
           );
         if (code === 'permission_denied')
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
+          throw forbidden(
             'This connection does not have access to this record.',
           );
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'Shopify could not load this record. Check the connection and try again.',
         );
       } finally {

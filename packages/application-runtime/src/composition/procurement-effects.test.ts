@@ -1,11 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import type { EffectIntent } from '@luma/connections';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { notFound } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -86,7 +83,7 @@ describe('procurement effects', () => {
       }),
       detail: vi
         .fn()
-        .mockRejectedValueOnce(new IdentityError(404, 'NOT_FOUND', 'missing'))
+        .mockRejectedValueOnce(notFound('missing'))
         .mockResolvedValue({
           order,
           canManage: true,

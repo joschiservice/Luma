@@ -5,7 +5,7 @@ import {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 
 const api = createWebApiClient();
@@ -71,7 +71,7 @@ export async function recoverDecision(
  * requiring a refresh.
  */
 export function decisionError(error: unknown) {
-  if (error instanceof IdentityError) {
+  if (error instanceof ApiError) {
     if (error.status === 401) return m.exceptions_decision_error_session();
     if (error.status === 403) return m.exceptions_decision_error_permission();
     if (error.status === 404) return m.exceptions_decision_error_missing();
@@ -99,8 +99,8 @@ export async function refreshResolution(
       body: {},
     });
   } catch (cause) {
-    if (!(cause instanceof IdentityError)) {
-      const error = new IdentityError(503);
+    if (!(cause instanceof ApiError)) {
+      const error = new ApiError(503);
       error.message = unavailable;
       throw error;
     }

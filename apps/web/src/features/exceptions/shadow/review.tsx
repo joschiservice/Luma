@@ -20,7 +20,7 @@ import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
 import { useQuery } from '@tanstack/react-query';
 import { useContext, useId, useRef, useState } from 'react';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import {
   candidateAction,
   reviewShadow,
@@ -128,10 +128,9 @@ export function ShadowReviewForm({
       await saved();
     } catch (error) {
       setError(shadowError(error));
-      if (!(error instanceof IdentityError) || error.status >= 500)
-        setRetry(body);
+      if (!(error instanceof ApiError) || error.status >= 500) setRetry(body);
       if (shadowAccessDenied(error)) accessLost(error);
-      if (error instanceof IdentityError && error.status === 409) await saved();
+      if (error instanceof ApiError && error.status === 409) await saved();
     } finally {
       lock.current = false;
       setPending(false);

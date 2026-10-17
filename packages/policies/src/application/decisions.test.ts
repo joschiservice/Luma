@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Approval, PolicyDecision } from '../domain/action.js';
@@ -114,7 +111,7 @@ describe('batch policy decision reads', () => {
     }));
 
     await expect(policies.decisions(context, ['a'])).rejects.toBeInstanceOf(
-      IdentityError,
+      ServiceError,
     );
   });
 });

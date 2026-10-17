@@ -1,11 +1,18 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import type {
   ActionReview,
@@ -89,14 +96,10 @@ export function createViewActions(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     if (write) requireChangesAllowed(fresh);
     if (!(await deps.released(fresh)))
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'View actions are not enabled for this workspace.',
-      );
+      throw unavailable('View actions are not enabled for this workspace.');
 
     return fresh;
   }
@@ -120,11 +123,7 @@ export function createViewActions(deps: {
       Object.keys(action.inputs).some((key) => !(key in capability.inputs)) ||
       Object.keys(capability.inputs).some((key) => !(key in action.inputs))
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'Map exactly the supported action inputs.',
-      );
+      throw invalid('Map exactly the supported action inputs.');
     for (const [key, type] of Object.entries(capability.inputs)) {
       const mapping = action.inputs[key]!;
       if (!row && mapping.source === 'row') continue;
@@ -134,11 +133,7 @@ export function createViewActions(deps: {
         typeof value !== type ||
         (typeof value === 'number' && !Number.isFinite(value))
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          `The action input ${key} needs a ${type} value.`,
-        );
+        throw invalid(`The action input ${key} needs a ${type} value.`);
       if (
         typeof value === 'string' ||
         typeof value === 'number' ||
@@ -158,11 +153,10 @@ export function createViewActions(deps: {
   ) {
     const view = await deps.view(context, viewId);
     const action = view.query.actions.find((a) => a.id === actionId);
-    if (!action)
-      throw new IdentityError(404, 'NOT_FOUND', 'View action not found.');
+    if (!action) throw notFound('View action not found.');
     const capability = match(action, await deps.catalog(context));
     if (!capability)
-      throw new IdentityError(
+      throw new ServiceError(
         409,
         'NOT_READY',
         'This action is unavailable. Its capability or published version was removed.',
@@ -170,22 +164,14 @@ export function createViewActions(deps: {
     for (const permission of capability.permissions)
       requirePermission(context, permission);
     if (!capability.domains.includes(view.query.domain))
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'This action does not support this record type.',
-      );
+      throw invalid('This action does not support this record type.');
     const missing = await capability.available(context);
     const rows = await deps.rows(context, view, request.recordIds);
     const reviews = [];
     for (const recordId of request.recordIds) {
       const row = rows.find((r) => r.id === recordId);
       if (!row)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'A selected record is unavailable in this view.',
-        );
+        throw notFound('A selected record is unavailable in this view.');
       const inputs = mappings(action, capability, row);
       capability.validateInputs?.(inputs);
       if (missing)
@@ -199,7 +185,7 @@ export function createViewActions(deps: {
             reason: null,
           });
         } catch (error) {
-          if (!(error instanceof IdentityError)) throw error;
+          if (!(error instanceof ServiceError)) throw error;
           reviews.push({
             recordId,
             inputs,
@@ -282,11 +268,7 @@ export function createViewActions(deps: {
       for (const action of query.actions) {
         const capability = match(action, catalog);
         if (!capability || !capability.domains.includes(query.domain))
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Choose an action from the supported record catalog.',
-          );
+          throw invalid('Choose an action from the supported record catalog.');
         for (const permission of capability.permissions)
           requirePermission(context, permission);
         // Row fields are catalog column IDs the view lists explicitly, or the record ID.
@@ -297,9 +279,7 @@ export function createViewActions(deps: {
             !visible.has(mapping.field) &&
             mapping.field !== 'id'
           )
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
+            throw invalid(
               'Choose a supported visible row field for each action input.',
             );
         if (types)
@@ -308,9 +288,7 @@ export function createViewActions(deps: {
               mapping.source === 'row' &&
               types[mapping.field] !== capability.inputs[key]
             )
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
+              throw invalid(
                 `The row field ${mapping.field} cannot supply the action input ${key}.`,
               );
         capability.validateInputs?.(mappings(action, capability));
@@ -392,9 +370,7 @@ export function createViewActions(deps: {
       if (recorded) return { items: recorded };
       const prepared = await prepare(context, viewId, actionId, request);
       if (prepared.reviewDigest !== request.reviewDigest)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The proposed change or its evidence changed. Review it again.',
         );
       const pending: ViewActionResult[] = prepared.reviews.map((record) => ({
@@ -441,9 +417,9 @@ export function createViewActions(deps: {
         } catch (error) {
           items.push({
             recordId: record.recordId,
-            state: error instanceof IdentityError ? 'failed' : 'uncertain',
+            state: error instanceof ServiceError ? 'failed' : 'uncertain',
             reason:
-              error instanceof IdentityError
+              error instanceof ServiceError
                 ? error.message
                 : 'The command outcome is uncertain. Open the record to reconcile it before retrying.',
             proposalId: null,

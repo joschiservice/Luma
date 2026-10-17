@@ -3,7 +3,7 @@ import type {
   InstalledConnection,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { conflict, notFound, ServiceError } from '@luma/platform';
 
 import {
   recordCapability,
@@ -49,7 +49,7 @@ export function createRecordService(options: {
   ) => {
     const parsed = recordInput.safeParse(input);
     if (!parsed.success)
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'CONFLICT',
         'Choose a valid Shopify record type and ID.',
@@ -69,18 +69,14 @@ export function createRecordService(options: {
         current.connection.provider !== 'shopify' ||
         current.connection.appInstallationVersion !== version
       )
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Shopify connection not found',
-        );
+        throw notFound('Shopify connection not found');
 
       return current;
     };
     const current = await credential();
     const shop = current.connection.target.shop;
     if (current.connection.target.kind !== 'shopify' || !shop)
-      throw new IdentityError(404, 'NOT_FOUND', 'Shopify connection not found');
+      throw notFound('Shopify connection not found');
     const reader = options.reader({
       ...(signal ? { signal } : {}),
       tenantId: context.tenantId,
@@ -93,11 +89,7 @@ export function createRecordService(options: {
       accessToken: async () => {
         const fresh = await credential();
         if (fresh.connection.target.shop !== shop)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Connection changed; reload and retry',
-          );
+          throw conflict('Connection changed; reload and retry');
 
         return fresh.credentials.token;
       },

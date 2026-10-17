@@ -67,15 +67,16 @@ zone where a page shows workspace time. Machine formats, such as ISO dates built
 The server stays the English source for the API, OpenAPI and the permission reference.
 Catalogs it serves under stable keys are localized in the web by key: permission groups,
 permissions and built-in roles (`permissions`), app manifest descriptions and app
-permissions (`catalog`, `permissions`), operational metric definitions (`metrics`), and
-workflow triggers, step types and subjects (`vocabulary`). Keys derive from the server ID
-with `.`, `:` and `-` replaced by `_`. The lookup helpers return the server's text for keys
-the client doesn't know, such as a newly added permission or a custom role.
+permissions (`catalog`, `permissions`), operational metric definitions (`metrics`), workflow
+triggers, step types and subjects (`vocabulary`), and issue kinds by exception class
+(`issues`). Keys derive from the server ID with `.`, `:` and `-` replaced by `_`. The lookup
+helpers return the server's text for keys the client doesn't know, such as a newly added
+permission or a custom role.
 
 The English message must equal the server text. Tests in each owning package (identity, the
-metric owners, workflows, procurement, resolution and each app) read the English catalog and
-fail when they differ, so change both together and write the German translation in the
-same change.
+metric owners, exceptions, workflows, procurement, resolution and each app) read the English
+catalog and fail when they differ, so change both together and write the German translation
+in the same change.
 
 Other visible text still arrives in English: provider data, issue diagnosis and decision
 explanations, workflow templates and step summaries, reads, actions and checks that apps

@@ -7,9 +7,10 @@ import type {
   SourceRecords,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
+import { hasPermission } from '@luma/identity';
 import type { CanonicalSnapshot, CommerceProjections } from '@luma/orders';
 import type { SqlTransaction } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { SalesTransaction } from '../application/service.js';
 import type { SalesOrder } from '../domain/order.js';
@@ -50,20 +51,14 @@ export function createSalesPersistence(
         source.rows[0]?.provider !== 'shopify' ||
         !['active', 'degraded'].includes(source.rows[0].status)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'A current Shopify order is required',
-        );
+        throw conflict('A current Shopify order is required');
       const data = snapshot.data;
       if (
         !['open', 'completed', 'cancelled'].includes(data.status) ||
         !data.displayNumber ||
         !data.total
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Order number, status and currency must be known before intake',
         );
       // Customer links are erasable, separate from the immutable order evidence.
@@ -137,9 +132,7 @@ export function createSalesPersistence(
             throw new Error('Unsupported tax rate');
         }
       } catch {
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'The source order cannot be represented as a Luma record',
         );
       }
@@ -163,9 +156,7 @@ export function createSalesPersistence(
           ),
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Select Luma ERP for order lifecycle and lines in source authority before editing',
         );
     },
@@ -297,11 +288,7 @@ export function createSalesPersistence(
 }
 
 function unknownQuantity(): never {
-  throw new IdentityError(
-    409,
-    'CONFLICT',
-    'Current line quantities must be known before intake',
-  );
+  throw conflict('Current line quantities must be known before intake');
 }
 
 function hash(value: string) {
@@ -337,5 +324,5 @@ function paymentStatus(value: string): SalesOrder['paymentStatus'] {
 function orderStatus(value: string): SalesOrder['status'] {
   if (value === 'open' || value === 'completed' || value === 'cancelled')
     return value;
-  throw new IdentityError(409, 'CONFLICT', 'Order status must be known');
+  throw conflict('Order status must be known');
 }

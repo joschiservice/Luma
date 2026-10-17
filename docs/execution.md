@@ -57,6 +57,73 @@ process. API, deterministic-browser and sandboxed-code effect adapters all enter
 admission and reservation path; a code runner must enforce its own process and network
 isolation.
 
+### Runtimes
+
+The API, the workflow worker, the commerce sync process (mailbox reading, supplier follow-up
+and return follow-up) and the pilot compose the same effect registry from the installed apps. A
+runtime with enabled execution and the installed purchase-order, return and mailbox runtimes
+resolves the same adapter for an action as every other runtime: the same dispatch identity,
+mechanism and executor. An attempt reserved in one process can therefore be reconciled in
+another. A runtime without execution, or the API without connection settings, resolves none
+of those provider writes.
+
+People's approvals send at once from the API, as the requester. Approved purchase orders,
+replies, return creations, return settlements and exchange steps whose send did not start are
+sent by the commerce sync passes, also as the requester and only while the approval is valid.
+Those passes reconcile uncertain writes by reading. A return write whose approval ended before
+execution reserved it is recorded as expired, and a new request is needed. The workflow
+worker's return step follow-up also reads sent refunds and exchange processing while it checks
+return money. No worker activity proposes or approves these writes; it only executes or
+reconciles the bound action under its recorded approval.
+
+Provider runtimes record no capability telemetry and keep no read observations, so a read's
+ID resolves only where its owner stored it. Owners that cite reads as verification evidence
+store them in their own tables, in the tenant's transaction, before returning the result:
+Shopify corrections and fulfillment recovery, Starshipit updates, procurement's submission
+and revision reads, and orders' return creation, settlement, exchange and completion reads.
+Mailbox verification cites the messages and outgoing send it stored. Provider results that
+aggregate several reads, such as a refund quote or an exchange proof, return the reads their
+evidence references name, so the citing owner can store them.
+
+Write receipts follow the same rule. When a provider accepts a write, the owner that bound the
+effect stores the receipt in the tenant's transaction before execution sees it, and the
+attempt and its completion audit cite only that receipt's ID, never the adapter's own
+references. Procurement (submissions and order revisions) and orders (return creations,
+settlements and exchange steps) store receipts beside their cited reads with kind
+`write_receipt`; messaging stores reply send receipts beside the reply. Shopify corrections,
+stock protection, order edits, fulfillment recovery and shipment publishing, and Starshipit
+updates store their acceptances in their own evidence tables. A receipt keeps the provider,
+connection, the provider records the response named, the provider request ID, the attempt's
+idempotency key and dispatch identity, the adapter version and the time; never the payload,
+credentials or message content. A lost or unreadable response has no receipt, so nothing is
+cited. If the receipt cannot be stored, the attempt records the write as dispatched with an
+unknown outcome, cites nothing and reconciles by reading. Internal effects, such as adaptive
+fields, Luma purchase orders and supplier follow-ups, cite the Luma record they changed.
+
+### Reading cited evidence
+
+`@luma/read-models` resolves the references a record cites, so people see the evidence rather
+than IDs. A request names a subject (a purchase order, a return creation, settlement or exchange
+step, a reply, or a case) and optionally its references; without them it resolves everything the
+subject cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
+`returns.read`, `messages.read` or `issues.read`); a subject the tenant doesn't have is not found.
+
+The subject's owner reports what the subject cites and looks up stored evidence only through the
+subject: procurement's reads and receipts of that order, orders' evidence of that return case,
+messaging's send receipts and the messages of that reply's thread. App evidence tables are not
+linked to a record, so Shopify and Starshipit evidence is read only for references the case's
+execution attempts cite. Each reference resolves to a read (source, record, read and source-update
+times, revision, completeness, adapter version and an allowlisted summary of the normalized
+read), a write receipt, a Luma record, `not_retained` or `unresolved`. Provider payloads, message
+content and addresses never leave the owner.
+
+Records written before an owner stored a kind of evidence cite IDs that were never kept and
+cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return
+reads, write receipts); a read or receipt cited before that date is `not_retained`. Everything
+else without stored evidence stays `unresolved`, including citations without a time and message
+reads, which were always stored: a missing read after storage began is a defect, not history.
+Busy views resolve evidence only when a person opens it.
+
 ## Observe-only
 
 Owners choose `observe_only` or `writes_enabled` for the workspace. New workspaces
@@ -156,7 +223,9 @@ stateDiagram-v2
 ```
 
 Verification performs a fresh authoritative read, checks the expected postcondition and
-returns the outcome, observation IDs, observation time and evaluator version. Observations
+returns the outcome, observation IDs, observation time and evaluator version. Each returned
+observation ID must name a read the owner has already stored with its source identity, read
+time and completeness; a verifier that cannot store a read must not cite it. Observations
 predating the attempt, malformed responses and thrown reads produce an unknown outcome;
 only a passed check is success. The verifier must prove the selected business postcondition: a
 corrected shipping method, for example, does not prove that fulfillment resumed. Closing

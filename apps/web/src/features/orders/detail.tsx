@@ -50,7 +50,7 @@ import {
 
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { OrderSection } from '../../shared/orders/order-section';
 import { RecordFields } from '../adaptive/record-fields';
@@ -137,9 +137,9 @@ export function OrderPage() {
     onlineSnapshot,
     serverSnapshot,
   );
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
-  const status = query.error instanceof IdentityError ? query.error.status : 0;
+  const status = query.error instanceof ApiError ? query.error.status : 0;
   const recordApps = new Set(
     (apps.data?.catalog ?? [])
       .filter(

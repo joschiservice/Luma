@@ -1,6 +1,7 @@
 import {
   customerRoutes,
   decisionRoutes,
+  evidenceRoutes,
   fulfillmentRoutes,
   insightRoutes,
   inventoryRoutes,
@@ -20,6 +21,7 @@ export function readModelsHttp(services: AppDependencies) {
   return {
     customers: customerRoutes(services.customers),
     decisions: decisionRoutes(services.decisions, services.decisionAssignments),
+    evidence: evidenceRoutes(services.evidence),
     fulfillment: fulfillmentRoutes(services.fulfillment),
     insights: insightRoutes(services.insights),
     inventory: inventoryRoutes(services.inventory),

@@ -6,8 +6,8 @@ import {
   shadowEvaluationSchema,
   shadowReportSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -17,13 +17,8 @@ import type { ShadowService } from '../application/shadow.js';
 export function shadowRoutes(service?: ShadowService) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Shadow evaluation is unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Shadow evaluation is unavailable');
 
     return { context: request.tenantContext, service };
   }

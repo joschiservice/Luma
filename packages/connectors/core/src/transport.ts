@@ -85,3 +85,74 @@ export async function retryRead<T>(
     }
   }
 }
+
+/** Encodes and decodes an opaque page cursor as base64url JSON. */
+export interface CursorCodec<T> {
+  /** Serializes the value with `JSON.stringify`, so its key order is the wire order. */
+  encode(value: T): string;
+  /** Returns the validated value, or throws an `invalid_input` connector failure. */
+  decode(cursor: string): T;
+}
+
+/**
+ * Creates a cursor codec for provider page cursors. Decoding rejects text that is not JSON
+ * matching the schema; `canonical` also rejects base64url text that does not re-encode to
+ * itself. Callers still compare any request binding the cursor carries.
+ */
+export function createCursorCodec<T>(
+  schema: z.ZodType<T>,
+  options: { canonical?: boolean } = {},
+): CursorCodec<T> {
+  return {
+    encode: (value) => Buffer.from(JSON.stringify(value)).toString('base64url'),
+    decode(cursor) {
+      try {
+        const bytes = Buffer.from(cursor, 'base64url');
+        if (options.canonical && bytes.toString('base64url') !== cursor)
+          fail('invalid_input');
+
+        return schema.parse(JSON.parse(bytes.toString('utf8')));
+      } catch {
+        fail('invalid_input');
+      }
+    },
+  };
+}
+
+/** Raw provider evidence attached to recorded observations while retention is enabled. */
+export interface CapturedPayloads {
+  raw?: { payloads: unknown[]; expiresAt: string };
+}
+
+/**
+ * Collects validated provider payloads for one capability call. Values are parsed before
+ * capture, so unexpected fields and provider errors never enter evidence. Nothing is kept
+ * when `retentionMs` is undefined.
+ */
+export function createPayloadCapture(
+  retentionMs: number | undefined,
+  now: () => Date,
+) {
+  const payloads: unknown[] = [];
+
+  return {
+    /** Parses a provider value, failing with `invalid_response`, and retains the result. */
+    capture<T>(schema: z.ZodType<T>, value: unknown): T {
+      const result = parse(schema, value);
+      if (retentionMs !== undefined) payloads.push(result);
+
+      return result;
+    },
+    /** Returns the retained payloads with their expiry, or nothing without retention. */
+    raw(): CapturedPayloads {
+      return retentionMs === undefined
+        ? {}
+        : {
+            raw: {
+              payloads,
+              expiresAt: new Date(now().getTime() + retentionMs).toISOString(),
+            },
+          };
+    },
+  };
+}

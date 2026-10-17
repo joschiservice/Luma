@@ -14,8 +14,9 @@ import {
   nativeShipmentReadSchema,
   nativeStockEvidenceSchema,
 } from '@luma/api-contract';
-import { IdentityError, type TenantContext } from '@luma/identity';
+import { type TenantContext } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { NativeStockRuntime } from '../application/native-stock.js';
@@ -34,18 +35,13 @@ export function nativeStockRoutes(service?: NativeStockRuntime) {
   ) {
     const tenant = context.request.tenantContext;
     if (!tenant)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Native stock is unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Native stock is unavailable');
     try {
       return await operation(service, tenant);
     } catch (error) {
       if (error instanceof LedgerError)
-        throw new IdentityError(
+        throw new ServiceError(
           ['invalid_quantity', 'invalid_entry', 'unbalanced'].includes(
             error.code,
           )

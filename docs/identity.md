@@ -143,7 +143,7 @@ flowchart TD
 | Provisioning in a disabled or other cell region  | 422      |
 
 For a member, a suspended or closed organization raises `WorkspaceInactiveError`, a 404
-`IdentityError` subclass. Callers see the same response; background work uses the subclass
+`ServiceError` subclass. Callers see the same response; background work uses the subclass
 to pause instead of failing or blocking. Cross-tenant worker discovery returns active
 organizations only.
 

@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -97,11 +97,7 @@ export function createAuthorityRepository(
             previous.group !== input.group ||
             previous.connectionId !== input.connectionId
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Authority command ID already used',
-            );
+            throw conflict('Authority command ID already used');
 
           return previous;
         }
@@ -113,23 +109,14 @@ export function createAuthorityRepository(
           );
         const state = await read(tx, tenantId);
         if (state.revision !== input.revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Source authority changed; reload and retry',
-          );
+          throw conflict('Source authority changed; reload and retry');
         if (input.connectionId) {
           const connection = state.connections.find(
             (c) => c.id === input.connectionId,
           );
-          if (!connection)
-            throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+          if (!connection) throw notFound('Connection not found');
           if (!eligibleAuthority(input.group, connection))
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Connection cannot supply this fact group',
-            );
+            throw conflict('Connection cannot supply this fact group');
         }
         const overrides = { ...state.overrides };
         if (input.connectionId) overrides[input.group] = input.connectionId;

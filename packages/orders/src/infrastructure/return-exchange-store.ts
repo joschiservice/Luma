@@ -11,6 +11,7 @@ import type {
   ExchangeStep,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
+import { insertReturnRead, insertReturnWriteReceipt } from './return-reads.js';
 
 /** Persists immutable provider plans and one case operation behind forced tenant RLS. */
 export function createReturnExchangeStore(
@@ -81,6 +82,15 @@ export function createReturnExchangeStore(
                 await tx.query<{ document: ExchangeStep }>(
                   'SELECT document FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2 ORDER BY requested_at,id',
                   [tenantId, caseId],
+                )
+              ).rows.map((r) => r.document),
+            live: async (requestedBy) =>
+              (
+                await tx.query<{ document: ExchangeStep }>(
+                  `SELECT document FROM orders_return_exchange_steps WHERE tenant_id=$1 AND document->>'requestedBy'=$2
+                    AND state IN ('approval_required','approved','sending','uncertain')
+                  ORDER BY requested_at,id LIMIT 100`,
+                  [tenantId, requestedBy],
                 )
               ).rows.map((r) => r.document),
             insert: async (value) => {
@@ -226,6 +236,9 @@ export function createReturnExchangeStore(
               );
             },
             audit: (entry) => log.append(entry),
+            recordRead: (evidence) => insertReturnRead(tx, tenantId, evidence),
+            recordWriteReceipt: (receipt) =>
+              insertReturnWriteReceipt(tx, tenantId, receipt),
           });
         },
         options,

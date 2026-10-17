@@ -4,10 +4,10 @@ import { ConnectorError, describeActionDiff } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requireChangesAllowed,
   requireTenant,
 } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 import type {
   AutonomyAdmission,
   PolicyDecision,
@@ -301,11 +301,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       !hasPermission(context, 'actions.propose') &&
       !(permission && context.permissions.has(permission))
     )
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role does not allow viewing action runs.',
-      );
+      throw forbidden('Your role does not allow viewing action runs.');
   }
 
   return {

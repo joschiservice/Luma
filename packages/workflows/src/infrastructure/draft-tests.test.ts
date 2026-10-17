@@ -4,11 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import type { TenantContext } from '@luma/identity';
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { conflict, forbidden } from '@luma/platform';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -225,7 +222,7 @@ function memoryStore(now: () => Date) {
           row.principal !== c.actor.id ||
           row.draftId !== draftId
         )
-          throw new IdentityError(409, 'CONFLICT', 'Different inputs.');
+          throw conflict('Different inputs.');
 
         return { item: structuredClone(row.item), created: false };
       }
@@ -1130,11 +1127,7 @@ describe('draft test runs', () => {
     const removed = setup({
       recent: [recent],
       refresh: async () => {
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Insufficient organization role',
-        );
+        throw forbidden('Insufficient organization role');
       },
     });
     const draft = removed.draft(content, { basedOn: edit.basedOn });

@@ -11,6 +11,31 @@ import tseslint from 'typescript-eslint';
 import architecture from './tooling/architecture/eslint-plugin.mjs';
 import ui from './tooling/style/eslint-plugin.mjs';
 
+// `no-restricted-syntax` options replace each other per file, so every block that sets the rule
+// starts with these shared restrictions.
+const sharedRestrictedSyntax = [
+  {
+    selector:
+      'Program > :not(ImportDeclaration):not(ExpressionStatement[directive]) ~ ImportDeclaration',
+    message: 'Keep static imports together at the top of the file.',
+  },
+  {
+    // The server's IdentityError became ServiceError and the web client's class became ApiError;
+    // keep the ambiguous name from returning on either side.
+    selector: "Identifier[name='IdentityError']:not(ImportSpecifier > .local)",
+    message:
+      'IdentityError no longer exists. Server code throws ServiceError or its helpers (notFound, conflict, invalid, forbidden, unavailable) from @luma/platform; web code uses ApiError from apps/web/src/lib/api-error.ts.',
+  },
+  // The ServiceError helpers return the error; called as a statement, the check does nothing.
+  // Only calls of the helpers imported from @luma/platform match; local throwing helpers may share a name.
+  ...['notFound', 'conflict', 'invalid', 'forbidden', 'unavailable'].map(
+    (name) => ({
+      selector: `Program:has(ImportDeclaration[source.value='@luma/platform'] ImportSpecifier[imported.name='${name}'][local.name='${name}']) ExpressionStatement > CallExpression[callee.name='${name}']`,
+      message: `${name}() returns the ServiceError without throwing it. Write \`throw ${name}(...)\`.`,
+    }),
+  ),
+];
+
 export default defineConfig(
   {
     ignores: [
@@ -38,6 +63,7 @@ export default defineConfig(
     files: [
       '**/*.test.{ts,tsx,js,mjs}',
       '**/*.stories.{ts,tsx}',
+      '**/*.fixture.{ts,tsx}',
       '**/test-support/**',
       '**/e2e/**',
     ],
@@ -84,14 +110,7 @@ export default defineConfig(
     },
     rules: {
       'simple-import-sort/imports': 'error',
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            'Program > :not(ImportDeclaration):not(ExpressionStatement[directive]) ~ ImportDeclaration',
-          message: 'Keep static imports together at the top of the file.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...sharedRestrictedSyntax],
       'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
       '@stylistic/padding-line-between-statements': [
         'error',
@@ -129,11 +148,7 @@ export default defineConfig(
     rules: {
       'no-restricted-syntax': [
         'error',
-        {
-          selector:
-            'Program > :not(ImportDeclaration):not(ExpressionStatement[directive]) ~ ImportDeclaration',
-          message: 'Keep static imports together at the top of the file.',
-        },
+        ...sharedRestrictedSyntax,
         {
           selector: "Identifier[name='requireRole']",
           message:

@@ -5,7 +5,8 @@ import type {
   ExecutionResult,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
@@ -85,15 +86,14 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     await deps.permission.require(fresh);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again.');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Sign in again.');
 
     return fresh;
   }
 
   async function load(context: TenantContext, id: string) {
     const run = await deps.store.get(context, id);
-    if (!run) throw new IdentityError(404, 'NOT_FOUND', 'Recovery not found.');
+    if (!run) throw notFound('Recovery not found.');
     await deps.authorize(context, run.target.connectionId);
 
     return run;
@@ -275,11 +275,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
           JSON.stringify(existing.choice) !== JSON.stringify(choice) ||
           existing.action.proposedBy.id !== context.actor.id
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This request already belongs to another recovery.',
-          );
+          throw conflict('This request already belongs to another recovery.');
 
         return view(context, await load(context, requestId));
       }
@@ -293,15 +289,13 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
           !execution.record.attempt.effectEvidenceRefs?.length &&
           execution.record.state !== 'succeeded'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A previous write is uncertain. Reconcile that recovery before starting another.',
           );
       }
       const before = await deps.read(context, target);
       const blocker = recoveryBlocker(before, choice, granted);
-      if (blocker) throw new IdentityError(409, 'CONFLICT', blocker);
+      if (blocker) throw conflict(blocker);
       // People get a decision window; Shopify is reread and the revision checked before sending.
       const expiresAt = new Date(
         deps.now().getTime() + (deps.decisionWindowMs ?? 4 * 60 * 60_000),
@@ -357,20 +351,14 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
       const run = await load(context, id);
       if (context.actor.id !== run.action.proposedBy.id)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only the requester can run this action.',
-        );
+        throw forbidden('Only the requester can run this action.');
       const previous = await deps.admission.get(context, id);
       if (previous?.state === 'not_executed')
         return view(context, run, previous);
       if (!previous || !('record' in previous)) {
         const current = await view(context, run);
         if (!current.canExecute && !current.observeOnly)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This action needs current approval before it can run.',
           );
         await deps.store.claim(context, run);
@@ -398,11 +386,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
         .parse(input);
       const run = await load(context, id);
       if (!run.decisionId || !(await view(context, run)).canApprove)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This action cannot be approved by you.',
-        );
+        throw conflict('This action cannot be approved by you.');
       await deps.policies.respond(
         context,
         run.decisionId,

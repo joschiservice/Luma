@@ -2,7 +2,7 @@ import { collectionViewStateSchema, inboxCatalog } from '@luma/api-contract';
 import { describe, expect, it } from 'vitest';
 
 import { builtinState } from '../../kit/collections/state';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { parseAddresses } from './composer';
 import {
   commandError,
@@ -17,19 +17,19 @@ import {
 
 describe('inbox data', () => {
   it('maps read failures to sign-in, access, missing and unavailable', () => {
-    expect(readFailure(new IdentityError(401))).toBe('signin');
-    expect(readFailure(new IdentityError(403))).toBe('access');
-    expect(readFailure(new IdentityError(404))).toBe('missing');
-    expect(readFailure(new IdentityError(503))).toBe('unavailable');
+    expect(readFailure(new ApiError(401))).toBe('signin');
+    expect(readFailure(new ApiError(403))).toBe('access');
+    expect(readFailure(new ApiError(404))).toBe('missing');
+    expect(readFailure(new ApiError(503))).toBe('unavailable');
     expect(readFailure(new TypeError('fetch failed'))).toBe('unavailable');
     expect(readFailure(null)).toBeUndefined();
   });
 
   it('treats network and server failures as unknown outcomes that retry the same request', () => {
     expect(uncertainOutcome(new TypeError('fetch failed'))).toBe(true);
-    expect(uncertainOutcome(new IdentityError(502))).toBe(true);
-    expect(uncertainOutcome(new IdentityError(409))).toBe(false);
-    expect(commandError(new IdentityError(500))).toMatch(/at most once/);
+    expect(uncertainOutcome(new ApiError(502))).toBe(true);
+    expect(uncertainOutcome(new ApiError(409))).toBe(false);
+    expect(commandError(new ApiError(500))).toMatch(/at most once/);
   });
 
   it('keeps valid URL state, drops invalid values and sends the view', () => {

@@ -610,7 +610,6 @@
   "procurement_timeline_email": "Email",
   "procurement_timeline_inventory": "Stock owner",
   "procurement_timeline_actor": "Recorded by: {actor}",
-  "procurement_timeline_evidence": "Evidence ({count})",
   "procurement_list_view_all": "All purchase orders",
   "procurement_list_view_all_suppliers": "All suppliers",
   "procurement_area_order": "Order",
@@ -656,5 +655,6 @@
   "procurement_value_mixed": "Mixed or partly priced",
   "procurement_waiting_proposals": "{count, plural, one {{count, number} proposal waiting for approval} other {{count, number} proposals waiting for approval}}",
   "procurement_list_orders_suppliers_ready": "Your suppliers are ready. Create a draft order or review the proposals waiting for approval.",
-  "procurement_list_orders_checking_suppliers": "Create a draft order once the supplier directory has loaded."
+  "procurement_list_orders_checking_suppliers": "Create a draft order once the supplier directory has loaded.",
+  "procurement_submission_evidence": "{count, plural, one {Submission evidence ({count, number} reference)} other {Submission evidence ({count, number} references)}}"
 }

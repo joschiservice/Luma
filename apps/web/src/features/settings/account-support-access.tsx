@@ -5,7 +5,7 @@ import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { createWebApiClient } from '../../lib/api-client';
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { securityActivityKey } from './security-activity';
 import { SupportInspectionList } from './support-inspections';
@@ -50,7 +50,7 @@ export function AccountSupportAccess({ disabled }: { disabled: boolean }) {
       setNotice(success);
     } catch (failure) {
       setError(
-        failure instanceof IdentityError && failure.status < 500
+        failure instanceof ApiError && failure.status < 500
           ? failure.message
           : m.settings_security_support_action_failed(),
       );

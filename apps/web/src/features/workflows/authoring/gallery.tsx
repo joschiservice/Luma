@@ -32,7 +32,7 @@ import {
 import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../../../kit/identity/common';
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import { usePermissions } from '../../../kit/identity/permissions';
 import { workflowError } from '../data';
 import { OfflineNotice } from '../offline';
@@ -99,10 +99,7 @@ export function NewWorkflowPage({
   >(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  if (
-    templates.error instanceof IdentityError &&
-    templates.error.status === 401
-  )
+  if (templates.error instanceof ApiError && templates.error.status === 401)
     return <SignInRedirect />;
 
   async function start(body: Parameters<typeof createDraft>[1]) {
@@ -120,8 +117,7 @@ export function NewWorkflowPage({
       });
     } catch (failure) {
       setError(workflowError(failure));
-      if (failure instanceof IdentityError && failure.status < 500)
-        setRequest(null);
+      if (failure instanceof ApiError && failure.status < 500) setRequest(null);
     } finally {
       setPending(false);
     }

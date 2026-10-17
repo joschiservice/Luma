@@ -16,9 +16,8 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
-import { createPolicies } from '@luma/policies/composition';
+import { canonicalJson, conflict, notFound } from '@luma/platform';
+import { createPolicies, policyAudit } from '@luma/policies/composition';
 
 import {
   createFulfillmentRecovery,
@@ -50,28 +49,7 @@ export function createShopifyRecovery(
   const policies = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
   );
 
   async function credential(
@@ -91,11 +69,7 @@ export function createShopifyRecovery(
       current.connection.target.kind !== 'shopify' ||
       current.connection.appInstallationVersion !== version
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Shopify connection not found.',
-      );
+      throw notFound('Shopify connection not found.');
 
     return current;
   }
@@ -125,11 +99,7 @@ export function createShopifyRecovery(
       accessToken: async () => {
         const fresh = await credential(tenant, connectionId, capability);
         if (fresh.connection.target.shop !== shop)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Connection changed. Refresh fulfillment details.',
-          );
+          throw conflict('Connection changed. Refresh fulfillment details.');
 
         return fresh.credentials.token;
       },

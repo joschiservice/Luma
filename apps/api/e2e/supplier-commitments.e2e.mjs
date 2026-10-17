@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
+import { expectResolvedEvidence } from './evidence-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
+import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
 const origin = 'http://127.0.0.1:3000';
 
@@ -242,9 +244,95 @@ it('places an approved order once, follows supplier confirmation and receipt, an
   );
   expect(placed).toHaveLength(1);
 
+  // The attempt cites one stored write receipt naming the JTL order it created.
+  const [attempt] = await expectStoredWriteReceipts(f.db.owner, org, [
+    requested.actionId,
+  ]);
+  expect(attempt.stored).toEqual([
+    expect.objectContaining({
+      owner: 'procurement',
+      document: expect.objectContaining({
+        purchaseOrderId: order.id,
+        purpose: 'submission',
+        subjectId: requested.id,
+        source: { provider: 'jtl', connectionId: f.manifest.connections.jtl },
+        records: [
+          {
+            resource: 'purchase_order',
+            externalId: approved.externalOrder.externalId,
+          },
+        ],
+      }),
+    }),
+  ]);
+
   record = await call(`/purchase-orders/${order.id}/record`);
   expect(record.order.status).toBe('open');
   expect(record.stage).toBe('awaiting_confirmation');
+
+  // The verified submission cites its verifying reads and the stored receipt, and the evidence
+  // API resolves each of them, and everything else the order cites, to stored evidence.
+  const resolveEvidence = (body) =>
+    request(`/v1/organizations/${org}/evidence/resolve`, body);
+  const verifiedSubmission = record.timeline.entries.find(
+    (entry) => entry.id === `submission:${requested.id}:verified`,
+  );
+  expect(verifiedSubmission?.evidenceRefs).toContain(attempt.cited[0]);
+  const submissionEvidence = await expectResolvedEvidence(
+    resolveEvidence,
+    { kind: 'purchase_order', id: order.id },
+    verifiedSubmission.evidenceRefs,
+  );
+  expect(submissionEvidence.map((item) => item.ref)).toEqual(
+    verifiedSubmission.evidenceRefs,
+  );
+  expect(
+    submissionEvidence.find((item) => item.ref === attempt.cited[0]),
+  ).toMatchObject({
+    citedAs: 'write_receipt',
+    resolution: {
+      kind: 'write_receipt',
+      provider: 'jtl',
+      connection: { id: f.manifest.connections.jtl },
+      capability: 'purchase-orders.submit',
+      records: [
+        {
+          resource: 'purchase_order',
+          externalId: approved.externalOrder.externalId,
+        },
+      ],
+    },
+  });
+  expect(
+    submissionEvidence.filter((item) => item.resolution.kind === 'read'),
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        citedAs: 'read',
+        resolution: expect.objectContaining({
+          provider: 'jtl',
+          completeness: 'complete',
+          record: {
+            resource: 'purchase_order',
+            externalId: approved.externalOrder.externalId,
+          },
+        }),
+      }),
+    ]),
+  );
+  const orderEvidence = await expectResolvedEvidence(resolveEvidence, {
+    kind: 'purchase_order',
+    id: order.id,
+  });
+  expect(orderEvidence.map((item) => item.ref)).toEqual(
+    expect.arrayContaining(verifiedSubmission.evidenceRefs),
+  );
+  // An order the workspace does not have has no evidence to read.
+  await request(
+    `/v1/organizations/${org}/evidence/resolve`,
+    { subject: { kind: 'purchase_order', id: randomUUID() } },
+    { status: 404 },
+  );
   expect(record.progress.next.owner).toBe('supplier');
 
   // The supplier confirms fewer units and a later date in JTL.

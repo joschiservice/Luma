@@ -27,7 +27,7 @@ import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   formatMoney,
   paymentLabels,
@@ -73,9 +73,9 @@ export function ReturnPage() {
     onlineSnapshot,
     serverSnapshot,
   );
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
-  const status = query.error instanceof IdentityError ? query.error.status : 0;
+  const status = query.error instanceof ApiError ? query.error.status : 0;
   const detail = status === 403 ? undefined : query.data;
   const appId = detail?.source?.appId;
   const recordApp =

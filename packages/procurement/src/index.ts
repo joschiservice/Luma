@@ -25,8 +25,6 @@ export type {
   PurchaseOrderMetricItem,
 } from './domain/metrics.js';
 
-export type { SupplierTermsService } from './application/supplier-terms.js';
-
 export type { Commitment } from './domain/commitments.js';
 
 export type {
@@ -36,7 +34,10 @@ export type {
 
 export type { PurchaseOrderChange } from './domain/purchase-order-changes.js';
 
-export { defaultSupplierTerms, orderProgress } from './domain/commitments.js';
+export {
+  incomingLineExpectations,
+  incomingSubmissionSettled,
+} from './domain/incoming-expectations.js';
 
 export type { FollowUp, Submission } from './domain/commitments.js';
 
@@ -59,5 +60,3 @@ export {
   followUpReceiptMatches,
   supplierFollowUpNote,
 } from './domain/follow-up-receipt.js';
-
-export { replenishmentApprovalCoversSend } from './domain/replenishment-approval.js';

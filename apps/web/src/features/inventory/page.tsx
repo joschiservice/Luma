@@ -57,7 +57,7 @@ import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { StockProtectionNotice } from '../../shared/stock-protection/notice';
 import { CollectionBulkActions } from '../adaptive/bulk-actions';
@@ -229,7 +229,7 @@ export function InventoryPage() {
   });
   // A 403 for a reader who can read inventory means a field the view uses is closed to them.
   const fieldDenied =
-    list.error instanceof IdentityError &&
+    list.error instanceof ApiError &&
     list.error.status === 403 &&
     can('inventory.read');
   const issues = [
@@ -368,7 +368,7 @@ export function InventoryPage() {
     onShowHelp: () => setHelp(true),
   });
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const link = (position: StockPosition) => (

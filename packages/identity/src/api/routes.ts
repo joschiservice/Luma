@@ -1,11 +1,12 @@
 import type { RouteAccess } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
+import { forbidden, notFound, ServiceError } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { IdentityService } from '../application/identity.js';
 import type { TenantContext } from '../domain/context.js';
-import { IdentityError, ReadOnlyAccessError } from '../domain/context.js';
+import { ReadOnlyAccessError } from '../domain/context.js';
 import type { HttpContext } from './contract-routes.js';
 import { restrictRequestToReads, runInRequestScope } from './request-scope.js';
 
@@ -16,7 +17,7 @@ export function credentials(request: FastifyRequest) {
 
 function tenantContext(request: FastifyRequest) {
   if (!request.tenantContext)
-    throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
   return request.tenantContext;
 }
@@ -28,7 +29,7 @@ function tenantContext(request: FastifyRequest) {
 export function identityRoutes(service?: IdentityService) {
   const use = () => {
     if (!service)
-      throw new IdentityError(
+      throw new ServiceError(
         503,
         'REGION_UNAVAILABLE',
         'Identity service is unavailable',
@@ -204,7 +205,7 @@ export function registerIdentityGuards(
     )
       return;
     if (!service)
-      throw new IdentityError(
+      throw new ServiceError(
         503,
         'REGION_UNAVAILABLE',
         'Identity service is unavailable',
@@ -214,18 +215,14 @@ export function registerIdentityGuards(
       (!request.headers.origin ||
         !trustedOrigins.includes(request.headers.origin))
     )
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'A trusted Origin header is required',
-      );
+      throw forbidden('A trusted Origin header is required');
     if (supportViewRoutes.has(key)) return;
     const supportView = service.hasSupportView(credentials(request));
     if (accountRoutes.has(route)) {
       // The support view lists only its own workspace; other account routes are personal.
       if (supportView && key === 'GET /v1/organizations') return;
       if (supportView)
-        throw new IdentityError(
+        throw new ServiceError(
           403,
           'READ_ONLY',
           'This isn’t available in a Luma support view.',
@@ -241,7 +238,7 @@ export function registerIdentityGuards(
         params.organizationId,
       )
     )
-      throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+      throw notFound('Organization not found');
     if (supportView && !readsOnly(request)) throw new ReadOnlyAccessError();
     const context = await service.resolveTenant(
       credentials(request),
@@ -293,9 +290,7 @@ function authorizeRoute(
         : access.permission
       : [];
   if (!permissions.some((permission) => context.permissions.has(permission)))
-    throw new IdentityError(
-      403,
-      'FORBIDDEN',
+    throw forbidden(
       permissions.length
         ? 'Your role does not allow this. Ask a workspace admin for access.'
         : 'This route does not declare who may use it.',

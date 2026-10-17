@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, ChevronRight, ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { orderReturnCasesOptions } from './case-data';
 import {
   caseStageLabels,
@@ -37,7 +37,7 @@ export function OrderReturnsWithCases({
   const query = useQuery(orderReturnCasesOptions(organizationId, orderId));
   const [opening, setOpening] = useState(false);
   const data =
-    query.error instanceof IdentityError && query.error.status === 403
+    query.error instanceof ApiError && query.error.status === 403
       ? undefined
       : query.data;
   const returnable = data?.sources.some((source) =>

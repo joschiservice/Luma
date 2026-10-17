@@ -82,7 +82,7 @@ import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { membersOptions } from '../../kit/settings/data';
 import { providerName } from '../sync/presentation';
@@ -251,10 +251,10 @@ export function ActivityPage() {
 
   const olderFailed = feed.isFetchNextPageError;
   const error = (olderFailed ? null : feed.error) ?? head.error;
-  if (error instanceof IdentityError && error.status === 401)
+  if (error instanceof ApiError && error.status === 401)
     return <SignInRedirect />;
   const accessLost =
-    error instanceof IdentityError && [403, 404].includes(error.status);
+    error instanceof ApiError && [403, 404].includes(error.status);
 
   // New events are those the poll found above the list's newest event, once it ran after the
   // list was read. An event the poll no longer lists, such as a group with a newer step, counts
@@ -340,7 +340,7 @@ export function ActivityPage() {
               pending: exporting.isPending,
               result: exporting.data,
               failed: exporting.isError
-                ? exporting.error instanceof IdentityError
+                ? exporting.error instanceof ApiError
                   ? exporting.error.message
                   : m.activity_export_failed()
                 : undefined,

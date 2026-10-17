@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type {
   AppLifecycleContext,
@@ -188,11 +188,7 @@ export function createAppRepository(database: TenantDatabase): AppRepository {
           )
         ).rows[0];
         if (!current || current.version !== version)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'App installation changed; refresh and retry',
-          );
+          throw conflict('App installation changed; refresh and retry');
         await tx.query(
           `INSERT INTO workspace_app_scopes(tenant_id,app_id,scope,installation_version,granted_by)
           SELECT $1,$2,unnest($3::text[]),$4,$5 ON CONFLICT DO NOTHING`,

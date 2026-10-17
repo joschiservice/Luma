@@ -1,3 +1,11 @@
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
+
 import type {
   DataRegion,
   Membership,
@@ -9,7 +17,6 @@ import type {
 } from '../domain/context.js';
 import {
   AccountErasedError,
-  IdentityError,
   isOwner,
   makeTenantContext,
   requirePermission,
@@ -182,7 +189,7 @@ export function createIdentityService(
   async function requirePlacement(tenantId: string) {
     const region = await repository.placement?.regionForTenant(tenantId);
     if (region && region !== settings.region)
-      throw new IdentityError(
+      throw new ServiceError(
         503,
         'REGION_UNAVAILABLE',
         'Organization region is unavailable',
@@ -194,7 +201,7 @@ export function createIdentityService(
   ): Promise<SessionIdentity> {
     const session = await repository.getSession(credentials);
     if (!session)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
     return session;
   }
@@ -210,8 +217,7 @@ export function createIdentityService(
     // Background work recorded as an erased account pauses instead of failing.
     if (!member && (await tx.accountErased())) throw new AccountErasedError();
     const organization = member && (await tx.findOrganization(organizationId));
-    if (!member || !organization)
-      throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+    if (!member || !organization) throw notFound('Organization not found');
 
     return makeTenantContext(
       session,
@@ -224,7 +230,7 @@ export function createIdentityService(
   }
 
   const supportViewEnded = () =>
-    new IdentityError(401, 'UNAUTHENTICATED', 'The Luma support view ended.');
+    new ServiceError(401, 'UNAUTHENTICATED', 'The Luma support view ended.');
 
   /** Checks the view a support token names; throws 401 once it has ended. */
   async function activeSupportView(
@@ -239,8 +245,7 @@ export function createIdentityService(
       readPath,
       requestId,
     );
-    if (view.state === 'other')
-      throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+    if (view.state === 'other') throw notFound('Organization not found');
     if (view.state !== 'active') throw supportViewEnded();
 
     return view;
@@ -296,9 +301,7 @@ export function createIdentityService(
             previous.actorId !== context.actor.id ||
             previous.request !== request
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This command ID was already used for another request.',
             );
 
@@ -311,34 +314,26 @@ export function createIdentityService(
           ? null
           : members.find((m) => m.id === command.memberId);
       if (command.action !== 'add' && !target)
-        throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+        throw notFound('Member not found');
       const next =
         command.action === 'remove'
           ? null
           : await tx.findRole(organizationId, command.roleId);
       if (command.action !== 'remove' && (!next || next.archived))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This role is no longer available. Refresh and choose another role.',
         );
       if (
         (target?.role.key === 'owner' || next?.reference.key === 'owner') &&
         !isOwner(context)
       )
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only owners can grant or remove ownership.',
-        );
+        throw forbidden('Only owners can grant or remove ownership.');
       if (
         !isOwner(context) &&
         ((target && !context.permissions.covers(target.permissions)) ||
           (next && !context.permissions.covers(next.permissions)))
       )
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
+        throw forbidden(
           'You can only assign roles, and change members, whose permissions you hold yourself.',
         );
       if (
@@ -349,11 +344,7 @@ export function createIdentityService(
           (m) => m.role.key === 'owner' && m.status !== 'suspended',
         ).length === 1
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'An organization must have an owner',
-        );
+        throw conflict('An organization must have an owner');
       let result: Membership | null = null;
       if (command.action === 'add')
         result = await tx.addMember(
@@ -476,9 +467,7 @@ export function createIdentityService(
     async redeemSupportView(handoff: string, requestId: string) {
       const view = await repository.supportViews.redeem(handoff, requestId);
       if (!view)
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
+        throw notFound(
           'This support link was already used or has expired. Start the view again from the staff console.',
         );
 
@@ -530,9 +519,7 @@ export function createIdentityService(
         httpRequestId,
       );
       if (change === 'conflict')
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This request was already answered or has lapsed. Refresh the page.',
         );
 
@@ -556,9 +543,7 @@ export function createIdentityService(
         httpRequestId,
       );
       if (change === 'conflict')
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This access already ended or can’t be revoked. Refresh the page.',
         );
 
@@ -579,11 +564,7 @@ export function createIdentityService(
       const session = await authenticate(credentials);
       const after = cursor ? decodeSecurityEventCursor(cursor) : null;
       if (cursor && !after)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'The page position is invalid. Reload the list.',
-        );
+        throw invalid('The page position is invalid. Reload the list.');
       const pageSize = 20;
       const events = await repository.listSecurityEvents(
         session.userId,
@@ -641,7 +622,7 @@ export function createIdentityService(
         (input.dataRegion && input.dataRegion !== settings.region) ||
         !settings.enabledRegions.includes(settings.region)
       )
-        throw new IdentityError(
+        throw new ServiceError(
           422,
           'REGION_UNAVAILABLE',
           'Requested region is unavailable',

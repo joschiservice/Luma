@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden } from '@luma/platform';
 import type { PlaybookRun } from '@luma/workflows';
 
 import type {
@@ -71,8 +68,7 @@ export function createShadowService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, 'playbooks.activate');
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
 
     return fresh;
   }
@@ -128,11 +124,7 @@ export function createShadowService(deps: {
       context = await authorize(context);
       const review = deps.parseReview(input);
       if (Date.parse(review.occurredAt) > deps.now().getTime())
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Observation time is in the future',
-        );
+        throw conflict('Observation time is in the future');
       await deps.store.review(context, deps.parseId(id), review);
 
       return { recorded: true as const };
@@ -148,11 +140,7 @@ export function createShadowService(deps: {
         window.until,
       );
       if (items.length > 500)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Narrow the report window to at most 500 incidents',
-        );
+        throw conflict('Narrow the report window to at most 500 incidents');
 
       return {
         mode: 'shadow' as const,

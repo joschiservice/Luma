@@ -163,6 +163,19 @@ const rmRecords = [
 ];
 
 // Server areas
+// Cited evidence: the cross-owner reader, its contract and each owner's lookup.
+const evidence = [
+  ...rmBase,
+  'packages/read-models/src/{api,application,domain}/evidence.ts',
+  'packages/read-models/src/infrastructure/evidence/**',
+  'packages/api-contract/src/{evidence,contracts/evidence}.ts',
+  'packages/procurement/src/infrastructure/purchase-order-evidence.ts',
+  'packages/orders/src/infrastructure/return-evidence.ts',
+  'packages/messaging/src/infrastructure/reply-evidence.ts',
+  'packages/resolution/src/infrastructure/persistence/case-evidence.ts',
+  'packages/apps/{shopify,starshipit}/src/infrastructure/evidence-reader.ts',
+  'packages/application-runtime/migrations/0159_evidence_retention_starts.sql',
+];
 const connections = [
   'packages/connections/**',
   'packages/connectors/core/**',
@@ -341,9 +354,12 @@ const returnCases = [
   'packages/api-contract/src/return-actions.ts',
   'packages/application-runtime/migrations/0087_return_service_reads.sql',
   'packages/application-runtime/migrations/0086_return_creation_binding.sql',
+  'packages/application-runtime/migrations/0157_orders_return_read_evidence.sql',
+  'packages/application-runtime/src/composition/return-reads.ts',
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
   'packages/application-runtime/src/composition/return-cases.ts',
+  'packages/application-runtime/src/composition/return-follow-up.ts',
 ];
 const sync = [
   'packages/commerce-sync/**',
@@ -414,6 +430,12 @@ const simulator = [
 ];
 
 // Web
+// The evidence disclosure records show their cited reads and receipts in.
+const webEvidence = [
+  ...evidence,
+  'apps/web/src/shared/evidence/**',
+  'packages/i18n/messages/*/evidence.json',
+];
 const webShell = [
   'apps/web/src/features/account/**',
   'apps/web/src/routes/{index,app,app.index,app.workspaces.index,app.workspaces.new,sign-in,sign-up,sign-out}.tsx',
@@ -481,6 +503,7 @@ const webCustomers = [
   'packages/i18n/messages/*/{adaptive,collections,customers,issues,orders,products,sync}.json',
 ];
 const webCases = [
+  ...webEvidence,
   'apps/web/src/features/exceptions/**',
   'apps/web/src/features/overview/data.ts',
   'apps/web/src/features/exceptions/shadow/case.tsx',
@@ -553,6 +576,7 @@ const webOrders = [
   'packages/i18n/messages/*/{activity,adaptive,apps,catalog,collections,connections,issues,orders,records,returns,settings,sync}.json',
 ];
 const webProcurement = [
+  ...webEvidence,
   'apps/web/src/features/adaptive/{adaptive.css,bulk-actions.tsx,data.ts,presentation.ts,query-fields.ts,summary-band.tsx}',
   'apps/web/src/features/fulfillment/data.ts',
   'apps/web/src/features/inventory/presentation.tsx',
@@ -580,6 +604,7 @@ const webRecords = [
   'packages/i18n/messages/*/{connections,records,sync}.json',
 ];
 const webReturns = [
+  ...webEvidence,
   'apps/web/src/features/adaptive/{data.ts,presentation.ts,query-fields.ts}',
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/shared/orders/presentation.ts',
@@ -603,6 +628,7 @@ const webSync = [
   'packages/i18n/messages/*/{connections,settings,sync}.json',
 ];
 const webInbox = [
+  ...webEvidence,
   'apps/web/src/features/inbox/**',
   'apps/web/src/routes/app.$organizationId.inbox.*',
   'packages/i18n/messages/*/{collections,messaging}.json',
@@ -792,6 +818,16 @@ export const journeyAreas = {
     ...inventory,
     'packages/api-contract/src/**/{supplier-email,supplier-terms,purchasing,incoming-stock}.ts',
   ],
+  'worker-effects.e2e.mjs': [
+    'apps/api/e2e/purchasing-reconciliation-worker.mjs',
+    ...simulator,
+    ...procurement,
+    ...supplierCommitments,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
   'purchase-order-changes.e2e.mjs': [
     ...simulator,
     ...procurement,
@@ -806,7 +842,7 @@ export const journeyAreas = {
     ...decisions,
     ...inventory,
     'packages/inventory/**',
-    'packages/application-runtime/src/composition/native-purchase-incoming.ts',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-incoming.ts',
   ],
   'purchasing-native-receipt.e2e.mjs': [
     ...simulator,
@@ -815,6 +851,7 @@ export const journeyAreas = {
     ...inventory,
     'packages/inventory/**',
     'packages/application-runtime/src/composition/native-stock.ts',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-receipts.ts',
   ],
   'inbox.e2e.mjs': [...simulator, ...procurement, ...decisions],
   'contextual-assistance.browser.mjs': [
@@ -1192,6 +1229,16 @@ export const journeyAreas = {
     ...webHome,
     ...webCases,
   ],
+  'evidence.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...supplierCommitments,
+    ...commerce,
+    ...webShell,
+    ...webProcurement,
+    ...webReturns,
+  ],
   'return-settlement.browser.mjs': [
     'apps/api/e2e/return-browser-commands.mjs',
     ...simulator,
@@ -1254,6 +1301,7 @@ export const journeyAreas = {
   ],
   'return-settlement.e2e.mjs': [
     ...simulator,
+    ...evidence,
     ...returns,
     ...returnCases,
     ...decisions,
@@ -1476,6 +1524,7 @@ export const journeyAreas = {
   ],
   'supplier-commitments.e2e.mjs': [
     ...simulator,
+    ...evidence,
     ...supplierCommitments,
     ...decisions,
   ],

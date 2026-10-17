@@ -31,7 +31,7 @@ import { z } from 'zod';
 
 import { anyOf, withLegacyConditions } from '../../kit/collections/legacy';
 import { collectionSearchShape, groupOf } from '../../kit/collections/state';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { requestErrorMessage } from '../../kit/identity/errors';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
@@ -273,7 +273,7 @@ export type ReadFailure = 'signin' | 'access' | 'missing' | 'unavailable';
  */
 export function readFailure(error: unknown): ReadFailure | undefined {
   if (!error) return undefined;
-  if (!(error instanceof IdentityError)) return 'unavailable';
+  if (!(error instanceof ApiError)) return 'unavailable';
   if (error.status === 401) return 'signin';
   if (error.status === 403) return 'access';
   if (error.status === 404) return 'missing';
@@ -288,9 +288,7 @@ export function readFailure(error: unknown): ReadFailure | undefined {
 export function uncertainOutcome(error: unknown) {
   return (
     !!error &&
-    (!(error instanceof IdentityError) ||
-      error.status === 0 ||
-      error.status >= 500)
+    (!(error instanceof ApiError) || error.status === 0 || error.status >= 500)
   );
 }
 

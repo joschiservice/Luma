@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { forbidden, invalid } from '@luma/platform';
 
 /** Current case responsibility; assignment never grants decision or execution permissions. */
 export interface CaseOwner {
@@ -47,7 +47,7 @@ export function createCaseOwners(deps: {
     requirePermission(fresh, 'decisions.assign');
     requireChangesAllowed(fresh);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     if (
       userId &&
       !(await deps.members(fresh)).some(
@@ -57,11 +57,7 @@ export function createCaseOwners(deps: {
           !member.accountDisabled,
       )
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'Choose an active workspace member.',
-      );
+      throw invalid('Choose an active workspace member.');
 
     return fresh;
   }

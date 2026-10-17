@@ -11,9 +11,14 @@ import {
   createSourceAuthority,
 } from '@luma/connections/composition';
 import type { Configuration } from '@luma/exceptions';
-import { defaultConfiguration } from '@luma/exceptions';
+import {
+  defaultConfiguration,
+  workspaceDetectionConfiguration,
+} from '@luma/exceptions';
+import { listDetectionScopes } from '@luma/exceptions/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
+import { createDetectionSettingsReader } from '@luma/identity/composition';
 import { orderStateQueries } from '@luma/orders/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
@@ -23,7 +28,10 @@ import {
   createOrderRefresh,
   createStockRefresh,
 } from '@luma/resolution';
-import { createDetectionSources } from '@luma/resolution/composition';
+import {
+  createDetectionSources,
+  createStockProtectionHoldReader,
+} from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
 import { createActiveDiagnosisRereader } from './active-diagnosis.js';
@@ -154,35 +162,7 @@ export function createScheduledDetection(options: {
   const buildMonitor = (configuration: Configuration) =>
     createDetectionMonitor({
       sources,
-      protection: (context, positionId, mapping) =>
-        options.database.transaction(context.tenantId, async (tx) => {
-          const selling =
-            mapping.sellingSource === 'left' ? mapping.left : mapping.right;
-          const authority =
-            mapping.authority === 'left'
-              ? mapping.left
-              : mapping.authority === 'right'
-                ? mapping.right
-                : null;
-          if (!authority) return null;
-          const row = (
-            await tx.query<{
-              id: string;
-              available: string;
-              observedAt: string;
-            }>(
-              `SELECT p->>'id' AS id,p->>'held' AS available,p->>'startedAt' AS "observedAt" FROM shopify_stock_protection_incidents i CROSS JOIN LATERAL jsonb_array_elements(i.document->'view'->'positions') p WHERE i.tenant_id=$1 AND i.connection_id=$2 AND i.source_connection_id=$3 AND p->>'positionId'=$4 AND p->>'status' IN ('held','tightened','releasing','unknown') AND p->>'startedAt' IS NOT NULL AND p->>'endedAt' IS NULL ORDER BY i.created_at DESC LIMIT 1`,
-              [
-                context.tenantId,
-                selling.source.connectionId,
-                authority.source.connectionId,
-                positionId,
-              ],
-            )
-          ).rows[0];
-
-          return row ?? null;
-        }),
+      protection: createStockProtectionHoldReader(options.database),
       orders: {
         ...quantities,
         refresh: (context, orderId, maxAgeMs) =>
@@ -217,38 +197,16 @@ export function createScheduledDetection(options: {
     });
 
   const base = buildMonitor(options.configuration ?? defaultConfiguration);
+  const detectionSettings = createDetectionSettingsReader(options.database);
 
   async function forContext(context: TenantContext) {
     if (options.configuration) return base;
-    const settings = await options.database.transaction(
-      context.tenantId,
-      async (tx) =>
-        (
-          await tx.query<{
-            detection: {
-              inventoryTolerance: string;
-              propagationSeconds: number;
-              oversellPropagationSeconds: number;
-              stuckSeconds: number;
-              stallSeconds?: number;
-              stallMinPositions?: number;
-              stallSharePercent?: number;
-            };
-          }>('SELECT detection FROM workspace_settings WHERE tenant_id=$1', [
-            context.tenantId,
-          ])
-        ).rows[0]?.detection,
-    );
+    const settings = await detectionSettings(context.tenantId);
     if (!settings) return base;
-    const { inventoryTolerance, ...thresholds } = settings;
-    const configuration = {
-      ...defaultConfiguration,
-      inventoryTolerance,
-      thresholds: { ...defaultConfiguration.thresholds, ...thresholds },
-    };
-    if (JSON.stringify(configuration) === JSON.stringify(defaultConfiguration))
-      return base;
-    configuration.version = `${defaultConfiguration.version}:${createHash('sha256').update(JSON.stringify(configuration)).digest('hex').slice(0, 16)}`;
+    const configuration = workspaceDetectionConfiguration(settings, (value) =>
+      createHash('sha256').update(value).digest('hex'),
+    );
+    if (!configuration) return base;
 
     return buildMonitor(configuration);
   }
@@ -342,18 +300,13 @@ export function createDetectionWorker(options: {
 
   /** Runs one pass over every workspace with an active sync. */
   async function pass() {
-    const scopes = (
-      await options.pool.query<{ tenant_id: string; principal_id: string }>(
-        'SELECT tenant_id,principal_id FROM detection_worker_scopes()',
-      )
-    ).rows;
-    for (const scope of scopes) {
+    for (const scope of await listDetectionScopes(options.pool)) {
       if (stop.signal.aborted) return;
       try {
         await monitor.tick(
           await options.identity.resolveWorkflowContext(
-            scope.principal_id,
-            scope.tenant_id,
+            scope.principalId,
+            scope.tenantId,
             'detection-monitor',
           ),
         );

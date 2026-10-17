@@ -9,7 +9,7 @@ import { m } from '@luma/i18n/messages';
 import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { ApiError } from '../../../kit/identity/data';
 import { createWebApiClient } from '../../../lib/api-client';
 import { privateQueryDefaults } from '../../../lib/private-query';
 
@@ -21,7 +21,7 @@ export type ShadowReview = ReturnType<typeof shadowReviewSchema.parse>;
 
 export type ShadowReport = ReturnType<typeof shadowReportSchema.parse>;
 
-class ShadowError extends IdentityError {
+class ShadowError extends ApiError {
   constructor(
     status: number,
     readonly feedback: string,
@@ -150,7 +150,7 @@ export function candidateAction(
 
 /** Explains access loss, conflicts and uncertain writes without implying success. */
 export function shadowError(error: unknown) {
-  if (error instanceof IdentityError) {
+  if (error instanceof ApiError) {
     if (error.status === 401) return m.shadow_error_session();
     if (error.status === 403) return m.shadow_error_role();
     if (error.status === 404) return m.shadow_error_not_found();
@@ -162,7 +162,5 @@ export function shadowError(error: unknown) {
 
 /** Hides retained private data when access can no longer be confirmed. */
 export function shadowAccessDenied(error: unknown) {
-  return (
-    error instanceof IdentityError && [401, 403, 404].includes(error.status)
-  );
+  return error instanceof ApiError && [401, 403, 404].includes(error.status);
 }

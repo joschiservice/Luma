@@ -2,16 +2,22 @@ import type {
   EffectIntent,
   PurchaseOrderRevisionInput,
   VerificationResult,
+  WriteAcceptance,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type { OrderProgress, Submission } from '../domain/commitments.js';
@@ -23,6 +29,12 @@ import type {
 } from '../domain/purchase-order-changes.js';
 import { matchesPurchaseOrderChange } from '../domain/purchase-order-changes.js';
 import type { PurchasingSystem, SubmissionExecution } from './commitments.js';
+import {
+  type PurchasingReadEvidence,
+  purchasingReadEvidence,
+  type PurchasingWriteReceipt,
+  purchasingWriteReceipt,
+} from './purchasing-reads.js';
 
 export interface PurchaseOrderChangeStore {
   /** Serializes every order change with the procurement owner. */
@@ -53,6 +65,10 @@ export interface PurchaseOrderChangeStore {
         observedAt: string,
         observationRefs: string[],
       ): Promise<void>;
+      /** Stores a cited purchasing-system read; an already stored read is kept unchanged. */
+      recordRead(evidence: PurchasingReadEvidence): Promise<void>;
+      /** Stores a write receipt; an already stored receipt is kept unchanged. */
+      recordWriteReceipt(receipt: PurchasingWriteReceipt): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
 }
@@ -149,21 +165,15 @@ export function createPurchaseOrderChangeService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
 
     return fresh;
   }
 
-  function conflict(reason: string): never {
-    throw new IdentityError(409, 'CONFLICT', reason);
-  }
-
   async function released(context: TenantContext) {
     if (!(await deps.released(context)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
+      throw forbidden(
         'Purchase-order changes are not enabled for this workspace.',
       );
   }
@@ -172,8 +182,7 @@ export function createPurchaseOrderChangeService(deps: {
     const change = await deps.store.transaction(context.tenantId, false, (tx) =>
       tx.change(id),
     );
-    if (!change)
-      throw new IdentityError(404, 'NOT_FOUND', 'Order change not found.');
+    if (!change) throw notFound('Order change not found.');
 
     return change;
   }
@@ -181,8 +190,7 @@ export function createPurchaseOrderChangeService(deps: {
   async function save(context: TenantContext, change: PurchaseOrderChange) {
     return deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = await tx.change(change.id);
-      if (!current)
-        throw new IdentityError(404, 'NOT_FOUND', 'Order change not found.');
+      if (!current) throw notFound('Order change not found.');
       const transitions: Record<
         PurchaseOrderChange['state'],
         PurchaseOrderChange['state'][]
@@ -205,7 +213,7 @@ export function createPurchaseOrderChangeService(deps: {
   }
 
   async function prepare(context: TenantContext, change: PurchaseOrderChange) {
-    if (!deps.admission) conflict('Governed execution is unavailable.');
+    if (!deps.admission) throw conflict('Governed execution is unavailable.');
     const decision = await deps.admission.prepare(
       context,
       change,
@@ -270,11 +278,7 @@ export function createPurchaseOrderChangeService(deps: {
     await authorize(principal, true);
     await released(principal);
     if (!deps.admission)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Governed execution is unavailable.',
-      );
+      throw unavailable('Governed execution is unavailable.');
     if (reconcile) {
       if (!['submitting', 'uncertain'].includes(change.state)) return change;
     } else {
@@ -292,7 +296,9 @@ export function createPurchaseOrderChangeService(deps: {
             order.revision !== change.baseline.revision ||
             order.status !== 'open'
           )
-            conflict('This order changed after approval. Nothing was sent.');
+            throw conflict(
+              'This order changed after approval. Nothing was sent.',
+            );
           const next = { ...current, state: 'submitting' as const };
           await tx.save(next);
 
@@ -443,7 +449,7 @@ export function createPurchaseOrderChangeService(deps: {
       );
       if (existing) {
         if (existing.requestDigest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used for a different order change.',
           );
         if (existing.state === 'preparing' && deps.admission)
@@ -456,8 +462,8 @@ export function createPurchaseOrderChangeService(deps: {
         submission = record.submission;
       if (request.operation.kind === 'cancel') {
         if (record.progress.lines.some((line) => line.received > 0))
-          conflict('An order with received goods cannot be cancelled.');
-        conflict(
+          throw conflict('An order with received goods cannot be cancelled.');
+        throw conflict(
           'The JTL-Wawi API does not expose purchase-order cancellation.',
         );
       }
@@ -466,7 +472,7 @@ export function createPurchaseOrderChangeService(deps: {
         order.status !== 'open' ||
         order.revision !== request.expectedRevision
       )
-        conflict(
+        throw conflict(
           'Only the current revision of a submitted, open Luma order can be changed.',
         );
       if (
@@ -478,7 +484,7 @@ export function createPurchaseOrderChangeService(deps: {
         !deps.admission ||
         !(await deps.canRevise(context, submission.connectionId))
       )
-        conflict(
+        throw conflict(
           'This purchasing connection does not support approved order revisions.',
         );
       const read = await deps.purchasing.orders(
@@ -491,8 +497,12 @@ export function createPurchaseOrderChangeService(deps: {
           },
         },
       );
-      if (!read.ok || read.value.length !== 1)
-        conflict(
+      if (
+        !read.ok ||
+        read.value.length !== 1 ||
+        read.value[0]!.completeness !== 'complete'
+      )
+        throw conflict(
           'A complete current purchasing-system read is required before changing this order.',
         );
       const source = read.value[0]!;
@@ -501,7 +511,7 @@ export function createPurchaseOrderChangeService(deps: {
         source.data.supplier.externalId !== submission.supplier.externalId ||
         source.data.lines.length !== order.lines.length
       )
-        conflict(
+        throw conflict(
           'The purchasing-system order changed outside Luma. Review its current lines before proposing a revision.',
         );
       const linked = await deps.store.transaction(
@@ -537,11 +547,11 @@ export function createPurchaseOrderChangeService(deps: {
           );
         })
       )
-        conflict(
+        throw conflict(
           'The purchasing-system quantities differ from the current Luma revision. Review the source order before changing another position.',
         );
       if (!['open', 'released'].includes(source.data.status))
-        conflict(
+        throw conflict(
           'JTL allows quantity, delivery-date, added-line and removed-line changes only while the purchase order is Open or Released.',
         );
       let operation: PurchaseOrderRevisionInput['operation'];
@@ -555,14 +565,14 @@ export function createPurchaseOrderChangeService(deps: {
           ) ||
           op.line.unit !== 'each'
         )
-          conflict('Add a distinct product line in the supported unit.');
+          throw conflict('Add a distinct product line in the supported unit.');
         const sku = await deps.store.transaction(
           context.tenantId,
           false,
           (tx) => tx.skuIdentity(submission.connectionId, op.line.sku),
         );
         if (!sku)
-          conflict(
+          throw conflict(
             'The new product must be linked to exactly one item in this purchasing system.',
           );
         lines.push({
@@ -579,7 +589,7 @@ export function createPurchaseOrderChangeService(deps: {
         const op = request.operation,
           index = lines.findIndex((line) => line.id === op.lineId),
           line = lines[index];
-        if (!line) conflict('Order line not found.');
+        if (!line) throw conflict('Order line not found.');
         const identity = await deps.store.transaction(
           context.tenantId,
           false,
@@ -592,7 +602,7 @@ export function createPurchaseOrderChangeService(deps: {
             value.sku?.scopeKey === identity.scopeKey,
         );
         if (current.length !== 1)
-          conflict(
+          throw conflict(
             'The current provider line must be mapped unambiguously before changing it.',
           );
         const providerLine = current[0]!;
@@ -600,7 +610,7 @@ export function createPurchaseOrderChangeService(deps: {
           providerLine.deliveredQuantity === null ||
           Number(providerLine.deliveredQuantity) > 0
         )
-          conflict('Received lines cannot be changed or removed.');
+          throw conflict('Received lines cannot be changed or removed.');
         const commitment = record.progress.lines.find(
           (value) => value.lineId === op.lineId,
         );
@@ -614,7 +624,7 @@ export function createPurchaseOrderChangeService(deps: {
               commitment.shippedDate !== null));
         if (op.kind === 'remove_line') {
           if (lines.length <= 1)
-            conflict('A purchase order must retain at least one line.');
+            throw conflict('A purchase order must retain at least one line.');
           lines.splice(index, 1);
           operation = { kind: 'remove_line', line: providerLine.id };
         } else {
@@ -624,7 +634,9 @@ export function createPurchaseOrderChangeService(deps: {
             (!op.requestedDeliveryDate ||
               op.requestedDeliveryDate === providerLine.requestedDeliveryDate)
           )
-            conflict('Choose a different quantity or requested delivery date.');
+            throw conflict(
+              'Choose a different quantity or requested delivery date.',
+            );
           lines[index] = {
             ...line,
             ...(op.quantity !== undefined ? { quantity: op.quantity } : {}),
@@ -677,7 +689,7 @@ export function createPurchaseOrderChangeService(deps: {
       await deps.store.transaction(context.tenantId, true, async (tx) => {
         const current = await tx.order(orderId);
         if (current?.revision !== order.revision)
-          conflict('The order changed while it was being reviewed.');
+          throw conflict('The order changed while it was being reviewed.');
         if (
           (await tx.changes(orderId)).some((v) =>
             [
@@ -689,7 +701,7 @@ export function createPurchaseOrderChangeService(deps: {
             ].includes(v.state),
           )
         )
-          conflict(
+          throw conflict(
             'An existing order change still needs approval or verification.',
           );
         await tx.insert(change);
@@ -709,7 +721,7 @@ export function createPurchaseOrderChangeService(deps: {
       let change = await get(context, id);
       if (change.state !== 'approval_required') return change;
       if (!deps.admission || !change.decisionId)
-        conflict('This order change has no active approval request.');
+        throw conflict('This order change has no active approval request.');
       if (change.expiresAt <= deps.now().toISOString())
         return save(context, { ...change, state: 'expired' });
       const currentDecision = await deps.admission.decision(
@@ -731,7 +743,7 @@ export function createPurchaseOrderChangeService(deps: {
         context,
         change.decisionId,
       );
-      if (!decision?.approval) conflict('The approval was not recorded.');
+      if (!decision?.approval) throw conflict('The approval was not recorded.');
       change = await save(context, {
         ...change,
         state:
@@ -812,6 +824,39 @@ export function createPurchaseOrderChangeService(deps: {
         ? { change, input: change.provider }
         : null;
     },
+    /**
+     * Stores the purchasing system's acceptance of an order change as procurement's write
+     * receipt and returns its ID, which execution cites. It records what already happened, so it
+     * does not recheck authority. Throws when the change is unknown or the acceptance belongs to
+     * another connection; execution then cites nothing and the outcome stays unknown.
+     */
+    async storeWriteReceipt(
+      context: TenantContext,
+      changeId: string,
+      acceptance: WriteAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, true, async (tx) => {
+        const change = await tx.change(changeId);
+        if (
+          !change ||
+          change.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'purchase-orders.revise'
+        )
+          throw conflict('The receipt does not belong to this order change.');
+        const receipt = purchasingWriteReceipt(
+          context.tenantId,
+          change.purchaseOrderId,
+          { purpose: 'revision', id: change.id },
+          deps.uuid(
+            `write-receipt:${context.tenantId}:${acceptance.idempotencyKey}`,
+          ),
+          acceptance,
+        );
+        await tx.recordWriteReceipt(receipt);
+
+        return receipt.id;
+      });
+    },
     /** Independently reads and then commits the new local revision, keeping the old revision immutable. */
     async verify(
       context: TenantContext,
@@ -845,21 +890,35 @@ export function createPurchaseOrderChangeService(deps: {
         };
       const source = read.value[0]!,
         matches =
+          source.completeness === 'complete' &&
           source.observedAt >= change.requestedAt &&
           matchesPurchaseOrderChange(change, source.data);
-      if (!matches)
+      const evidence = purchasingReadEvidence(
+        context.tenantId,
+        change.connectionId,
+        change.purchaseOrderId,
+        { purpose: 'revision', id: change.id },
+        source,
+      );
+      if (!matches) {
+        await deps.store.transaction(context.tenantId, true, (tx) =>
+          tx.recordRead(evidence),
+        );
+
         return {
           outcome: 'inconclusive',
           observationRefs: [source.observationId],
           observedAt: source.observedAt,
           evaluatorVersion: 'purchase-order-change/1',
         };
+      }
       await deps.store.transaction(context.tenantId, true, async (tx) => {
+        await tx.recordRead(evidence);
         const current = await tx.change(changeId);
         if (!current || current.state === 'verified') return;
         const order = await tx.order(change.purchaseOrderId);
         if (order?.revision !== change.baseline.revision)
-          conflict(
+          throw conflict(
             'The local order changed while the source revision was being verified.',
           );
         await tx.apply(change, source.observedAt, [source.observationId]);

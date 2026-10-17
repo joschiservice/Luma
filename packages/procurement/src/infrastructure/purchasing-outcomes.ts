@@ -2,8 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import type { createPurchasingOutcomes } from '../application/purchasing-outcomes.js';
 import type {
@@ -62,11 +61,7 @@ export function createPurchasingOutcomePersistence(
           prior.actor_id !== context.actor.id ||
           canonicalJson(prior.request) !== canonicalJson(request)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This decision ID was already used.',
-          );
+          throw conflict('This decision ID was already used.');
 
         return true;
       });
@@ -84,11 +79,7 @@ export function createPurchasingOutcomePersistence(
             prior.actor_id !== context.actor.id ||
             canonicalJson(prior.request) !== canonicalJson(request)
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This decision ID was already used.',
-            );
+            throw conflict('This decision ID was already used.');
 
           return;
         }
@@ -105,9 +96,7 @@ export function createPurchasingOutcomePersistence(
           ],
         );
         if (!inserted.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This decision was recorded concurrently. Retry the same request.',
           );
         await audit({

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { invalid } from '@luma/platform';
 
 import type {
   DetectionRepository,
@@ -478,11 +478,7 @@ export function createDetectionRepository(
           [tenantId, disposition.evidenceRefs],
         );
         if (refs.rowCount !== new Set(disposition.evidenceRefs).size)
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Resolution evidence not found',
-          );
+          throw invalid('Resolution evidence not found');
         const auditId = randomUUID();
         const automation = automationId
           ? { id: automationId, name: null }

@@ -53,7 +53,7 @@ import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { SyncCoverage } from '../sync/coverage';
 import {
@@ -230,7 +230,7 @@ export function TransfersPage() {
     onShowHelp: () => setHelp(true),
   });
 
-  if (list.error instanceof IdentityError && list.error.status === 401)
+  if (list.error instanceof ApiError && list.error.status === 401)
     return <SignInRedirect />;
 
   const segment = state.segment ?? 'inventory_transfer';
@@ -536,7 +536,7 @@ export function TransferPage() {
     transferOptions(organizationId, transferId, search.connectionId),
   );
   const online = useOnline();
-  if (query.error instanceof IdentityError && query.error.status === 401)
+  if (query.error instanceof ApiError && query.error.status === 401)
     return <SignInRedirect />;
   // The list's view and page, without this record's source.
   const listSearch: TransferSearch = { ...search };

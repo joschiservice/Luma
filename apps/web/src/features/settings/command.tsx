@@ -4,7 +4,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, useSyncExternalStore } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { settingsApi } from '../../kit/settings/data';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
@@ -53,7 +53,7 @@ export function useSettingsCommand(organizationId: string) {
       await operation(command.id);
     } catch (error) {
       setError(error);
-      if (!(error instanceof IdentityError) || error.status >= 500) {
+      if (!(error instanceof ApiError) || error.status >= 500) {
         uncertain.current = command;
         setNeedsCheck(true);
       }
@@ -83,7 +83,7 @@ export function useSettingsCommand(organizationId: string) {
       setMessage(command.success);
       await refresh();
     } catch (error) {
-      if (error instanceof IdentityError && error.status < 500) {
+      if (error instanceof ApiError && error.status < 500) {
         uncertain.current = null;
         setNeedsCheck(false);
       }

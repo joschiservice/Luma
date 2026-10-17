@@ -4,12 +4,12 @@ import type { AppFactoryContext } from '@luma/app-host';
 import { type InstalledConnection, secretBinding } from '@luma/connections';
 import type { StoredInstallation } from '@luma/connections/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
 
+import { installationCredentials } from './domain/installation-validation.js';
 import { createStarshipitProvider } from './index.js';
-import { installationCredentials } from './infrastructure/installation-validation.js';
 import { registerStarshipitRoutes } from './routes.js';
 import type { createStarshipitUpdates } from './updates.js';
 import { createWebhookSecrets } from './webhook-secrets.js';
@@ -206,7 +206,7 @@ describe('Starshipit webhook secret generation', () => {
 
     const denied = secrets(stored(strong), {
       requirePermission: async () => {
-        throw new IdentityError(403, 'FORBIDDEN', 'Missing connections.manage');
+        throw forbidden('Missing connections.manage');
       },
     });
     await expect(

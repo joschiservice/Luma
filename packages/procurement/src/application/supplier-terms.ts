@@ -2,10 +2,10 @@ import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, notFound } from '@luma/platform';
 
 import type {
   SupplierProductTerms,
@@ -69,15 +69,11 @@ export function createSupplierTermsService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
 
     return fresh;
   }
-
-  const conflict = (message: string): never => {
-    throw new IdentityError(409, 'CONFLICT', message);
-  };
 
   async function record(
     context: TenantContext,
@@ -96,11 +92,7 @@ export function createSupplierTermsService(deps: {
   ) {
     context = await authorize(context, true);
     if (!(await deps.released(context)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Purchasing terms are not enabled for this workspace.',
-      );
+      throw forbidden('Purchasing terms are not enabled for this workspace.');
     const digest = deps.digest({
       actorId: context.actor.id,
       request,
@@ -111,23 +103,21 @@ export function createSupplierTermsService(deps: {
       const prior = await tx.command(request.id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used for different purchasing terms.',
           );
 
         return prior.result;
       }
       if (!(await tx.exists(request.supplierId, request.skuId)))
-        throw new IdentityError(
-          404,
-          'NOT_FOUND',
-          'Supplier or product not found.',
-        );
+        throw notFound('Supplier or product not found.');
       const current = (
         await tx.list({ supplierId: request.supplierId, skuId: request.skuId })
       )[0];
       if (!provenance && (current?.revision ?? 0) !== request.expectedRevision)
-        conflict('Purchasing terms changed. Refresh and review before saving.');
+        throw conflict(
+          'Purchasing terms changed. Refresh and review before saving.',
+        );
       if (provenance)
         await tx.recordRead?.(
           request.supplierId,
@@ -156,7 +146,7 @@ export function createSupplierTermsService(deps: {
             item.effective.preferred === true,
         )
       )
-        conflict(
+        throw conflict(
           'Another supplier is preferred. Remove that preference before changing suppliers.',
         );
       const recordedAt = deps.now().toISOString();

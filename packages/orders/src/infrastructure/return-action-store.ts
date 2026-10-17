@@ -7,6 +7,7 @@ import type {
 } from '../application/return-actions.js';
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
+import { insertReturnRead, insertReturnWriteReceipt } from './return-reads.js';
 
 /** Persists tenant-scoped settlement requests and reads explicitly mapped Wawi item identities. */
 export function createReturnActionStore(
@@ -71,6 +72,15 @@ export function createReturnActionStore(
                   [tenantId, caseId],
                 )
               ).rows.map((r) => r.document),
+            live: async (requestedBy) =>
+              (
+                await tx.query<{ document: ReturnAction }>(
+                  `SELECT document FROM orders_return_actions WHERE tenant_id=$1 AND document->>'requestedBy'=$2
+                    AND state IN ('approval_required','approved','sending','uncertain','pending')
+                  ORDER BY requested_at,id LIMIT 100`,
+                  [tenantId, requestedBy],
+                )
+              ).rows.map((r) => r.document),
             insert: async (value) => {
               await tx.query(
                 'INSERT INTO orders_return_actions(tenant_id,id,case_id,connection_id,kind,order_line_id,state,sent,document,requested_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
@@ -95,6 +105,9 @@ export function createReturnActionStore(
               );
             },
             audit: (entry) => log.append(entry),
+            recordRead: (evidence) => insertReturnRead(tx, tenantId, evidence),
+            recordWriteReceipt: (receipt) =>
+              insertReturnWriteReceipt(tx, tenantId, receipt),
             targets: async (value) => {
               const rows = await tx.query<
                 Omit<ReturnStockTarget, 'warehouse'> & Record<string, unknown>

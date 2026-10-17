@@ -22,6 +22,8 @@ export { createCustomerWorkspace } from './infrastructure/customers/workspace.js
 
 export { createDecisionQueue } from './infrastructure/decisions/queue.js';
 
+export { createEvidenceReader } from './infrastructure/evidence/reader.js';
+
 export { createInsights } from './infrastructure/insights/workspace.js';
 
 export {
@@ -38,7 +40,10 @@ export {
 
 export { createProcurementContext } from './infrastructure/procurement/context.js';
 
-export { procurementActionDecisionProvider } from './infrastructure/decisions/procurement-actions.js';
+export {
+  nativeReceiptDecision,
+  procurementActionDecisionProvider,
+} from './infrastructure/decisions/procurement-actions.js';
 
 export {
   createShipmentDispatchReader,
@@ -50,3 +55,12 @@ export { createAdaptiveViewIdentities } from './infrastructure/adaptive-identiti
 export { createActionDiffReader } from './infrastructure/action-diffs.js';
 
 export { governedFollowUpDecisionProvider } from './infrastructure/decisions/governed-follow-ups.js';
+
+export {
+  createMessageDocumentDirectory,
+  createMessageRecordDirectory,
+} from './infrastructure/message-records.js';
+
+export { readNativePurchaseIncoming } from './infrastructure/procurement/native-purchase-incoming.js';
+
+export { readNativePurchaseReceipt } from './infrastructure/procurement/native-purchase-receipts.js';

@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, invalid, unavailable } from '@luma/platform';
 
 import type { ViewReadAdapter, ViewReadResult } from '../application/views.js';
 import type { AdaptiveRecordType, CustomField } from '../domain/fields.js';
@@ -24,8 +23,7 @@ function cursorScope(context: TenantContext, query: ViewExecutionQuery) {
 
 function offsetFrom(cursor: unknown, scope: string) {
   if (cursor === undefined) return 0;
-  if (typeof cursor !== 'string')
-    throw new IdentityError(422, 'VALIDATION_ERROR', 'Invalid view cursor.');
+  if (typeof cursor !== 'string') throw invalid('Invalid view cursor.');
   try {
     const parsed: unknown = JSON.parse(
       Buffer.from(cursor, 'base64url').toString(),
@@ -45,9 +43,7 @@ function offsetFrom(cursor: unknown, scope: string) {
 
     return parsed.offset;
   } catch {
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
+    throw invalid(
       'The cursor belongs to a different query. Start from the first page.',
     );
   }
@@ -164,9 +160,7 @@ export function createAdaptiveViewReadAdapter(
         records.push(...result.items);
         warnings.push(...(result.warnings ?? []));
         if (records.length > candidateLimit)
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
+          throw invalid(
             'This query exceeds the 2,000-record aggregation limit. Add filters before using custom fields, grouping or metrics.',
           );
         if (!result.nextCursor) {
@@ -174,18 +168,12 @@ export function createAdaptiveViewReadAdapter(
           break;
         }
         if (seen.has(result.nextCursor))
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'The record source could not finish this query.',
-          );
+          throw unavailable('The record source could not finish this query.');
         seen.add(result.nextCursor);
         next = result.nextCursor;
       }
       if (next)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'This query exceeds the bounded source-read limit. Add filters before using custom fields, grouping or metrics.',
         );
       // A record remains attributable to the owner; source summaries are never merged or summed.
@@ -229,12 +217,7 @@ export function createAdaptiveViewReadAdapter(
             const field = definitions.find(
               (definition) => definition.id === fieldId,
             );
-            if (!field)
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'A custom field is unavailable.',
-              );
+            if (!field) throw invalid('A custom field is unavailable.');
             alias = `f${fieldAliases.size}`;
             fieldAliases.set(fieldId, alias);
             joins.push(
@@ -249,28 +232,15 @@ export function createAdaptiveViewReadAdapter(
               const definition = definitions.find(
                 (item) => item.id === field.slice(7),
               );
-              if (!definition)
-                throw new IdentityError(
-                  422,
-                  'VALIDATION_ERROR',
-                  'A custom field is unavailable.',
-                );
+              if (!definition) throw invalid('A custom field is unavailable.');
               const alias = custom(definition.id);
               if (numeric && definition.type !== 'number')
-                throw new IdentityError(
-                  422,
-                  'VALIDATION_ERROR',
-                  'Numeric metrics require a number field.',
-                );
+                throw invalid('Numeric metrics require a number field.');
 
               return numeric ? `${alias}.number_value` : `${alias}.value`;
             }
             if (!options.columns.includes(field))
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'Unknown view field.',
-              );
+              throw invalid('Unknown view field.');
             const key = param(field);
 
             return numeric
@@ -284,11 +254,7 @@ export function createAdaptiveViewReadAdapter(
               (item) => item.id === filter.fieldId,
             );
             if (!definition)
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'A filter references an unavailable custom field.',
-              );
+              throw invalid('A filter references an unavailable custom field.');
             const alias = custom(filter.fieldId);
             if (filter.operator === 'is_empty') {
               predicates.push(
@@ -306,17 +272,13 @@ export function createAdaptiveViewReadAdapter(
                   `strpos(${alias}.text_value,${param(filter.value)}::text)>0`,
                 );
               else
-                throw new IdentityError(
-                  422,
-                  'VALIDATION_ERROR',
+                throw invalid(
                   'Contains requires text or multiple-choice fields.',
                 );
               continue;
             }
             if (definition.type === 'multi_choice')
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
+              throw invalid(
                 'Multiple-choice filters use contains or is-empty.',
               );
             if (
@@ -328,20 +290,12 @@ export function createAdaptiveViewReadAdapter(
                 (!['number', 'boolean'].includes(definition.type) &&
                   typeof filter.value !== 'string'))
             )
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'The filter value does not match the field type.',
-              );
+              throw invalid('The filter value does not match the field type.');
             if (
               filter.value === null &&
               !['eq', 'ne'].includes(filter.operator)
             )
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'Only equality filters accept an empty value.',
-              );
+              throw invalid('Only equality filters accept an empty value.');
             const operator = {
               eq: '=',
               ne: '<>',
@@ -360,11 +314,7 @@ export function createAdaptiveViewReadAdapter(
               ['gt', 'gte', 'lt', 'lte'].includes(filter.operator) &&
               !['number', 'date'].includes(definition.type)
             )
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'Range comparisons require number or date fields.',
-              );
+              throw invalid('Range comparisons require number or date fields.');
             const column = fieldColumn(definition);
             predicates.push(
               `${alias}.${column} ${operator} ${param(filter.value)}`,

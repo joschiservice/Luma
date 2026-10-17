@@ -27,7 +27,7 @@ import { Link } from '@tanstack/react-router';
 import { Link2, Unlink } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { identityKey, identityOptions, requestLink } from './data';
 import { linkMethodLabel, providerName, sourceId } from './presentation';
 
@@ -92,7 +92,7 @@ export function IdentityLinks({
       });
     } catch (cause) {
       setError(
-        cause instanceof IdentityError && cause.message
+        cause instanceof ApiError && cause.message
           ? cause.message
           : m.sync_links_request_failed(),
       );

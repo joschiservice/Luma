@@ -60,3 +60,8 @@ export { createNativePublicationFence } from './infrastructure/publication-fence
 export { createPurchaseIncoming } from './application/purchase-incoming.js';
 
 export { createPurchaseIncomingStore } from './infrastructure/purchase-incoming-store.js';
+
+export {
+  lockNativeStockOrder,
+  lockStockOwnership,
+} from './infrastructure/native-stock-locks.js';

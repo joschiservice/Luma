@@ -1,7 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict } from '@luma/platform';
 
 import type { WorkflowTriggerStore } from '../application/triggers.js';
 import type {
@@ -78,11 +77,7 @@ export function createWorkflowTriggerStore(
               canonicalJson(input)
           )
             return prior;
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This subscription changed. Refresh before saving.',
-          );
+          throw conflict('This subscription changed. Refresh before saving.');
         }
         if (
           head &&
@@ -93,11 +88,7 @@ export function createWorkflowTriggerStore(
             )
           ).rowCount
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Subscription belongs to another workflow.',
-          );
+          throw conflict('Subscription belongs to another workflow.');
         await tx.query(
           'INSERT INTO workflow_subscription_revisions(tenant_id,id,revision,definition_id,document) VALUES($1,$2,$3,$4,$5)',
           [
@@ -183,9 +174,7 @@ export function createWorkflowTriggerStore(
             !head?.active ||
             canonicalJson(head) !== canonicalJson(run.subscription)
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'Subscription changed before this start. Refresh and retry.',
             );
         }

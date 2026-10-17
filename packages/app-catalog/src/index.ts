@@ -26,8 +26,9 @@ import {
   createSourceAuthority,
   createSourceEnvironmentService,
 } from '@luma/connections/composition';
-import { IdentityError, type TenantContext } from '@luma/identity';
+import { type TenantContext } from '@luma/identity';
 import type { AtomicStore, TenantDatabase } from '@luma/platform';
+import { conflict, ServiceError } from '@luma/platform';
 import { createValkeyStore } from '@luma/platform/composition';
 
 import { factories } from './generated.js';
@@ -90,7 +91,7 @@ export function createAppHost(
       close: async () => undefined,
     };
   const unavailable = () => {
-    throw new IdentityError(
+    throw new ServiceError(
       503,
       'SERVICE_UNAVAILABLE',
       'Connection credential storage is not configured',
@@ -225,7 +226,7 @@ export function createAppHost(
         );
       } catch (error) {
         if (
-          error instanceof IdentityError &&
+          error instanceof ServiceError &&
           [403, 404, 409].includes(error.statusCode)
         )
           return false;
@@ -250,12 +251,7 @@ export function createAppHost(
         },
       );
       const handler = adapter.capabilities['purchase-orders.read'];
-      if (!handler)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Purchase-order evidence is unavailable',
-        );
+      if (!handler) throw conflict('Purchase-order evidence is unavailable');
       const output = handler.parseOutput(
         await handler.run(
           {
@@ -275,11 +271,7 @@ export function createAppHost(
             source.provider !== adapter.provider,
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Source evidence is incomplete',
-        );
+        throw conflict('Source evidence is incomplete');
 
       return output.items.map((o) => ({
         id: o.id,

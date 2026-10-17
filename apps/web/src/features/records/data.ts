@@ -2,7 +2,7 @@ import { type RecordKind } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
@@ -40,7 +40,7 @@ export function recordListError(
   search: RecordsSearch,
 ): RecordsError | undefined {
   if (!error) return undefined;
-  if (!(error instanceof IdentityError)) return { kind: 'unavailable' };
+  if (!(error instanceof ApiError)) return { kind: 'unavailable' };
   if ([401, 403, 404].includes(error.status)) return { kind: 'access' };
   if (error.code === 'VALIDATION_ERROR' && search.cursor)
     return { kind: 'page', message: error.message };

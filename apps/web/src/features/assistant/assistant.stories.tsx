@@ -47,7 +47,7 @@ const answer: AssistantAnswer = {
     {
       kind: 'issue',
       id: '30000000-0000-4000-8000-000000000001',
-      label: 'Stuck fulfillment',
+      label: 'Fulfillment delay',
       detail: 'Fulfillment for #1047 has not progressed for 52 hours.',
       sources: [{ label: 'Shopify · Northstar', system: null }],
       observedAt: '2026-10-04T16:40:00.000Z',
@@ -214,7 +214,7 @@ export const Answered: Story = {
       within(sources).getByRole('link', { name: /Order #1042/ }),
     ).toBeVisible();
     await expect(
-      panel.getByRole('link', { name: 'Source 4: Issue · Stuck fulfillment' }),
+      panel.getByRole('link', { name: 'Source 4: Issue · Fulfillment delay' }),
     ).toBeVisible();
     await userEvent.click(panel.getByText('2 reads · 5 records'));
     await expect(

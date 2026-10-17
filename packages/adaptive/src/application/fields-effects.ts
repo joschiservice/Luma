@@ -1,7 +1,7 @@
 import type { EffectIntent, EffectRegistry } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { hasPermission } from '@luma/identity';
+import { canonicalJson, conflict, invalid } from '@luma/platform';
 
 import type {
   AdaptiveRecordType,
@@ -63,11 +63,7 @@ export function createFieldsEffects(
       !Number.isInteger(intent.parameters.fieldRevision) ||
       intent.parameters.fieldRevision < 1
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'The field change is invalid.',
-      );
+      throw invalid('The field change is invalid.');
     const value = parseValue(field, JSON.parse(intent.parameters.valueJson));
     const current = record.values.find((v) => v.fieldId === field.id);
 
@@ -98,12 +94,7 @@ export function createFieldsEffects(
         },
         execute: async (action, idempotencyKey) => {
           const current = await target(context, action);
-          if (!current)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'The field is unavailable.',
-            );
+          if (!current) throw conflict('The field is unavailable.');
           await fields.writeGovernedValue(context, {
             commandId: idempotencyKey,
             recordType: current.recordType,

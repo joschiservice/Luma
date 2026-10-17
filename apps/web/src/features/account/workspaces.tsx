@@ -10,8 +10,8 @@ import { useRef, useState } from 'react';
 
 import { EntryFrame, Failure, Pending } from '../../kit/identity/common';
 import {
+  ApiError,
   createOrganization,
-  IdentityError,
   organizationsOptions,
   regionOptions,
   workspaceName,
@@ -125,7 +125,7 @@ export function NewWorkspace() {
         });
       } catch (error) {
         if (
-          error instanceof IdentityError &&
+          error instanceof ApiError &&
           [401, 403, 404].includes(error.status)
         ) {
           setFailureStatus(error.status);
@@ -133,7 +133,7 @@ export function NewWorkspace() {
           return;
         }
         if (
-          error instanceof IdentityError &&
+          error instanceof ApiError &&
           [400, 409, 422].includes(error.status)
         ) {
           setMessage(
@@ -161,7 +161,7 @@ export function NewWorkspace() {
   if (failureStatus)
     return (
       <Failure
-        error={new IdentityError(failureStatus)}
+        error={new ApiError(failureStatus)}
         retry={() => {
           // Authorization failures show navigation actions instead of a retry button.
         }}

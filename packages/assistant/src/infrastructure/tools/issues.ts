@@ -1,6 +1,6 @@
 import type { CaseService } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { notFound } from '@luma/platform';
 import { z } from 'zod';
 
 import type { AssistantIssueReview } from '../../application/context.js';
@@ -152,7 +152,7 @@ export function getIssueTool(
     describe: () => 'Read issue details',
     async run(context, input) {
       const issue = await cases.get(context, input.issueId);
-      if (!issue) throw new IdentityError(404, 'NOT_FOUND', 'Issue not found');
+      if (!issue) throw notFound('Issue not found');
       const diagnosis = issue.diagnosis;
       const governed = await review?.(context, issue.id);
 

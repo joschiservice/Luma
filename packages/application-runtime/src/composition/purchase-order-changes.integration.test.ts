@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createAuditLog } from '@luma/audit/composition';
+import type { WriteAcceptance } from '@luma/connections';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { createTenantDatabase } from '@luma/platform/composition';
 import type { PurchaseOrderChange } from '@luma/procurement';
@@ -194,6 +195,11 @@ describe.skipIf(!databaseUrl)(
                 {
                   observationId,
                   observedAt: new Date().toISOString(),
+                  provider: 'jtl',
+                  adapterVersion: 'jtl-wawi/2.2',
+                  sourceUpdatedAt: null,
+                  sourceRevision: null,
+                  completeness: 'complete' as const,
                   externalId: '50',
                   scopeKey: 'global',
                   data: source,
@@ -231,7 +237,119 @@ describe.skipIf(!databaseUrl)(
             rows.rows.map((r) => r.document.order.lines[0]!.quantity),
           ).toEqual([12, 6]);
         });
+        const revised = (await createAuditLog(database).list(tenantId, orderId))
+          .filter((e) => e.eventType === 'purchase_order.revised')
+          .flatMap((e) => e.evidenceRefs);
+        await database.transaction(tenantId, async (tx) => {
+          const cited = [
+            ...(
+              await tx.query<{ document: PurchaseOrderChange }>(
+                'SELECT document FROM procurement_order_changes WHERE id=$1',
+                [change.id],
+              )
+            ).rows[0]!.document.observationRefs,
+            ...revised.filter((ref) => ref !== change.id),
+          ];
+          expect(cited).toEqual([observationId, observationId]);
+          const stored = await tx.query<{
+            id: string;
+            purpose: string;
+            subject_id: string;
+            document: Record<string, unknown>;
+          }>(
+            'SELECT id,purpose,subject_id,document FROM procurement_read_evidence WHERE id=ANY($1::uuid[])',
+            [cited],
+          );
+          expect(stored.rows).toEqual([
+            expect.objectContaining({
+              id: observationId,
+              purpose: 'revision',
+              subject_id: change.id,
+              document: expect.objectContaining({
+                source: {
+                  provider: 'jtl',
+                  connectionId,
+                  resource: 'purchase_order',
+                  externalId: '50',
+                  scopeKey: 'global',
+                },
+                completeness: 'complete',
+              }),
+            }),
+          ]);
+        });
+        // The revision's write receipt is stored beside its reads under the ID execution cites.
+        const acceptance: WriteAcceptance = {
+          provider: 'jtl',
+          connectionId,
+          capability: 'purchase-orders.revise',
+          adapterVersion: 'jtl-wawi/2.2',
+          dispatchIdentity: '["jtl","jtl-wawi/2.2"]',
+          idempotencyKey: `v0:${change.actionId}`,
+          acceptedAt: new Date().toISOString(),
+          providerRequestId: 'jtl-request-1',
+          records: [{ resource: 'purchase_order', externalId: '50' }],
+        };
+        const receiptId = await service.storeWriteReceipt(
+          context,
+          change.id,
+          acceptance,
+        );
+        expect(
+          await service.storeWriteReceipt(context, change.id, acceptance),
+        ).toBe(receiptId);
+        await expect(
+          service.storeWriteReceipt(context, change.id, {
+            ...acceptance,
+            capability: 'purchase-orders.submit',
+          }),
+        ).rejects.toThrow('The receipt does not belong to this order change.');
+        await database.transaction(tenantId, async (tx) => {
+          const stored = await tx.query(
+            'SELECT id,kind,purchase_order_id,purpose,subject_id,document FROM procurement_read_evidence WHERE id=$1',
+            [receiptId],
+          );
+          expect(stored.rows).toEqual([
+            {
+              id: receiptId,
+              kind: 'write_receipt',
+              purchase_order_id: orderId,
+              purpose: 'revision',
+              subject_id: change.id,
+              document: {
+                kind: 'write_receipt',
+                id: receiptId,
+                tenantId,
+                purchaseOrderId: orderId,
+                purpose: 'revision',
+                subjectId: change.id,
+                source: { provider: 'jtl', connectionId },
+                capability: 'purchase-orders.revise',
+                adapterVersion: acceptance.adapterVersion,
+                dispatchIdentity: acceptance.dispatchIdentity,
+                idempotencyKey: acceptance.idempotencyKey,
+                observedAt: acceptance.acceptedAt,
+                status: 'accepted',
+                providerRequestId: 'jtl-request-1',
+                records: acceptance.records,
+              },
+            },
+          ]);
+        });
+        for (const id of [observationId, receiptId])
+          for (const statement of [
+            'DELETE FROM procurement_read_evidence WHERE id=$1',
+            "UPDATE procurement_read_evidence SET kind='read' WHERE id=$1",
+          ])
+            await expect(
+              database.transaction(tenantId, (tx) =>
+                tx.query(statement, [id]).then(() => {}),
+              ),
+            ).rejects.toThrow('permission denied');
         await database.transaction(otherTenant, async (tx) => {
+          expect(
+            (await tx.query('SELECT * FROM procurement_read_evidence')).rows,
+          ).toEqual([]);
           expect(
             (await tx.query('SELECT * FROM procurement_order_changes')).rows,
           ).toEqual([]);

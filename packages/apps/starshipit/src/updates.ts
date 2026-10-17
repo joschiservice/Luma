@@ -15,10 +15,16 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { hasPermission, requireTenant } from '@luma/identity';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import type { ProposedAction } from '@luma/policies';
-import { createPolicies } from '@luma/policies/composition';
+import { createPolicies, policyAudit } from '@luma/policies/composition';
 import { z } from 'zod';
 
 import {
@@ -49,28 +55,7 @@ export function createStarshipitUpdates(
   const policies = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
   );
   const enabled = async (tenantId: string) =>
     !!(await context.featureEnabled?.(tenantId, 'starshipit-fulfillment')) &&
@@ -79,8 +64,7 @@ export function createStarshipitUpdates(
   async function authorize(tenant: TenantContext) {
     const fresh = await context.refreshContext(tenant);
     requireTenant(fresh, tenant.tenantId);
-    if (fresh.actor.id !== tenant.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again.');
+    if (fresh.actor.id !== tenant.actor.id) throw forbidden('Sign in again.');
     await context.requirePermission(fresh, {
       app: 'starshipit',
       permission: updatePermission,
@@ -220,8 +204,7 @@ export function createStarshipitUpdates(
 
   async function load(tenant: TenantContext, id: string) {
     const saved = await store.get(tenant, id);
-    if (!saved)
-      throw new IdentityError(404, 'NOT_FOUND', 'Order correction not found.');
+    if (!saved) throw notFound('Order correction not found.');
     await provider(tenant, saved.document.connectionId);
 
     return saved;
@@ -641,11 +624,7 @@ export function createStarshipitUpdates(
       tenant = await authorize(tenant);
       const request = previewSchema.parse(input);
       if (!(await enabled(tenant.tenantId)))
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Starshipit corrections are unavailable.',
-        );
+        throw conflict('Starshipit corrections are unavailable.');
       const prior = await store.get(tenant, request.requestId);
       if (prior) {
         if (
@@ -658,11 +637,7 @@ export function createStarshipitUpdates(
             })),
           ) !== canonicalJson(request.lines)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This request belongs to another correction.',
-          );
+          throw conflict('This request belongs to another correction.');
 
         return view(tenant, prior);
       }
@@ -674,9 +649,7 @@ export function createStarshipitUpdates(
         (before.order.status ?? before.order.order_status)?.toLowerCase() !==
           'unshipped'
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'A fresh mapped authoritative order and an unshipped Starshipit order are required.',
         );
       const lines = request.lines.map((change) => {
@@ -689,7 +662,7 @@ export function createStarshipitUpdates(
           Number(item.quantity) > 999999 ||
           item.quantity === String(change.quantity)
         )
-          throw new IdentityError(
+          throw new ServiceError(
             422,
             'CONFLICT',
             'Select an existing line with a changed quantity.',
@@ -753,11 +726,7 @@ export function createStarshipitUpdates(
       tenant = await authorize(tenant);
       const saved = await load(tenant, reference.parse(input).id);
       if (saved.document.action.proposedBy.id !== tenant.actor.id)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only the requester can send this correction.',
-        );
+        throw forbidden('Only the requester can send this correction.');
       await bind(tenant, saved.document);
       const result = await admission.execute(tenant, {
         runId: saved.document.id,
@@ -775,11 +744,7 @@ export function createStarshipitUpdates(
         .parse(input);
       const saved = await load(tenant, request.id);
       if (!(await view(tenant, saved)).canApprove || !saved.decision_id)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This correction cannot be approved by you.',
-        );
+        throw conflict('This correction cannot be approved by you.');
       await policies.respond(
         tenant,
         saved.decision_id,

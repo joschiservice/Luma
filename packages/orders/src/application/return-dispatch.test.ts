@@ -1,3 +1,4 @@
+import type { WriteAcceptance } from '@luma/connections';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { describe, expect, it } from 'vitest';
 
@@ -7,14 +8,17 @@ import type {
   ExchangeStep,
   ReturnExchange,
 } from '../domain/return-exchanges.js';
+import type { ReturnRead, ReturnReadEvidence } from '../domain/return-reads.js';
 import {
   createReturnActions,
   type ReturnActionStore,
+  type ReturnSettlementAdmission,
 } from './return-actions.js';
 import {
   createReturnExchanges,
   type ReturnExchangeStore,
 } from './return-exchanges.js';
+import type { ReturnWriteReceipt } from './return-write-receipts.js';
 
 const now = new Date('2026-10-12T12:00:00Z');
 const context = makeTenantContext(
@@ -41,6 +45,25 @@ const decided = {
   at: now.toISOString(),
   evidence: { note: 'Counted', link: null },
 };
+const read = (
+  id: string,
+  completeness: ReturnRead['completeness'] = 'complete',
+): ReturnRead => ({
+  id,
+  source: {
+    provider: 'shopify',
+    connectionId: 'shopify',
+    resource: 'order',
+    externalId: 'order',
+    scopeKey: '',
+  },
+  observedAt: now.toISOString(),
+  sourceUpdatedAt: null,
+  sourceRevision: 'r1',
+  adapterVersion: 'shopify-returns/1',
+  completeness,
+  data: { operationId: 'effect' },
+});
 
 function fixture(kind: 'settlement' | 'exchange') {
   const c: ReturnCase = {
@@ -170,6 +193,17 @@ function fixture(kind: 'settlement' | 'exchange') {
       },
     },
   };
+  const stored: ReturnReadEvidence[] = [];
+  let storage: 'ok' | 'failing' = 'ok';
+  const recordRead = async (evidence: ReturnReadEvidence) => {
+    if (storage === 'failing') throw new Error('storage unavailable');
+    if (!stored.some((s) => s.id === evidence.id)) stored.push(evidence);
+  };
+  const receipts: ReturnWriteReceipt[] = [];
+  const recordWriteReceipt = async (receipt: ReturnWriteReceipt) => {
+    if (storage === 'failing') throw new Error('storage unavailable');
+    if (!receipts.some((r) => r.id === receipt.id)) receipts.push(receipt);
+  };
   const reads = { locks: 0, snapshots: 0 };
   const actionStore: ReturnActionStore = {
     transaction: async (_tenant, fn, options) => {
@@ -187,9 +221,12 @@ function fixture(kind: 'settlement' | 'exchange') {
           action = structuredClone(v);
         },
         list: async () => [structuredClone(action)],
+        live: async () => [structuredClone(action)],
         insert: unavailable,
         targets: async () => [],
         audit: async () => {},
+        recordRead,
+        recordWriteReceipt,
       });
     },
   };
@@ -213,12 +250,15 @@ function fixture(kind: 'settlement' | 'exchange') {
           step = structuredClone(v);
         },
         list: async () => [structuredClone(step)],
+        live: async () => [structuredClone(step)],
         insert: unavailable,
         choices: async () => [],
         refundFallback: unavailable,
         stockActions: async () => [],
         finishCase: unavailable,
         audit: async () => {},
+        recordRead,
+        recordWriteReceipt,
       });
     },
   };
@@ -226,12 +266,28 @@ function fixture(kind: 'settlement' | 'exchange') {
     state: 'uncertain' | 'withheld' | 'not_started';
     failure: 'withheld';
   }> => ({ state: 'uncertain', failure: 'withheld' });
+  let executions = 0;
+  let ledger: 'not_started' | 'uncertain' = 'not_started';
+  let approval: {
+    outcome: 'approved' | 'rejected';
+    approverId: string;
+  } | null = null;
   const admission = {
     prepare: unavailable,
-    decision: async () => null,
+    decision: async () =>
+      approval
+        ? ({ approval } as unknown as Awaited<
+            ReturnType<ReturnSettlementAdmission['decision']>
+          >)
+        : null,
     respond: async () => {},
-    execute: () => execute(),
+    execute: () => {
+      executions++;
+
+      return execute();
+    },
     reconcile: async () => ({ state: 'uncertain' as const }),
+    get: async () => ({ state: ledger }),
     writeMode: async () => 'writes_enabled' as const,
   };
   const common = {
@@ -247,6 +303,7 @@ function fixture(kind: 'settlement' | 'exchange') {
     admission,
   };
   let outcome: 'passed' | 'inconclusive' = 'passed';
+  let proofReads: ReturnRead[] = [read('source-proof')];
   const service =
     kind === 'settlement'
       ? createReturnActions({
@@ -260,6 +317,7 @@ function fixture(kind: 'settlement' | 'exchange') {
               payment: null,
               observedAt: now.toISOString(),
               evidenceRefs: ['source-proof'],
+              reads: proofReads,
             }),
           },
         })
@@ -273,6 +331,7 @@ function fixture(kind: 'settlement' | 'exchange') {
               available: true,
               observedAt: now.toISOString(),
               evidenceRefs: ['stock'],
+              reads: [read('stock')],
             }),
             proof: async () => ({
               outcome,
@@ -285,12 +344,26 @@ function fixture(kind: 'settlement' | 'exchange') {
               fulfillmentReady: true,
               payment: 'not_required',
               financial: null,
+              reads: proofReads,
             }),
           },
         });
 
   return {
     send: () => service.send(context, 'case', 'effect'),
+    recover: () => service.recover(context),
+    executions: () => executions,
+    setLedger: (next: typeof ledger) => {
+      ledger = next;
+    },
+    setApproval: (next: typeof approval) => {
+      approval = next;
+    },
+    patch: (next: Partial<ReturnAction & ExchangeStep>) => {
+      if (kind === 'settlement')
+        action = { ...action, ...next } as ReturnAction;
+      else step = { ...step, ...next } as ExchangeStep;
+    },
     check: () => service.check(context, 'case', 'effect'),
     list: () => service.list(context, 'case'),
     reads,
@@ -302,6 +375,17 @@ function fixture(kind: 'settlement' | 'exchange') {
     },
     current: () => (kind === 'settlement' ? action : step),
     root: () => root,
+    verify: () => service.verify(context, 'effect'),
+    storeReceipt: (acceptance: WriteAcceptance) =>
+      service.storeWriteReceipt(context, 'effect', acceptance),
+    stored,
+    receipts,
+    setStorage: (next: typeof storage) => {
+      storage = next;
+    },
+    setProofReads: (next: ReturnRead[]) => {
+      proofReads = next;
+    },
   };
 }
 
@@ -393,6 +477,227 @@ describe.each(['settlement', 'exchange'] as const)(
         state: 'not_executed',
       });
       if (kind === 'exchange') expect(f.root().processingStarted).toBe(false);
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s background follow-up',
+  (kind) => {
+    const later = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+    it('sends an approved write as its requester once and verifies it by reading', async () => {
+      const f = fixture(kind);
+      await f.recover();
+      expect(f.current()).toMatchObject({
+        sent: true,
+        state: 'verified',
+        proof: { outcome: 'passed' },
+      });
+      await f.recover();
+      expect(f.executions()).toBe(1);
+    });
+
+    it('records an expired approval without sending', async () => {
+      const f = fixture(kind);
+      f.patch({ expiresAt: later(1) });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: false, state: 'expired' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('applies an approval policy recorded but the owner never stored, then sends', async () => {
+      const f = fixture(kind);
+      f.patch({ state: 'approval_required', decidedBy: null, decidedAt: null });
+      await f.recover();
+      expect(f.current().state).toBe('approval_required');
+      f.setApproval({ outcome: 'approved', approverId: 'approver' });
+      await f.recover();
+      expect(f.current()).toMatchObject({
+        decidedBy: 'approver',
+        sent: true,
+        state: 'verified',
+      });
+      expect(f.executions()).toBe(1);
+    });
+
+    it('reads a reserved uncertain write and never sends it again', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain', updatedAt: later(60_000) });
+      f.setLedger('uncertain');
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'verified' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('resumes a fenced send the ledger never reserved, within its approval', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'sending', updatedAt: later(2 * 60_000) });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'verified' });
+      expect(f.executions()).toBe(1);
+    });
+
+    it('releases a fenced send the ledger never reserved once its approval ended', async () => {
+      const f = fixture(kind);
+      f.patch({
+        sent: true,
+        state: 'uncertain',
+        expiresAt: later(1),
+        updatedAt: later(60_000),
+      });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: false, state: 'expired' });
+      expect(f.executions()).toBe(0);
+    });
+
+    it('leaves a recent send to the request dispatching it', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'sending' });
+      await f.recover();
+      expect(f.current()).toMatchObject({ sent: true, state: 'sending' });
+      expect(f.executions()).toBe(0);
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s verification evidence',
+  (kind) => {
+    const purpose = kind === 'settlement' ? 'settlement' : 'exchange';
+
+    it('stores every cited read with its source identity before citing it', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      expect(await f.verify()).toEqual({
+        outcome: 'passed',
+        observationRefs: ['source-proof'],
+      });
+      expect(f.stored).toEqual([
+        {
+          ...read('source-proof'),
+          tenantId: 'tenant',
+          caseId: 'case',
+          purpose,
+          subjectId: 'effect',
+        },
+      ]);
+
+      await f.check();
+      expect(f.current()).toMatchObject({
+        state: 'verified',
+        proof: { evidenceRefs: ['source-proof'], complete: true },
+      });
+      // The same read cited again is stored once.
+      expect(f.stored.map((s) => s.id)).toEqual(['source-proof']);
+    });
+
+    it('never passes on a partial read, and records the proof as incomplete', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setProofReads([read('source-proof', 'partial')]);
+      expect(await f.verify()).toEqual({
+        outcome: 'inconclusive',
+        observationRefs: ['source-proof'],
+      });
+      expect(f.stored[0]).toMatchObject({ completeness: 'partial' });
+
+      await f.check();
+      expect(f.current().state).not.toBe('verified');
+      expect(f.current().proof).toMatchObject({
+        outcome: 'inconclusive',
+        complete: false,
+      });
+    });
+
+    it('cites nothing when a reference has no read to store', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setProofReads([]);
+      expect(await f.verify()).toEqual({
+        outcome: 'inconclusive',
+        observationRefs: [],
+      });
+      await f.check();
+      expect(f.current()).toMatchObject({
+        state: 'uncertain',
+        failure: 'stale_evidence',
+        proof: null,
+      });
+      expect(f.stored).toEqual([]);
+    });
+
+    it('leaves the outcome unknown when the read cannot be stored', async () => {
+      const f = fixture(kind);
+      f.patch({ sent: true, state: 'uncertain' });
+      f.setStorage('failing');
+      await expect(f.verify()).rejects.toThrow('storage unavailable');
+      await expect(f.check()).rejects.toThrow('storage unavailable');
+      expect(f.current()).toMatchObject({ state: 'uncertain', proof: null });
+    });
+  },
+);
+
+describe.each(['settlement', 'exchange'] as const)(
+  '%s write receipts',
+  (kind) => {
+    const acceptance: WriteAcceptance = {
+      provider: 'shopify',
+      connectionId: 'shopify',
+      capability:
+        kind === 'settlement' ? 'returns.restock' : 'returns.exchange.process',
+      adapterVersion: 'shopify-returns/1',
+      dispatchIdentity: '["shopify","shopify-returns/1"]',
+      idempotencyKey: 'v0:action',
+      acceptedAt: now.toISOString(),
+      providerRequestId: 'request-1',
+      records: [{ resource: 'return', externalId: 'gid://shopify/Return/1' }],
+    };
+
+    it('stores the accepted write once and returns the ID execution cites', async () => {
+      const f = fixture(kind);
+      const id = await f.storeReceipt(acceptance);
+      expect(await f.storeReceipt(acceptance)).toBe(id);
+      expect(f.receipts).toEqual([
+        {
+          kind: 'write_receipt',
+          id,
+          tenantId: 'tenant',
+          caseId: 'case',
+          purpose: kind,
+          subjectId: 'effect',
+          source: { provider: 'shopify', connectionId: 'shopify' },
+          capability: acceptance.capability,
+          adapterVersion: 'shopify-returns/1',
+          dispatchIdentity: acceptance.dispatchIdentity,
+          idempotencyKey: 'v0:action',
+          observedAt: now.toISOString(),
+          status: 'accepted',
+          providerRequestId: 'request-1',
+          records: acceptance.records,
+        },
+      ]);
+    });
+
+    it('refuses an acceptance from another connection or capability', async () => {
+      const f = fixture(kind);
+      for (const other of [
+        { ...acceptance, connectionId: 'other' },
+        { ...acceptance, capability: 'returns.create' as const },
+      ])
+        await expect(f.storeReceipt(other)).rejects.toThrow(
+          'The receipt does not belong',
+        );
+      expect(f.receipts).toEqual([]);
+    });
+
+    it('throws when the receipt cannot be stored, so nothing is cited', async () => {
+      const f = fixture(kind);
+      f.setStorage('failing');
+      await expect(f.storeReceipt(acceptance)).rejects.toThrow(
+        'storage unavailable',
+      );
+      expect(f.receipts).toEqual([]);
     });
   },
 );

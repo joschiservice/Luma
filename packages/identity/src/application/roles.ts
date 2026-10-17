@@ -1,5 +1,7 @@
+import { conflict, forbidden, notFound, ServiceError } from '@luma/platform';
+
 import type { Membership, TenantContext } from '../domain/context.js';
-import { IdentityError, requireActiveMembership } from '../domain/context.js';
+import { requireActiveMembership } from '../domain/context.js';
 import type { PermissionDefinition } from '../domain/permissions.js';
 import {
   appPermissionGroupDescription,
@@ -88,14 +90,6 @@ export interface RoleInput {
   permissions: string[];
 }
 
-function conflict(message: string): never {
-  throw new IdentityError(409, 'CONFLICT', message);
-}
-
-function forbidden(message: string): never {
-  throw new IdentityError(403, 'FORBIDDEN', message);
-}
-
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const difference = (a: Iterable<string>, b: Iterable<string>) => {
@@ -124,11 +118,10 @@ export function createRolesService(deps: {
       context.actor.id,
       async (tx) => {
         const actor = await tx.member(context.actor.id);
-        if (!actor)
-          throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        if (!actor) throw notFound('Workspace not found');
         requireActiveMembership(actor);
         if (manage && !actor.permissions.has('roles.manage'))
-          forbidden(
+          throw forbidden(
             'Your role does not allow managing roles. Ask a workspace admin for access.',
           );
 
@@ -151,7 +144,7 @@ export function createRolesService(deps: {
           previous.actorId !== context.actor.id ||
           previous.request !== serialized
         )
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -187,7 +180,7 @@ export function createRolesService(deps: {
       );
     });
     if (invalid.length)
-      throw new IdentityError(
+      throw new ServiceError(
         422,
         'VALIDATION_ERROR',
         `These permissions are unknown or unavailable: ${invalid.slice(0, 5).join(', ')}.`,
@@ -201,7 +194,7 @@ export function createRolesService(deps: {
       keys.filter((key) => !actor.permissions.has(key)),
     );
     if (missing.length)
-      forbidden(
+      throw forbidden(
         `You can only grant permissions you hold. Missing: ${[...new Set(missing)].slice(0, 5).join(', ')}.`,
       );
   }
@@ -346,14 +339,11 @@ export function createRolesService(deps: {
         async (tx, actor) => {
           const before = uuid.test(roleId) ? await tx.role(roleId) : null;
           if (!before)
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
-              'Role not found. Built-in roles cannot be changed.',
-            );
-          if (before.archived) conflict('Archived roles cannot be changed.');
+            throw notFound('Role not found. Built-in roles cannot be changed.');
+          if (before.archived)
+            throw conflict('Archived roles cannot be changed.');
           if (before.revision !== input.revision)
-            conflict(
+            throw conflict(
               'Someone else changed this role. Review the latest version before saving.',
             );
           await validate(
@@ -414,20 +404,18 @@ export function createRolesService(deps: {
         async (tx, actor) => {
           const before = uuid.test(roleId) ? await tx.role(roleId) : null;
           if (!before)
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
+            throw notFound(
               'Role not found. Built-in roles cannot be archived.',
             );
-          if (before.archived) conflict('This role is already archived.');
+          if (before.archived) throw conflict('This role is already archived.');
           if (before.revision !== input.revision)
-            conflict(
+            throw conflict(
               'Someone else changed this role. Review the latest version first.',
             );
           requireCovers(actor, before.permissions);
           const members = (await tx.usage()).get(roleId)?.members ?? 0;
           if (members)
-            conflict(
+            throw conflict(
               `${members} ${members === 1 ? 'person has' : 'people have'} this role. Give them another role before archiving it.`,
             );
           const revoked = await tx.revokeInvitations(roleId);

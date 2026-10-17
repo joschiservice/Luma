@@ -9,7 +9,7 @@ import { useRef, useState } from 'react';
 import {
   installationCredentials,
   installationInput,
-} from '../infrastructure/installation-validation.js';
+} from '../domain/installation-validation.js';
 
 const reads = [
   'orders.read',

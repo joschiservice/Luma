@@ -9,6 +9,7 @@ import {
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { actorLabel } from '@luma/ui/lib/actor';
 
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { commitmentKinds, statusLabels } from './presentation';
 
 const kinds = {
@@ -49,8 +50,10 @@ const sources = {
 
 /** Presents recorded decisions, provider observations and independent verification together without conflating them. */
 export function PurchasingTimeline({
+  organizationId,
   record,
 }: {
+  organizationId: string;
   record: PurchaseOrderRecord;
 }) {
   return (
@@ -120,20 +123,12 @@ export function PurchasingTimeline({
                   </small>
                 ) : null}
                 {entry.evidenceRefs.length ? (
-                  <details>
-                    <summary>
-                      {m.procurement_timeline_evidence({
-                        count: formatNumber(entry.evidenceRefs.length),
-                      })}
-                    </summary>
-                    <ul>
-                      {entry.evidenceRefs.map((ref, index) => (
-                        <li key={`${index}:${ref}`}>
-                          <code>{ref}</code>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
+                  <EvidenceDisclosure
+                    organizationId={organizationId}
+                    subject={{ kind: 'purchase_order', id: record.order.id }}
+                    refs={entry.evidenceRefs}
+                    count={entry.evidenceRefs.length}
+                  />
                 ) : null}
               </span>
             </li>

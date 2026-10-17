@@ -1,3 +1,4 @@
+import type { AppRegistry } from '@luma/app-host';
 import {
   createConnectionCoverage,
   type createOrderSourceVisibility,
@@ -11,19 +12,31 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
+import { replyCitations, replyEvidence } from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
   orderStateQueries,
+  returnWriteCitations,
+  returnWriteEvidence,
+  type ReturnWriteKind,
 } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
 import {
   type createProcurement,
   createProcurementMetricReader,
   createStockRiskReader,
+  purchaseOrderCitations,
+  purchaseOrderEvidence,
   type SupplierCommitments,
 } from '@luma/procurement/composition';
+import type {
+  EvidenceOwners,
+  EvidenceSubjectOwner,
+  StoredEvidence,
+} from '@luma/read-models';
 import {
   createCustomerWorkspace,
+  createEvidenceReader,
   createFulfillmentWorkspace,
   createInsights,
   createInventoryWorkspace,
@@ -36,6 +49,8 @@ import {
   createReturnWorkspace,
 } from '@luma/read-models/composition';
 import {
+  caseCitations,
+  caseRecords,
   createActivityStore,
   createResolutionMetricReader,
 } from '@luma/resolution/composition';
@@ -45,6 +60,7 @@ import type { createTenantFeatureRelease } from './feature-release.js';
 /** The read-only workspace views, by the HTTP area that serves them. */
 export interface ReadModelServices {
   customers: ReturnType<typeof createCustomerWorkspace>;
+  evidence: ReturnType<typeof createEvidenceReader>;
   fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
   insights: ReturnType<typeof createInsights>;
   inventory: ReturnType<typeof createInventoryWorkspace>;
@@ -55,6 +71,77 @@ export interface ReadModelServices {
   products: ReturnType<typeof createProductWorkspace>;
   records: ReturnType<typeof createRecordExplorer>;
   returns: ReturnType<typeof createReturnWorkspace>;
+}
+
+/**
+ * The owner that reports what each kind of subject cites and finds its stored evidence. Reads
+ * and receipts each carry the retention start of the table their owner began storing them in;
+ * messages were always stored, so reply reads have none. A case's provider evidence belongs to
+ * the apps that made its writes.
+ */
+export function createEvidenceOwners(
+  apps: ReturnType<AppRegistry['evidenceSources']>,
+): EvidenceOwners {
+  const returnWrite = (kind: ReturnWriteKind): EvidenceSubjectOwner => ({
+    permission: 'returns.read',
+    retention: { read: 'return_reads', write_receipt: 'write_receipts' },
+    citations: (tx, tenantId, id) =>
+      returnWriteCitations(tx, tenantId, kind, id),
+    lookup: (tx, tenantId, id, refs) =>
+      returnWriteEvidence(tx, tenantId, kind, id, refs),
+  });
+
+  return {
+    case: {
+      permission: 'issues.read',
+      retention: { read: null, write_receipt: null },
+      citations: caseCitations,
+      async lookup(tx, tenantId, id, refs) {
+        const found: StoredEvidence[] = await caseRecords(
+          tx,
+          tenantId,
+          id,
+          refs,
+        );
+        if (refs.cited.length)
+          for (const app of apps)
+            found.push(...(await app.read(tx, tenantId, refs.cited)));
+
+        return found;
+      },
+    },
+    purchase_order: {
+      permission: 'procurement.read',
+      retention: { read: 'procurement_reads', write_receipt: 'write_receipts' },
+      // Stock booking proof of the order's receipts is the inventory area's evidence.
+      citations: (tx, tenantId, id, access) =>
+        purchaseOrderCitations(tx, tenantId, id, {
+          stock: access.can('inventory.read'),
+        }),
+      async lookup(tx, tenantId, id, refs, access) {
+        const found: StoredEvidence[] = await purchaseOrderEvidence(
+          tx,
+          tenantId,
+          id,
+          refs,
+        );
+        if (access.can('inventory.read') && refs.cited.length)
+          for (const app of apps)
+            found.push(...(await app.read(tx, tenantId, refs.cited)));
+
+        return found;
+      },
+    },
+    reply: {
+      permission: 'messages.read',
+      retention: { read: null, write_receipt: 'write_receipts' },
+      citations: replyCitations,
+      lookup: replyEvidence,
+    },
+    return_creation: returnWrite('creation'),
+    return_exchange_step: returnWrite('exchange_step'),
+    return_settlement: returnWrite('settlement'),
+  };
 }
 
 /**
@@ -71,6 +158,8 @@ export function createReadModelServices(options: {
   /** The permission a person needs to request a provider write through an app. */
   actionPermission?: (appId: string, capability: string) => string | null;
   commitments: SupplierCommitments;
+  /** Installed apps' readers of the evidence they store for their provider writes. */
+  evidenceSources?: ReturnType<AppRegistry['evidenceSources']>;
   procurement: ReturnType<typeof createProcurement>;
   release: ReturnType<typeof createTenantFeatureRelease>;
 }): ReadModelServices {
@@ -133,6 +222,10 @@ export function createReadModelServices(options: {
 
   return {
     customers: createCustomerWorkspace(database),
+    evidence: createEvidenceReader(
+      database,
+      createEvidenceOwners(options.evidenceSources ?? []),
+    ),
     fulfillment,
     insights,
     inventory: createInventoryWorkspace(database),

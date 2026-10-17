@@ -5,8 +5,8 @@ import type {
   ExecutionResult,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { requireTenant } from '@luma/identity';
+import { canonicalJson, conflict, forbidden, notFound } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
@@ -131,16 +131,14 @@ export function createOrderEdits(deps: OrderEditDependencies) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     await deps.permission.require(fresh);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again.');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Sign in again.');
 
     return fresh;
   }
 
   async function load(context: TenantContext, id: string) {
     const run = await deps.store.get(context, id);
-    if (!run)
-      throw new IdentityError(404, 'NOT_FOUND', 'Order edit not found.');
+    if (!run) throw notFound('Order edit not found.');
     await deps.authorize(context, run.target.connectionId);
 
     return run;
@@ -419,11 +417,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
           canonicalJson(existing.change) !== canonicalJson(change) ||
           existing.action.proposedBy.id !== context.actor.id
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This request already belongs to another order edit.',
-          );
+          throw conflict('This request already belongs to another order edit.');
 
         return view(context, await load(context, requestId));
       }
@@ -438,9 +432,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
           execution.record.state !== 'succeeded' &&
           execution.record.attempt.verification?.outcome !== 'failed'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A previous edit of this order is uncertain. Reconcile it before starting another.',
           );
       }
@@ -456,11 +448,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
       const blocker = orderEditBlocker(first, change, access);
       // The blocker already requires resolved authority; the check narrows its type.
       if (blocker || !authority)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          blocker ?? 'Order line authority is unknown.',
-        );
+        throw conflict(blocker ?? 'Order line authority is unknown.');
       // Observe-only sends nothing to Shopify, not even the non-committing calculation.
       const observeOnly =
         (await deps.admission.writeMode?.(context, target.connectionId)) ===
@@ -480,9 +468,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
           editFacts(before) !== editFacts(first) ||
           orderEditBlocker(before, change, access)
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'The order changed while Shopify calculated the edit. Refresh and try again.',
           );
       }
@@ -563,20 +549,14 @@ export function createOrderEdits(deps: OrderEditDependencies) {
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
       const run = await load(context, id);
       if (context.actor.id !== run.action.proposedBy.id)
-        throw new IdentityError(
-          403,
-          'FORBIDDEN',
-          'Only the requester can send this edit.',
-        );
+        throw forbidden('Only the requester can send this edit.');
       const previous = await deps.admission.get(context, id);
       if (previous?.state === 'not_executed')
         return view(context, run, previous);
       if (!previous || !('record' in previous)) {
         const now = await view(context, run);
         if (!now.canExecute && !now.observeOnly)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This edit needs current approval before it can be sent.',
           );
         if (!now.observeOnly) await deps.store.claim(context, run);
@@ -604,11 +584,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
         .parse(input);
       const run = await load(context, id);
       if (!run.decisionId || !(await view(context, run)).canApprove)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This edit cannot be approved by you.',
-        );
+        throw conflict('This edit cannot be approved by you.');
       await deps.policies.respond(
         context,
         run.decisionId,

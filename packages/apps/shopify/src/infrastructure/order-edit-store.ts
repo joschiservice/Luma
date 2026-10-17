@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import type {
   OrderEditRun,
@@ -78,11 +77,7 @@ export function createOrderEditStore(
         !stored ||
         canonicalJson({ ...stored, decisionId: null }) !== canonicalJson(run)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This request already belongs to another order edit.',
-        );
+        throw conflict('This request already belongs to another order edit.');
 
       return stored;
     },
@@ -98,9 +93,7 @@ export function createOrderEditStore(
           )
         ).rows;
         if (pending.some((item) => item.run_id !== run.id))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another edit of this order is running or awaiting reconciliation. Check its outcome first.',
           );
         const values = [
@@ -120,9 +113,7 @@ export function createOrderEditStore(
           )
         ).rows[0];
         if (row?.run_id !== run.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another edit already reserved this order revision. Refresh to review it.',
           );
       }),

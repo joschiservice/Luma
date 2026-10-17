@@ -9,11 +9,11 @@ import type {
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
-class WorkflowError extends IdentityError {
+class WorkflowError extends ApiError {
   constructor(
     status: number,
     readonly feedback: string,
@@ -127,9 +127,9 @@ export async function revokeWorkflow(
 
 /** Provides actionable feedback for access loss, stale submissions and uncertain responses. */
 export function workflowError(error: unknown) {
-  if (error instanceof IdentityError && error.status === 401)
+  if (error instanceof ApiError && error.status === 401)
     return m.workflows_error_session_expired();
-  if (error instanceof IdentityError && error.status === 403)
+  if (error instanceof ApiError && error.status === 403)
     return m.workflows_error_access_changed();
   if (error instanceof WorkflowError) return error.feedback;
 

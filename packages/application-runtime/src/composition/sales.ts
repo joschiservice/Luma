@@ -8,6 +8,10 @@ import {
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
+import {
+  lockNativeStockOrder,
+  lockStockOwnership,
+} from '@luma/inventory/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import type { SalesService } from '@luma/sales';
 import {
@@ -31,18 +35,9 @@ export function createSalesRuntime(
     enabled,
     atomic: (context, operation, orderId) =>
       db.transaction(context.tenantId, async (tx) => {
-        if (orderId)
-          await tx.query(
-            'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-            [`native-stock-order:${context.tenantId}:${orderId}`],
-          );
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-          `sales:${context.tenantId}`,
-        ]);
-        await tx.query(
-          'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
-          [`commerce-ingestion:${context.tenantId}`],
-        );
+        // Same order as native stock: the order's demand, then record ownership.
+        if (orderId) await lockNativeStockOrder(tx, context.tenantId, orderId);
+        await lockStockOwnership(tx, context.tenantId);
         const scoped: TenantDatabase = {
           transaction: async (tenantId, work) => {
             requireTenant(context, tenantId);

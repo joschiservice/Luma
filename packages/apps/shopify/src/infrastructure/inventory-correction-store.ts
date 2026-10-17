@@ -1,6 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
 
 import type {
   CorrectionRun,
@@ -49,9 +48,7 @@ export function createCorrectionStore(
           ],
         );
         if (held.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Stock protection owns this position. Release the hold before correcting stock.',
           );
         if (run.target.receipt) {
@@ -76,9 +73,7 @@ export function createCorrectionStore(
                 row.run_id !== run.id && row.dispatch !== 'not_dispatched',
             )
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This receipt already has a stock booking. Check that booking instead of applying it again.',
             );
           await tx.query(
@@ -97,9 +92,7 @@ export function createCorrectionStore(
           )
         ).rows;
         if (pending.some((item) => item.run_id !== run.id))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another correction is awaiting reconciliation. Check its outcome before another action.',
           );
         const values = [
@@ -121,9 +114,7 @@ export function createCorrectionStore(
           )
         ).rows[0];
         if (row?.run_id !== run.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Another correction already reserved this inventory revision. Refresh to review it.',
           );
       }),
@@ -157,9 +148,7 @@ export function createCorrectionStore(
         !stored ||
         canonicalJson({ ...stored, decisionId: null }) !== canonicalJson(run)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This inventory revision already has a correction. Refresh to review it.',
         );
 

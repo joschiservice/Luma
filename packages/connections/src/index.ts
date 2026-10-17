@@ -29,12 +29,23 @@ export type {
 
 export { ConnectorError } from './domain/capabilities.js';
 
+/** @public Declaration emit names it in the Shopify app's inferred scan session type. */
+export type { PageQuery } from './domain/capabilities.js';
+
+export { writeReceiptEvidence } from './domain/write-receipts.js';
+
+export type {
+  WriteAcceptance,
+  WriteReceiptEvidence,
+} from './domain/write-receipts.js';
+
 export type {
   CapabilityInput,
   CapabilityOutput,
   CapabilityResult,
   ConnectorFailure,
   AttachmentContent,
+  CitedRead,
   CustomerSnapshot,
   ExternalId,
   FulfillmentSnapshot,

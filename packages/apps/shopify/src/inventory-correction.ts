@@ -19,10 +19,10 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requirePermission } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import { createNativePublicationFence } from '@luma/inventory/composition';
-import { canonicalJson } from '@luma/platform';
-import { createPolicies } from '@luma/policies/composition';
+import { canonicalJson, conflict, notFound, unavailable } from '@luma/platform';
+import { createPolicies, policyAudit } from '@luma/policies/composition';
 import { z } from 'zod';
 
 import {
@@ -69,28 +69,7 @@ export function createShopifyInventoryCorrection(
   const policies = createPolicies(
     context.database,
     context.refreshContext,
-    async (event) => {
-      const value = event.document;
-      await audit.append({
-        id: value.id,
-        tenantId: value.tenantId,
-        eventKey: value.id,
-        eventType: event.type,
-        schemaVersion: 1,
-        occurredAt:
-          'evaluatedAt' in value ? value.evaluatedAt : value.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in value ? value.actorId : value.approverId,
-        },
-        correlationId: value.correlationId,
-        proposalId: value.proposalId,
-        actionHash: value.actionHash,
-        policyDecisionId: 'actorId' in value ? value.id : value.decisionId,
-        evidenceRefs: [],
-        details: { outcome: value.outcome, policyVersion: value.policyVersion },
-      });
-    },
+    policyAudit(audit),
   );
 
   async function credential(
@@ -109,11 +88,7 @@ export function createShopifyInventoryCorrection(
       summary.target.kind !== 'shopify' ||
       summary.appInstallationVersion !== version
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Shopify connection not found.',
-      );
+      throw notFound('Shopify connection not found.');
     const current = await installations.credential(
       tenant,
       connectionId,
@@ -125,11 +100,7 @@ export function createShopifyInventoryCorrection(
       current.connection.target.kind !== 'shopify' ||
       current.connection.appInstallationVersion !== version
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Shopify connection not found.',
-      );
+      throw notFound('Shopify connection not found.');
 
     return current;
   }
@@ -174,11 +145,7 @@ export function createShopifyInventoryCorrection(
       accessToken: async () => {
         const fresh = await credential(tenant, connectionId, capability);
         if (fresh.connection.target.shop !== shop)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Connection changed. Refresh inventory details.',
-          );
+          throw conflict('Connection changed. Refresh inventory details.');
 
         return fresh.credentials.token;
       },
@@ -254,11 +221,7 @@ export function createShopifyInventoryCorrection(
                         source.source.revision !==
                         nativeRun.before.source.revision
                       )
-                        throw new IdentityError(
-                          409,
-                          'CONFLICT',
-                          'Receipt stock evidence changed.',
-                        );
+                        throw conflict('Receipt stock evidence changed.');
                       started = true;
 
                       return await operation();
@@ -320,9 +283,7 @@ export function createShopifyInventoryCorrection(
       force,
     );
     if (force && Date.parse(authority.source.observedAt) < startedAt)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
+      throw unavailable(
         'A new complete ERP stock read could not be confirmed. Existing holds remain unchanged.',
       );
     const snapshot = await (
@@ -530,11 +491,7 @@ export function createShopifyInventoryCorrection(
             request.purchaseOrderId ||
           existing.target.receipt.lineId !== request.lineId
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This request belongs to another receipt.',
-          );
+          throw conflict('This request belongs to another receipt.');
 
         return service.preview(tenant, {
           requestId: request.requestId,
@@ -547,9 +504,7 @@ export function createShopifyInventoryCorrection(
         request.lineId,
       );
       if (receipt.quantity <= 0)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'All undamaged units in this receipt have already been booked.',
         );
       await context.refreshStock?.(tenant, receipt.positionId);
@@ -572,11 +527,7 @@ export function createShopifyInventoryCorrection(
         await provider(tenant, receipt.connectionId)
       ).read(mapping.inventoryItemId, mapping.locationId);
       if (baseline.available === null)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Read Shopify stock before booking this receipt.',
-        );
+        throw conflict('Read Shopify stock before booking this receipt.');
       target.receipt.baselineAvailable = baseline.available;
 
       return service.preview(tenant, {

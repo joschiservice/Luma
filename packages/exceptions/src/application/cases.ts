@@ -1,5 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
+import { unavailable } from '@luma/platform';
 
 import type { Diagnosis } from '../domain/diagnosis.js';
 import type { Incident } from './detection.js';
@@ -181,12 +182,7 @@ export function createCaseService(
       id: string,
       input: { userId: string | null; revision: number },
     ) {
-      if (!owners)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Case assignment is unavailable',
-        );
+      if (!owners) throw unavailable('Case assignment is unavailable');
 
       return owners.assign(context, id, input);
     },
@@ -195,12 +191,7 @@ export function createCaseService(
      * `createCaseOwners().claim`.
      */
     async claimOwner(context: TenantContext, id: string, userId: string) {
-      if (!owners)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Case assignment is unavailable',
-        );
+      if (!owners) throw unavailable('Case assignment is unavailable');
 
       return owners.claim(context, id, userId);
     },

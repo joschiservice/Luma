@@ -91,6 +91,7 @@ const suites = {
       '@luma/api',
       'test:browser',
       'supplier-commitments.browser.mjs',
+      'evidence.browser.mjs',
       'purchasing-workbench.browser.mjs',
       'replenishment.browser.mjs',
       'inbox.browser.mjs',

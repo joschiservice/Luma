@@ -17,7 +17,7 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
-import { IdentityError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import {
   stockProtectionApi,
   stockProtectionOptions,
@@ -45,7 +45,7 @@ export function StockProtectionSettings({
 }) {
   const query = useQuery(stockProtectionOptions(organizationId));
   if (
-    query.error instanceof IdentityError &&
+    query.error instanceof ApiError &&
     [401, 403, 404].includes(query.error.status)
   )
     return null;

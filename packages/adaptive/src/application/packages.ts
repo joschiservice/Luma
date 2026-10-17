@@ -1,11 +1,18 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   isPermission,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import type {
   OperationalPackage,
@@ -71,13 +78,11 @@ export function createOperationalPackages(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, 'adaptive.packages.manage');
     if (write) requireChangesAllowed(fresh);
     if (!(await deps.released(fresh)))
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
+      throw unavailable(
         'Operational packages are not enabled for this workspace.',
       );
 
@@ -88,8 +93,7 @@ export function createOperationalPackages(deps: {
     const found = deps.definitions.find(
       (d) => d.id === id && d.version === version,
     );
-    if (!found)
-      throw new IdentityError(404, 'NOT_FOUND', 'Package version not found.');
+    if (!found) throw notFound('Package version not found.');
 
     return found;
   }
@@ -123,30 +127,18 @@ export function createOperationalPackages(deps: {
         (key) => !d.parameters.some((p) => p.key === key),
       )
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'The package does not define this parameter.',
-      );
+      throw invalid('The package does not define this parameter.');
     for (const p of d.parameters) {
       const value = config.parameters[p.key];
       if (
         (value === undefined && p.required) ||
         (value !== undefined && typeof value !== p.type)
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          `Configure the ${p.key} parameter as ${p.type}.`,
-        );
+        throw invalid(`Configure the ${p.key} parameter as ${p.type}.`);
     }
     for (const permission of d.permissions) {
       if (!isPermission(permission))
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'A required package permission is unavailable.',
-        );
+        throw invalid('A required package permission is unavailable.');
       requirePermission(context, permission as Permission);
     }
     const configured = await deps.configure(context, d, config);
@@ -246,9 +238,7 @@ export function createOperationalPackages(deps: {
         const receipt = await tx.receipt(request.commandId);
         if (receipt) {
           if (receipt.digest !== commandDigest)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This command ID was used for a different package change.',
             );
 
@@ -257,13 +247,9 @@ export function createOperationalPackages(deps: {
         const prior = await tx.installation(id);
         const p = await prepare(context, id, request, prior);
         if (p.reviewDigest !== request.reviewDigest)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The package review changed. Preview it again.',
-          );
+          throw conflict('The package review changed. Preview it again.');
         if (p.missing.length)
-          throw new IdentityError(409, 'NOT_READY', p.missing.join(' '));
+          throw new ServiceError(409, 'NOT_READY', p.missing.join(' '));
         // Same version and configuration are a no-op even under a new command ID.
         if (
           prior &&
@@ -280,9 +266,7 @@ export function createOperationalPackages(deps: {
           return summary(p.d, prior);
         }
         if (prior && deps.digest(prior.config) !== deps.digest(p.config))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Keep the installed workspace configuration when applying a new package version. Edit local resources separately.',
           );
         const resources = await tx.install(context, p.configured, prior);
@@ -324,25 +308,15 @@ export function createOperationalPackages(deps: {
         const receipt = await tx.receipt(request.commandId);
         if (receipt) {
           if (receipt.digest !== digest)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This command ID was used for another change.',
-            );
+            throw conflict('This command ID was used for another change.');
 
           return { removed: true as const };
         }
         const prior = await tx.installation(id);
         if (!prior || prior.removed)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Package installation not found.',
-          );
+          throw notFound('Package installation not found.');
         if (prior.revision !== request.revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'The installation changed. Reload before removing it.',
           );
         await tx.remove(context, prior);

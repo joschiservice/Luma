@@ -1,4 +1,4 @@
-import { IdentityError } from '@luma/identity';
+import { invalid } from '@luma/platform';
 
 /**
  * Where a metric's next page starts: after the record with sort `key`. `offset` counts the
@@ -59,9 +59,7 @@ export function readMetricCursor(
   if (value === undefined) return undefined;
   const cursor = decodeMetricCursor(value);
   if (!cursor || !metrics.includes(cursor.metric) || !validKey(cursor.key))
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
+    throw invalid(
       'This page cursor is not valid for this request. Start again from the first page.',
     );
 

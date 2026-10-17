@@ -36,7 +36,7 @@ import { ArrowRight, Database, Plug } from 'lucide-react';
 import { useState } from 'react';
 
 import { connectionsOptions } from '../../kit/connections/data';
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { linkMethodLabel } from '../sync/presentation';
 import {
   recordListError,
@@ -455,8 +455,7 @@ export function RecordDetailPage() {
   const listHref = `/app/${encodeURIComponent(organizationId)}/records${listParams.size ? `?${listParams}` : ''}`;
   const record = query.data?.record;
   const denied =
-    query.error instanceof IdentityError &&
-    [401, 403].includes(query.error.status);
+    query.error instanceof ApiError && [401, 403].includes(query.error.status);
 
   return (
     <div className="records-page record-detail-page">

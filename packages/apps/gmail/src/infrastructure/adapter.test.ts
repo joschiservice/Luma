@@ -403,6 +403,10 @@ describe('messages.send', () => {
       status: 'accepted',
       evidenceRefs: [sentEvidenceId(tenantId, connectionId, 'sent-1')],
       providerRequestId: null,
+      records: [
+        { resource: 'message', externalId: 'sent-1' },
+        { resource: 'thread', externalId: 't1' },
+      ],
     });
   });
 

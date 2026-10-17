@@ -1,6 +1,6 @@
 import { ConnectorError } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import type { CaseRun, ProcessActionResult } from '@luma/workflows';
 
 /** What a case workflow needs to know about one of the app's governed changes. */
@@ -41,10 +41,10 @@ export function createGovernedSteps(deps: {
 }) {
   // Settled failures hand the case to a person; transient ones let the activity retry.
   const conflict = (error: unknown) =>
-    (error instanceof IdentityError && [404, 409].includes(error.statusCode)) ||
+    (error instanceof ServiceError && [404, 409].includes(error.statusCode)) ||
     (error instanceof ConnectorError && error.failure.retry === 'never');
   const problem = (error: unknown) =>
-    error instanceof IdentityError
+    error instanceof ServiceError
       ? error.message
       : error instanceof ConnectorError && error.failure.code === 'not_found'
         ? 'Shopify no longer has this record.'

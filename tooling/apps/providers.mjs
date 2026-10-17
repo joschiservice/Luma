@@ -8,9 +8,6 @@ import {
   createStarshipitProvider,
 } from '@luma/app-starshipit';
 import {
-  createInstalledMessageRuntime as mailboxes,
-  createInstalledPurchaseOrderRuntime as purchaseOrders,
-  createInstalledReturnRuntime as returns,
   createInstalledRuntime as runtime,
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
@@ -93,6 +90,8 @@ export function createInstalledConnections(db, options) {
 
   return {
     ...host.connections,
+    // The host shape `applicationOptionsFor` derives runtime options from.
+    connections: host.connections,
     close: host.close,
     apps: host.apps,
     registry: host.registry,
@@ -117,28 +116,4 @@ export function createInstalledShippingMethodEffects(options, binding) {
     { ...options, providers: options.providers ?? fixtureProviders(options) },
     binding,
   );
-}
-
-/** Builds simulator purchase-order reads and submission effects with explicit providers. */
-export function createInstalledPurchaseOrderRuntime(options) {
-  return purchaseOrders({
-    ...options,
-    providers: options.providers ?? fixtureProviders(options),
-  });
-}
-
-/** Builds simulator mailbox reads and reply send effects with explicit providers. */
-export function createInstalledMessageRuntime(options) {
-  return mailboxes({
-    ...options,
-    providers: options.providers ?? fixtureProviders(options),
-  });
-}
-
-/** Builds simulator return reads and return-creation effects with explicit providers. */
-export function createInstalledReturnRuntime(options) {
-  return returns({
-    ...options,
-    providers: options.providers ?? fixtureProviders(options),
-  });
 }

@@ -15,4 +15,11 @@ export type {
   DecisionQueue,
 } from './application/decisions.js';
 
+export type {
+  EvidenceOwners,
+  EvidenceSubjectOwner,
+} from './application/evidence.js';
+
+export type { StoredEvidence } from './domain/evidence.js';
+
 export type { Insights } from './application/insights.js';

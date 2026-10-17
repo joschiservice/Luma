@@ -2,7 +2,13 @@ import '@luma/identity/http';
 
 import { ConnectorError } from '@luma/connections';
 import { AdmissionRejected } from '@luma/execution';
-import { IdentityError } from '@luma/identity';
+import {
+  conflict,
+  forbidden,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 
@@ -42,7 +48,7 @@ export function registerInventoryCorrectionRoutes(
       async (request, reply) => {
         reply.header('cache-control', 'no-store');
         if (!request.tenantContext)
-          throw new IdentityError(
+          throw new ServiceError(
             401,
             'UNAUTHENTICATED',
             'Sign in to continue.',
@@ -51,39 +57,31 @@ export function registerInventoryCorrectionRoutes(
           return await service[command](request.tenantContext, request.body);
         } catch (error) {
           if (error instanceof ZodError)
-            throw new IdentityError(
+            throw new ServiceError(
               422,
               'CONFLICT',
               'Choose a valid stock position and approved source.',
             );
           if (error instanceof AdmissionRejected)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This action is no longer eligible. Refresh inventory details.',
             );
           if (
             error instanceof ConnectorError &&
             error.failure.code === 'not_found'
           )
-            throw new IdentityError(
-              404,
-              'NOT_FOUND',
+            throw notFound(
               'This Shopify inventory item or location was not found.',
             );
           if (
             error instanceof ConnectorError &&
             ['authentication', 'permission_denied'].includes(error.failure.code)
           )
-            throw new IdentityError(
-              403,
-              'FORBIDDEN',
+            throw forbidden(
               'Reconnect Shopify with access to this inventory item and location.',
             );
           if (error instanceof ConnectorError)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
+            throw unavailable(
               'Shopify could not confirm this action. Refresh to check its status before continuing.',
             );
           throw error;

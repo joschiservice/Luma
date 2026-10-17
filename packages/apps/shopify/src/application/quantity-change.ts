@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { OrderChangePlan, OrderChangePlans } from '@luma/api-contract';
 import type { InstalledConnection } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { conflict } from '@luma/platform';
 import type {
   CaseRun,
   CaseWorkflowAdapter,
@@ -429,17 +429,11 @@ export function createQuantityChangeWorkflow(deps: {
         const quantity = pinned(previous);
         const result = quantity ? await plan(context, run, quantity) : null;
         if (!result || 'problem' in result)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            result?.problem ?? 'The run has no target quantity.',
-          );
+          throw conflict(result?.problem ?? 'The run has no target quantity.');
         const edit = shopifyStep(result.plan);
         const assessed = assess(result.plan, await shops(context));
         if (!edit?.connectionId || !edit.handoff || !assessed.safe)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             assessed.problem || 'Luma can’t edit this Shopify order now.',
           );
 

@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { OutboundRepository, OutboundRow } from '../application/store.js';
 
@@ -74,9 +74,7 @@ export function outboundRepository(
           'code' in error &&
           error.code === '23505'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A submission already exists for this order. Refresh the Operations Inbox before drafting again.',
           );
         throw error;
@@ -121,6 +119,20 @@ export function outboundRepository(
       await tx.query(
         "UPDATE messaging_messages SET origin='luma' WHERE tenant_id=$1 AND id=$2",
         [tenantId, messageId],
+      );
+    },
+    async recordSendReceipt(receipt) {
+      await tx.query(
+        `INSERT INTO messaging_send_receipts(tenant_id,id,outbound_id,connection_id,accepted_at,document)
+        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+        [
+          tenantId,
+          receipt.id,
+          receipt.outboundId,
+          receipt.source.connectionId,
+          receipt.observedAt,
+          receipt,
+        ],
       );
     },
   };

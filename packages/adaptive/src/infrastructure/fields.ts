@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, notFound } from '@luma/platform';
 
 import type {
   CustomFieldEvent,
@@ -293,11 +292,7 @@ export function createFieldsStore(
               await audit({
                 transaction: async (tenant, work) => {
                   if (tenant !== tenantId)
-                    throw new IdentityError(
-                      404,
-                      'NOT_FOUND',
-                      'Workspace not found.',
-                    );
+                    throw notFound('Workspace not found.');
 
                   return work(tx);
                 },

@@ -10,7 +10,7 @@ import { createClient, parse, type RequestPacer } from '@luma/connector-cin7';
 import * as s from '@luma/connector-cin7/schemas';
 import type { z } from 'zod';
 
-import { installationTarget } from './installation-validation.js';
+import { installationTarget } from '../domain/installation-validation.js';
 
 const probes: {
   path: string;

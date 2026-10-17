@@ -362,6 +362,34 @@ test('the declared module graph is acyclic and references registered modules', (
   for (const name of Object.keys(dependencies)) visit(name);
 });
 
+test("ADR-001's module table matches the enforced dependency map", () => {
+  const adr = readFileSync(
+    filename('docs/architecture/001-module-boundaries.md'),
+    'utf8',
+  );
+  const table = adr
+    .split('## Module map and allowed imports')[1]
+    .split('\n## ')[0]
+    .split('\n')
+    .filter((line) => line.startsWith('| '))
+    .slice(2) // Header and separator rows.
+    .map((line) => line.split('|').map((cell) => cell.trim()));
+  const documented = Object.fromEntries(
+    table.map(([, name, , providers]) => [
+      name,
+      providers === 'none' ? [] : providers.split(/,\s*/).sort(),
+    ]),
+  );
+  const enforced = Object.fromEntries(
+    Object.entries(dependencies).map(([name, providers]) => [
+      name,
+      [...providers].sort(),
+    ]),
+  );
+
+  assert.deepEqual(documented, enforced);
+});
+
 test('simulator packages cannot cross provider or connector boundaries', () => {
   assert.equal(
     violation(

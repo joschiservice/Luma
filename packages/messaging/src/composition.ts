@@ -34,6 +34,11 @@ export { documentExtractionProfile } from './infrastructure/extraction.js';
 
 export { purgeExpiredMessaging } from './infrastructure/store.js';
 
+export {
+  replyCitations,
+  replyEvidence,
+} from './infrastructure/reply-evidence.js';
+
 const digest = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 

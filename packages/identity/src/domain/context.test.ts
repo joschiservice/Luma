@@ -1,9 +1,9 @@
+import { conflict, notFound, ServiceError } from '@luma/platform';
 import { expect, it } from 'vitest';
 
 import {
   AccountDisabledError,
   hasPermission,
-  IdentityError,
   makeTenantContext,
   MembershipSuspendedError,
   pausesBackgroundWork,
@@ -113,7 +113,7 @@ it.each(['suspended', 'closed'] as const)(
     expect(resolve('u')).toThrow(
       expect.objectContaining({ statusCode: 404, code: 'NOT_FOUND' }),
     );
-    expect(resolve('other')).toThrow(IdentityError);
+    expect(resolve('other')).toThrow(ServiceError);
     expect(resolve('other')).not.toThrow(WorkspaceInactiveError);
   },
 );
@@ -182,8 +182,19 @@ it('pauses background work only for an inactive workspace or a suspended member'
   expect(pausesBackgroundWork(new WorkspaceInactiveError())).toBe(true);
   expect(pausesBackgroundWork(new MembershipSuspendedError())).toBe(true);
   expect(pausesBackgroundWork(new AccountDisabledError())).toBe(true);
-  expect(
-    pausesBackgroundWork(new IdentityError(404, 'NOT_FOUND', 'Removed')),
-  ).toBe(false);
+  expect(pausesBackgroundWork(notFound('Removed'))).toBe(false);
   expect(pausesBackgroundWork(new Error('Unavailable'))).toBe(false);
+});
+
+it('treats service errors and identity errors as one error type', () => {
+  const thrown = notFound('Order not found');
+
+  expect(thrown).toBeInstanceOf(ServiceError);
+  expect(conflict('Changed')).toBeInstanceOf(ServiceError);
+  expect(new WorkspaceInactiveError()).toBeInstanceOf(ServiceError);
+  expect(thrown).toMatchObject({
+    statusCode: 404,
+    code: 'NOT_FOUND',
+    message: 'Order not found',
+  });
 });

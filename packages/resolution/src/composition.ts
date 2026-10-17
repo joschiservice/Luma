@@ -30,7 +30,14 @@ export { createOperationsOverview } from './application/overview.js';
 
 export { createDeskStore } from './infrastructure/persistence/desk.js';
 
+export {
+  caseCitations,
+  caseRecords,
+} from './infrastructure/persistence/case-evidence.js';
+
 export { createDetectionSources } from './infrastructure/persistence/detection-sources.js';
+
+export { createStockProtectionHoldReader } from './infrastructure/persistence/stock-protection-holds.js';
 
 /** Composes explicit review-only discovery from authoritative retained learning and environment facts. */
 export function createResolutionImprovementDiscovery(

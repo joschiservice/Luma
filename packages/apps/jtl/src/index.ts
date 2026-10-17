@@ -12,14 +12,14 @@ import { hasPermission } from '@luma/identity';
 import { z } from 'zod';
 
 import { type JtlEndpoint, readJtlEndpoints } from './config.js';
-import { jtlPermissions } from './domain/permissions.js';
-import { createJtlConnector } from './infrastructure/adapter.js';
-import { approvedJtlFetch } from './infrastructure/approved-jtl-fetch.js';
 import {
   installationCredentials,
   installationInput,
   installationTarget,
-} from './infrastructure/installation-validation.js';
+} from './domain/installation-validation.js';
+import { jtlPermissions } from './domain/permissions.js';
+import { createJtlConnector } from './infrastructure/adapter.js';
+import { approvedJtlFetch } from './infrastructure/approved-jtl-fetch.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export { createJtlConnector };

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import { recordListError, recordReturnPath, recordsSearch } from './data';
 
 it('keeps record return links within the selected workspace', () => {
@@ -22,7 +22,7 @@ it('keeps valid page positions in the URL and drops malformed ones', () => {
 });
 
 it('explains a page link that no longer matches the search', () => {
-  const stale = new IdentityError(400, {
+  const stale = new ApiError(400, {
     code: 'VALIDATION_ERROR',
     message:
       'This page link no longer matches the record search. Start from the first page.',
@@ -36,7 +36,7 @@ it('explains a page link that no longer matches the search', () => {
   expect(recordListError(stale, { q: 'tote' })).toEqual({
     kind: 'unavailable',
   });
-  expect(recordListError(new IdentityError(404), { q: '' })).toEqual({
+  expect(recordListError(new ApiError(404), { q: '' })).toEqual({
     kind: 'access',
   });
   expect(recordListError(undefined, { q: '' })).toBeUndefined();

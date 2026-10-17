@@ -1,7 +1,9 @@
 import type { Diagnosis, IncidentVerificationAttempt } from '@luma/exceptions';
-import { IdentityError } from '@luma/identity';
 import {
   canonicalJson as canonicalPlaybook,
+  conflict,
+  forbidden,
+  notFound,
   type TenantDatabase,
 } from '@luma/platform';
 import type {
@@ -16,10 +18,7 @@ import type {
   ShadowEvaluation,
 } from '../../application/shadow-evaluation.js';
 
-const missing = () =>
-  new IdentityError(404, 'NOT_FOUND', 'Shadow evaluation or case not found');
-const conflict = (message: string) =>
-  new IdentityError(409, 'CONFLICT', message);
+const missing = () => notFound('Shadow evaluation or case not found');
 
 /** Stores immutable Shadow snapshots and reviews under tenant RLS; reads only retained production evidence. */
 export function createShadowStore(
@@ -121,11 +120,7 @@ export function createShadowStore(
         let version = null;
         if (candidate) {
           if (candidate.principalId !== context.actor.id)
-            throw new IdentityError(
-              403,
-              'FORBIDDEN',
-              'Proposal belongs to another principal',
-            );
+            throw forbidden('Proposal belongs to another principal');
           if (!row.version || typeof row.version !== 'object')
             throw conflict('Playbook version unavailable');
           const { digest, ...source } = row.version as Record<string, unknown>;

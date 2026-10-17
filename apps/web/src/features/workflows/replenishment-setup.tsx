@@ -22,7 +22,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 
-import { IdentityError } from '../../kit/identity/data';
+import { ApiError } from '../../kit/identity/data';
 import {
   configureReplenishmentBatch,
   previewReplenishment,
@@ -77,7 +77,7 @@ const previewOutcomes = {
 >;
 
 const uncertainError = (error: unknown) =>
-  !(error instanceof IdentityError) || error.status >= 500;
+  !(error instanceof ApiError) || error.status >= 500;
 
 type SetupFlowProps = {
   organizationId: string;
