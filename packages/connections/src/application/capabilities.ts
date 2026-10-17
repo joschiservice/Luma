@@ -52,6 +52,12 @@ export interface InvocationContext {
   provider: string;
   /** Present for writes; adapters namespace the key by tenant and connection. */
   idempotencyKey?: string;
+  /**
+   * Present for writes: the connection's adapter version and the dispatch identity execution
+   * pinned for the attempt, so an adapter that stores its own acceptance can record them.
+   */
+  adapterVersion?: string;
+  dispatchIdentity?: string;
   /** Internal scheduling intent supplied by a service, outside capability input. */
   readPurpose?: 'foreground' | 'incremental' | 'history';
 }
@@ -216,7 +222,16 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             ...(request.readPurpose
               ? { readPurpose: request.readPurpose }
               : {}),
-            ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+            ...(idempotencyKey === undefined
+              ? {}
+              : {
+                  idempotencyKey,
+                  adapterVersion: connection.adapterVersion,
+                  dispatchIdentity: dispatchIdentity(
+                    connection,
+                    request.capability,
+                  ),
+                }),
           },
           input,
         ),
