@@ -49,7 +49,7 @@
     "observe:queries": "node tooling/observability/queries.mjs",
     "evaluate:playbook": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... --filter=@luma/app-jtl... --filter=@luma/app-shopify... && node tooling/evaluation/cli.mjs",
     "evaluate:red-team": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... --filter=@luma/app-jtl... --filter=@luma/app-shopify... && node tooling/evaluation/red-team-cli.mjs",
-    "propose:red-team": "pnpm exec turbo run build --filter=@luma/config --filter=@luma/resolution... --filter=@luma/simulator... && node tooling/evaluation/red-team-propose-cli.mjs",
+    "propose:red-team": "pnpm exec turbo run build --filter=@luma/config --filter=@luma/resolution... --filter=@luma/simulator... --filter=@luma/app-jtl... --filter=@luma/app-shopify... && node tooling/evaluation/red-team-propose-cli.mjs",
     "test:evaluation": "pnpm exec turbo run build --filter=@luma/config --filter=@luma/resolution... --filter=@luma/simulator... --filter=@luma/app-jtl... --filter=@luma/app-shopify... --filter=@luma/procurement... && node --test tooling/evaluation/*.test.mjs",
     "shopify:cost-check": "pnpm exec turbo run build --filter=@luma/tooling^... && node tooling/shopify/cost-check.mjs",
     "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs",
