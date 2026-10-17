@@ -136,3 +136,17 @@ export const passkey = pgTable('passkeys', {
   aaguid: text('aaguid'),
   createdAt: time('created_at'),
 });
+
+// The account security mail outbox, as far as Better Auth writes it; delivery columns keep
+// their database defaults. See `securityMailSchema`.
+export const securityMail = pgTable('password_security_mail', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  resetToken: text('reset_token'),
+  factor: text('factor'),
+  locale: text('locale').notNull(),
+  expiresAt: time('expires_at').notNull(),
+});

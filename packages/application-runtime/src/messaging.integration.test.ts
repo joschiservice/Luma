@@ -88,6 +88,10 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
       sentAt: input.receivedAt,
       labels: ['INBOX'],
       attachments: [],
+      // The mailbox provider authenticated the sender, or the mailbox sent the message.
+      ...(input.direction === 'outbound'
+        ? { providerSent: true }
+        : { senderAuthentication: 'aligned' as const }),
       ...input,
     } satisfies MessageData,
   });
@@ -1134,5 +1138,74 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
         .outcome,
     ).toBe('truncated');
     expect(handedOff).toHaveLength(before);
+  });
+
+  it('keeps a forged message from suppressing the genuine one or linking on its sender', async () => {
+    const before = handedOff.length;
+    const shared = `confirm-${randomUUID()}@acme.example`;
+    mailbox.push(
+      message('m-forged', 't-shared', {
+        from: anna,
+        to: [ops],
+        subject: 'Delivery for PO-1001',
+        text: 'PO-1001 ships in December.',
+        rfcMessageId: shared,
+        senderAuthentication: 'unaligned',
+        receivedAt: new Date().toISOString(),
+      }),
+    );
+    await messaging.service.syncMailbox(adminContext(), connectionId);
+    await drain();
+    let detail = await threadByProvider('t-shared');
+    expect(detail.messages.map((m) => m.senderAuthentication)).toEqual([
+      'unaligned',
+    ]);
+    // The From address is only a claim: the supplier link waits for a person.
+    expect(
+      detail.links
+        .map((l) => [l.record.kind, l.state, l.evidence.senderUnverified])
+        .sort(),
+    ).toEqual([
+      ['purchase_order', 'active', false],
+      ['supplier', 'suggested', true],
+    ]);
+    expect(handedOff.slice(before)).toEqual([
+      expect.objectContaining({ messageId: shared, senderVerified: false }),
+    ]);
+
+    // The genuine message with the same Message-ID is stored and handed off on its own.
+    mailbox.push(
+      message('m-genuine', 't-shared', {
+        from: anna,
+        to: [ops],
+        subject: 'Re: Delivery for PO-1001',
+        text: 'PO-1001 ships on time.',
+        rfcMessageId: shared,
+        receivedAt: new Date().toISOString(),
+      }),
+    );
+    await messaging.service.syncMailbox(adminContext(), connectionId);
+    await drain();
+    detail = await threadByProvider('t-shared');
+    expect(
+      detail.messages.map((m) => [m.text, m.senderAuthentication]),
+    ).toEqual([
+      ['PO-1001 ships in December.', 'unaligned'],
+      ['PO-1001 ships on time.', 'aligned'],
+    ]);
+    expect(
+      detail.links
+        .map((l) => [l.record.kind, l.state, l.evidence.senderUnverified])
+        .sort(),
+    ).toEqual([
+      ['purchase_order', 'active', false],
+      ['supplier', 'active', false],
+    ]);
+    const handed = handedOff.slice(before);
+    expect(handed.map((h) => [h.body, h.senderVerified])).toEqual([
+      ['PO-1001 ships in December.', false],
+      ['PO-1001 ships on time.', true],
+    ]);
+    expect(new Set(handed.map((h) => h.id)).size).toBe(2);
   });
 });

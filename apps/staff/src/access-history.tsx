@@ -22,6 +22,12 @@ const eventLabels: Record<string, string> = {
   'role.app_permissions_removed': 'App permissions removed from role',
   'policy.updated': 'Approval policy changed',
   'workspace.updated': 'Workspace details changed',
+  'support_inspection.requested': 'Inspection requested by staff',
+  'support_inspection.approved': 'Inspection approved',
+  'support_inspection.declined': 'Inspection declined',
+  'support_inspection.expired': 'Inspection request lapsed',
+  'support_inspection.revoked': 'Inspection revoked',
+  'support_inspection.emergency_opened': 'Emergency inspection opened by staff',
 };
 
 /** Lists member, invitation, role, policy and workspace changes, newest first, under the support grant. */

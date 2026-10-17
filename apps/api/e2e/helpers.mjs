@@ -168,6 +168,50 @@ export async function database(t) {
   };
 }
 
+/**
+ * Writes a membership directly with the database owner pool and returns its ID. Customers add
+ * people only through invitations; journeys that need extra members use this fixture instead.
+ * `roleId` is a built-in role key or a custom role ID. Like a real member change, it also
+ * records the `member.add` workspace access event, attributed to `actorId` or else the
+ * workspace's first owner, or the added person when the workspace has no owner yet.
+ */
+export async function addMembership(
+  owner,
+  tenantId,
+  userId,
+  roleId,
+  actorId = null,
+) {
+  const builtIn = { owner: 'Owner', admin: 'Admin', member: 'Member' };
+  const custom = !Object.hasOwn(builtIn, roleId);
+  const id = randomUUID();
+  await owner.query(
+    `WITH added AS (
+      INSERT INTO memberships(id,tenant_id,user_id,role,custom_role_id,created_at)
+      VALUES($1,$2,$3,$4,$5,now()) RETURNING id
+    )
+    INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value)
+    SELECT $6,$2,COALESCE($7::uuid,(SELECT user_id FROM memberships WHERE tenant_id=$2 AND role='owner'
+      ORDER BY created_at LIMIT 1),$3::uuid),'member.add',added.id::text,'null'::jsonb,
+      jsonb_build_object('id',added.id,'userId',$3::text,'roleId',$8::text,'roleName',
+        COALESCE($9::text,(SELECT name FROM workspace_roles WHERE tenant_id=$2 AND id::text=$8::text)))
+    FROM added`,
+    [
+      id,
+      tenantId,
+      userId,
+      custom ? 'custom' : roleId,
+      custom ? roleId : null,
+      randomUUID(),
+      actorId,
+      roleId,
+      custom ? null : builtIn[roleId],
+    ],
+  );
+
+  return id;
+}
+
 /** Starts the built API on an assigned port and waits for readiness. */
 export async function startApi(
   t,
@@ -187,6 +231,8 @@ export async function startApi(
       BETTER_AUTH_SECRET: secret,
       BETTER_AUTH_URL: browserOrigin,
       OBSERVABILITY_ENVIRONMENT: 'test',
+      // Journeys sign in many times from one loopback address; limits have their own tests.
+      AUTH_RATE_LIMIT: 'off',
       ...env,
     },
     true,
@@ -211,6 +257,7 @@ export async function startApi(
   return {
     origin,
     process,
+    db,
     async request(path, { method = 'GET', cookie, body, status = 200 } = {}) {
       const response = await fetch(`${origin}${path}`, {
         method,
@@ -233,24 +280,92 @@ export async function startApi(
   };
 }
 
-/** Registers a test user and returns its session cookie and identifier. */
+/**
+ * Confirms a test account's email address directly, as following the emailed link would.
+ * `owner` is the test database's owner pool.
+ */
+export async function verifyEmail(owner, email) {
+  const result = await owner.query(
+    'UPDATE users SET email_verified=true WHERE email=$1',
+    [email.toLowerCase()],
+  );
+  assert.strictEqual(result.rowCount, 1, `No account for ${email}`);
+}
+
+/**
+ * Registers a test user, confirms its email address and signs in. Returns the session cookie
+ * and identifier. `api` must come from `startApi`.
+ */
 export async function signup(api, name) {
+  const email = `${name}@example.test`;
+  const password = 'long-e2e-test-password';
   const response = await api.request('/auth/sign-up/email', {
     method: 'POST',
     body: {
       name,
-      email: `${name}@example.test`,
-      password: 'long-e2e-test-password',
+      email,
+      password,
       dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
-  const cookie = response.headers
+  assert.strictEqual(
+    response.headers.getSetCookie().length,
+    0,
+    'Signup must not issue a session before the email is confirmed',
+  );
+  await verifyEmail(api.db.owner, email);
+  const signedIn = await api.request('/auth/sign-in/email', {
+    method: 'POST',
+    body: { email, password },
+  });
+  const cookie = signedIn.headers
     .getSetCookie()
     .map((value) => value.split(';')[0])
     .join('; ');
-  assert.ok(cookie, 'Signup must issue a session cookie');
+  assert.ok(cookie, 'Sign-in must issue a session cookie');
 
   return { cookie, userId: response.body.user.id };
+}
+
+/**
+ * Creates an account through the web sign-up form, confirms its email address in the database
+ * and signs in through the sign-in form. The page then shows what follows sign-in, such as
+ * workspace creation for a new account.
+ */
+export async function createAccount(
+  page,
+  db,
+  { name, email, password, region = /Australia/ },
+) {
+  await page.goto('/sign-up');
+  await page.getByRole('radio', { name: region }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill(name);
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  const registered = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/auth/sign-up/email') &&
+      response.request().method() === 'POST',
+  );
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  const response = await registered;
+  assert.strictEqual(response.status(), 200, await response.text());
+  await confirmAndSignIn(page, db, email, password);
+}
+
+/**
+ * Confirms a registered account's email address in the database and signs in through the web
+ * sign-in form, returning to the application.
+ */
+export async function confirmAndSignIn(page, db, email, password) {
+  await verifyEmail(db.owner, email);
+  await page.goto('/sign-in');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 /** Reserves and releases a loopback port for a test server to bind. */

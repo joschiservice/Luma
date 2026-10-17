@@ -741,6 +741,13 @@ export interface MailboxFilter {
   includeSent: boolean;
 }
 
+/**
+ * Whether the mailbox's receiving system authenticated the From domain: `aligned` when DMARC
+ * passed for exactly that domain, `unaligned` when it was checked and did not, `unknown` when
+ * the provider reported no result. Only `aligned` identifies the sender.
+ */
+type SenderAuthentication = 'aligned' | 'unaligned' | 'unknown';
+
 interface MessageAddress {
   /** Lower-case address. */
   address: string;
@@ -775,6 +782,8 @@ export interface MessageSnapshot {
   /** True only when provider-owned metadata confirms a sent message. */
   providerSent?: boolean;
   from: MessageAddress;
+  /** Missing means `unknown`: the From address alone never identifies the sender. */
+  senderAuthentication?: SenderAuthentication;
   to: MessageAddress[];
   cc: MessageAddress[];
   replyTo: MessageAddress[];

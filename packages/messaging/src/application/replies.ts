@@ -10,7 +10,11 @@ import { canonicalJson } from '@luma/platform';
 
 import { consequentialReasons } from '../domain/consequential.js';
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
-import type { RecordState, ReplyBasis } from '../domain/replies.js';
+import type {
+  DeliveryOutcome,
+  RecordState,
+  ReplyBasis,
+} from '../domain/replies.js';
 import {
   composeReply,
   liveStates,
@@ -393,10 +397,19 @@ export function createReplies(deps: ReplyDependencies) {
 
         return;
       }
+      // A read proves acceptance, not delivery: an unverified delivery report keeps it uncertain,
+      // and the send itself is recorded once.
+      const report = current.document.unverifiedDeliveryReport;
+      if (report?.sendRecorded) return;
       await tx.outbound.markMessageSent(found.id);
       const saved = await save(tx, current, {
-        state: 'sent',
-        document: { sentMessageId: found.id, stateReason: null },
+        state: report ? 'uncertain' : 'sent',
+        document: report
+          ? {
+              sentMessageId: found.id,
+              unverifiedDeliveryReport: { ...report, sendRecorded: true },
+            }
+          : { sentMessageId: found.id, stateReason: null },
       });
       await tx.audit(
         audit(null, context.tenantId, {
@@ -413,11 +426,12 @@ export function createReplies(deps: ReplyDependencies) {
     if (!deps.settled) return;
     const outbound = await load(context.tenantId, outboundId);
     if (!outbound.document.procurement) return;
-    if (
-      outbound.document.ownerHandoffAt &&
-      ['sent', 'failed'].includes(outbound.state)
-    )
-      return;
+    // Settled for the record owner: sent, failed, or uncertain because of an unverified
+    // delivery report, which no further read of the send can change.
+    const settledFor = (row: OutboundRow) =>
+      ['sent', 'failed'].includes(row.state) ||
+      (row.state === 'uncertain' && !!row.document.unverifiedDeliveryReport);
+    if (outbound.document.ownerHandoffAt && settledFor(outbound)) return;
     try {
       await deps.settled(context, outbound);
     } catch (error) {
@@ -441,7 +455,7 @@ export function createReplies(deps: ReplyDependencies) {
 
       return;
     }
-    if (['sent', 'failed'].includes(outbound.state))
+    if (settledFor(outbound))
       await deps.store.transaction(context.tenantId, async (tx) => {
         const current = await tx.outbound.get(outboundId, true);
         if (current && current.state === outbound.state)
@@ -1342,6 +1356,117 @@ export function createReplies(deps: ReplyDependencies) {
       return present(context, outboundId);
     },
     /**
+     * Records a person's decision about an uncertain supplier email after they checked with the
+     * supplier: `delivered` settles it as sent, `not_delivered` as failed, so procurement may
+     * draft the submission again. Nothing is sent. Needs `messages.send` and
+     * `procurement.manage`, the current revision and a command ID; an exact retry returns the
+     * recorded result. The record owner is told as the requester, or by the next pass.
+     */
+    async resolveDelivery(
+      context: TenantContext,
+      outboundId: string,
+      input: {
+        id: string;
+        expectedRevision: number;
+        outcome: DeliveryOutcome;
+        note?: string | null | undefined;
+      },
+    ) {
+      context = await authorize(context, 'messages.send');
+      requirePermission(context, 'procurement.manage');
+      const note = input.note?.trim() || null;
+      const resolved = await deps.store.transaction(
+        context.tenantId,
+        async (tx) => {
+          if (
+            !(await once(tx, context, input.id, {
+              command: 'resolve_delivery',
+              outboundId,
+              expectedRevision: input.expectedRevision,
+              outcome: input.outcome,
+              note,
+            }))
+          )
+            return null;
+          const current = await tx.outbound.get(outboundId, true);
+          if (!current) notFound('Reply not found');
+          if (!current!.document.procurement)
+            conflict('Only supplier emails can be marked as delivered or not.');
+          if (current!.state !== 'uncertain')
+            conflict(
+              'This email no longer waits for a delivery decision. Refresh it.',
+            );
+          if (current!.revision !== input.expectedRevision)
+            conflict('This email changed. Refresh and try again.');
+          const at = deps.now().toISOString();
+          const delivered = input.outcome === 'delivered';
+          const saved = await save(tx, current!, {
+            state: delivered ? 'sent' : 'failed',
+            document: {
+              stateReason: delivered
+                ? 'Delivered: a team member confirmed with the supplier that this email arrived.'
+                : 'Not delivered: a team member confirmed with the supplier that this email did not arrive. Check the supplier address before drafting the submission again.',
+              deliveryResolution: {
+                id: input.id,
+                outcome: input.outcome,
+                source: 'person',
+                by: context.actor.id,
+                at,
+                note,
+                messageId: null,
+              },
+              ownerHandoffAt: null,
+            },
+          });
+          const details = {
+            outcome: input.outcome,
+            source: 'person',
+            previousState: 'uncertain',
+            unverifiedReport: current!.document.unverifiedDeliveryReport
+              ? 'yes'
+              : 'no',
+          };
+          await event(
+            tx,
+            saved,
+            'delivery_resolved',
+            { kind: 'user', id: context.actor.id },
+            { outcome: input.outcome, source: 'person' },
+          );
+          await tx.audit(
+            audit(context, context.tenantId, {
+              type: 'reply.delivery_resolved',
+              key: input.id,
+              outbound: saved,
+              details,
+            }),
+          );
+
+          return saved;
+        },
+      );
+      if (resolved)
+        try {
+          // Procurement records the outcome on the requester's submission; a failure here is
+          // retried by the supplier mail pass, because the handoff is still open.
+          await notifyOwner(
+            await requester(
+              resolved,
+              context.tenantId,
+              `reply-delivery:${outboundId}`,
+            ),
+            outboundId,
+          );
+        } catch (error) {
+          deps.log(
+            'A delivery decision could not be handed to the record owner yet; retrying later.',
+            error,
+          );
+        }
+
+      return present(context, outboundId);
+    },
+    /**
      * Discards a draft or withdraws a reply waiting for approval. Without an approved send its
      * action is never eligible again, so nothing can be sent.
      */
@@ -1481,7 +1606,8 @@ export function createReplies(deps: ReplyDependencies) {
           );
           // Refresh permissions for every mailbox read; a check never sends again.
           requirePermission(principal, 'messages.read');
-          if (outbound.state === 'sent') {
+          // Delivery-uncertain sends keep being read so an authenticated report can settle them.
+          if (outbound.state === 'sent' || outbound.state === 'uncertain') {
             const data = await deps.store.transaction(
               context.tenantId,
               async (tx) => {
@@ -1543,6 +1669,12 @@ export function createReplies(deps: ReplyDependencies) {
           const stale =
             now.getTime() - Date.parse(outbound.updatedAt) > sendingGraceMs;
           if (outbound.state === 'sending' && !stale) continue;
+          // Acceptance was already read and the supplier mail check reads the thread for reports;
+          // reconciling the send again cannot settle delivery.
+          if (outbound.document.unverifiedDeliveryReport?.sendRecorded) {
+            await notifyOwner(principal, outbound.id);
+            continue;
+          }
           const execution = await reconcile(principal, outbound);
           // Execution reserves before it dispatches, so a send without an execution record was
           // never dispatched and is started once now; recorded attempts are only read.
@@ -1624,8 +1756,13 @@ export function createReplies(deps: ReplyDependencies) {
       const fresh = await readThread(context, data);
       if (!fresh) return inconclusive();
       const expectedId = `luma.${outboundId}@${(data.outbound.document.fromAddress ?? data.mailbox.address).split('@')[1]}`;
+      // Anyone can send mail with this Message-ID into the thread; only a message the mailbox
+      // itself sent can be the reply, so a copy someone else sent can't block verification.
       const matches = fresh.filter(
-        (item) => item.data.rfcMessageId === expectedId,
+        (item) =>
+          item.data.rfcMessageId === expectedId &&
+          item.data.providerSent === true &&
+          item.data.direction === 'outbound',
       );
       if (matches.length !== 1) return inconclusive();
       const found = matches[0]!;

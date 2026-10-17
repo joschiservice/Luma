@@ -556,6 +556,13 @@ export function eventText(
       return details.reason
         ? m.messaging_event_reply_withheld_reason({ reason: details.reason })
         : m.messaging_event_reply_withheld();
+    case 'delivery_resolved':
+      if (details.source === 'reply')
+        return m.messaging_event_delivery_confirmed_by_reply();
+
+      return details.outcome === 'not_delivered'
+        ? m.messaging_event_delivery_marked_not_delivered()
+        : m.messaging_event_delivery_marked_delivered();
     case 'text_removed':
       return m.messaging_event_text_removed();
   }

@@ -87,6 +87,9 @@ function fixture() {
       state: 'draft',
       stateReason: null,
       sentMessageId: null,
+      delivery: { report: null, resolution: null },
+      canResolveDelivery: false,
+      revision: 1,
     };
     work.push({ outbound, work: request.procurement });
 
@@ -313,6 +316,26 @@ describe('supplier email drafts', () => {
     expect(f.recordEmailSubmission.mock.calls[2]?.[1]).toMatchObject({
       state: 'failed',
       reason: '5.1.1',
+    });
+    // A person's delivery decision is passed on so procurement records who decided, once.
+    const decision = {
+      id: randomUUID(),
+      source: 'person' as const,
+      by: randomUUID(),
+      at: new Date().toISOString(),
+    };
+    await f.service.settled(f.context(), {
+      ...outbound,
+      state: 'failed',
+      document: {
+        ...outbound.document,
+        stateReason: 'Not delivered',
+        deliveryResolution: decision,
+      },
+    });
+    expect(f.recordEmailSubmission.mock.calls[3]?.[1]).toMatchObject({
+      state: 'failed',
+      decision,
     });
     expect(f.respond).not.toHaveBeenCalled();
   });

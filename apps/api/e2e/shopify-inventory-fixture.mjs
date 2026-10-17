@@ -9,6 +9,7 @@ import { readStock, shopify } from '@luma/simulator-shopify';
 import { Pool } from 'pg';
 
 import { appScopes } from './app-scopes.mjs';
+import { addMembership } from './helpers.mjs';
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -180,13 +181,7 @@ export async function correctionFixture(
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,
   );
   const admin = await f.signup('StockApprover');
-  await f.request(
-    f.owner,
-    `${f.base}/members`,
-    'POST',
-    { userId: admin.id, roleId: 'admin' },
-    201,
-  );
+  await addMembership(f.db.owner, f.org.id, admin.id, 'admin');
   await f.request(f.owner, `${f.base}/apps/shopify/install`, 'POST', {
     version: null,
     scopes: appScopes.shopify,

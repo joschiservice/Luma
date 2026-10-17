@@ -19,6 +19,7 @@ import {
   usePasskeySupport,
 } from '../../kit/identity/data';
 import { regionLabel } from '../../kit/identity/region';
+import { ResendConfirmation } from './email-verification';
 import { RegionChoice } from './region-choice';
 import { SecondFactorForm } from './second-factor';
 import { ResolutionStory } from './story';
@@ -40,6 +41,10 @@ export function AuthForm({
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const [challenge, setChallenge] = useState(false);
+  // Set after sign-up: the address the confirmation link went to.
+  const [sentTo, setSentTo] = useState<string>();
+  // Set when a sign-in was refused because the account's address isn't confirmed.
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const passkeys = usePasskeySupport() && !signup;
   const lock = useRef(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
@@ -69,17 +74,22 @@ export function AuthForm({
     lock.current = true;
     setPending(true);
     setMessage('');
+    setUnconfirmed(false);
     try {
       const result = await auth.signIn.passkey();
       if (result.error) {
+        const code = 'code' in result.error ? result.error.code : undefined;
+        setUnconfirmed(code === 'EMAIL_NOT_VERIFIED');
         setMessage(
-          'code' in result.error && result.error.code === 'ACCOUNT_DISABLED'
+          code === 'ACCOUNT_DISABLED'
             ? m.identity_auth_account_disabled()
-            : result.error.status === 400
-              ? m.identity_auth_passkey_canceled()
-              : result.error.status === 401
-                ? m.identity_auth_passkey_unknown()
-                : m.identity_auth_passkey_failed(),
+            : code === 'EMAIL_NOT_VERIFIED'
+              ? m.identity_auth_email_not_verified()
+              : result.error.status === 400
+                ? m.identity_auth_passkey_canceled()
+                : result.error.status === 401
+                  ? m.identity_auth_passkey_unknown()
+                  : m.identity_auth_passkey_failed(),
         );
 
         return;
@@ -109,6 +119,7 @@ export function AuthForm({
       lock.current = true;
       setPending(true);
       setMessage('');
+      setUnconfirmed(false);
       try {
         const result = signup
           ? await signUpInRegion(value, confirmedRegion!)
@@ -117,17 +128,29 @@ export function AuthForm({
               password: value.password,
             });
         if (result.error) {
+          const code = result.error.code;
+          setUnconfirmed(!signup && code === 'EMAIL_NOT_VERIFIED');
           setMessage(
             signup
               ? m.identity_auth_signup_failed()
-              : result.error.code === 'ACCOUNT_DISABLED'
+              : code === 'ACCOUNT_DISABLED'
                 ? m.identity_auth_account_disabled()
-                : result.error.status === 401
-                  ? m.identity_auth_signin_invalid()
-                  : result.error.status === 429
-                    ? m.identity_auth_signin_rate_limited()
-                    : m.identity_auth_signin_failed(),
+                : code === 'EMAIL_NOT_VERIFIED'
+                  ? m.identity_auth_email_not_verified()
+                  : code === 'SIGN_IN_LOCKED'
+                    ? m.identity_auth_signin_locked()
+                    : result.error.status === 401
+                      ? m.identity_auth_signin_invalid()
+                      : result.error.status === 429
+                        ? m.identity_auth_signin_rate_limited()
+                        : m.identity_auth_signin_failed(),
           );
+
+          return;
+        }
+        // A new account has no session until its address is confirmed.
+        if (signup) {
+          setSentTo(value.email.trim());
 
           return;
         }
@@ -158,6 +181,21 @@ export function AuthForm({
   const pendingLabel = signup
     ? m.identity_auth_creating_account()
     : m.identity_auth_signing_in();
+
+  if (signup && sentTo)
+    return (
+      <AuthLayout
+        title={m.identity_verify_sent_title()}
+        lead={m.identity_verify_sent_lead({ email: sentTo })}
+      >
+        <ResendConfirmation email={() => sentTo} />
+        <p className="auth-switch">
+          <Link to="/sign-in" search={{ returnTo }}>
+            {m.identity_auth_signin_submit()}
+          </Link>
+        </p>
+      </AuthLayout>
+    );
 
   if (signup && !confirmedRegion)
     return (
@@ -319,6 +357,9 @@ export function AuthForm({
         <p role="status" tabIndex={-1} ref={resultRef} className="form-message">
           {pending ? pendingLabel : message}
         </p>
+        {unconfirmed && !pending ? (
+          <ResendConfirmation email={() => form.getFieldValue('email')} />
+        ) : null}
         <Button size="lg" type="submit" disabled={pending}>
           {pending
             ? pendingLabel

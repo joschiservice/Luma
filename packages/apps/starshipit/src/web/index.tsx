@@ -4,7 +4,7 @@ import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import {
@@ -31,113 +31,273 @@ function Setup({ connection, services, done }: AppUiProps) {
     accountId: connection?.target.accountId ?? '',
     token: '',
     subscriptionKey: '',
-    webhookSecret: '',
   });
   const [pending, setPending] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [webhook, setWebhook] = useState<WebhookResult | null>(null);
   const [error, setError] = useState('');
   const [uncertain, setUncertain] = useState(false);
   const lock = useRef(false);
   const replacing = connection && connection.status !== 'disconnected';
+  // Revoked and disconnected connections hold no credentials to add a secret to.
+  const regenerable =
+    connection &&
+    connection.status !== 'disconnected' &&
+    connection.status !== 'revoked'
+      ? connection
+      : null;
   const labels = {
     label: m.cin7_setup_label_name,
     accountId: m.starshipit_setup_account,
     token: m.starshipit_setup_api_key,
     subscriptionKey: m.starshipit_setup_subscription_key,
-    webhookSecret: m.starshipit_setup_webhook_secret,
   };
   const names = replacing
-    ? (['token', 'subscriptionKey', 'webhookSecret'] as const)
-    : ([
-        'label',
-        'accountId',
-        'token',
-        'subscriptionKey',
-        'webhookSecret',
-      ] as const);
+    ? (['token', 'subscriptionKey'] as const)
+    : (['label', 'accountId', 'token', 'subscriptionKey'] as const);
+
+  /** Asks the server for a new secret; only this response ever contains it. */
+  const generate = (id: string, version: number) =>
+    services
+      .request('generate-webhook-secret', { connectionId: id, version })
+      .then((value) => webhookSecret.parse(value));
+
+  if (webhook !== null) return <WebhookSecret result={webhook} done={done} />;
 
   return (
-    <form
-      className="connection-setup-form"
-      autoComplete="off"
-      aria-busy={pending}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (lock.current || uncertain) return;
-        const credentials = {
-          token: values.token,
-          subscriptionKey: values.subscriptionKey,
-          ...(values.webhookSecret
-            ? { webhookSecret: values.webhookSecret }
-            : {}),
-        };
-        const input = {
-          label: values.label,
-          target: { kind: 'starshipit', accountId: values.accountId },
-          credentials,
-          permissions: ['orders.read', 'fulfillment.read'],
-        };
-        const parsed = replacing
-          ? installationCredentials.safeParse(credentials)
-          : installationInput.safeParse(input);
-        if (!parsed.success) {
-          setError(m.starshipit_setup_invalid());
+    <div className="connection-setup-form">
+      {regenerable ? (
+        <section
+          className="connection-setup-form"
+          aria-labelledby="starshipit-webhook-title"
+        >
+          <h3 id="starshipit-webhook-title">
+            {m.starshipit_setup_webhook_title()}
+          </h3>
+          <p className="field-help">
+            {m.starshipit_setup_webhook_regenerate_help()}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending || uncertain}
+            onClick={() => {
+              if (lock.current) return;
+              lock.current = true;
+              setPending(true);
+              setGenerating(true);
+              setError('');
+              generate(regenerable.id, regenerable.version)
+                .then((secret) => setWebhook({ kind: 'replaced', ...secret }))
+                .catch((failure: unknown) => {
+                  setError(services.error(failure));
+                  setUncertain(services.uncertain(failure));
+                })
+                .finally(() => {
+                  lock.current = false;
+                  setPending(false);
+                  setGenerating(false);
+                });
+            }}
+          >
+            {generating
+              ? m.starshipit_setup_webhook_generating()
+              : m.starshipit_setup_webhook_regenerate()}
+          </Button>
+        </section>
+      ) : null}
+      <form
+        className="connection-setup-form"
+        autoComplete="off"
+        aria-busy={pending}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (lock.current || uncertain) return;
+          const credentials = {
+            token: values.token,
+            subscriptionKey: values.subscriptionKey,
+          };
+          const input = {
+            label: values.label,
+            target: { kind: 'starshipit', accountId: values.accountId },
+            credentials,
+            permissions: ['orders.read', 'fulfillment.read'],
+          };
+          const parsed = replacing
+            ? installationCredentials.safeParse(credentials)
+            : installationInput.safeParse(input);
+          if (!parsed.success) {
+            setError(m.starshipit_setup_invalid());
 
-          return;
-        }
-        lock.current = true;
-        setPending(true);
-        setError('');
-        (replacing
-          ? services.rotate(connection, credentials)
-          : services.install(installationInput.parse(input))
-        )
-          .then(done)
-          .catch((failure: unknown) => {
-            setError(services.error(failure));
-            setUncertain(services.uncertain(failure));
-          })
-          .finally(() => {
-            setValues((old) => ({
-              ...old,
-              token: '',
-              subscriptionKey: '',
-              webhookSecret: '',
-            }));
-            lock.current = false;
-            setPending(false);
-          });
-      }}
-    >
-      <p className="field-help">{m.starshipit_setup_help()}</p>
-      {names.map((name) => (
-        <div className="form-field" key={name}>
-          <label htmlFor={`starshipit-${name}`}>{labels[name]()}</label>
+            return;
+          }
+          lock.current = true;
+          setPending(true);
+          setError('');
+          (replacing
+            ? services.rotate(connection, credentials)
+            : services.install(installationInput.parse(input))
+          )
+            .then(async (saved) => {
+              // Saved keys carry no webhook secret; senders need a new one before wakeups work.
+              setWebhook(
+                await generate(saved.id, saved.version).then(
+                  (secret) => ({ kind: 'saved', ...secret }) as const,
+                  () => ({ kind: 'unavailable' }) as const,
+                ),
+              );
+            })
+            .catch((failure: unknown) => {
+              setError(services.error(failure));
+              setUncertain(services.uncertain(failure));
+            })
+            .finally(() => {
+              setValues((old) => ({
+                ...old,
+                token: '',
+                subscriptionKey: '',
+              }));
+              lock.current = false;
+              setPending(false);
+            });
+        }}
+      >
+        <p className="field-help">{m.starshipit_setup_help()}</p>
+        {names.map((name) => (
+          <div className="form-field" key={name}>
+            <label htmlFor={`starshipit-${name}`}>{labels[name]()}</label>
+            <Input
+              id={`starshipit-${name}`}
+              value={values[name]}
+              onChange={(event) =>
+                setValues((old) => ({ ...old, [name]: event.target.value }))
+              }
+              type={
+                name === 'label' || name === 'accountId' ? 'text' : 'password'
+              }
+              required
+              autoComplete="off"
+              disabled={pending}
+              maxLength={name === 'label' || name === 'accountId' ? 120 : 4096}
+              spellCheck={false}
+            />
+          </div>
+        ))}
+        {!replacing ? (
+          <p className="field-help">{m.starshipit_setup_readonly()}</p>
+        ) : null}
+        <p role="alert">{error}</p>
+        {uncertain ? <p>{m.starshipit_setup_uncertain()}</p> : null}
+        <Button disabled={pending || uncertain} type="submit">
+          {pending ? m.common_saving() : m.cin7_setup_save()}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+const webhookSecret = z.object({
+  path: z.string().startsWith('/v1/starshipit/changes/'),
+  authorization: z.string().startsWith('Bearer '),
+});
+
+type WebhookResult =
+  | ({ kind: 'saved' | 'replaced' } & z.infer<typeof webhookSecret>)
+  | { kind: 'unavailable' };
+
+/**
+ * Shows a newly generated webhook URL and Authorization header exactly once, with copy actions.
+ * Closing discards them; the server keeps no readable copy.
+ */
+function WebhookSecret({
+  result,
+  done,
+}: {
+  result: WebhookResult;
+  done: () => Promise<void>;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const notice = useRef<HTMLParagraphElement>(null);
+  useEffect(() => notice.current?.focus(), []);
+
+  if (result.kind === 'unavailable')
+    return (
+      <div className="connection-setup-form">
+        <p role="alert" tabIndex={-1} ref={notice}>
+          {m.starshipit_setup_webhook_unavailable()}
+        </p>
+        <Button type="button" onClick={() => void done()}>
+          {m.common_done()}
+        </Button>
+      </div>
+    );
+  const fields = [
+    {
+      id: 'url',
+      label: m.starshipit_setup_webhook_url(),
+      value: `${window.location.origin}/api${result.path}`,
+    },
+    {
+      id: 'secret',
+      label: m.starshipit_setup_webhook_secret(),
+      value: result.authorization,
+    },
+  ];
+
+  return (
+    <div className="connection-setup-form">
+      <p className="field-help">
+        {result.kind === 'saved'
+          ? m.starshipit_setup_webhook_saved()
+          : m.starshipit_setup_webhook_replaced()}
+      </p>
+      <p role="alert" tabIndex={-1} ref={notice}>
+        <strong>{m.starshipit_setup_webhook_once()}</strong>
+      </p>
+      {fields.map((field) => (
+        <div className="form-field" key={field.id}>
+          <div className="form-field-label">
+            <label htmlFor={`starshipit-webhook-${field.id}`}>
+              {field.label}
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="form-field-toggle"
+              aria-label={m.starshipit_setup_webhook_copy({
+                field: field.label,
+              })}
+              onClick={() => {
+                void navigator.clipboard
+                  ?.writeText(field.value)
+                  .then(() => setCopied(field.id));
+              }}
+            >
+              {copied === field.id ? m.common_copied() : m.common_copy()}
+            </Button>
+          </div>
           <Input
-            id={`starshipit-${name}`}
-            value={values[name]}
-            onChange={(event) =>
-              setValues((old) => ({ ...old, [name]: event.target.value }))
-            }
-            type={
-              name === 'label' || name === 'accountId' ? 'text' : 'password'
-            }
-            required={name !== 'webhookSecret'}
+            id={`starshipit-webhook-${field.id}`}
+            value={field.value}
+            readOnly
             autoComplete="off"
-            disabled={pending}
-            maxLength={name === 'label' || name === 'accountId' ? 120 : 4096}
             spellCheck={false}
+            onFocus={(event) => event.currentTarget.select()}
           />
         </div>
       ))}
-      {!replacing ? (
-        <p className="field-help">{m.starshipit_setup_readonly()}</p>
-      ) : null}
-      <p role="alert">{error}</p>
-      {uncertain ? <p>{m.starshipit_setup_uncertain()}</p> : null}
-      <Button disabled={pending || uncertain} type="submit">
-        {pending ? m.common_saving() : m.cin7_setup_save()}
+      <p role="status" className="field-help">
+        {copied
+          ? m.starshipit_setup_webhook_copied({
+              field: fields.find((field) => field.id === copied)?.label ?? '',
+            })
+          : ''}
+      </p>
+      <Button type="button" onClick={() => void done()}>
+        {m.common_done()}
       </Button>
-    </form>
+    </div>
   );
 }
 

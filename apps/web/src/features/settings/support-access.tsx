@@ -12,6 +12,7 @@ import { settingsApi } from '../../kit/settings/data';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { CommandFeedback, useSettingsCommand } from './command';
 import { SectionHeading } from './section-heading';
+import { SupportInspectionList } from './support-inspections';
 
 const durations = [
   { hours: 24, label: m.settings_support_duration_day },
@@ -38,7 +39,8 @@ const supportAccessOptions = (organizationId: string) =>
 
 /**
  * Lets people with `support_access.manage` allow read-only Luma support access for a chosen
- * period, revoke it, and answer requests from Luma support.
+ * period, revoke it, answer requests from Luma support, and approve, decline or end inspection
+ * of the workspace's records.
  */
 export function SupportAccessSettings({
   organizationId,
@@ -233,8 +235,46 @@ function SupportAccessForm({
           ))}
         </div>
       ) : null}
+      {access.inspections.length ? (
+        <div className="settings-panel">
+          <div className="settings-panel-heading">
+            <h3>{m.settings_support_inspections_title()}</h3>
+            <p>{m.settings_support_inspections_description()}</p>
+          </div>
+          <SupportInspectionList
+            items={access.inspections}
+            locked={locked}
+            onDecide={(requestId, decision) =>
+              void command.run(
+                (commandId) =>
+                  settingsApi.settings.decideSupportInspection({
+                    params: { organizationId, requestId },
+                    body: { commandId, decision },
+                  }),
+                decision === 'approve'
+                  ? m.settings_support_inspection_approved()
+                  : m.settings_support_inspection_declined(),
+              )
+            }
+            onRevoke={(requestId) =>
+              void command.run(
+                (commandId) =>
+                  settingsApi.settings.revokeSupportInspection({
+                    params: { organizationId, requestId },
+                    body: { commandId },
+                  }),
+                m.settings_support_inspection_ended(),
+              )
+            }
+          />
+        </div>
+      ) : null}
       <div className="settings-guardrails">
         <h3>{m.settings_support_guardrails_title()}</h3>
+        <p>
+          <Check size={14} aria-hidden="true" />{' '}
+          {m.settings_support_guardrail_inspection()}
+        </p>
         <p>
           <Check size={14} aria-hidden="true" />{' '}
           {m.settings_support_guardrail_read_only()}

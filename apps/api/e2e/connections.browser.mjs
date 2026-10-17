@@ -2,7 +2,13 @@
 import { readdirSync } from 'node:fs';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 let origin;
 // The web build names each workspace app's lazy UI chunk after the app.
@@ -39,17 +45,11 @@ async function fixture(t) {
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('ada@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'ada@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('North Studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

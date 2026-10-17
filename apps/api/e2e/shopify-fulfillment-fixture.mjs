@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 
 import { appScopes } from './app-scopes.mjs';
+import { addMembership } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 const gid = (kind, value = 1) => `gid://shopify/${kind}/${value}`;
@@ -109,13 +110,7 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,
   );
   const admin = await f.signup('Approver');
-  await f.request(
-    f.owner,
-    `${f.base}/members`,
-    'POST',
-    { userId: admin.id, roleId: 'admin' },
-    201,
-  );
+  await addMembership(f.db.owner, f.org.id, admin.id, 'admin');
   await f.request(f.owner, `${f.base}/apps/shopify/install`, 'POST', {
     version: null,
     scopes: appScopes.shopify,

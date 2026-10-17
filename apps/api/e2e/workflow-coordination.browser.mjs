@@ -16,7 +16,13 @@ import {
 import { Pool } from 'pg';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 
 test('answers a human handoff in Needs you with keyboard use and narrow light and dark layouts', async ({
   resources: t,
@@ -39,17 +45,11 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('handoff@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'handoff@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Human handoffs');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

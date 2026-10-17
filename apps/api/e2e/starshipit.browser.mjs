@@ -39,7 +39,7 @@ async function browserFixture(t, options) {
     return current;
   };
 
-  return { ...f, page, errors };
+  return { ...f, origin, page, errors };
 }
 
 async function confirmLink(page, f, button, reason) {
@@ -304,5 +304,128 @@ test('shows a disabled shipping action release without offering an executable co
       exact: true,
     }),
   ).toHaveCount(0);
+  expect(f.errors).toEqual([]);
+});
+
+test('shows a generated webhook secret once, replaces it on request and records each generation', async ({
+  resources: t,
+}) => {
+  const f = await browserFixture(t);
+  const id = f.manifest.connections.starshipit;
+  const page = await f.page();
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  const wake = (authorization) =>
+    fetch(`${f.apiOrigin}/v1/starshipit/changes/${f.tenantId}/${id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization },
+      body: JSON.stringify({ order_id: 1 }),
+    }).then((response) => response.status);
+  const pilotHeader = `Bearer ${f.manifest.simulator.webhookSecret}`;
+  expect(await wake(pilotHeader)).toBe(202);
+
+  await page.goto(`/app/${f.tenantId}/connections#connection-${id}`);
+  await page.waitForURL('**/apps/starshipit/settings#connection-*');
+  const card = page.locator(`#connection-${id}`);
+  const openSettings = async () => {
+    await card.getByRole('button', { name: 'Connection settings' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(
+      dialog.getByRole('heading', { name: 'Change notifications' }),
+    ).toBeVisible();
+
+    return dialog;
+  };
+  /** Reads the one-time reveal, checks focus and copying, then closes it. */
+  const reveal = async (dialog, intro) => {
+    await expect(dialog.getByText(intro, { exact: true })).toBeVisible();
+    const notice = dialog
+      .getByRole('alert')
+      .filter({ hasText: "You won't see this secret again." });
+    await expect(notice).toBeFocused();
+    const url = dialog.getByLabel('Change notification URL', { exact: true });
+    const header = dialog.getByLabel(
+      'Authorization header for change notifications',
+      { exact: true },
+    );
+    await expect(url).toHaveValue(
+      `${f.origin}/api/v1/starshipit/changes/${f.tenantId}/${id}`,
+    );
+    const authorization = await header.inputValue();
+    expect(authorization).toMatch(/^Bearer [A-Za-z0-9_-]{43}$/);
+    await dialog
+      .getByRole('button', {
+        name: 'Copy Authorization header for change notifications',
+      })
+      .click();
+    await expect(
+      dialog.getByRole('status').filter({
+        hasText: 'Authorization header for change notifications copied.',
+      }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => globalThis.navigator.clipboard.readText()),
+    ).toBe(authorization);
+    await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    return authorization;
+  };
+
+  let dialog = await openSettings();
+  await dialog
+    .getByRole('button', { name: 'Generate a new webhook secret' })
+    .click();
+  const generated = await reveal(
+    dialog,
+    'Luma generated a new webhook secret. The previous secret no longer works.',
+  );
+  // The previous secret stops working at once; the generated one wakes reads.
+  expect(await wake(pilotHeader)).toBe(401);
+  expect(await wake(generated)).toBe(202);
+
+  // Reopening never shows the secret again.
+  dialog = await openSettings();
+  await expect(
+    dialog.getByLabel('Authorization header for change notifications'),
+  ).toHaveCount(0);
+  await expect(dialog.getByText(generated.slice(7))).toHaveCount(0);
+
+  // Saving new keys replaces the secret and reveals the new one once.
+  await dialog
+    .getByLabel('API key', { exact: true })
+    .fill('synthetic-not-a-provider-secret');
+  await dialog
+    .getByLabel('Subscription key', { exact: true })
+    .fill('synthetic-subscription-key');
+  await dialog.getByRole('button', { name: 'Save connection' }).click();
+  const rotated = await reveal(
+    dialog,
+    'Saved. Luma generated a webhook secret for this connection.',
+  );
+  expect(rotated).not.toBe(generated);
+  // Saved keys leave the connection pending, so wakeups wait for validation.
+  expect(await wake(rotated)).toBe(401);
+  expect(await wake(generated)).toBe(401);
+
+  const events = (
+    await f.db.owner.query(
+      'SELECT event,actor_id FROM connector_lifecycle_events WHERE tenant_id=$1 AND connection_id=$2 ORDER BY version',
+      [f.tenantId, id],
+    )
+  ).rows;
+  expect(
+    events.map((event) => event.event).filter((event) => event !== 'checked'),
+  ).toEqual(
+    expect.arrayContaining(['webhook_secret_generated', 'credentials_rotated']),
+  );
+  expect(
+    events.filter((event) => event.event === 'webhook_secret_generated'),
+  ).toHaveLength(2);
+  expect(JSON.stringify(events)).not.toContain(generated.slice(7));
+  expect(JSON.stringify(events)).not.toContain(rotated.slice(7));
+  await page.goto(`/app/${f.tenantId}/activity`);
+  await expect(
+    page.getByText('Webhook secret generated', { exact: true }).first(),
+  ).toBeVisible();
   expect(f.errors).toEqual([]);
 });

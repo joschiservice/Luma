@@ -24,6 +24,7 @@ import type { Observability } from '@luma/platform';
 import {
   createModelGateway,
   createTenantDatabase,
+  createValkeyStore,
 } from '@luma/platform/composition';
 import {
   createShipmentDispatchOptionsReader,
@@ -90,8 +91,20 @@ export async function buildRuntimeApp(
       : undefined;
   const resources = createResourceScope();
   try {
+    // Auth rate limits share counters with every API instance when a store is configured.
+    const rateLimitStore =
+      settings.rateLimitStore ??
+      (settings.rateLimit?.store
+        ? createValkeyStore(
+            settings.rateLimit.store.url,
+            settings.rateLimit.store.cluster,
+          )
+        : undefined);
+    if (rateLimitStore && !settings.rateLimitStore)
+      resources.add(() => rateLimitStore.close());
     const identity = createIdentity({
       ...settings,
+      ...(rateLimitStore ? { rateLimitStore } : {}),
       readOnly: requestIsReadOnly,
       morningBriefEnabled: (tenantId) =>
         createTenantFeatureRelease(observability)(
@@ -326,6 +339,7 @@ export async function buildRuntimeApp(
         installedConnections.apps.permissions(tenantId),
       ),
       trustedOrigins: settings.trustedOrigins,
+      httpsOrigin: new URL(settings.baseURL).protocol === 'https:',
       checkReadiness: createReadinessCheck(
         identity.checkReadiness,
         connections ? casePool : undefined,

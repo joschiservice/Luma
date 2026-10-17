@@ -8,6 +8,7 @@ import {
   referenceTokens,
 } from '../domain/linking.js';
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
+import { repliedOutboundId, replyProvesDelivery } from '../domain/replies.js';
 import type { MessageData } from '../domain/threads.js';
 import {
   aggregateThread,
@@ -25,6 +26,7 @@ import type {
   LinkRow,
   MessagingStore,
   MessagingTransaction,
+  OutboundRow,
   ThreadRow,
 } from './store.js';
 
@@ -231,6 +233,7 @@ export function createIngest(deps: IngestDependencies) {
             body,
             receivedAt: candidate.data.receivedAt,
             messageId: candidate.data.rfcMessageId?.slice(0, 250) ?? null,
+            senderVerified: candidate.data.senderAuthentication === 'aligned',
           });
       } catch (error) {
         deps.log(
@@ -356,6 +359,10 @@ export function createIngest(deps: IngestDependencies) {
             thread.id,
             proposeLinks({
               messageId,
+              senderVerified:
+                data.providerSent === true ||
+                (data.direction === 'inbound' &&
+                  data.senderAuthentication === 'aligned'),
               rules: matched,
               customers: correspondents(data)
                 .filter((address) => address !== lookup.own)
@@ -382,21 +389,40 @@ export function createIngest(deps: IngestDependencies) {
             const outbound = failedId
               ? await tx.outbound.get(failedId, true)
               : null;
+            // Anyone can send a delivery report. Only one whose sender the receiving system
+            // authenticated proves the send failed; any other leaves delivery uncertain, so
+            // nobody is prompted to send the order again on a forged report. Once a person or
+            // the recipient's reply settled delivery, only an authenticated report changes it.
+            const verified = data.senderAuthentication === 'aligned';
             if (
               outbound &&
               outbound.connectionId === mailbox.connectionId &&
               ['sent', 'uncertain', 'sending'].includes(outbound.state) &&
+              (verified || !outbound.document.deliveryResolution) &&
               [...outbound.document.to, ...outbound.document.cc].some(
                 (a) =>
                   a.address.toLowerCase() === data.deliveryFailure!.recipient,
               )
             ) {
+              const { status, recipient } = data.deliveryFailure;
               await tx.outbound.update({
                 ...outbound,
-                state: 'failed',
+                state: verified ? 'failed' : 'uncertain',
                 document: {
                   ...outbound.document,
-                  stateReason: `Mail delivery failed (${data.deliveryFailure.status}). Check the supplier address before drafting another submission.`,
+                  stateReason: verified
+                    ? `Mail delivery failed (${status}). Check the supplier address before drafting another submission.`
+                    : `A delivery report says this email did not reach ${recipient} (${status}), but Luma could not verify who sent the report. Confirm with the supplier before sending again.`,
+                  ...(verified
+                    ? {}
+                    : {
+                        unverifiedDeliveryReport: {
+                          messageId,
+                          recipient,
+                          status,
+                          sendRecorded: outbound.state === 'sent',
+                        },
+                      }),
                   ownerHandoffAt: null,
                 },
                 revision: outbound.revision + 1,
@@ -404,6 +430,7 @@ export function createIngest(deps: IngestDependencies) {
               });
             }
           }
+          await settleByReply(tx, mailbox, messageId, data, at);
           if (data.direction === 'inbound' && !data.deliveryFailure) {
             entry.reopen ||= entry.thread.status !== 'open';
             candidates.push({
@@ -442,6 +469,97 @@ export function createIngest(deps: IngestDependencies) {
 
     return inserted;
   };
+
+  /**
+   * Settles an uncertain send as delivered when the recipient replied to its exact Message-ID
+   * from an authenticated domain. The owner handoff runs in the next supplier mail pass.
+   */
+  async function settleByReply(
+    tx: MessagingTransaction,
+    mailbox: Mailbox,
+    messageId: string,
+    data: MessageData,
+    at: string,
+  ) {
+    const outboundId =
+      data.direction === 'inbound' && data.senderAuthentication === 'aligned'
+        ? repliedOutboundId(data)
+        : null;
+    const outbound = outboundId
+      ? await tx.outbound.get(outboundId, true)
+      : null;
+    const fromAddress = outbound?.document.fromAddress ?? mailbox.address;
+    if (
+      !outbound ||
+      outbound.connectionId !== mailbox.connectionId ||
+      outbound.state !== 'uncertain' ||
+      !fromAddress ||
+      !replyProvesDelivery(
+        {
+          id: outbound.id,
+          fromAddress,
+          recipients: [...outbound.document.to, ...outbound.document.cc],
+        },
+        data,
+      )
+    )
+      return;
+    const resolution = {
+      id: deps.uuid(`messaging:delivery-reply:${outbound.id}:${messageId}`),
+      outcome: 'delivered' as const,
+      source: 'reply' as const,
+      by: null,
+      at,
+      note: null,
+      messageId,
+    };
+    const saved: OutboundRow = {
+      ...outbound,
+      state: 'sent',
+      document: {
+        ...outbound.document,
+        stateReason: `Delivered: ${data.from.address.toLowerCase()} replied to this email from an authenticated address.`,
+        deliveryResolution: resolution,
+        ownerHandoffAt: null,
+      },
+      revision: outbound.revision + 1,
+      updatedAt: at,
+    };
+    await tx.outbound.update(saved);
+    const details = {
+      outboundId: outbound.id,
+      outcome: resolution.outcome,
+      source: resolution.source,
+      messageId,
+    };
+    await tx.events.insert({
+      id: deps.id(),
+      threadId: outbound.threadId,
+      type: 'delivery_resolved',
+      actor: { kind: 'luma', id: 'luma' },
+      details,
+      occurredAt: at,
+    });
+    await tx.audit({
+      id: deps.id(),
+      tenantId: mailbox.tenantId,
+      eventKey: `messaging:reply.delivery_resolved:${resolution.id}`,
+      eventType: 'messaging.reply.delivery_resolved',
+      schemaVersion: 1,
+      occurredAt: at,
+      actor: { kind: 'service', id: 'messaging' },
+      correlationId: outbound.id,
+      proposalId: outbound.id,
+      actionHash: deps.digest({ type: 'reply.delivery_resolved', ...details }),
+      connectionId: outbound.connectionId,
+      evidenceRefs: [outbound.threadId, outbound.id, messageId],
+      details: {
+        threadId: outbound.threadId,
+        previousState: 'uncertain',
+        ...details,
+      },
+    });
+  }
 
   /** The thread for a provider thread, created on its first message and locked. */
   async function threadFor(

@@ -25,7 +25,7 @@ Who belongs to the workspace and what each role can do.
 | --- | --- | --- | --- | --- | --- | --- |
 | Manage team members | `members.manage` | Invite people, change their role, and remove their access. People can only assign roles whose permissions they hold. | Yes | Yes | Yes |  |
 | Manage roles | `roles.manage` | Create, edit, and archive custom roles, and see their change history. People can only grant permissions they hold. | Yes | Yes | Yes |  |
-| Manage Luma support access | `support_access.manage` | Allow or revoke read-only access for Luma support, and approve or decline their requests. | Yes | Yes | Yes |  |
+| Manage Luma support access | `support_access.manage` | Allow or revoke read-only access for Luma support, approve or decline their access and inspection requests, and end inspections early. | Yes | Yes | Yes |  |
 
 ## Commerce records
 

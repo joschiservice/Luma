@@ -32,7 +32,9 @@ interface Delivery {
     | 'connections'
     | 'support_view_started'
     | 'support_view_ended'
-    | 'support_access_requested';
+    | 'support_access_requested'
+    | 'support_inspection_requested'
+    | 'support_inspection_emergency';
   user_id: string | null;
   invitation_id: string | null;
   generation: number | null;
@@ -64,7 +66,8 @@ const language = (value: string | null | undefined): Locale =>
 /**
  * Builds a Luma support notice for an owner who is still an active owner, in the owner's
  * language. Views name the member shown and when the view started and ends; requests carry the
- * reason support gave.
+ * reason support gave, and are sent only while they wait for an answer; emergency inspection
+ * names its category and window.
  */
 async function supportMail(
   tx: PoolClient,
@@ -83,6 +86,51 @@ async function supportMail(
   const recipient = { to: owner.email, locale: language(owner.locale) };
   const activityLink = `${origin}/app/${tenantId}/activity`;
   const supportLink = `${origin}/app/${tenantId}/settings/support`;
+  if (message.kind === 'support_inspection_requested') {
+    const request = (
+      await tx.query<{ reason: string }>(
+        "SELECT reason FROM workspace_inspection_requests WHERE tenant_id=$1 AND id=$2 AND status='pending' AND expires_at>now()",
+        [tenantId, message.target_id],
+      )
+    ).rows[0];
+    if (!request) return null;
+
+    return {
+      ...recipient,
+      email: {
+        kind: 'support_inspection_requested',
+        workspace: workspace.name,
+        reason: request.reason,
+        link: supportLink,
+      },
+    };
+  }
+  if (message.kind === 'support_inspection_emergency') {
+    const access = (
+      await tx.query<{
+        emergency_category: 'security_incident' | 'legal_request';
+        decided_at: Date;
+        access_expires_at: Date;
+      }>(
+        "SELECT emergency_category,decided_at,access_expires_at FROM workspace_inspection_requests WHERE tenant_id=$1 AND id=$2 AND mode='emergency'",
+        [tenantId, message.target_id],
+      )
+    ).rows[0];
+    if (!access) return null;
+
+    return {
+      ...recipient,
+      email: {
+        kind: 'support_inspection_emergency',
+        workspace: workspace.name,
+        category: access.emergency_category,
+        from: access.decided_at,
+        until: access.access_expires_at,
+        timeZone: workspace.timeZone,
+        activityLink,
+      },
+    };
+  }
   if (message.kind === 'support_access_requested') {
     const request = (
       await tx.query<{ reason: string; duration_hours: number }>(
@@ -415,7 +463,9 @@ export function createMailDelivery(
                   )
                 : message.kind === 'support_view_started' ||
                     message.kind === 'support_view_ended' ||
-                    message.kind === 'support_access_requested'
+                    message.kind === 'support_access_requested' ||
+                    message.kind === 'support_inspection_requested' ||
+                    message.kind === 'support_inspection_emergency'
                   ? await supportMail(tx, tenantId, message, origin, workspace)
                   : await memberMail(tx, tenantId, message, origin, workspace);
             if (!addressed) {

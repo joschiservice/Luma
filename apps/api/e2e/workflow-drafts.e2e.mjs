@@ -4,7 +4,7 @@ import { replenishmentSource } from '@luma/procurement';
 import { Pool } from 'pg';
 import { expect, it } from 'vitest';
 
-import { database, signup, startApi } from './helpers.mjs';
+import { addMembership, database, signup, startApi } from './helpers.mjs';
 
 /** A computation workflow that validates against the default installed vocabulary. */
 const checkOrder = {
@@ -50,12 +50,7 @@ it('saves, validates and publishes tenant drafts without activating them', async
       },
     })
   ).body;
-  await api.request(`/v1/organizations/${org.id}/members`, {
-    cookie: owner.cookie,
-    method: 'POST',
-    status: 201,
-    body: { userId: member.userId, roleId: 'member' },
-  });
+  await addMembership(db.owner, org.id, member.userId, 'member');
   const base = `/v1/organizations/${org.id}`;
   const call = (path, options = {}) =>
     api.request(`${base}${path}`, { cookie: owner.cookie, ...options });

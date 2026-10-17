@@ -101,6 +101,37 @@ describe('HTTP foundation', () => {
     expect(apiErrorSchema.parse(response.json()).code).toBe('NOT_FOUND');
   });
 
+  it('sends browser security headers on success, missing-route and error responses', async () => {
+    const app = createApp(
+      {},
+      { httpsOrigin: true, checkReadiness: async () => false },
+    );
+    for (const [url, status] of [
+      ['/health', 200],
+      ['/v1/unknown', 404],
+      ['/v1/connector-providers/INVALID', 400],
+      ['/ready', 503],
+    ] as const) {
+      const response = await app.inject(url);
+      expect(response.statusCode).toBe(status);
+      expect(response.headers).toMatchObject({
+        'content-security-policy': expect.stringContaining(
+          "frame-ancestors 'none'",
+        ),
+        'referrer-policy': 'no-referrer',
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'DENY',
+        'strict-transport-security': 'max-age=31536000',
+      });
+    }
+  });
+
+  it('omits HSTS when the public origin is plain HTTP', async () => {
+    const response = await createApp().inject('/health');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['strict-transport-security']).toBeUndefined();
+  });
+
   it.each([
     async () => false,
     async () => {
@@ -226,12 +257,16 @@ function fixture() {
     refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(),
     listSecurityEvents: vi.fn(),
+    supportInspections: vi.fn(),
+    decideSupportInspection: vi.fn(),
+    revokeSupportInspection: vi.fn(),
     setLanguage: vi.fn(),
     listOrganizations: vi.fn(),
     createOrganization: vi.fn(),
     listMembers: vi.fn(),
     suspendedMembers: vi.fn(),
     changeMember: vi.fn(),
+    provisionMember: vi.fn(),
     hasSupportView: vi.fn(() => false),
     supportView: vi.fn(),
     redeemSupportView: vi.fn(),

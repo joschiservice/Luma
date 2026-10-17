@@ -77,9 +77,14 @@ A Luma-owned order whose supplier has no purchasing-system link may be submitted
 connected Operations Inbox. Procurement drafts an English or German PDF from the immutable
 order and explicit company details, then leaves review, approval and sending to the inbox.
 The inbox's independent acceptance read records an email submission and opens the draft.
-It never creates a confirmed quantity or supplier commitment. A permanent bounce becomes a
-failed submission in Needs you; the original acceptance time and outgoing message stay as
-evidence. Uncertain sends are reconciled only by reading.
+It never creates a confirmed quantity or supplier commitment. A permanent bounce from an
+authenticated sender becomes a failed submission in Needs you; a bounce whose sender was not
+authenticated leaves the submission uncertain with its reason, because a forged report must
+not prompt a second order. The supplier's authenticated reply to the order email settles it
+as submitted; a person who asked the supplier may record it as delivered (submitted) or not
+delivered (failed, so the order can be drafted again), recorded with who decided
+([Operations inbox](messaging.md#supplier-purchasing-mail)). Luma never sends it again on
+its own. The original acceptance time and outgoing message stay as evidence.
 
 Overdue confirmation and delivery items offer an inbox follow-up draft showing what was
 promised and what remains outstanding. Its verified send records the outgoing message and
@@ -91,11 +96,19 @@ PostHog releases; turning one off prevents pending dispatch, while reads keep pr
 ## Supplier messages
 
 Messages are stored once per message ID, or per digest of sender, subject, time and text.
+Anyone can copy a Message-ID, so only trusted messages claim it: those from an authenticated
+sender and those a person recorded. A message from an unauthenticated sender is keyed by its
+Message-ID and text; it is a duplicate only of a copy with the same text and never makes a
+different message with that ID a duplicate. A genuine reply that arrives after a forged copy
+is therefore still read, and its facts count while the forged copy's wait for review.
 With an EU zero-retention Bedrock route for the `supplier-extraction` profile
 ([model gateway](model-gateway.md#supplier-extraction-profile)), the model lists statements
 with exact quotes. Facts whose quote is not in the message are dropped. Material changes,
 conditions, unmatched lines and low-confidence facts wait for review; matching facts count
-immediately. Without a route, people select words in the message to record facts and no
+immediately. Messages the inbox hands over carry whether the mail provider authenticated the
+sender; every fact from an unauthenticated sender waits for review, because a forged
+"confirmed, on time" email would otherwise hide a missed confirmation. Messages people record
+by hand are vouched for by them and follow the other rules only. Without a route, people select words in the message to record facts and no
 model is called.
 
 Message text is removed after `supplierMessageRetentionDays` (365 by default) or on

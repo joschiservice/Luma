@@ -88,6 +88,8 @@ const activityLabels: Record<string, Label> = {
   'connection.disconnected': m.activity_action_connection_disconnected,
   'connection.reconnected': m.activity_action_connection_reconnected,
   'connection.revoked': m.activity_action_connection_revoked,
+  'connection.webhook_secret_generated':
+    m.activity_action_connection_webhook_secret_generated,
   'purchase_order.created': m.activity_action_po_created,
   'purchase_order.status_changed': m.activity_action_po_status_changed,
   'purchase_order.submitted': m.activity_action_po_submitted,
@@ -105,6 +107,9 @@ const activityLabels: Record<string, Label> = {
   'purchase_order.message_recorded': m.activity_action_po_message_recorded,
   'purchase_order.message_read': m.activity_action_po_message_read,
   'purchase_order.message_removed': m.activity_action_po_message_removed,
+  'purchase_order.email_submission': m.activity_action_po_email_submission,
+  'messaging.reply.delivery_resolved':
+    m.activity_action_email_delivery_resolved,
   'workflow.activated': m.activity_action_workflow_enabled,
   'workflow.activation_revoked': m.activity_action_workflow_disabled,
   'workflow.published': m.activity_action_workflow_published,
@@ -134,6 +139,14 @@ const activityLabels: Record<string, Label> = {
     m.activity_action_support_access_request_approved,
   'support_access.request_declined':
     m.activity_action_support_access_request_declined,
+  'support_inspection.requested':
+    m.activity_action_support_inspection_requested,
+  'support_inspection.approved': m.activity_action_support_inspection_approved,
+  'support_inspection.declined': m.activity_action_support_inspection_declined,
+  'support_inspection.expired': m.activity_action_support_inspection_expired,
+  'support_inspection.revoked': m.activity_action_support_inspection_revoked,
+  'support_inspection.emergency_opened':
+    m.activity_action_support_inspection_emergency_opened,
   'invitation.created': m.activity_action_invitation_created,
   'invitation.accepted': m.activity_action_invitation_accepted,
   'invitation.revoked': m.activity_action_invitation_revoked,

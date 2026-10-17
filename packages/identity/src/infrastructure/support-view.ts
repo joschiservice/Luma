@@ -84,6 +84,10 @@ export function createSupportViewCredentials(
         'SELECT support_view_sweep($1) AS ended',
         [requestId],
       );
+      // Unanswered inspection requests lapse here too, so the lapse is recorded for the customer.
+      await pool.query(
+        'SELECT support_inspection_sweep(),identity_account_inspection_sweep()',
+      );
 
       return result.rows[0]?.ended ?? 0;
     },

@@ -125,6 +125,8 @@ export interface ProcurementHandoff {
       body: string;
       receivedAt: string;
       messageId: string | null;
+      /** True only when the receiving system authenticated the From domain (DMARC aligned). */
+      senderVerified: boolean;
     },
   ): Promise<'recorded' | 'duplicate' | 'forbidden'>;
 }

@@ -162,6 +162,11 @@ function LinkItem({
             ? m.messaging_link_manual_by({ name: people.name(link.createdBy) })
             : m.messaging_link_evidence_none()}
       </p>
+      {link.state === 'suggested' && link.evidence.senderUnverified ? (
+        <p className="messaging-muted">
+          {m.messaging_link_sender_unverified()}
+        </p>
+      ) : null}
       {manage ? (
         <div className="messaging-inline-actions">
           {link.state === 'suggested' ? (

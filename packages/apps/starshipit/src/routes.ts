@@ -13,6 +13,9 @@ import { z, ZodError } from 'zod';
 
 import { installationCredentials } from './infrastructure/installation-validation.js';
 import { type createStarshipitUpdates, updatePermission } from './updates.js';
+import { createWebhookSecrets } from './webhook-secrets.js';
+
+const bearer = /^Bearer [\x21-\x7e]{32,4096}$/;
 
 /** Registers governed private commands and authenticated refresh-only shipping wakeups. */
 export function registerStarshipitRoutes(
@@ -20,6 +23,7 @@ export function registerStarshipitRoutes(
   updates: ReturnType<typeof createStarshipitUpdates>,
   context: AppFactoryContext,
 ) {
+  const secrets = createWebhookSecrets(context);
   for (const command of [
     'inspect',
     'preview',
@@ -64,9 +68,28 @@ export function registerStarshipitRoutes(
       },
     );
   server.post(
+    '/v1/organizations/:organizationId/apps/starshipit/generate-webhook-secret',
+    { config: { access: { permission: 'connections.manage' } } },
+    async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      if (!request.tenantContext)
+        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+
+      return await secrets.generate(request.tenantContext, request.body);
+    },
+  );
+  server.post(
     '/v1/starshipit/changes/:organizationId/:connectionId',
     { config: { authentication: 'app' }, bodyLimit: 65536 },
     async (request, reply) => {
+      // Malformed bearer headers are refused before any lookup or decryption.
+      const supplied = request.headers.authorization ?? '';
+      if (!bearer.test(supplied))
+        throw new IdentityError(
+          401,
+          'UNAUTHENTICATED',
+          'Invalid shipping webhook.',
+        );
       const params = z
         .object({
           organizationId: z.string().uuid(),
@@ -99,12 +122,12 @@ export function registerStarshipitRoutes(
           'UNAUTHENTICATED',
           'Invalid shipping webhook.',
         );
-      const credentials = installationCredentials.parse(
+      // Credentials that no longer validate, such as a too-short secret, authenticate nothing.
+      const credentials = installationCredentials.safeParse(
         context.cipher.open(record.secret, secretBinding(record.connection)),
       );
-      const supplied = request.headers.authorization ?? '';
-      const expected = credentials.webhookSecret
-        ? `Bearer ${credentials.webhookSecret}`
+      const expected = credentials.data?.webhookSecret
+        ? `Bearer ${credentials.data.webhookSecret}`
         : '';
       if (
         !expected ||

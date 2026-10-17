@@ -310,6 +310,7 @@ export const commitmentSchema = z.object({
       'date_later',
       'unmatched_line',
       'supplier_condition',
+      'sender_unverified',
     ]),
   ),
   supersedes: z.string().uuid().nullable(),
@@ -335,6 +336,11 @@ export const communicationSchema = z.object({
   body: z.string().nullable(),
   receivedAt: z.string().datetime({ offset: true }),
   messageId: z.string().nullable(),
+  /**
+   * For messages read from a connected inbox: whether the receiving mail system authenticated
+   * the sender's domain (DMARC aligned). Absent when a person recorded the message.
+   */
+  senderVerified: z.boolean().optional(),
   digest: z.string(),
   capturedBy: z.string(),
   capturedAt: z.string().datetime(),

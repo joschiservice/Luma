@@ -730,7 +730,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       expired: 'The approval request expired. Nothing was sent.',
       submitting: 'Luma is placing the order in the purchasing system.',
       uncertain:
-        'The purchasing system did not confirm the request. Luma checks whether the order was created and will not send it again.',
+        submission.channel === 'email'
+          ? (submission.failure ??
+            'Luma can’t tell whether the order email reached the supplier and will not send it again. Confirm with the supplier, then mark it as delivered or not delivered.')
+          : 'The purchasing system did not confirm the request. Luma checks whether the order was created and will not send it again.',
       submitted:
         'An independent read found the order in the purchasing system. The purchasing system sends it to the supplier.',
       failed:
@@ -1239,6 +1242,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         for (const fact of result.facts) {
           const line = order.lines.find((l) => l.id === fact.lineId) ?? null;
           const reasons = reviewReasons(fact, line, requestedDate, {
+            senderVerified: communication.senderVerified,
             confident: fact.confident && result.relatesToOrder,
             lineRequired:
               multiLine &&
@@ -2304,18 +2308,31 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     },
     /**
      * Captures a supplier message for an order and reads its commitments when a model is
-     * configured. Repeated deliveries of the same message are recorded once.
+     * configured. Repeated deliveries of the same message are recorded once. `provenance` comes
+     * only from trusted callers such as the inbox handoff, never from request input; an
+     * unverified sender sends every extracted fact to review.
+     *
+     * Anyone can copy a Message-ID, so only trusted messages (an authenticated sender, or one a
+     * person recorded) claim it. An unverified message is keyed by its Message-ID and content:
+     * it never suppresses a different message with the same ID, and it is a duplicate only of
+     * a copy with the same text.
      */
     async recordMessage(
       context: TenantContext,
       orderId: string,
       input: unknown,
+      provenance?: { senderVerified: boolean },
     ) {
       context = await authorize(context, true);
       const request = deps.parse.message(input);
-      const key = request.messageId
+      const digest = deps.digest(messageText(request));
+      const trustedKey = request.messageId
         ? `id:${request.messageId}`
         : `digest:${deps.digest({ from: request.from.toLowerCase(), subject: request.subject, receivedAt: request.receivedAt, body: request.body })}`;
+      const unverified = provenance?.senderVerified === false;
+      const key = unverified
+        ? `unverified:${deps.digest({ key: trustedKey, digest })}`
+        : trustedKey;
       const { communication, order, created } = await command(
         context,
         request.id,
@@ -2323,7 +2340,12 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         async (tx) => {
           const order = await tx.order(orderId);
           if (!order) notFound('Purchase order not found');
-          const duplicate = await tx.communicationByKey(key);
+          const trustedCopy = unverified
+            ? await tx.communicationByKey(trustedKey)
+            : null;
+          const duplicate =
+            (await tx.communicationByKey(key)) ??
+            (trustedCopy?.digest === digest ? trustedCopy : null);
           if (duplicate)
             return { communication: duplicate, order: order!, created: false };
           const now = deps.now();
@@ -2338,7 +2360,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             body: request.body,
             receivedAt: request.receivedAt,
             messageId: request.messageId,
-            digest: deps.digest(messageText(request)),
+            ...(provenance
+              ? { senderVerified: provenance.senderVerified }
+              : {}),
+            digest,
             capturedBy: context.actor.id,
             capturedAt: now.toISOString(),
             retainUntil: new Date(
@@ -2656,6 +2681,16 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         state: 'submitted' | 'failed' | 'uncertain';
         sentMessageId?: string;
         reason?: string;
+        /**
+         * How uncertain delivery was settled, when it was: a person's decision (`by`) or the
+         * supplier's authenticated reply. Each decision is recorded once.
+         */
+        decision?: {
+          id: string;
+          source: 'person' | 'reply';
+          by: string | null;
+          at: string;
+        };
       },
     ) {
       context = await authorize(context, true);
@@ -2682,7 +2717,12 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
               prior.requestedBy !== context.actor.id)
           )
             conflict('This email submission ID was already used.');
-          if (prior?.state === 'submitted' && request.state === 'submitted')
+          // Handoffs are retried until acknowledged, so an outcome already recorded is kept.
+          if (
+            prior?.state === request.state &&
+            (request.state === 'submitted' ||
+              (prior.failure ?? null) === (request.reason ?? null))
+          )
             return { submission: prior, order: order! };
           if (
             !prior &&
@@ -2722,9 +2762,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             submittedAt:
               prior?.submittedAt ??
               (request.state === 'submitted' ? now : null),
-            decidedBy: null,
-            decidedAt: null,
-            failure: request.reason ?? null,
+            decidedBy: request.decision?.by ?? null,
+            decidedAt: request.decision?.by ? request.decision.at : null,
+            failure:
+              request.state === 'submitted' ? null : (request.reason ?? null),
             updatedAt: now,
           };
           if (prior) await tx.saveSubmission(submission, true);
@@ -2736,12 +2777,26 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             audit(
               context,
               'purchase_order.email_submission',
-              `${request.id}:${request.state}`,
+              `${request.id}:${request.state}${request.decision ? `:${request.decision.id}` : ''}`,
               order!.id,
               {
                 state: request.state,
                 outboundId: request.outboundId,
                 threadId: request.threadId,
+                ...(request.decision
+                  ? {
+                      reason:
+                        request.decision.source === 'person'
+                          ? request.state === 'submitted'
+                            ? 'A team member confirmed the order email was delivered'
+                            : 'A team member confirmed the order email was not delivered'
+                          : 'The supplier replied to the order email',
+                      decision: request.decision.source,
+                      ...(request.decision.by
+                        ? { decidedBy: request.decision.by }
+                        : {}),
+                    }
+                  : {}),
               },
               [request.outboundId],
             ),

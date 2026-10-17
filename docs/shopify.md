@@ -178,10 +178,20 @@ sequenceDiagram
 ```
 
 Webhooks are verified with HMAC-SHA256 over the original request bytes and the expected
-shop, and deduplicated by tenant, connection, topic and event ID. They only produce
-refresh hints for [commerce sync](commerce-sync.md#change-notifications); partial webhook
-fields are never projected, and missing fields never mean deletion. Persist the hint
-before acknowledging.
+shop. They only produce refresh hints for
+[commerce sync](commerce-sync.md#change-notifications); partial webhook fields are never
+projected, and missing fields never mean deletion. Persist the hint before acknowledging.
+
+Only the body is signed: the topic, delivery IDs and trigger time are not, so a captured
+body can be replayed under other headers. Hints are therefore deduplicated by tenant,
+connection, topic and a hash of the body, and a delivery counts only when its body is about
+the topic's resource: its own GraphQL ID, or a top-level member such as
+`fulfillment_order`, must name that resource type. Removal topics accept only bodies without
+an update time. Bare `{id}` deletion bodies look alike across resources and share one key
+whatever the topic, so a relabelled deletion cannot request another full reread. Mismatched
+bodies are acknowledged without a hint and do not count as a verified delivery. A replay
+can still reach the other topics of the same resource; the runner coalesces their hints into
+at most one wake-up per stream, which reads current provider state.
 
 Order edits and fulfillment-order moves, splits, merges and cancellations refresh both
 orders and fulfillment work. `orders/edited` uses `read_orders`; the fulfillment-order

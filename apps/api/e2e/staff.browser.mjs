@@ -161,6 +161,84 @@ async function seedHealth(db, tenantId, userId) {
   }
 }
 
+/** Approves the pending workspace inspection request as one of the workspace's owners would. */
+async function approveWorkspaceInspection(
+  customerApi,
+  cookie,
+  workspaceId,
+  decision = 'approve',
+) {
+  const base = `/v1/organizations/${workspaceId}/settings/support-access`;
+  const { body } = await customerApi.request(base, { cookie });
+  const pending = body.inspections.find((item) => item.status === 'pending');
+  expect(pending?.reason).toBeTruthy();
+  await customerApi.request(`${base}/inspections/${pending.id}`, {
+    method: 'POST',
+    cookie,
+    body: { commandId: randomUUID(), decision },
+  });
+}
+
+/** Approves the pending inspection of an account as its holder would, in Settings › Security. */
+async function approveAccountInspection(customerApi, cookie) {
+  const { body } = await customerApi.request(
+    '/v1/account/support-inspections',
+    {
+      cookie,
+    },
+  );
+  const pending = body.items.find((item) => item.status === 'pending');
+  await customerApi.request(`/v1/account/support-inspections/${pending.id}`, {
+    method: 'POST',
+    cookie,
+    body: { decision: 'approve' },
+  });
+}
+
+/** Sends an inspection request from the inspection panel of a workspace or account page. */
+async function requestInspection(page, reason) {
+  await page
+    .getByRole('button', { name: 'Request inspection', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Support reason or ticket reference').fill(reason);
+  await dialog
+    .getByRole('button', { name: 'Send request', exact: true })
+    .click();
+  await expect(page.getByText(/^Waiting for approval/)).toBeVisible();
+}
+
+/** Rechecks the request after the customer answered and opens the approved access. */
+async function openApproved(page, name) {
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await page.getByRole('button', { name, exact: true }).click();
+}
+
+/** Asks Support North for inspection from the directory, approves it as its owner and opens it. */
+async function inspectWorkspace(
+  page,
+  customerApi,
+  customer,
+  workspace,
+  reason,
+) {
+  await page.getByLabel('Name, email or workspace').fill('Support North');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect Support North' }).click();
+  await page.getByLabel('Support reason or ticket reference').fill(reason);
+  await page.getByRole('button', { name: 'Send request', exact: true }).click();
+  await expect(page.getByText(/^Waiting for approval/)).toBeVisible();
+  await approveWorkspaceInspection(customerApi, customer.cookie, workspace.id);
+  await openApproved(page, 'Open workspace');
+}
+
+/** On an account page without access, requests inspection, approves it as the holder and opens it. */
+async function inspectAccount(page, customerApi, cookie, reason) {
+  await requestInspection(page, reason);
+  await approveAccountInspection(customerApi, cookie);
+  await openApproved(page, 'Open account');
+}
+
 async function signIn(page) {
   await page.goto('/');
   await expect(
@@ -185,15 +263,13 @@ test('staff investigates a workspace and retries an uncertain global revocation 
     await fixture(t);
   await seedHealth(db, workspace.id, customer.userId);
   await signIn(page);
-  await page.getByLabel('Name, email or workspace').fill('Support North');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect Support North' }).click();
-  await page
-    .getByLabel('Support reason or ticket reference')
-    .fill('Investigating customer access ticket');
-  await page
-    .getByRole('button', { name: 'Open support access', exact: true })
-    .click();
+  await inspectWorkspace(
+    page,
+    customerApi,
+    customer,
+    workspace,
+    'Investigating customer access ticket',
+  );
   await expect(
     page.getByRole('heading', { name: workspace.name, exact: true }),
   ).toBeVisible();
@@ -213,7 +289,8 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(history).toContainText('Member role changed');
   await page.getByRole('button', { name: 'Load older changes' }).focus();
   await page.keyboard.press('Enter');
-  await expect(history.getByRole('row')).toHaveCount(52);
+  // 51 seeded changes plus the inspection request and its approval.
+  await expect(history.getByRole('row')).toHaveCount(54);
   await expect(
     page.getByText('This is the oldest recorded access change.'),
   ).toBeVisible();
@@ -296,15 +373,13 @@ test('staff suspends the only active owner after acknowledgement and reactivates
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
   await signIn(page);
-  await page.getByLabel('Name, email or workspace').fill('Support North');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect Support North' }).click();
-  await page
-    .getByLabel('Support reason or ticket reference')
-    .fill('Owner departed, customer asked for removal');
-  await page
-    .getByRole('button', { name: 'Open support access', exact: true })
-    .click();
+  await inspectWorkspace(
+    page,
+    customerApi,
+    customer,
+    workspace,
+    'Owner departed, customer asked for removal',
+  );
   const members = page.getByRole('table', { name: 'Workspace members' });
   await expect(members).toContainText('Active');
   await page
@@ -426,17 +501,12 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
   await page
     .getByRole('link', { name: 'Open account customer@example.test' })
     .click();
-  await page
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
-  await page
-    .getByRole('dialog')
-    .getByLabel('Support reason or ticket reference')
-    .fill('Compromised account report, ticket 5120');
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
+  await inspectAccount(
+    page,
+    customerApi,
+    customer.cookie,
+    'Compromised account report, ticket 5120',
+  );
   await page
     .getByRole('button', { name: 'Disable account', exact: true })
     .click();
@@ -512,8 +582,13 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
 test('staff schedules, restores and erases an account, and history shows a former member', async ({
   resources: t,
 }) => {
-  const { page, db, customerApi, workspace, errors } = await fixture(t);
+  const { page, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
   const member = await signup(customerApi, 'leaver');
+  const cookies = {
+    'customer@example.test': customer.cookie,
+    'leaver@example.test': member.cookie,
+  };
   await db.owner.query(
     "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'admin',now())",
     [randomUUID(), workspace.id, member.userId],
@@ -527,17 +602,12 @@ test('staff schedules, restores and erases an account, and history shows a forme
     await page.getByLabel('Name, email or workspace').fill(email);
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await page.getByRole('link', { name: `Open account ${email}` }).click();
-    await page
-      .getByRole('button', { name: 'Open account access', exact: true })
-      .click();
-    await page
-      .getByRole('dialog')
-      .getByLabel('Support reason or ticket reference')
-      .fill('Deletion request, ticket SUP-7710');
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Open account access', exact: true })
-      .click();
+    await inspectAccount(
+      page,
+      customerApi,
+      cookies[email],
+      'Deletion request, ticket SUP-7710',
+    );
   };
   const deletion = async (button, values) => {
     await page.getByRole('button', { name: button, exact: true }).click();
@@ -684,17 +754,16 @@ test('staff schedules, restores and erases an account, and history shows a forme
 test('staff reviews the audit log by event and staff member', async ({
   resources: t,
 }) => {
-  const { page, db, workspace, errors } = await fixture(t);
+  const { page, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
   await signIn(page);
-  await page.getByLabel('Name, email or workspace').fill('Support North');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect Support North' }).click();
-  await page
-    .getByLabel('Support reason or ticket reference')
-    .fill('Checking the audit trail for this ticket');
-  await page
-    .getByRole('button', { name: 'Open support access', exact: true })
-    .click();
+  await inspectWorkspace(
+    page,
+    customerApi,
+    customer,
+    workspace,
+    'Checking the audit trail for this ticket',
+  );
   await expect(
     page.getByRole('heading', { name: workspace.name, exact: true }),
   ).toBeVisible();
@@ -760,7 +829,8 @@ test('staff reviews the audit log by event and staff member', async ({
 test('staff opens a customer account and follows a workspace into its own support access', async ({
   resources: t,
 }) => {
-  const { page, db, customer, workspace, errors } = await fixture(t);
+  const { page, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
   await signIn(page);
   await page.getByLabel('Name, email or workspace').fill('customer@example');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -773,16 +843,12 @@ test('staff opens a customer account and follows a workspace into its own suppor
   await expect(
     page.getByRole('table', { name: 'Account workspaces' }),
   ).toHaveCount(0);
-  await page
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
-  const dialog = page.getByRole('dialog');
-  await dialog
-    .getByLabel('Support reason or ticket reference')
-    .fill('Investigating a customer sign-in ticket');
-  await dialog
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
+  await inspectAccount(
+    page,
+    customerApi,
+    customer.cookie,
+    'Investigating a customer sign-in ticket',
+  );
   await expect(
     page.getByRole('heading', { name: 'customer', exact: true, level: 1 }),
   ).toBeVisible();
@@ -792,20 +858,21 @@ test('staff opens a customer account and follows a workspace into its own suppor
   await expect(
     page.getByRole('table', { name: 'Account workspaces' }),
   ).toContainText('Owner');
-  // The header row and the session created at sign-up.
+  // The header row and the session created when the confirmed account signed in.
   await expect(
     page
       .getByRole('table', { name: 'Active customer sessions' })
       .getByRole('row'),
   ).toHaveCount(2);
   await expect(
-    page.getByRole('heading', { name: 'No security activity' }),
-  ).toBeVisible();
+    page.getByRole('table', { name: 'Account security activity' }),
+  ).toContainText('Password sign-in');
   const audit = await db.owner.query(
     "SELECT event,details->>'userId' AS \"userId\" FROM staff_audit WHERE event LIKE 'account.%' ORDER BY event",
   );
   expect(audit.rows).toEqual([
     { event: 'account.access.opened', userId: customer.userId },
+    { event: 'account.access.requested', userId: customer.userId },
     { event: 'account.inspected', userId: customer.userId },
     { event: 'account.security-events.inspected', userId: customer.userId },
   ]);
@@ -826,8 +893,18 @@ test('staff opens a customer account and follows a workspace into its own suppor
   await expect(
     page.getByRole('heading', { name: 'Workspace support access' }),
   ).toBeVisible();
+  // The workspace needs its own approval; a declined request says so and can be asked again.
+  await requestInspection(page, 'Following up on the sign-in ticket');
+  await approveWorkspaceInspection(
+    customerApi,
+    customer.cookie,
+    workspace.id,
+    'decline',
+  );
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(page.getByText(/^Your request was declined/)).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Open support access', exact: true }),
+    page.getByRole('button', { name: 'Request again', exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -835,22 +912,21 @@ test('staff opens a customer account and follows a workspace into its own suppor
 test('staff access removal clears customer details and rejects direct API calls', async ({
   resources: t,
 }) => {
-  const { page, context, db, errors } = await fixture(t);
+  const { page, context, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
   await signIn(page);
   const denied = await context.request.post('/api/auth/sign-up/email', {
     headers: { origin: new URL(page.url()).origin },
     data: { email: 'unexpected@example.test', password, name: 'Unexpected' },
   });
   expect(denied.status()).toBe(404);
-  await page.getByLabel('Name, email or workspace').fill('Support North');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect Support North' }).click();
-  await page
-    .getByLabel('Support reason or ticket reference')
-    .fill('Checking support offboarding behavior');
-  await page
-    .getByRole('button', { name: 'Open support access', exact: true })
-    .click();
+  await inspectWorkspace(
+    page,
+    customerApi,
+    customer,
+    workspace,
+    'Checking support offboarding behavior',
+  );
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toBeVisible();
@@ -1033,7 +1109,8 @@ test('staff sign-in rate limits remain distinct for clients behind a trusted pro
 test('regional staff directory keeps partial results and sends account access to the owning API', async ({
   resources: t,
 }) => {
-  const { page, context, workspace, errors } = await fixture(t);
+  const { page, context, customerApi, customer, workspace, errors } =
+    await fixture(t);
   let ownerRequests = 0;
   await page.route('**/api/v1/staff/config', async (route) => {
     const actual = await route.fetch();
@@ -1101,16 +1178,12 @@ test('regional staff directory keeps partial results and sends account access to
     .getByRole('link', { name: 'Open account customer@example.test' })
     .click();
   expect(new URL(page.url()).searchParams.get('region')).toBe('EU');
-  await page
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
-  const dialog = page.getByRole('dialog');
-  await dialog
-    .getByLabel('Support reason or ticket reference')
-    .fill('Investigating regional support routing');
-  await dialog
-    .getByRole('button', { name: 'Open account access', exact: true })
-    .click();
+  await inspectAccount(
+    page,
+    customerApi,
+    customer.cookie,
+    'Investigating regional support routing',
+  );
   await expect(
     page.getByRole('table', { name: 'Account workspaces' }),
   ).toContainText(workspace.name);

@@ -30,6 +30,11 @@ export interface MessageData {
   /** True only when provider-owned metadata confirms a sent message. */
   providerSent?: boolean;
   from: Address;
+  /**
+   * Whether the receiving system authenticated the From domain (DMARC aligned). Missing on
+   * older messages and means `unknown`; only `aligned` identifies the sender.
+   */
+  senderAuthentication?: 'aligned' | 'unaligned' | 'unknown';
   to: Address[];
   cc: Address[];
   replyTo: Address[];

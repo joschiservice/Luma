@@ -9,7 +9,7 @@ Workspace settings cover the workspace name, timezone and detection limits, team
 - `workspace.approval_policy.manage` changes the approval preference.
 - `members.manage` invites, reassigns and removes people. Only owners grant or revoke ownership, and nobody can assign a role with permissions they do not hold. The [membership rules](identity.md#membership-rules) apply.
 - `roles.manage` creates, edits and archives custom roles and reads role history.
-- `support_access.manage` allows and revokes Luma support access and answers support requests.
+- `support_access.manage` allows and revokes Luma support access, answers support requests and approves, declines or revokes inspection requests.
 
 Sections a role cannot change say which permission they need. Team and role mutations recheck authority under the organization row lock, including concurrent last-owner changes. Access, role and policy changes are appended to `workspace_access_events` with actor, timestamp and bounded before/after values.
 
@@ -62,7 +62,7 @@ Each editable object carries a revision. A stale revision returns 409; refresh b
 - Preview and acceptance require a session and a trusted Origin. Acceptance checks the workspace, email, expiry, token and pending status under the same organization lock as membership edits, and consumes the invitation and creates the membership in one transaction.
 - Reusing an accepted link returns 404, even after access is later removed. The browser reconciles a lost acceptance response against its workspace list.
 
-The token travels only in the URL fragment, tab-local session storage during sign-in and the POST body. It is never sent in navigation requests or kept in audit evidence, and only its hash is stored. The mail worker derives links with the identity signing secret, so resend pending invitations after rotating `BETTER_AUTH_SECRET`. Never log mail contents or acceptance bodies.
+The token travels only in the URL fragment, tab-local session storage during sign-in and the POST body. It is never sent in navigation requests or kept in audit evidence, and only its hash is stored. The mail worker derives links with a key derived from the identity signing secret, so resend pending invitations after rotating `BETTER_AUTH_SECRET`. Never log mail contents or acceptance bodies.
 
 ## Email delivery
 
@@ -75,7 +75,7 @@ MAIL_PUBLIC_ORIGIN=https://app.example.com
 MAIL_RESEND_WEBHOOK_SECRET=whsec_...
 ```
 
-Without them, Settings reports delivery unavailable and disables invitations and test sends; personal preferences still persist, and optional email starts off. Every API replica needs the same provider, public origin and identity signing secret.
+Without them, Settings reports delivery unavailable and disables invitations and test sends; personal preferences still persist, and optional email starts off. New accounts can't confirm their email address, so they can't sign in; see [email confirmation](identity.md#email-confirmation). Every API replica needs the same provider, public origin and identity signing secret.
 
 Mail goes through three PostgreSQL queues: password mail, account notices and workspace mail. The API drains them every five seconds, in that order, through one dispatch step that renders the message and calls Resend. Source transactions enqueue opted-in members when an issue needs approval, manual intervention or uncertainty review, or a connection becomes degraded or revoked.
 
@@ -178,6 +178,13 @@ replaces an earlier one; revoking clears it and ends open views on their next re
 a request allows the requested duration from now, or keeps a later end time. Each is a command
 with a receipt and a `revision`, recorded as a `support_access.*` access event. Staff can't change
 consent from a support view, because every write is refused there.
+
+The same section answers staff requests to inspect the workspace's records
+([staff access](staff.md#authority-and-evidence)). Approving opens thirty minutes for the staff
+member who asked; declining and revoking approved access are commands with receipts. The
+database records each state as a `support_inspection.*` access event, so the service writes no
+event of its own. A lapsed or answered request, and access that ended or is emergency access,
+returns 409.
 
 ## Bounded delegation
 

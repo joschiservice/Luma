@@ -13,8 +13,23 @@ export const installationTarget = z
   })
   .strict();
 
+/**
+ * Bearer secret for refresh wakeups: at least 32 printable characters that are not a repeated
+ * pattern. Luma generates 32 random bytes on request; programmatic installs such as the pilot
+ * may supply their own that meets the same bar.
+ */
+const webhookSecret = key.min(32).refine((value) => new Set(value).size >= 10);
+
+/**
+ * Supplied and stored credentials. A connection without a webhook secret reads normally and
+ * refuses wakeups until someone generates one.
+ */
 export const installationCredentials = z
-  .object({ token: key, subscriptionKey: key, webhookSecret: key.optional() })
+  .object({
+    token: key,
+    subscriptionKey: key,
+    webhookSecret: webhookSecret.optional(),
+  })
   .strict();
 
 export const installationInput = z

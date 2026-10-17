@@ -272,7 +272,7 @@ export const settingsContract = {
       path: `${path}/support-access`,
       summary: 'Read Luma support access',
       description:
-        'Returns until when Luma support may open read-only views of this workspace, and pending requests from Luma support.',
+        'Returns until when Luma support may open read-only views of this workspace, pending requests from Luma support, and inspection requests with approved inspections that are still open.',
     })
     .meta({
       access: requires('support_access.manage'),
@@ -345,6 +345,50 @@ export const settingsContract = {
         body: command
           .extend({ decision: z.enum(['approve', 'decline']) })
           .strict(),
+      }),
+    )
+    .output(supportAccessSchema),
+  decideSupportInspection: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/support-access/inspections/{requestId}`,
+      summary: 'Approve or decline a Luma support inspection request',
+      description:
+        'Approving lets the support team member who asked inspect this workspace’s records for thirty minutes from now. Inspection reads members, connections, sync health and access history; it can’t change anything. A request that lapsed or was answered returns 409.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          requestId: z.string().uuid(),
+        }),
+        body: command
+          .extend({ decision: z.enum(['approve', 'decline']) })
+          .strict(),
+      }),
+    )
+    .output(supportAccessSchema),
+  revokeSupportInspection: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/support-access/inspections/{requestId}/revoke`,
+      summary: 'End an approved Luma support inspection',
+      description:
+        'Ends approved inspection access now; the support team’s next read is refused. Emergency access can’t be revoked. Access that already ended returns 409.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          requestId: z.string().uuid(),
+        }),
+        body: command.strict(),
       }),
     )
     .output(supportAccessSchema),

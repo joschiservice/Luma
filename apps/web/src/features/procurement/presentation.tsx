@@ -138,6 +138,7 @@ export const reviewReasonLabels = {
   date_later: m.procurement_review_reason_date_later,
   unmatched_line: m.procurement_review_reason_unmatched_line,
   supplier_condition: m.procurement_review_reason_supplier_condition,
+  sender_unverified: m.procurement_review_reason_sender_unverified,
 } satisfies Record<Commitment['reviewReasons'][number], () => string>;
 
 /** Formats a quantity in the active language without float noise. */

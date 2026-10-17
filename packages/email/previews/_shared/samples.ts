@@ -72,6 +72,22 @@ export const samples = {
       'Your team reported that stock updates to Shopify stopped on 9 October. We want to look at the sync history of the affected connection.',
     link: `${origin}/app/${tenant}/settings/support`,
   },
+  support_inspection_requested: {
+    kind: 'support_inspection_requested',
+    workspace,
+    reason:
+      'Ticket 4821: orders from your Shopify store stopped syncing yesterday. We want to check the connection’s sync health and recent access changes.',
+    link: `${origin}/app/${tenant}/settings/support`,
+  },
+  support_inspection_emergency: {
+    kind: 'support_inspection_emergency',
+    workspace,
+    category: 'security_incident',
+    from: new Date('2026-10-11T22:40:00Z'),
+    until: new Date('2026-10-11T23:10:00Z'),
+    timeZone,
+    activityLink: `${origin}/app/${tenant}/activity`,
+  },
   support_view_started: {
     kind: 'support_view_started',
     workspace,
@@ -99,6 +115,15 @@ export const samples = {
     kind: 'password_changed',
     resetLink: `${origin}/forgot-password`,
   },
+  email_verification: {
+    kind: 'email_verification',
+    link: `${origin}/verify-email#eyJhbGciOiJIUzI1NiJ9.sample`,
+  },
+  security_factor_added: {
+    kind: 'security_factor_added',
+    factor: 'passkey',
+    resetLink: `${origin}/forgot-password`,
+  },
   account_deletion_scheduled: {
     kind: 'account_deletion_scheduled',
     eraseAfter: new Date('2026-11-11T00:00:00Z'),
@@ -108,4 +133,17 @@ export const samples = {
     signInLink: `${origin}/sign-in`,
   },
   account_erased: { kind: 'account_erased' },
+  account_inspection_requested: {
+    kind: 'account_inspection_requested',
+    reason:
+      'Ticket 4830: you reported that you can’t sign in with your passkey. We want to check your sign-in factors and recent security activity.',
+    link: `${origin}/app/${tenant}/settings/security`,
+  },
+  account_inspection_emergency: {
+    kind: 'account_inspection_emergency',
+    category: 'legal_request',
+    from: new Date('2026-10-11T22:40:00Z'),
+    until: new Date('2026-10-11T23:10:00Z'),
+    link: `${origin}/app/${tenant}/settings/security`,
+  },
 } satisfies { [K in Email['kind']]: Email & { kind: K } };

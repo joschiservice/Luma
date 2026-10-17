@@ -110,7 +110,8 @@ export function outboundRepository(
       return (
         await rows(
           `SELECT * FROM messaging_outbound WHERE tenant_id=$1 AND document ? 'procurement'
-        AND state IN ('sent','failed') AND (document->>'ownerHandoffAt' IS NULL OR (state='sent' AND created_at > now()-interval '60 days' AND COALESCE(document->>'deliveryCheckedAt',created_at::text)::timestamptz < now()-interval '10 minutes'))
+        AND (state IN ('sent','failed') OR (state='uncertain' AND document ? 'unverifiedDeliveryReport'))
+        AND (document->>'ownerHandoffAt' IS NULL OR (state IN ('sent','uncertain') AND created_at > now()-interval '60 days' AND COALESCE(document->>'deliveryCheckedAt',created_at::text)::timestamptz < now()-interval '10 minutes'))
         ORDER BY COALESCE(document->>'deliveryCheckedAt',created_at::text)::timestamptz,id LIMIT $2`,
           [tenantId, limit],
         )

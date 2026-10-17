@@ -10,7 +10,13 @@ import {
 } from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, startApi, startProcess } from './helpers.mjs';
+import {
+  availablePort,
+  createAccount,
+  database,
+  startApi,
+  startProcess,
+} from './helpers.mjs';
 import { seedPlaybooks } from './playbooks-fixture.mjs';
 
 test('evaluates, retries, reloads and reviews a Shadow case through the real API without execution', async ({
@@ -40,17 +46,11 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
   page.setDefaultTimeout(15_000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/sign-up');
-  await page.getByRole('radio', { name: /Australia/ }).check();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
-  await page.getByLabel('Email', { exact: true }).fill('shadow@example.test');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('browser-test-password-123');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
+  await createAccount(page, db, {
+    name: 'Ada',
+    email: 'shadow@example.test',
+    password: 'browser-test-password-123',
+  });
   await page.getByLabel('Workspace name').fill('Shadow studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })

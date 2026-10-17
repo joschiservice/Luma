@@ -2,36 +2,20 @@ import { Alert, AlertDescription } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@luma/ui/components/primitives/dialog';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from '@luma/ui/components/primitives/field';
-import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
-import { useForm } from '@tanstack/react-form';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { reasonSchema } from './access';
 import {
   AccountDeletionDialog,
   deletionCategoryLabel,
 } from './account-deletion';
 import { AccountSecurityEvents } from './account-security';
 import { AccountStatusDialog, categoryLabel } from './account-status';
-import { useRegionalStaffApi } from './api';
 import { Failure, Loading } from './feedback';
+import { InspectionAccess } from './inspection';
 import { accountOptions, sessionOptions } from './queries';
 import { staffRegion } from './regions';
 import { accountRoute } from './router';
@@ -59,7 +43,6 @@ export function AccountPage() {
     ...accountOptions(userId, grantId),
     refetchInterval: 30_000,
   });
-  const [requestAccess, setRequestAccess] = useState(false);
   // Fixed when the dialog opens, so the refetch after the change doesn't flip its wording.
   const [statusChange, setStatusChange] = useState<'disable' | 'enable' | null>(
     null,
@@ -70,6 +53,8 @@ export function AccountPage() {
     session.data?.permissions.includes('staff.accounts.manage') ?? false;
   const canDelete =
     session.data?.permissions.includes('staff.accounts.delete') ?? false;
+  const canEmergency =
+    session.data?.permissions.includes('staff.inspect.emergency') ?? false;
   const [deletionChange, setDeletionChange] = useState<
     'schedule' | 'restore' | 'erase_now' | null
   >(null);
@@ -86,18 +71,18 @@ export function AccountPage() {
       {!grantId ? (
         <>
           <PageHeader title="Account support access" />
-          <Alert tone="warning">
-            <AlertDescription>
-              {canInspect
-                ? 'Account details require current account support access.'
-                : 'Your staff role does not allow account inspection.'}
-            </AlertDescription>
-          </Alert>
           {canInspect ? (
-            <Button onClick={() => setRequestAccess(true)}>
-              Open account access
-            </Button>
-          ) : null}
+            <InspectionAccess
+              target={{ kind: 'account', id: userId }}
+              canEmergency={canEmergency}
+            />
+          ) : (
+            <Alert tone="warning">
+              <AlertDescription>
+                Your staff role does not allow account inspection.
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       ) : detail.isPending ? (
         <Loading>Checking access and reading account…</Loading>
@@ -106,9 +91,10 @@ export function AccountPage() {
           <PageHeader title="Account unavailable" />
           <Failure error={detail.error} retry={() => void detail.refetch()} />
           {canInspect ? (
-            <Button variant="outline" onClick={() => setRequestAccess(true)}>
-              Request new account access
-            </Button>
+            <InspectionAccess
+              target={{ kind: 'account', id: userId }}
+              canEmergency={canEmergency}
+            />
           ) : null}
         </>
       ) : (
@@ -354,113 +340,6 @@ export function AccountPage() {
           onClose={() => setDeletionChange(null)}
         />
       ) : null}
-      {requestAccess && canInspect ? (
-        <AccountAccessDialog
-          userId={userId}
-          name={detail.data?.account.name ?? 'account'}
-          onClose={() => setRequestAccess(false)}
-        />
-      ) : null}
     </>
-  );
-}
-
-/** Requests auditable, account-scoped access before displaying account details. */
-function AccountAccessDialog({
-  userId,
-  name,
-  onClose,
-}: {
-  userId: string;
-  name: string;
-  onClose: () => void;
-}) {
-  const staffApi = useRegionalStaffApi();
-  const navigate = useNavigate();
-  const access = useMutation({
-    mutationFn: (reason: string) => staffApi.grantAccount(userId, reason),
-    onSuccess: async (grant) => {
-      onClose();
-      await navigate({
-        to: '/accounts/$userId',
-        params: { userId },
-        search: { region: staffRegion(), grantId: grant.id },
-      });
-    },
-  });
-  const form = useForm({
-    defaultValues: { reason: '' },
-    onSubmit: async ({ value }) => {
-      try {
-        await access.mutateAsync(reasonSchema.parse(value.reason));
-      } catch {
-        /* Mutation and field feedback describe the failed request. */
-      }
-    },
-  });
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !access.isPending) onClose();
-      }}
-    >
-      <DialogContent showCloseButton={!access.isPending}>
-        <DialogHeader>
-          <DialogTitle>Inspect {name}</DialogTitle>
-          <DialogDescription>
-            Open time-limited support access to this customer account. Your
-            identity, reason and subsequent reads are recorded.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="staff-form"
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            void form.handleSubmit();
-          }}
-        >
-          <form.Field name="reason" validators={{ onChange: reasonSchema }}>
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="account-access-reason">
-                  Support reason or ticket reference
-                </FieldLabel>
-                <Textarea
-                  id="account-access-reason"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  disabled={access.isPending}
-                  maxLength={500}
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  aria-describedby="account-access-reason-error"
-                />
-                <FieldError
-                  id="account-access-reason-error"
-                  errors={field.state.meta.errors}
-                />
-              </Field>
-            )}
-          </form.Field>
-          {access.isError ? <Failure error={access.error} /> : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={onClose}
-              disabled={access.isPending}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={access.isPending}>
-              {access.isPending ? 'Opening access…' : 'Open account access'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -17,6 +17,7 @@ import {
   mailboxSettingsInputSchema,
   noteInputSchema,
   outboundDecisionInputSchema,
+  outboundDeliveryInputSchema,
   outboundInputSchema,
   outboundSchema,
   statusInputSchema,
@@ -350,6 +351,18 @@ export const messagingContract = {
     })
     .meta({ access: requires('messages.send'), errors })
     .input(z.object({ params: outboundParams, body: commandInputSchema }))
+    .output(outboundSchema),
+  resolveOutboundDelivery: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/outbound/{outboundId}/delivery`,
+      summary: 'Mark an uncertain supplier email as delivered or not delivered',
+      description: `Requires \`messages.send\` and \`procurement.manage\`. Records a person's decision after checking with the supplier; nothing is sent. \`delivered\` settles the email as sent; \`not_delivered\` as failed, so the order's submission can be drafted again. Only supplier emails in the \`uncertain\` state can be resolved; fails with 409 when \`expectedRevision\` is not current. ${retry}`,
+    })
+    .meta({ access: requires('messages.send'), errors })
+    .input(
+      z.object({ params: outboundParams, body: outboundDeliveryInputSchema }),
+    )
     .output(outboundSchema),
   discardOutbound: endpoint
     .route({

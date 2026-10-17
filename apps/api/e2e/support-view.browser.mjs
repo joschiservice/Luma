@@ -5,6 +5,7 @@ import { seedLocalStaff } from '@luma/staff/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
 import {
+  addMembership,
   availablePort,
   database,
   signup,
@@ -33,12 +34,7 @@ async function fixture(t) {
     body: { name: 'Support North', slug: 'support-north' },
     status: 201,
   });
-  await api.request(`/v1/organizations/${workspace.id}/members`, {
-    method: 'POST',
-    cookie: owner.cookie,
-    body: { userId: member.userId, roleId: 'member' },
-    status: 201,
-  });
+  await addMembership(db.owner, workspace.id, member.userId, 'member');
   const web = startProcess(
     t,
     'e2e/web-server.mjs',
@@ -90,6 +86,7 @@ async function fixture(t) {
       permissions: [
         'staff.directory.read',
         'staff.workspace.inspect',
+        'staff.accounts.inspect',
         'staff.view-as',
       ],
     },
@@ -135,6 +132,26 @@ async function signedIn(t, origin, cookie) {
   return context;
 }
 
+/** Signs in to the staff console in a new browser context. */
+async function staffPage(t, f, errors) {
+  const context = await t.newContext({
+    baseURL: f.staffOrigin,
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(12000);
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await page.getByLabel('Email', { exact: true }).fill('support@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Support directory', level: 1 }),
+  ).toBeVisible();
+
+  return { context, page };
+}
+
 test('staff view a consenting workspace as a member, read-only, until the owner revokes access', async ({
   resources: t,
 }) => {
@@ -155,18 +172,8 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     ownerPage.getByText('Luma support access is on', { exact: true }),
   ).toBeVisible();
 
-  // Staff start a view as the member from the workspace page.
-  const staffContext = await t.newContext({
-    baseURL: f.staffOrigin,
-    viewport: { width: 1440, height: 900 },
-  });
-  const staff = await staffContext.newPage();
-  staff.setDefaultTimeout(12000);
-  staff.on('pageerror', (error) => errors.push(error.message));
-  await staff.goto('/');
-  await staff.getByLabel('Email', { exact: true }).fill('support@example.test');
-  await staff.getByLabel('Password', { exact: true }).fill(password);
-  await staff.getByRole('button', { name: 'Sign in', exact: true }).click();
+  // Staff ask to inspect the workspace; nothing opens until the owner approves.
+  const { context: staffContext, page: staff } = await staffPage(t, f, errors);
   await staff.getByLabel('Name, email or workspace').fill('Support North');
   await staff.getByRole('button', { name: 'Search', exact: true }).click();
   await staff.getByRole('button', { name: 'Inspect Support North' }).click();
@@ -174,8 +181,32 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     .getByLabel('Support reason or ticket reference')
     .fill('Member reports a missing order on Home');
   await staff
-    .getByRole('button', { name: 'Open support access', exact: true })
+    .getByRole('button', { name: 'Send request', exact: true })
     .click();
+  await expect(staff.getByText(/^Waiting for approval from/)).toBeVisible();
+  await expect(
+    staff.getByRole('button', { name: 'Open workspace' }),
+  ).toHaveCount(0);
+
+  // The owner sees the support team's reason and approves in Settings.
+  await ownerPage.reload();
+  await expect(
+    ownerPage.getByRole('heading', { name: 'Inspection requests' }),
+  ).toBeVisible();
+  await expect(
+    ownerPage.getByText('Member reports a missing order on Home'),
+  ).toBeVisible();
+  await ownerPage.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(
+    ownerPage.getByText('Inspection approved for 30 minutes.'),
+  ).toBeVisible();
+  await expect(
+    ownerPage.getByRole('button', { name: 'End inspection' }),
+  ).toBeVisible();
+
+  // Staff open the approved access and start a view as the member.
+  await staff.getByRole('button', { name: 'Check again' }).click();
+  await staff.getByRole('button', { name: 'Open workspace' }).click();
   await expect(
     staff.getByText(/allows read-only support views until/),
   ).toBeVisible();
@@ -239,8 +270,19 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
   );
   expect(preferences.rows[0].count).toBe(0);
 
-  // Activity names the member shown and the path read. The owner then revokes access.
+  // Activity shows the inspection grant, the member shown and the path read. The owner then
+  // revokes access.
   await ownerPage.goto(`/app/${f.workspace.id}/activity`);
+  await expect(
+    ownerPage.getByRole('link', {
+      name: /^Support inspection requested\b.*Luma support\. Recorded\./,
+    }),
+  ).toBeVisible();
+  await expect(
+    ownerPage.getByRole('link', {
+      name: /^Support inspection approved for 30 minutes\b.*Recorded\./,
+    }),
+  ).toBeVisible();
   await expect(
     ownerPage.getByRole('link', {
       name: /^Read-only support view started\. .*member, Luma support\. Recorded\./,
@@ -264,6 +306,79 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
   ).toBeVisible();
   await expect(
     view.getByText('The workspace revoked Luma support access.'),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a person approves account inspection in Settings › Security and can end it early', async ({
+  resources: t,
+}) => {
+  const f = await fixture(t);
+  const errors = [];
+
+  // Staff ask to inspect the member's account.
+  const { page: staff } = await staffPage(t, f, errors);
+  await staff.goto(`/accounts/${f.member.userId}`);
+  await staff.getByRole('button', { name: 'Request inspection' }).click();
+  await staff
+    .getByLabel('Support reason or ticket reference')
+    .fill('Member cannot sign in with their passkey');
+  await staff
+    .getByRole('button', { name: 'Send request', exact: true })
+    .click();
+  await expect(staff.getByText(/^Waiting for approval from/)).toBeVisible();
+
+  // The member answers in Settings › Security, where the reason is shown.
+  const memberContext = await signedIn(t, f.customerOrigin, f.member.cookie);
+  const member = await memberContext.newPage();
+  member.setDefaultTimeout(12000);
+  member.on('pageerror', (error) => errors.push(error.message));
+  await member.goto(`/app/${f.workspace.id}/settings/security`);
+  await expect(
+    member.getByRole('heading', { name: 'Luma support access' }),
+  ).toBeVisible();
+  await expect(
+    member.getByText('Member cannot sign in with their passkey'),
+  ).toBeVisible();
+  await member.setViewportSize({ width: 390, height: 844 });
+  await member.emulateMedia({ colorScheme: 'dark' });
+  await expect
+    .poll(() =>
+      member.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await member.screenshot({
+    path: test.info().outputPath('account-inspection-request-dark-narrow.png'),
+    animations: 'disabled',
+  });
+  const approve = member.getByRole('button', { name: 'Approve', exact: true });
+  await approve.focus();
+  await member.keyboard.press('Enter');
+  await expect(
+    member.getByText('Access approved for 30 minutes.'),
+  ).toBeVisible();
+  await expect(
+    member.getByText(
+      'You approved Luma support access to your account for 30 minutes',
+    ),
+  ).toBeVisible();
+  await expect(
+    member.getByText('Luma support asked to inspect your account'),
+  ).toBeVisible();
+
+  // Staff open the account under the approval.
+  await staff.getByRole('button', { name: 'Check again' }).click();
+  await staff.getByRole('button', { name: 'Open account' }).click();
+  await expect(staff.getByText('member@example.test').first()).toBeVisible();
+
+  // Ending it early refuses the next read.
+  await member.getByRole('button', { name: 'End inspection' }).click();
+  await expect(
+    member.getByText('Access ended. Luma support’s next read is refused.'),
+  ).toBeVisible();
+  await staff.reload();
+  await expect(
+    staff.getByText(/The customer revoked your access/),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

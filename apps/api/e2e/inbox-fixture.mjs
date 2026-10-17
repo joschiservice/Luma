@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
-import { until } from './helpers.mjs';
+import { addMembership, until, verifyEmail } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 export const mailboxAddress = 'einkauf@luma-goods.example';
@@ -58,27 +58,32 @@ export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
   };
   const messaging = (path, body, options) =>
     request(`/messaging${path}`, body, options);
-  /** Signs up a person and adds them to the workspace with a role. */
+  /** Signs up a person and, given a role, writes their membership directly. */
   const join = async (name, roleId) => {
+    const email = `${name.toLowerCase()}@example.test`;
+    const password = 'inbox-e2e-password-123';
     const response = await f.pilot.app.inject({
       method: 'POST',
       url: '/auth/sign-up/email',
       headers: { origin },
       payload: {
         name,
-        email: `${name.toLowerCase()}@example.test`,
+        email,
         dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
-        password: 'inbox-e2e-password-123',
+        password,
       },
     });
     assert.equal(response.statusCode, 200, response.body);
-    const person = { id: response.json().user.id, cookie: session(response) };
-    if (roleId)
-      await request(
-        '/members',
-        { userId: person.id, roleId },
-        { cookie: owner, status: 201 },
-      );
+    await verifyEmail(f.db.owner, email);
+    const signedIn = await f.pilot.app.inject({
+      method: 'POST',
+      url: '/auth/sign-in/email',
+      headers: { origin },
+      payload: { email, password },
+    });
+    assert.equal(signedIn.statusCode, 200, signedIn.body);
+    const person = { id: response.json().user.id, cookie: session(signedIn) };
+    if (roleId) await addMembership(f.db.owner, org, person.id, roleId);
 
     return person;
   };

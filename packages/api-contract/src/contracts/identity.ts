@@ -9,6 +9,7 @@ import {
   requires,
 } from '../common.js';
 import { roleReferenceSchema } from '../roles.js';
+import { supportInspectionSchema } from '../settings.js';
 
 export const organizationSchema = z.object({
   id: z.string().uuid(),
@@ -111,6 +112,12 @@ export const securityEventTypeSchema = z.enum([
   'account.enabled',
   'account.deletion-scheduled',
   'account.restored',
+  'support-inspection.requested',
+  'support-inspection.approved',
+  'support-inspection.declined',
+  'support-inspection.expired',
+  'support-inspection.revoked',
+  'support-inspection.emergency-opened',
 ]);
 
 const securityEventSchema = z.object({
@@ -202,6 +209,43 @@ export const identityContract = {
         nextCursor: z.string().nullable(),
       }),
     ),
+  listSupportInspections: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/account/support-inspections',
+      summary: 'List Luma support requests for your account',
+      description:
+        'Returns requests from Luma support to inspect your account, and approved inspections that are still open, newest first. Inspection shows your workspaces and roles, sign-in factor status, active sessions and security activity; it never shows passwords or factor secrets.',
+    })
+    .meta({ errors })
+    .output(z.object({ items: z.array(supportInspectionSchema) })),
+  decideSupportInspection: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/account/support-inspections/{requestId}',
+      summary: 'Approve or decline a Luma support request for your account',
+      description:
+        'Approving lets the support team member who asked inspect your account for thirty minutes from now. Repeating the same answer returns the current list; a request that lapsed or got another answer returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: z.object({ requestId: z.string().uuid() }),
+        body: z.object({ decision: z.enum(['approve', 'decline']) }).strict(),
+      }),
+    )
+    .output(z.object({ items: z.array(supportInspectionSchema) })),
+  revokeSupportInspection: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/account/support-inspections/{requestId}/revoke',
+      summary: 'End an approved Luma support inspection of your account',
+      description:
+        'Ends approved access now; the support team’s next read is refused. Emergency access can’t be revoked. Revoking again returns the current list; access that already ended returns 409.',
+    })
+    .meta({ errors })
+    .input(z.object({ params: z.object({ requestId: z.string().uuid() }) }))
+    .output(z.object({ items: z.array(supportInspectionSchema) })),
   setLanguage: endpoint
     .route({
       method: 'PUT',
@@ -270,26 +314,6 @@ export const identityContract = {
     .meta({ access: anyMember, errors })
     .input(z.object({ params: organizationParamsSchema }))
     .output(z.object({ items: z.array(membershipSchema) })),
-  addMember: endpoint
-    .route({
-      method: 'POST',
-      path: '/v1/organizations/{organizationId}/members',
-      successStatus: 201,
-      summary: 'Add a registered user to an organization',
-      description:
-        'Requires `members.manage`. Only owners can grant ownership, and others can only assign roles whose permissions they hold.',
-    })
-    .meta({ access: requires('members.manage'), errors })
-    .input(
-      z.object({
-        params: organizationParamsSchema,
-        headers: commandHeaders,
-        body: z
-          .object({ userId: z.string().uuid(), roleId: z.string().min(1) })
-          .strict(),
-      }),
-    )
-    .output(membershipSchema),
   updateMember: endpoint
     .route({
       method: 'PATCH',

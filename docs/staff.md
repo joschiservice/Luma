@@ -56,9 +56,11 @@ Google sessions retain the verified subject from their sign-in. A session withou
 matching subject is rejected, including an old callback that finishes after rebinding.
 Sessions also recheck admission on every request. The administrator operation records
 its operator, reason and resulting grant atomically; the running
-staff credentials cannot perform it. Opening workspace support grants
-requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
-requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
+staff credentials cannot perform it. Requesting and opening workspace support grants
+requires both `staff.directory.read` and `staff.workspace.inspect`; account grants
+require `staff.directory.read` and `staff.accounts.inspect`. Emergency inspection, without
+customer approval, additionally requires `staff.inspect.emergency`; grant it separately from
+support roles. Global customer
 session revocation additionally requires `staff.sessions.revoke`, and suspending or
 reactivating a membership requires `staff.memberships.manage`. Disabling or enabling an account
 requires `staff.accounts.manage` together with `staff.accounts.inspect`; scheduling, restoring
@@ -93,19 +95,56 @@ its built-in Owner and Admin roles automatically receive every core permission. 
 redefines it with the complete list.
 
 Directory access exposes bounded user/workspace metadata. Customer detail requires a
-workspace support grant with a reason, bound to the current staff identity and session,
-and valid for thirty minutes. Grants are checked again on every read and command. Database
-policies preserve workspace boundaries without inserting artificial customer memberships.
-Inspection can support suspended workspaces; it grants no commerce execution authority.
+workspace support grant, and a grant requires the customer's approval:
 
-Account detail requires an account support grant for one customer account, with the same
-reason, staff session binding and thirty-minute limit. It shows the person's workspaces and
+- **Request.** Staff ask with a reason of ten to five hundred characters. People with
+  `support_access.manage` see the reason in Settings › Luma support and approve or decline;
+  owners are emailed. The reason is shown because approvers must judge it, so write it for the
+  customer. One request per staff member and workspace can be pending; it lapses after 24 hours.
+  The customer API's minute sweep records lapses nobody looked at.
+- **Approval.** Approval opens thirty minutes from the answer, for the staff member who asked.
+  They then open a grant bound to their current session; it takes the request's reason and ends
+  with the approval. Several sessions may open grants under one approval; none outlives it.
+- **Revocation.** The workspace can revoke approved access early. Grants are rechecked against
+  their request on every read and command, so the next one is refused.
+- **Emergency.** For a security incident or legal request, `staff.inspect.emergency` opens
+  thirty minutes without approval. It needs a category, a reference, a reason and a staff
+  sign-in within fifteen minutes. Owners are emailed, Activity shows it with its category, and
+  the workspace can't revoke it.
+- **Suspended or closed workspaces** can't answer, because nobody can sign in to approve; a
+  request returns 409, and only emergency access remains.
+
+Every state is a customer-visible record: the workspace's Activity shows the request and lapse
+(by Luma support and Luma), the answer or revocation (by the member who gave it) and emergency
+access. Triggers on the request table write each record in the statement that changes the state,
+and a trigger on the grant table admits a grant only under an approved, unexpired request of the
+same staff member and workspace. No grant therefore exists without its approval record.
+Customers never see the staff identity or an emergency reference, nor the reason of emergency
+access; the staff audit keeps them (`workspace.access.requested`, `workspace.access.emergency`,
+`workspace.access.opened`).
+
+The request tables belong to support consent: workspace requests are written only by
+`luma_support_view` functions, account requests by `luma_identity_support` functions. The staff
+runtime only calls the request and status functions; the customer runtime reads requests without
+the staff identity or reference and may only answer or revoke under tenant or account row
+security. A trigger enforces the lifecycle whichever role writes. Database policies preserve
+workspace boundaries without inserting artificial customer memberships. Inspection grants no
+commerce execution authority.
+
+Account detail requires an account support grant for one customer account, approved by the
+person in Settings › Security, with the same lifecycle, emergency path and session binding. The
+person is emailed with a link to Settings › Security in one of their workspaces; someone without
+a workspace can't reach Settings and the request lapses. Disabled accounts can't answer, so only
+emergency access works for them. It shows the person's workspaces and
 roles, whether two-factor authentication is on, how many passkeys are registered, and active
 sessions with their IP address, approximate browser and operating system, and last activity.
 It never returns credentials, factor secrets or passkey credential IDs. An account grant opens
 no workspace: workspace detail and session revocation still need a workspace grant. Restricted
-views expose only the listed columns, and only under a current account grant. Opening a grant
-is audited as `account.access.opened` and each read as `account.inspected`. IP addresses and
+views expose only the listed columns, and only under a current account grant. Requests are
+audited as `account.access.requested` or `account.access.emergency`, opening a grant as
+`account.access.opened` and each read as `account.inspected`. The person's
+[security events](identity.md#security-events) record every request state, written by triggers
+like the workspace records. IP addresses and
 user agents come from the customer's requests; treat them as hints, not proof of device or
 location.
 
@@ -233,7 +272,9 @@ before the feature is used with production accounts.
 
 A support view shows the customer app as one member sees it, read-only, for up to thirty
 minutes. [ADR-011](architecture/011-support-view.md) records the design. Start it from the
-workspace page under a workspace grant, with a reason; the target must be an active member.
+workspace page under a workspace grant, so after an approved or emergency inspection, with a
+reason; the target must be an active member. The view's consent is separate from inspection
+approval.
 
 ```mermaid
 sequenceDiagram

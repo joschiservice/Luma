@@ -44,9 +44,15 @@ Work the list from the keyboard: **J** and **K**, or the arrow keys, move throug
 
 The timeline records who changed what and when.
 
+### Sender verification
+
+Gmail checks whether a received message really comes from the domain in its From address. When that check fails, the message shows **Sender not verified**: the From address may be forged, so check with the sender, for example by phone, before you act on it. When Gmail recorded no check, as for mail imported into the mailbox, the message shows **Sender couldn't be verified**. Messages from verified senders show no label. Mail from colleagues on your own Google Workspace domain counts as verified when Google signed it for that domain.
+
+Luma never treats an unverified sender's message as proof: supplier commitments from it wait for your review, and it doesn't confirm that an order email arrived.
+
 ## Linked records
 
-Luma links a thread when the evidence is exact: a supplier rule, a customer's email address, or an order or purchase order number in the message. Each link shows how it was found. A reference that matches several records is only **Suggested**; confirm the right one or dismiss it. Use **Link record** to add a link yourself, and **Remove link** to remove one; Luma doesn't add a removed link again.
+Luma links a thread when the evidence is exact: a supplier rule, a customer's email address, or an order or purchase order number in the message. Each link shows how it was found. A reference that matches several records is only **Suggested**; confirm the right one or dismiss it. A supplier rule or customer address that matched a sender Luma couldn't verify is also only **Suggested**, because anyone can write someone else's address in the From line. Use **Link record** to add a link yourself, and **Remove link** to remove one; Luma doesn't add a removed link again.
 
 Linked records show their threads on their own page under **Inbox threads**. A supplier message linked to exactly one purchase order is also recorded on that purchase order, where its commitments are reviewed.
 

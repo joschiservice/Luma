@@ -21,7 +21,6 @@ export const accountSessionsKey = ['private', 'account-sessions'] as const;
 const sessionsSchema = z.array(
   z.object({
     id: z.string(),
-    token: z.string(),
     current: z.boolean(),
     lastActiveAt: z.union([
       z.iso.datetime(),
@@ -69,7 +68,10 @@ export function SessionSettings({ disabled }: { disabled: boolean }) {
       const result =
         target === 'others'
           ? await auth.revokeOtherSessions()
-          : await auth.revokeSession({ token: target.token });
+          : await auth.$fetch('/revoke-session-by-id', {
+              method: 'POST',
+              body: { sessionId: target.id },
+            });
       if (result.error) {
         setError(m.settings_security_sessions_revoke_failed());
 

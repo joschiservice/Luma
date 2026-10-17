@@ -83,7 +83,23 @@ describe.skipIf(!databaseUrl)(
           ).toBe(0);
           const registered = await signup(region);
           expect(registered.status, await registered.clone().text()).toBe(200);
-          const cookies = registered.headers.getSetCookie();
+          expect(registered.headers.getSetCookie()).toEqual([]);
+          // The emailed confirmation link would set this before the first sign-in.
+          await database.owner.query(
+            "UPDATE users SET email_verified=true WHERE email='owner@example.test'",
+          );
+          const signedIn = await identity.handler(
+            new Request(`${origin}/auth/sign-in/email`, {
+              method: 'POST',
+              headers: { origin, 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email: 'owner@example.test',
+                password: 'a-long-regional-password',
+              }),
+            }),
+          );
+          expect(signedIn.status, await signedIn.clone().text()).toBe(200);
+          const cookies = signedIn.headers.getSetCookie();
           expect(cookies.length).toBeGreaterThan(0);
           for (const cookie of cookies) {
             expect(cookie).not.toMatch(/;\s*Domain=/i);
