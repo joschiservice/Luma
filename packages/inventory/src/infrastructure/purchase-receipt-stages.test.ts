@@ -63,7 +63,11 @@ const receipt = (accounts: { id: string; balance: string }[]) => ({
 
 /** A database holding one order's pending, rejected and two approved receipt reviews. */
 function database(currentAvailable: string) {
-  const calls: { tenantId: string; sql: string; values?: unknown[] }[] = [];
+  const calls: {
+    tenantId: string;
+    sql: string;
+    values?: unknown[] | undefined;
+  }[] = [];
   let readOnly = false;
   const db: TenantDatabase = {
     async transaction(tenant, operation, options) {
