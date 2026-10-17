@@ -421,7 +421,7 @@ it.each([
       captureActivityError,
     );
     const failure = await environment
-      .run(activities.refresh!, input, 'incident')
+      .run(activities.refresh, input, 'incident')
       .catch((failure: unknown) => failure);
 
     expect(failure).toBeInstanceOf(ApplicationFailure);

@@ -460,7 +460,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         });
         if (!stream?.scan) return true;
       }
-      const scan = stream.scan!;
+      const scan = stream.scan;
       const result = await deps.reader.read(tenant, {
         readPurpose: scan.kind === 'incremental' ? 'incremental' : 'history',
         connectionId: claimed.connectionId,

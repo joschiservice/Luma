@@ -1031,7 +1031,7 @@ export function createShopifyStockProtection(
       !record.view.positions.some(
         (p) =>
           active.has(p.status) ||
-          (record!.view.mode === 'preview' && p.status === 'preview'),
+          (record.view.mode === 'preview' && p.status === 'preview'),
       ) &&
       (record.view.releaseRequested || recovered);
     if (done) {
