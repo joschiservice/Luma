@@ -24,6 +24,8 @@ export { orderStateQueries } from './infrastructure/order-state.js';
 
 export { createOrderListRebuilder } from './infrastructure/list-projection.js';
 
+export { listReturnWriteScopes } from './infrastructure/return-write-scopes.js';
+
 const digest = (value: unknown) =>
   createHash('sha256').update(canonicalJson(value)).digest('hex');
 

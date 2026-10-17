@@ -877,6 +877,25 @@ export async function createPilot(
         );
     };
     /**
+     * Runs one return follow-up pass, as the sync worker does: approved return writes are sent
+     * as their requester and uncertain ones are checked by reading.
+     */
+    const returnFollowUp = async () => {
+      const { rows } = await pool.query(
+        'SELECT tenant_id,principal_id FROM orders_return_write_scopes()',
+      );
+      for (const row of rows) {
+        const requester = await identity.service.resolveWorkflowContext(
+          row.principal_id,
+          row.tenant_id,
+          'return-follow-up',
+        );
+        await application.returnCases.recover(requester);
+        await application.returnActions.recover(requester);
+        await application.returnExchanges.recover(requester);
+      }
+    };
+    /**
      * Runs mailbox reading passes as the sync worker does, until no mailbox is due or `passes`
      * ran. Message text past its retention is removed first.
      */
@@ -903,6 +922,12 @@ export async function createPilot(
         );
       }, 10_000);
       resources.add(() => clearInterval(mailboxTimer));
+      const returnTimer = setInterval(() => {
+        returnFollowUp().catch((error) =>
+          console.error('Return follow-up failed; retrying.', error),
+        );
+      }, 10_000);
+      resources.add(() => clearInterval(returnTimer));
     }
 
     return {
@@ -918,6 +943,7 @@ export async function createPilot(
       procurementContext: application.http.procurementContext,
       decisions: application.http.decisions,
       followUp,
+      returnFollowUp,
       /** Return deadline checks, as the return step follow-up runs them in the workflow worker. */
       returnDeadlines: application.returnDeadlines,
       /** The operations inbox, its replies and a `sync()` that reads due mailboxes now. */

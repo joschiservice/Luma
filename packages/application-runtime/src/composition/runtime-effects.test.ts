@@ -139,6 +139,7 @@ const runtimes = {
   workflowWorker: { ...applicationOptionsFor(host()), execution: enabled },
   mailboxSync: { ...applicationOptionsFor(host()), execution: enabled },
   supplierFollowUp: { ...applicationOptionsFor(host()), execution: enabled },
+  returnFollowUp: { ...applicationOptionsFor(host()), execution: enabled },
 };
 
 function intent(capability: string): EffectIntent {
@@ -207,6 +208,7 @@ describe('runtime effects', () => {
       workflowWorker: [...internal, ...external].sort(),
       mailboxSync: [...internal, ...external].sort(),
       supplierFollowUp: [...internal, ...external].sort(),
+      returnFollowUp: [...internal, ...external].sort(),
     });
   });
 
@@ -227,6 +229,7 @@ describe('runtime effects', () => {
       runtimes.workflowWorker,
       runtimes.mailboxSync,
       runtimes.supplierFollowUp,
+      runtimes.returnFollowUp,
     ])
       expect(await adapters(options)).toEqual(api);
   });

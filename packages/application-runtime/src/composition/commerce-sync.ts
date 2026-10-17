@@ -47,6 +47,7 @@ import { createDetectionWorker } from './detection-worker.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createMailboxSyncWorker } from './mailbox-sync.js';
 import { createResourceScope } from './resources.js';
+import { createReturnFollowUpWorker } from './return-follow-up.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
@@ -207,8 +208,8 @@ export function createCommerceSyncService(
 
 /**
  * Starts the commerce sync process: identity for resolving who each sync runs as, the
- * worker database pool, the runner loop, supplier follow-up, mailbox reading and scheduled
- * detection. Failures
+ * worker database pool, the runner loop, supplier follow-up, return follow-up, mailbox
+ * reading and scheduled detection. Failures
  * are written to stderr and reported through `observability` when supplied. Close it after
  * `run` resolves. With `modelSettings` and `observability`, mailbox reading extracts facts from
  * documents and supplier messages through the configured regional routes.
@@ -272,8 +273,19 @@ export async function createDefaultCommerceSyncWorker(
       log,
     });
 
+    const returnFollowUp = createReturnFollowUpWorker({
+      ...(observability ? { observability } : {}),
+      database: createTenantDatabase(pool),
+      pool,
+      identity: identity.service,
+      connections: settings.connections,
+      env,
+      log,
+    });
+
     resources.add(followUp.close);
     resources.add(mailboxes.close);
+    resources.add(returnFollowUp.close);
 
     const detection = createDetectionWorker({
       ...(observability ? { observability } : {}),
@@ -292,6 +304,7 @@ export async function createDefaultCommerceSyncWorker(
           worker.run(),
           followUp.run(),
           mailboxes.run(),
+          returnFollowUp.run(),
           detection.run(),
         ]);
       },
@@ -299,6 +312,7 @@ export async function createDefaultCommerceSyncWorker(
         worker.shutdown();
         followUp.shutdown();
         mailboxes.shutdown();
+        returnFollowUp.shutdown();
         detection.shutdown();
       },
       close: resources.close,

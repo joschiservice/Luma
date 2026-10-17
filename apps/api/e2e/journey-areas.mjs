@@ -341,6 +341,7 @@ const returnCases = [
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
   'packages/application-runtime/src/composition/return-cases.ts',
+  'packages/application-runtime/src/composition/return-follow-up.ts',
 ];
 const sync = [
   'packages/commerce-sync/**',

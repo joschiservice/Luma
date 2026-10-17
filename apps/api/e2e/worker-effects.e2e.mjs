@@ -395,3 +395,193 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
 });
+
+/** Makes a return write due for the follow-up pass, which rereads a write at most once a minute. */
+const dueReturnWrite = (f, table, id) =>
+  f.db.owner.query(
+    `UPDATE ${table} SET document=jsonb_set(document,'{updatedAt}',to_jsonb(to_char((now()-interval '10 minutes') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) WHERE tenant_id=$1 AND id=$2`,
+    [f.org, id],
+  );
+
+it('refunds an approved return from the sync worker once and verifies it after a lost response and restart', async (t) => {
+  const f = await settlementFixture(t);
+  await addAdmin(f, f.approver);
+  const refund = await f.request(`${f.path}/settlements`, {
+    id: randomUUID(),
+    kind: 'refund',
+  });
+  expect(refund.state).toBe('approval_required');
+  const refunds = async () =>
+    (
+      await f.call('runs/operations/records/shopify?kind=Refund&limit=100')
+    ).items.filter((r) => r.data.note === `luma-rs:${refund.id}`);
+  const settlement = async () =>
+    (await f.request(`${f.path}/settlements`)).items.find(
+      (item) => item.id === refund.id,
+    );
+  let worker = await purchasingWorker(t, f.purchasingWorkerConfiguration());
+
+  // The API records the approval but cannot send as the requester, as after a crash.
+  const approved = await withRequesterSuspended(f, f.manifest.operatorId, () =>
+    f.request(
+      `${f.path}/settlements/${refund.id}/decision`,
+      { decisionId: refund.decisionId, outcome: 'approved' },
+      f.approver,
+    ),
+  );
+  expect(approved).toMatchObject({ state: 'approved', sent: false });
+  expect(await refunds()).toHaveLength(0);
+
+  // The worker sends as the requester; Shopify commits the refund and the response is lost.
+  await loseResponse(f, 'shopify', 'returns.refund');
+  await worker.returnWrites();
+  expect(await refunds()).toHaveLength(1);
+  expect((await settlement()).state).not.toBe('verified');
+
+  // After payment settles, a restarted worker only reads and verifies the same refund.
+  await f.command({ kind: 'refund-settle', order: f.providerOrderId });
+  await dueReturnWrite(f, 'orders_return_actions', refund.id);
+  worker = await restart(t, f, worker, (next) => next.returnWrites());
+  expect(await refunds()).toHaveLength(1);
+  expect(await settlement()).toMatchObject({
+    state: 'verified',
+    proof: { outcome: 'passed', payment: 'paid' },
+  });
+  await worker.returnWrites();
+  expect(
+    (await f.request(`${f.path}/settlements/${refund.id}/send`, {})).state,
+  ).toBe('verified');
+  expect(await refunds()).toHaveLength(1);
+
+  const actionId = (
+    await f.db.owner.query(
+      "SELECT document->>'actionId' AS id FROM orders_return_actions WHERE tenant_id=$1 AND id=$2",
+      [f.org, refund.id],
+    )
+  ).rows[0].id;
+  const found = await evidence(f, actionId);
+  expect(found.executions).toHaveLength(1);
+  expect(found.executions[0].state).toBe('succeeded');
+  expect(found.executions[0].document.attempt).toMatchObject({
+    requestedBy: f.manifest.operatorId,
+    businessOutcome: 'satisfied',
+    verification: { outcome: 'passed' },
+  });
+  expect(found.approvers).toEqual([f.manifest.requesterId]);
+  expect(found).toMatchObject({ prepared: 1, completed: 1 });
+  expect(found.reconciled).toBeGreaterThan(0);
+});
+
+it('creates an approved return from the sync worker once and records it after a lost response and restart', async (t) => {
+  const f = await settlementFixture(t, { prepare: 'opened' });
+  await addAdmin(f, f.approver);
+  const requested = await f.request(`${f.path}/creations`, {
+    id: randomUUID(),
+    warehouse: { externalId: 'shopify', scopeKey: '' },
+    reason: { externalId: 'SIZE_TOO_SMALL', scopeKey: '' },
+  });
+  const creation = requested.creation;
+  expect(creation.state).toBe('approval_required');
+  const returns = async () =>
+    (
+      await f.call('runs/operations/records/shopify?kind=Return&limit=100')
+    ).items.filter((r) => r.data.order === f.providerOrderId);
+  const current = async () => (await f.request(f.path)).creation;
+  let worker = await purchasingWorker(t, f.purchasingWorkerConfiguration());
+
+  // The API records the approval but cannot send as the requester, as after a crash.
+  const approved = await withRequesterSuspended(f, f.manifest.operatorId, () =>
+    f.request(
+      `${f.path}/creations/${creation.id}/decision`,
+      { decisionId: creation.decisionId, outcome: 'approved' },
+      f.approver,
+    ),
+  );
+  expect(approved.creation.state).toBe('approved');
+  expect(await returns()).toHaveLength(0);
+
+  // The worker creates the return as the requester; the response is lost after Shopify commits.
+  await loseResponse(f, 'shopify', 'returns.create');
+  await worker.returnWrites();
+  expect(await returns()).toHaveLength(1);
+  expect((await current()).state).toBe('uncertain');
+
+  // A restarted worker reads the store instead of creating a second return.
+  await dueReturnWrite(f, 'orders_return_creations', creation.id);
+  worker = await restart(t, f, worker, (next) => next.returnWrites());
+  expect(await returns()).toHaveLength(1);
+  expect(await current()).toMatchObject({
+    state: 'created',
+    externalReturn: { externalId: expect.any(String) },
+  });
+  await worker.returnWrites();
+  expect(await returns()).toHaveLength(1);
+
+  const actionId = (
+    await f.db.owner.query(
+      "SELECT document->>'actionId' AS id FROM orders_return_creations WHERE tenant_id=$1 AND id=$2",
+      [f.org, creation.id],
+    )
+  ).rows[0].id;
+  const found = await evidence(f, actionId);
+  expect(found.executions).toHaveLength(1);
+  expect(found.executions[0].state).toBe('succeeded');
+  expect(found.executions[0].document.attempt).toMatchObject({
+    requestedBy: f.manifest.operatorId,
+    verification: { outcome: 'passed' },
+  });
+  expect(found.approvers).toEqual([f.manifest.requesterId]);
+  expect(found).toMatchObject({ prepared: 1, completed: 1 });
+  expect(found.reconciled).toBeGreaterThan(0);
+});
+
+it('records an approved return refund that was never sent as expired once its approval ends', async (t) => {
+  const f = await settlementFixture(t);
+  await addAdmin(f, f.approver);
+  const refund = await f.request(`${f.path}/settlements`, {
+    id: randomUUID(),
+    kind: 'refund',
+  });
+  await withRequesterSuspended(f, f.manifest.operatorId, () =>
+    f.request(
+      `${f.path}/settlements/${refund.id}/decision`,
+      { decisionId: refund.decisionId, outcome: 'approved' },
+      f.approver,
+    ),
+  );
+  // The approval window ends before any process sends it.
+  await f.db.owner.query(
+    `UPDATE orders_return_actions SET document=jsonb_set(document,'{expiresAt}',to_jsonb(to_char((now()-interval '1 minute') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) WHERE tenant_id=$1 AND id=$2`,
+    [f.org, refund.id],
+  );
+  expect(
+    (await f.request(`${f.path}/settlements`)).items.find(
+      (item) => item.id === refund.id,
+    ),
+  ).toMatchObject({ state: 'expired', canSend: false });
+
+  const worker = await purchasingWorker(t, f.purchasingWorkerConfiguration());
+  await worker.returnWrites();
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT state,sent FROM orders_return_actions WHERE tenant_id=$1 AND id=$2',
+        [f.org, refund.id],
+      )
+    ).rows[0],
+  ).toEqual({ state: 'expired', sent: false });
+  expect(
+    (
+      await f.call('runs/operations/records/shopify?kind=Refund&limit=100')
+    ).items.filter((r) => r.data.note === `luma-rs:${refund.id}`),
+  ).toHaveLength(0);
+  // The refund slot is free for a fresh request and approval.
+  expect(
+    (
+      await f.request(`${f.path}/settlements`, {
+        id: randomUUID(),
+        kind: 'refund',
+      })
+    ).state,
+  ).toBe('approval_required');
+});
