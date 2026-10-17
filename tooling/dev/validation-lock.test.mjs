@@ -7,7 +7,12 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { acquireValidation } from './validation-lock.mjs';
+import {
+  acquireJourneySlot,
+  acquireValidation,
+  journeySlots,
+  runsJourneys,
+} from './validation-lock.mjs';
 
 async function checkout(t) {
   const root = await mkdtemp(join(tmpdir(), 'luma-validation-'));
@@ -99,4 +104,64 @@ test('a killed validation owner does not permanently block later runs', async (t
   await utimes(join(root, '.luma/validation.lock'), old, old);
   const lease = await acquireValidation(root);
   await lease.release();
+});
+
+test('journeys from another checkout wait for a free slot and name the holder', async (t) => {
+  const directory = await checkout(t);
+  const first = await acquireJourneySlot('/checkouts/a', { directory });
+  t.after(first.release);
+  let announced;
+  const waiting = new Promise((resolve) => {
+    announced = resolve;
+  });
+  let entered = false;
+  const second = acquireJourneySlot('/checkouts/b', {
+    directory,
+    onWait: (holders) => announced(holders),
+  }).then((slot) => {
+    entered = true;
+
+    return slot;
+  });
+  assert.deepEqual(await waiting, ['/checkouts/a']);
+  assert.equal(entered, false);
+  await first.release();
+  const slot = await second;
+  assert.equal(
+    await readFile(join(directory, 'slot-1.owner'), 'utf8'),
+    '/checkouts/b',
+  );
+  await slot.release();
+});
+
+test('more journey slots let that many checkouts run at once', async (t) => {
+  const directory = await checkout(t);
+  const first = await acquireJourneySlot('/checkouts/a', {
+    directory,
+    slots: 2,
+  });
+  t.after(first.release);
+  const second = await acquireJourneySlot('/checkouts/b', {
+    directory,
+    slots: 2,
+    onWait: () => assert.fail('a free slot should not wait'),
+  });
+  await second.release();
+});
+
+test('only API journey commands take a journey slot, and slot counts must be positive', () => {
+  assert.equal(
+    runsJourneys(['--filter', '@luma/api', 'test:e2e', 'e2e/a.e2e.mjs']),
+    true,
+  );
+  assert.equal(runsJourneys(['--filter', '@luma/api', 'test:browser']), true);
+  assert.equal(
+    runsJourneys(['exec', 'turbo', 'run', 'build', '--filter=@luma/api...']),
+    false,
+  );
+  assert.equal(runsJourneys(['test:e2e']), false);
+  assert.equal(journeySlots(undefined), 1);
+  assert.equal(journeySlots('2'), 2);
+  assert.throws(() => journeySlots('0'), /positive integer/);
+  assert.throws(() => journeySlots('two'), /positive integer/);
 });

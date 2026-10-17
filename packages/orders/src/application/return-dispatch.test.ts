@@ -197,10 +197,18 @@ function fixture(kind: 'settlement' | 'exchange') {
     if (storage === 'failing') throw new Error('storage unavailable');
     if (!stored.some((s) => s.id === evidence.id)) stored.push(evidence);
   };
+  const reads = { locks: 0, snapshots: 0 };
   const actionStore: ReturnActionStore = {
-    transaction: async (_tenant, fn) =>
-      fn({
-        lock: async () => structuredClone(c),
+    transaction: async (_tenant, fn, options) => {
+      if (options?.readOnlySnapshot) reads.snapshots++;
+
+      return fn({
+        lock: async () => {
+          reads.locks++;
+
+          return structuredClone(c);
+        },
+        read: async () => structuredClone(c),
         get: async () => structuredClone(action),
         save: async (v) => {
           action = structuredClone(v);
@@ -211,12 +219,20 @@ function fixture(kind: 'settlement' | 'exchange') {
         targets: async () => [],
         audit: async () => {},
         recordRead,
-      }),
+      });
+    },
   };
   const exchangeStore: ReturnExchangeStore = {
-    transaction: async (_tenant, fn) =>
-      fn({
-        lock: async () => structuredClone(c),
+    transaction: async (_tenant, fn, options) => {
+      if (options?.readOnlySnapshot) reads.snapshots++;
+
+      return fn({
+        lock: async () => {
+          reads.locks++;
+
+          return structuredClone(c);
+        },
+        read: async () => structuredClone(c),
         root: async () => structuredClone(root),
         saveRoot: async (v) => {
           root = structuredClone(v);
@@ -234,7 +250,8 @@ function fixture(kind: 'settlement' | 'exchange') {
         finishCase: unavailable,
         audit: async () => {},
         recordRead,
-      }),
+      });
+    },
   };
   let execute = async (): Promise<{
     state: 'uncertain' | 'withheld' | 'not_started';
@@ -339,6 +356,8 @@ function fixture(kind: 'settlement' | 'exchange') {
       else step = { ...step, ...next } as ExchangeStep;
     },
     check: () => service.check(context, 'case', 'effect'),
+    list: () => service.list(context, 'case'),
+    reads,
     setOutcome: (next: typeof outcome) => {
       outcome = next;
     },
@@ -430,6 +449,12 @@ describe.each(['settlement', 'exchange'] as const)(
       await send;
       expect(f.current()).toMatchObject({ sent: false, state: 'not_executed' });
       if (kind === 'exchange') expect(f.root().processingStarted).toBe(false);
+    });
+
+    it('reads case detail from one snapshot without taking the case write lock', async () => {
+      const f = fixture(kind);
+      await f.list();
+      expect(f.reads).toEqual({ locks: 0, snapshots: 1 });
     });
 
     it('releases only a still-sending identity after confirmed non-dispatch', async () => {

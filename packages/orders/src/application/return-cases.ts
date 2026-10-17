@@ -244,6 +244,11 @@ export type CreationExecution =
   | { state: 'failed'; failure: CreationFailure }
   | { state: 'uncertain' };
 
+/** A creation's policy decision with its recorded human response. */
+export type CreationDecision = PolicyDecision & {
+  approval?: { outcome: 'approved' | 'rejected'; approverId: string };
+};
+
 /** Binds creations to Action Admission, workspace policy and audited execution. */
 export interface CreationAdmission {
   /** Effective workspace and connection write controls, without provider calls. */
@@ -260,12 +265,12 @@ export interface CreationAdmission {
   decision(
     context: TenantContext,
     id: string,
-  ): Promise<
-    | (PolicyDecision & {
-        approval?: { outcome: 'approved' | 'rejected'; approverId: string };
-      })
-    | null
-  >;
+  ): Promise<CreationDecision | null>;
+  /** Reads decisions as `decision` does, refreshing authorization once for the whole read. Unknown IDs map to null. */
+  decisions(
+    context: TenantContext,
+    ids: string[],
+  ): Promise<Map<string, CreationDecision | null>>;
   respond(
     context: TenantContext,
     decisionId: string,
@@ -681,15 +686,49 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     return { by: context.actor.id, at: deps.now().toISOString(), evidence };
   }
 
+  /**
+   * Admission reads for creation views within one service call. `decisions` holds decisions
+   * already read in a batch; write modes are read once per connection.
+   */
+  function admissionReads(
+    context: TenantContext,
+    decisions?: Map<string, CreationDecision | null>,
+  ) {
+    const modes = new Map<
+      string,
+      Promise<'observe_only' | 'writes_enabled' | undefined>
+    >();
+
+    return {
+      async decision(id: string) {
+        if (!deps.admission) return null;
+        if (decisions?.has(id)) return decisions.get(id) ?? null;
+
+        return deps.admission.decision(context, id);
+      },
+      writeMode(connectionId: string) {
+        let mode = modes.get(connectionId);
+        if (!mode) {
+          mode = Promise.resolve(
+            deps.admission?.writeMode?.(context, connectionId),
+          );
+          modes.set(connectionId, mode);
+        }
+
+        return mode;
+      },
+    };
+  }
+
   async function creationView(
     context: TenantContext,
     creation: ReturnCreation,
     people: Map<string, Person>,
+    reads = admissionReads(context),
   ): Promise<CreationView> {
-    const decision =
-      creation.decisionId && deps.admission
-        ? await deps.admission.decision(context, creation.decisionId)
-        : null;
+    const decision = creation.decisionId
+      ? await reads.decision(creation.decisionId)
+      : null;
     // An unsent approval ends with its window; the background pass records it soon after.
     const expired =
       ['approval_required', 'approved'].includes(creation.state) &&
@@ -697,8 +736,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     const observeOnly =
       creation.state === 'not_executed' ||
       (['approval_required', 'approved'].includes(creation.state) &&
-        (await deps.admission?.writeMode?.(context, creation.connectionId)) ===
-          'observe_only');
+        (await reads.writeMode(creation.connectionId)) === 'observe_only');
     const requester = context.actor.id === creation.requestedBy;
     const manager = hasPermission(context, 'returns.manage');
     // Approvers also need permission to approve changes and any app permission the creating
@@ -1391,6 +1429,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           return { items, people };
         },
       );
+      // One authorized admission read covers every listed creation's decision.
+      const decisionIds = data.items.flatMap(({ creation }) =>
+        creation?.decisionId ? [creation.decisionId] : [],
+      );
+      const reads = admissionReads(
+        context,
+        deps.admission && decisionIds.length
+          ? await deps.admission.decisions(context, decisionIds)
+          : undefined,
+      );
       const result = [];
       for (const {
         value,
@@ -1415,7 +1463,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               }
             : {}),
           creation: creation
-            ? await creationView(context, creation, data.people)
+            ? await creationView(context, creation, data.people, reads)
             : null,
           canManage: hasPermission(context, 'returns.manage'),
         });
@@ -1941,8 +1989,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     },
 
     /**
-     * Approves or rejects a creation. Approval comes from someone other than the requester; Luma
-     * then dispatches it as the requester, exactly once.
+     * Approves or rejects a creation. When the workspace requires independent approval, it comes
+     * from someone other than the requester. Luma then dispatches it as the requester, exactly
+     * once.
      */
     async decideCreation(
       context: TenantContext,

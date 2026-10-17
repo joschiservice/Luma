@@ -18,13 +18,14 @@ import type { PurchasingConnection, SubmissionView } from './commitments.js';
  * orders, and an on-demand read of a placed order.
  */
 export function createCommitmentRecords(
-  { deps, authorize, terms, progressFor }: CommitmentContext,
+  { deps, authorize, terms, progressFor, suppliersOf }: CommitmentContext,
   {
     submissionView,
+    admissionReads,
     readiness,
   }: Pick<
     ReturnType<typeof createSubmissionRequests>,
-    'submissionView' | 'readiness'
+    'submissionView' | 'admissionReads' | 'readiness'
   >,
   {
     locate,
@@ -183,13 +184,7 @@ export function createCommitmentRecords(
             submissions,
             commitments,
             followUps: await tx.followUps(orders.map((o) => o.id)),
-            suppliers: new Map(
-              await Promise.all(
-                [...new Set(orders.map((o) => o.supplierId))].map(
-                  async (id) => [id, await tx.supplier(id)] as const,
-                ),
-              ),
-            ),
+            suppliers: await suppliersOf(tx, orders),
           };
         },
       );
@@ -202,7 +197,7 @@ export function createCommitmentRecords(
         line: PurchaseOrder['lines'][number] | null;
         canRespond: boolean;
       }[] = [];
-      for (const order of data.orders) {
+      const attended = data.orders.flatMap((order) => {
         const { progress, submission } = progressFor(order, {
           ...data,
           supplier: data.suppliers.get(order.supplierId) ?? null,
@@ -211,9 +206,22 @@ export function createCommitmentRecords(
         const wanted = progress.attention.filter(
           (attention) => !filter.kinds || filter.kinds.includes(attention.kind),
         );
-        if (!wanted.length) continue;
+
+        return wanted.length ? [{ order, submission, wanted }] : [];
+      });
+      // One authorized admission read covers every listed submission's decision.
+      const decisionIds = attended.flatMap(({ submission }) =>
+        submission?.decisionId ? [submission.decisionId] : [],
+      );
+      const reads = admissionReads(
+        context,
+        deps.admission && decisionIds.length
+          ? await deps.admission.decisions(context, decisionIds)
+          : undefined,
+      );
+      for (const { order, submission, wanted } of attended) {
         const view = submission
-          ? await submissionView(context, submission)
+          ? await submissionView(context, submission, reads)
           : null;
         for (const attention of wanted) {
           if (
@@ -251,9 +259,9 @@ export function createCommitmentRecords(
         async (tx) => {
           const supplier = await tx.supplier(supplierId);
           if (!supplier) throw notFound('Supplier not found');
-          const orders = (await tx.orders()).filter(
-            (o) => o.supplierId === supplierId,
-          );
+          const orders = (
+            await tx.purchaseOrders({ q: '', supplierId }, null, null)
+          ).map((row) => row.record);
           const ids = orders.map((o) => o.id);
 
           return {
@@ -262,10 +270,7 @@ export function createCommitmentRecords(
             submissions: ids.length ? await tx.submissions(ids) : [],
             commitments: ids.length ? await tx.commitments(ids) : [],
             followUps: ids.length ? await tx.followUps(ids) : [],
-            communications: (await tx.communications({ supplierId })).slice(
-              0,
-              20,
-            ),
+            communications: await tx.communications({ supplierId, limit: 20 }),
           };
         },
       );

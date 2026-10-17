@@ -33,9 +33,29 @@ export function changesAny(
 
 const subscriptions = new Map<string, ReturnType<typeof createSubscription>>();
 
+const hidden = () =>
+  typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
 function createSubscription(organizationId: string) {
   const subscribers = new Set<Subscriber>();
   let lastEvent: MetricEvent | undefined;
+  // Refetch topics received while the tab was hidden, delivered together once it is visible.
+  let deferred = new Set<string>();
+  // Holds refetches while hidden; once visible, adds held topics to the next delivered event.
+  const deliverable = (event: MetricEvent): MetricEvent => {
+    if (hidden()) {
+      if (event.refetch) for (const topic of event.topics) deferred.add(topic);
+
+      return { ...event, refetch: false, topics: [] };
+    }
+    if (!deferred.size) return event;
+    const topics = [
+      ...new Set([...(event.refetch ? event.topics : []), ...deferred]),
+    ];
+    deferred = new Set();
+
+    return { ...event, refetch: true, topics };
+  };
   let stop = () => {
     /* Assigned when the first subscriber opens the stream. */
   };
@@ -67,7 +87,8 @@ function createSubscription(organizationId: string) {
         lastEvent = event;
         lastEventAt = Date.now();
         retryDelay = 1000;
-        for (const subscriber of subscribers) subscriber.onResync(event);
+        for (const subscriber of subscribers)
+          subscriber.onResync(deliverable(event));
       },
       onError: () => {
         stop();
@@ -94,8 +115,15 @@ function createSubscription(organizationId: string) {
       if (stale) open();
     }
   }, 5000);
+  const visible = () => {
+    if (hidden() || !deferred.size || !lastEvent) return;
+    const event = deliverable({ ...lastEvent, refetch: false, topics: [] });
+    for (const subscriber of subscribers) subscriber.onResync(event);
+  };
   window.addEventListener('online', open);
   window.addEventListener('offline', offline);
+  if (typeof document !== 'undefined')
+    document.addEventListener('visibilitychange', visible);
 
   return {
     add(subscriber: Subscriber) {
@@ -120,13 +148,20 @@ function createSubscription(organizationId: string) {
         clearInterval(fallback);
         window.removeEventListener('online', open);
         window.removeEventListener('offline', offline);
+        if (typeof document !== 'undefined')
+          document.removeEventListener('visibilitychange', visible);
         subscriptions.delete(organizationId);
       };
     },
   };
 }
 
-/** Shares one workspace stream in this page and closes it when the last consumer leaves. */
+/**
+ * Shares one workspace stream in this page and closes it when the last consumer leaves. While the
+ * tab is hidden, consumers still receive connection state, but refetch requests are held and
+ * delivered as one combined event when the tab becomes visible again, so background tabs do not
+ * keep reading. Reconnects still reconcile every area for late consumers.
+ */
 export function subscribeToWorkspaceMetrics(
   organizationId: string,
   subscriber: Subscriber,

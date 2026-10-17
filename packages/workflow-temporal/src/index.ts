@@ -1,5 +1,5 @@
 export {
-  createDeskWorkflowReader,
+  createDeskWorkflowClient,
   createExceptionClient,
   createExceptionWorker,
   createWorkflowCommands,

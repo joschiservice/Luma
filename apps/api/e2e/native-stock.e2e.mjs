@@ -557,3 +557,107 @@ test('failed stock reads pause older reconciliation evidence without overwriting
   );
   assert.equal(f.mutations.length, 0);
 });
+
+test('ownership evidence keeps each opened pool at a location separate', async (t) => {
+  const f = await setup(t);
+  await f.runShopify({
+    kind: 'seed-catalog',
+    products: [
+      {
+        id: '2',
+        title: 'Linen pouch',
+        vendor: 'Luma Goods',
+        productType: 'Bags',
+        published: true,
+        variants: [
+          {
+            id: '2',
+            sku: 'LUMA-002',
+            title: 'Default Title',
+            price: '12.00',
+            barcode: '4006381333948',
+            stock: { 1: 5 },
+          },
+        ],
+      },
+    ],
+  });
+  await f.syncRecords('inventory.read', {
+    limit: 100,
+    sku: { externalId: 'gid://shopify/InventoryItem/2', scopeKey: '' },
+    location: { externalId: 'gid://shopify/Location/1', scopeKey: '' },
+    includeComposition: true,
+  });
+  const second = (
+    await f.f.db.owner.query(
+      "SELECT s.id,s.document FROM inventory_snapshots s JOIN inventory_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.connection_id=s.connection_id AND p.snapshot_id=s.id WHERE s.tenant_id=$1 AND s.connection_id=$2 AND s.kind='position' AND s.location_id=$3 AND s.sku_id<>$4",
+      [f.owner.tenantId, f.installed.id, f.base.locationId, f.base.skuId],
+    )
+  ).rows;
+  assert.equal(second.length, 1);
+  const opening = await f.ledger.prepareOpening(f.owner, {
+    id: randomUUID(),
+    key: randomUUID(),
+    snapshotId: second[0].id,
+    reason: 'Second synthetic pool',
+    balances: { available: '5' },
+  });
+  await f.ledger.review(f.admin, opening.id, true);
+  await f.ledger.postReviewed(f.owner, opening.id);
+
+  const { evidence, expected } = await f.native.store.transaction(
+    f.owner,
+    async (tx) => {
+      const evidence = await tx.ownershipEvidence(
+        f.installed.id,
+        f.base.locationId,
+      );
+      // The per-pool ledger reads are the reference the set-based review must match.
+      const expected = [];
+      for (const pool of evidence.pools)
+        expected.push({
+          source: pool.source
+            ? await tx.ledger.stockEvidence(pool.source.snapshotId)
+            : null,
+          comparison: pool.comparison
+            ? await tx.ledger.comparison(pool.comparison.key)
+            : null,
+          accounts: await tx.ledger.pool(
+            pool.skuId,
+            f.base.locationId,
+            pool.unit,
+            false,
+          ),
+        });
+
+      return { evidence, expected };
+    },
+  );
+  const skus = [f.base.skuId, second[0].document.data.skuId].sort();
+  assert.deepEqual(
+    evidence.pools.map((pool) => pool.skuId),
+    skus,
+  );
+  for (const [index, pool] of evidence.pools.entries()) {
+    assert.equal(pool.source.skuId, pool.skuId);
+    assert.equal(pool.opening.skuId, pool.skuId);
+    assert.ok(pool.accounts.length > 0);
+    assert.ok(pool.accounts.every((a) => a.address.skuId === pool.skuId));
+    assert.deepEqual(
+      {
+        source: pool.source,
+        comparison: pool.comparison,
+        accounts: pool.accounts,
+      },
+      expected[index],
+    );
+  }
+  // Only the fixture's SKU has a shadow reconciliation; the new pool must not borrow it.
+  const [first, other] = skus.map((sku) =>
+    evidence.pools.find((pool) => pool.skuId === sku),
+  );
+  const reconciled = first.skuId === f.base.skuId ? first : other,
+    fresh = first.skuId === f.base.skuId ? other : first;
+  assert.equal(reconciled.comparison.source.skuId, f.base.skuId);
+  assert.equal(fresh.comparison, null);
+});

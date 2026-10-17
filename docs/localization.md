@@ -85,12 +85,11 @@ answers and API error details. Error handling maps generic API error codes to
 translated messages and keeps the server's detail for validation and conflict errors, which
 are specific to the request.
 
-## Adding a language
+## Adding text or a language
 
-Add the locale to the inlang project settings, its own name to `localeNames` and its
-formatting locale to `formattingLocales`, then a complete set of message files. Add the
-language to the documentation source so guides can be translated. Check narrow layouts:
-German runs about a third longer than English.
+The [localize-ui](../.agents/skills/localize-ui/SKILL.md) skill covers the steps for adding
+messages, namespaces and interface languages. Check narrow layouts: German runs about a third
+longer than English.
 
 ## Build
 

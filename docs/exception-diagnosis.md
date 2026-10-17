@@ -15,6 +15,27 @@ connectors or the model gateway. A worker runs the engine and publishes the resu
 earlier revisions stay in history as superseded. A worker cannot publish over a newer
 revision or a resolved incident.
 
+```mermaid
+stateDiagram-v2
+  [*] --> pending: detection commits a revision
+  pending --> ready: worker runs the engine
+  pending --> insufficient_evidence
+  pending --> failed
+  failed --> ready: rerun after any retry-after
+  failed --> insufficient_evidence
+  failed --> failed
+  pending --> superseded
+  ready --> superseded
+  insufficient_evidence --> superseded
+  failed --> superseded
+  superseded --> [*]
+  note right of superseded
+    A flag, not a status: set by a newer
+    revision, a resolved incident or expiry.
+    Superseded results have no next steps.
+  end note
+```
+
 Statuses are `pending`, `ready`, `insufficient_evidence` and `failed`. A failed
 investigation keeps established facts and a safe reason; it does not mean the incident is
 gone. A detector `clear` requests lifecycle verification and never resolves an incident;

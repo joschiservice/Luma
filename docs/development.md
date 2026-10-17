@@ -19,20 +19,20 @@ updating them.
 
 ## Commands
 
-| Command                   | Behavior                                                                                                                          |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run setup`          | Install dependencies and Chromium, start PostgreSQL and Valkey, migrate, provision roles and seed demo data. Safe to repeat.      |
-| `pnpm dev`                | Start PostgreSQL and Valkey if needed, apply migrations, and watch the API, web app, commerce sync process, config and contracts. |
-| `pnpm dev:workflows`      | Also start Temporal and its UI, and watch the workflow worker.                                                                    |
-| `pnpm dev:observe`        | Also start the local Grafana stack; see [observability](observability.md).                                                        |
-| `pnpm dev:doctor`         | Check tool versions, containers, database logins and API readiness. Run while the app is running.                                 |
-| `pnpm dev:down`           | Stop this checkout's containers; keep volumes and credentials.                                                                    |
-| `pnpm dev:manual`         | Watch app processes using your own `.env` files and services.                                                                     |
-| `pnpm db:seed`            | Create or reuse the demo user, workspace and synthetic exceptions.                                                                |
-| `pnpm db:reset`           | Erase this checkout's database, migrate, provision roles and reseed. Stop app and worker processes first.                         |
-| `pnpm db:studio`          | Open Drizzle Studio on this checkout's database as the administrator, across all workspaces. Edits are written directly.          |
-| `pnpm pilot`, `simulator` | Synthetic provider environments; see the [pilot](pilot-environment.md) and [simulator](simulator.md) guides.                      |
-| `pnpm storybook`          | Component workshop; needs no API.                                                                                                 |
+| Command                   | Behavior                                                                                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run setup`          | Install dependencies, Chromium and the Code Step runtime, start PostgreSQL and Valkey, migrate, provision roles and seed demo data. Safe to repeat. |
+| `pnpm dev`                | Start PostgreSQL and Valkey if needed, apply migrations, and watch the API, web app, commerce sync process, config and contracts.                   |
+| `pnpm dev:workflows`      | Also start Temporal and its UI, and watch the workflow worker.                                                                                      |
+| `pnpm dev:observe`        | Also start the local Grafana stack; see [observability](observability.md).                                                                          |
+| `pnpm dev:doctor`         | Check tool versions, containers, database logins and API readiness. Run while the app is running.                                                   |
+| `pnpm dev:down`           | Stop this checkout's containers; keep volumes and credentials.                                                                                      |
+| `pnpm dev:manual`         | Watch app processes using your own `.env` files and services.                                                                                       |
+| `pnpm db:seed`            | Create or reuse the demo user, workspace and synthetic exceptions.                                                                                  |
+| `pnpm db:reset`           | Erase this checkout's database, migrate, provision roles and reseed. Stop app and worker processes first.                                           |
+| `pnpm db:studio`          | Open Drizzle Studio on this checkout's database as the administrator, across all workspaces. Edits are written directly.                            |
+| `pnpm pilot`, `simulator` | Synthetic provider environments; see the [pilot](pilot-environment.md) and [simulator](simulator.md) guides.                                        |
+| `pnpm storybook`          | Component workshop; needs no API.                                                                                                                   |
 
 Setup creates `demo@example.test` with a generated password in `.luma/demo.json`, one AU
 workspace and two synthetic exceptions taken from the golden corpus. Seeding uses the real
@@ -68,14 +68,11 @@ once, then restart `pnpm db:studio`.
 The migration administrator is used only during initialization. Runtime logins never have
 superuser, database creation, role creation or RLS bypass privileges.
 
-- `luma_api` inherits `luma_identity`, `luma_connectors`, `luma_case_reader`, `luma_desk`
-  and `luma_commerce_sync`.
-- `luma_worker` inherits `luma_exceptions`, `luma_policies`, `luma_execution`,
-  `luma_audit`, `luma_connectors`, `luma_orders`, `luma_inventory`, `luma_desk`,
-  `luma_commerce_sync` and `luma_customers`.
-
+The local logins `luma_api`, `luma_worker` and `luma_staff` inherit domain group roles such as
+`luma_identity`, `luma_desk` and `luma_connectors`; `tooling/dev/database.mjs` defines which.
 A migration that adds a table grants it to the owning role and, where needed, to reader
-roles. See [ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
+roles; follow the [add-migration](../.agents/skills/add-migration/SKILL.md) skill. See
+[ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
 
 ### API source imports
 
@@ -147,8 +144,13 @@ suites cannot run. Report that limitation when relying on it.
 
 The shared validation runner queues commands per checkout so overlapping runs do not compete for database,
 Chromium and build resources. Nested commands in `check` and `test:full` share the active
-run; independent worktrees keep separate queues. Interrupted runs release the lease or
-expire its heartbeat automatically. Direct package tests and Turbo commands bypass this coordination.
+run; independent worktrees keep separate queues. Backend and browser journeys also take a
+journey slot shared by every checkout of the same user, because each run already uses half the
+CPUs and parallel runs from several worktrees time each other out. A run holds its slot from
+its first journey until it ends, and waiting runs print the checkout that holds it.
+`LUMA_JOURNEY_SLOTS` allows more concurrent runs on a larger machine. Interrupted runs
+release the lease or slot, or their heartbeat expires automatically. Direct package tests and
+Turbo commands bypass this coordination.
 
 ### Cached and affected tests
 

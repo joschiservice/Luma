@@ -85,30 +85,68 @@ export function createPolicyService(deps: PolicyDependencies) {
     }
   }
 
+  async function refreshReader(context: TenantContext) {
+    const fresh = await deps.refreshContext(context);
+    requireTenant(fresh, context.tenantId);
+    if (fresh.actor.id !== context.actor.id)
+      throw forbidden('Sign in again to continue.');
+  }
+
+  async function readDecision(tenantId: string, id: string) {
+    const decision = await deps.repository.findDecision(tenantId, id);
+    if (!decision) return null;
+    const approval = await deps.repository.findApproval(
+      tenantId,
+      decision.proposalId,
+      decision.actionHash,
+      decision.policyVersion,
+    );
+
+    return { ...decision, approval };
+  }
+
   return {
     /** Reads a tenant policy decision and its recorded human response after refreshing membership. */
     async decision(context: TenantContext, id: string) {
-      const fresh = await deps.refreshContext(context);
-      requireTenant(fresh, context.tenantId);
-      if (fresh.actor.id !== context.actor.id)
-        throw forbidden('Sign in again to continue.');
-
-      const decision = await deps.repository.findDecision(context.tenantId, id);
+      await refreshReader(context);
+      const decision = await readDecision(context.tenantId, id);
       if (!decision) return null;
-      const approval = await deps.repository.findApproval(
-        context.tenantId,
-        decision.proposalId,
-        decision.actionHash,
-        decision.policyVersion,
-      );
-
       const workspace = await deps.repository.workspacePolicy(context.tenantId);
 
       return {
         ...decision,
-        approval,
         requireIndependentApproval: workspace.requireIndependentApproval,
       };
+    },
+    /**
+     * Reads several tenant policy decisions as `decision` does, refreshing membership and the
+     * workspace rule once for the whole read. Unknown IDs map to null.
+     */
+    async decisions(context: TenantContext, ids: string[]) {
+      await refreshReader(context);
+      const unique = [...new Set(ids)];
+      const result = new Map<
+        string,
+        | (PolicyDecision & {
+            approval: Approval | null;
+            requireIndependentApproval: boolean;
+          })
+        | null
+      >();
+      if (!unique.length) return result;
+      const workspace = await deps.repository.workspacePolicy(context.tenantId);
+      for (const id of unique) {
+        const decision = await readDecision(context.tenantId, id);
+        result.set(
+          id,
+          decision && {
+            ...decision,
+            requireIndependentApproval: workspace.requireIndependentApproval,
+          },
+        );
+      }
+
+      return result;
     },
     /** Reads the effective policy version for a fresh admission check. */
     currentVersion: version,

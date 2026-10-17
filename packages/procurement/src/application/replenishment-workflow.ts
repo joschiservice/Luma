@@ -46,6 +46,7 @@ import {
   replenishmentCommitments,
   stockUnusableReason,
 } from '../domain/metrics.js';
+import type { PurchaseOrder } from '../domain/procurement.js';
 import { planReplenishment } from '../domain/replenishment.js';
 import {
   replenishmentOutcome,
@@ -253,15 +254,16 @@ export function createReplenishmentService(deps: {
     return requireStock((await store.stocksFor(context, [rule]))[0]);
   }
 
+  /** Plans `rule` against `orders` when given, or against purchase orders read now. */
   async function plan(
     context: TenantContext,
     rule: ReplenishmentActivation,
     inventory: ReplenishmentStock,
     excludeOrder?: string,
+    orders?: readonly PurchaseOrder[],
   ) {
-    const orders = await deps.procurement.orders(context);
     const commitments = replenishmentCommitments(
-      orders.items,
+      orders ?? (await deps.procurement.orders(context)).items,
       rule.sku,
       excludeOrder,
     );
@@ -1276,12 +1278,11 @@ export function createReplenishmentService(deps: {
 
       const inventory = outputs.find((step) => step.stepId === 'inventory');
       const verification = outputs.find((step) => step.kind === 'verification');
-      const orders = await deps.procurement.orders(context);
-      const order = orders.items.find(
-        (item) =>
-          item.id === binding?.action.target.id &&
-          item.origin.workflowRunId === id,
-      );
+      const target = binding?.action.target.id;
+      const found = target
+        ? await deps.procurement.order(context, target)
+        : null;
+      const order = found?.origin.workflowRunId === id ? found : undefined;
 
       return {
         runId: id,
@@ -1852,18 +1853,23 @@ export function createReplenishmentService(deps: {
           !waiting.has(rule.id),
       );
       const stocks = await store.stocksFor(context, rules);
+      // One order read serves every rule; a start may add commitments, so it is read again after one.
+      let orders: readonly PurchaseOrder[] | null = null;
       for (const rule of rules) {
         let inventory = findStock(stocks, rule);
         // Reuse this pass's scoped stock unless a provider refresh may have changed it.
         if (await refresh(context, rule, 240_000, inventory))
           inventory = (await store.stocksFor(context, [rule]))[0];
         inventory = requireStock(inventory);
-        const current = await plan(context, rule, inventory);
-        if (current.fresh && current.belowMinimum)
+        orders ??= (await deps.procurement.orders(context)).items;
+        const current = await plan(context, rule, inventory, undefined, orders);
+        if (current.fresh && current.belowMinimum) {
           await api.start(context, {
             id: deps.id(`${rule.id}:${inventory.observationId}`),
             activationId: rule.id,
           });
+          orders = null;
+        }
       }
     },
   };

@@ -100,6 +100,7 @@ import {
   decisionPageSize,
   decisionsKey,
   decisionsOptions,
+  decisionsPollInterval,
   decisionView,
   defaultDecisionSort,
   type NeedsYouSearch,
@@ -222,15 +223,24 @@ export function decisionGroupLabel(
   });
 }
 
-function DecisionTime({ item, now }: { item: DecisionItem; now: number }) {
+function DecisionTime({
+  item,
+  now,
+}: {
+  item: DecisionItem;
+  now: number | undefined;
+}) {
   const timeZone = useContext(WorkspaceTimezone);
+  const clock = useNow();
 
   return (
     <span
       className="case-row-time"
       title={formatWorkspaceInstant(item.requestedAt, timeZone)}
     >
-      <time dateTime={item.requestedAt}>{elapsed(item.requestedAt, now)}</time>
+      <time dateTime={item.requestedAt}>
+        {elapsed(item.requestedAt, now ?? clock)}
+      </time>
     </span>
   );
 }
@@ -240,7 +250,7 @@ function decisionProperty(
   item: DecisionItem,
   key: string,
   context: {
-    now: number;
+    now: number | undefined;
     members: readonly Member[];
     self: string | undefined;
   },
@@ -382,7 +392,8 @@ export function NeedsYouView({
   /** Opens or closes a decision. */
   onChange: (search: NeedsYouSearch) => void;
   onRefresh: () => void;
-  now: number;
+  /** A fixed time for relative times and deadlines; the shared clock by default. */
+  now?: number | undefined;
   members?: readonly Member[];
   self?: string | undefined;
   /** The open decision, `loading` while resolving a direct link, or `missing`. */
@@ -752,8 +763,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const search = useSearch({ from: '/app/$organizationId/needs-you' });
   const navigate = useNavigate({ from: '/app/$organizationId/needs-you' });
   const client = useQueryClient();
-  useDecisionUpdates(organizationId);
-  const now = useNow();
+  const updates = useDecisionUpdates(organizationId);
   const online = useOnline();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
@@ -825,10 +835,12 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       limit: 100,
       cursor: waitingCursor,
     }),
+    refetchInterval: decisionsPollInterval(updates),
     enabled: ready && waitingOpen,
   });
   const list = useQuery({
     ...decisionsOptions(organizationId, query),
+    refetchInterval: decisionsPollInterval(updates),
     enabled: ready && !clientIssues.length,
   });
   // With a page cursor, a refused request means the page link is stale, not the view.
@@ -1172,7 +1184,6 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       onFirst={paging.first}
       onChange={change}
       onRefresh={refresh}
-      now={now}
       members={memberList}
       self={self}
       selected={selected}
@@ -1197,7 +1208,6 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
                   ? 'none'
                   : assignmentAccess
             }
-            now={now}
             assigning={assignment.isPending}
             assignError={assignError}
             onAssign={(assigneeId) => assignment.mutate({ item, assigneeId })}
@@ -1229,6 +1239,10 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
                 <OwnerReview
                   organizationId={organizationId}
                   owner={item.owner}
+                  refreshedAt={Math.max(
+                    list.dataUpdatedAt,
+                    direct.dataUpdatedAt,
+                  )}
                   handover={item.kind === 'workflow_handover'}
                   onChange={() =>
                     client.invalidateQueries({

@@ -57,6 +57,7 @@ export function createCommitmentLists({
   deps,
   authorize,
   progressFor,
+  suppliersOf,
 }: CommitmentContext) {
   /** The list summary of one order: stage, expected date, attention and next owner. */
   function summaryOf(
@@ -121,13 +122,7 @@ export function createCommitmentLists({
     const submissions = group(await tx.submissions(ids));
     const commitments = group(await tx.commitments(ids));
     const followUps = group(await tx.followUps(ids));
-    const suppliers = new Map(
-      await Promise.all(
-        [...new Set(orders.map((o) => o.supplierId))].map(
-          async (id) => [id, await tx.supplier(id)] as const,
-        ),
-      ),
-    );
+    const suppliers = await suppliersOf(tx, orders);
 
     return new Map(
       orders.map((order) => [

@@ -207,7 +207,7 @@ export function createWorkflowTriggerStore(
     list: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const rows = await tx.query<Row>(
-          "SELECT document,state,triggered_at FROM workflow_trigger_runs WHERE tenant_id=$1 AND definition_id=$2 ORDER BY (document->>'createdAt')::timestamptz DESC,id DESC LIMIT 50",
+          "SELECT document,state,triggered_at FROM workflow_trigger_runs WHERE tenant_id=$1 AND definition_id=$2 ORDER BY document->>'createdAt' DESC,id DESC LIMIT 50",
           [context.tenantId, id],
         );
 

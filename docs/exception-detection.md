@@ -8,6 +8,23 @@ left minus right). Detection opens, updates and verifies incidents; it never rep
 redispatches or records a verified resolution without independent verification. `@luma/exceptions` owns the
 rules and persistence; `@luma/application-runtime` composes them.
 
+```mermaid
+flowchart TD
+  candidates["Stored state selects candidates and open cases"] --> reads["Fresh provider reads, projected"]
+  reads --> rule{"Rule decision"}
+  rule -->|detect| incident["Open or update the incident with a pending diagnosis"]
+  rule -->|"clear, case open"| verify["Request verification"]
+  rule -->|defer| waiting{"Waiting for provider sync?"}
+  rule -->|"reject (tenant mismatch)"| unchanged["No incident change"]
+  waiting -->|"yes: propagation_pending or sync_stalled"| later["Reevaluate on a later pass"]
+  waiting -->|no| uncertain{"Uncertain for 30 minutes?"}
+  uncertain -->|no| later
+  uncertain -->|yes| escalate["Escalate the incident or record a review task"]
+  verify --> evidence{"Fresh, complete, independent evidence passes?"}
+  evidence -->|yes| resolved["Incident resolved"]
+  evidence -->|no| open["Case stays open"]
+```
+
 ## Ingestion
 
 Every entry point requires an identity-resolved `TenantContext` (workers resolve current
@@ -113,6 +130,26 @@ an incident. One advisory lock per tenant serializes evidence conflicts, fingerp
 updates and resolution; other tenants stay independent, but throughput within a busy
 tenant is serialized. A partial unique index guarantees one unresolved incident per
 fingerprint.
+
+```mermaid
+stateDiagram-v2
+  [*] --> detected: first detect decision
+  detected --> detected: new evidence adds an occurrence
+  detected --> escalated: uncertainty review or case escalation
+  escalated --> escalated: new evidence adds an occurrence
+  detected --> resolved: verification passes or human disposition
+  escalated --> resolved: verification passes or human disposition
+  resolved --> [*]
+  note right of resolved
+    Immutable. New evidence for the same
+    fingerprint opens a successor in detected,
+    linked by previousExceptionId.
+  end note
+```
+
+Detection writes `detected`, uncertainty review and case escalation write `escalated`, and
+resolution writes `resolved`. The schema's other states (`diagnosed` through `failed`) are
+not written by current services; like every state except `resolved`, they count as active.
 
 An evidence set adds at most one occurrence per fingerprint, including under concurrent
 redelivery. New evidence updates the active incident; failed and escalated incidents stay

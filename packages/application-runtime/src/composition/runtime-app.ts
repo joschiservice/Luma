@@ -27,7 +27,7 @@ import {
   createShipmentDispatchReader,
 } from '@luma/read-models/composition';
 import {
-  createDeskWorkflowReader,
+  createDeskWorkflowClient,
   createProcessClient,
 } from '@luma/workflow-temporal';
 import type { FastifyServerOptions } from 'fastify';
@@ -189,10 +189,10 @@ export async function buildRuntimeApp(
       observability,
     );
 
-    const workflowReader = workflowSettings
-      ? createDeskWorkflowReader(workflowSettings.temporal, identity.service)
+    const deskWorkflow = workflowSettings
+      ? createDeskWorkflowClient(workflowSettings.temporal, identity.service)
       : undefined;
-    if (workflowReader) resources.add(workflowReader.close);
+    if (deskWorkflow) resources.add(deskWorkflow.close);
     const processClient = workflowSettings
       ? await createProcessClient(
           {
@@ -222,7 +222,12 @@ export async function buildRuntimeApp(
         ? { kind: 'enabled', effects: { resolve: async () => null } }
         : { kind: 'disabled' },
       ...(processClient ? { replenishmentTransport: processClient } : {}),
-      desk: workflowReader ? { workflow: workflowReader.get } : {},
+      desk: deskWorkflow
+        ? {
+            workflow: deskWorkflow.get,
+            notifyApproval: deskWorkflow.notifyApproval,
+          }
+        : {},
       ...(stockRefresh ? { refreshStock } : {}),
       // Mailboxes are listed from the configured connection service, which may be injected.
       ...(connectionService

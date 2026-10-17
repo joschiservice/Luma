@@ -9,6 +9,9 @@
 /** Changes that cannot affect a journey's outcome. */
 export const ignoredPaths = [
   '**/*.md',
+  // Agent skills; `**` does not match dot directories.
+  '.agents/skills/**',
+  '.claude/skills',
   '**/*.test.{ts,tsx,mjs}',
   '**/test-support/**',
   '**/*.stories.tsx',

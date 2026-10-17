@@ -31,6 +31,18 @@ Order numbers and SKU text suggest mappings; they never establish canonical iden
 Line and tracking IDs retain their order namespace. Explicit tenant-owned mappings connect
 this provider to existing commerce records.
 
+```mermaid
+flowchart TD
+    Tracking["Latest carrier tracking status per tracking number"] --> Status["Status"]
+    Status -->|"in transit, out for delivery, attempted, delivered"| Shipped["Shipment shipped or delivered: handoff"]
+    Status -->|"printed, awaiting dispatch"| Label["Label created: handoff unknown"]
+    Status -->|"failed, exception"| Failed["Carrier failure"]
+    Status -->|"other, contradictory or missing"| Unknown["Processing: handoff unknown"]
+    Shipped --> Allocation["One package, one tracking number, order shipped, nothing left to ship?"]
+    Allocation -->|yes| Lines["Order quantities allocated to the shipment"]
+    Allocation -->|no| NoLines["Shipment without line allocation"]
+```
+
 Only carrier tracking status establishes handoff. Printed and awaiting-dispatch remain
 unknown for handoff; unshipped does not establish warehouse custody. Reordered duplicates
 retain the newest dated report. Contradictory statuses at one time become unknown.
@@ -57,6 +69,29 @@ Reviews bind exact line IDs, old and target quantities, provider fingerprint and
 revision. Both sources are refreshed. Explicit mapping and complete current authoritative
 evidence are required. Shared policy, approval, Action Admission, execution and audit
 govern the update. Observe-only mode sends no update.
+
+```mermaid
+sequenceDiagram
+    participant Execution
+    participant Adapter as Starshipit adapter
+    participant DB as PostgreSQL
+    participant Starshipit
+    Execution->>Adapter: Dispatch the reviewed update
+    Adapter->>Adapter: Recheck review, authority and release
+    Adapter->>Starshipit: Read the order
+    alt revision changed or no longer unshipped
+        Adapter-->>Execution: Withheld, nothing sent
+    else unchanged
+        Adapter->>DB: Mark sent unless already sent or closed
+        Adapter->>Starshipit: Update existing item quantities
+        alt valid acknowledgement
+            Adapter-->>Execution: Accepted, not verified
+        else lost or malformed acknowledgement
+            Adapter-->>Execution: Uncertain, claim kept
+        end
+    end
+    Execution->>Starshipit: Verify by a fresh independent read
+```
 
 The provider documents neither atomic revision preconditions nor idempotency keys for
 updates. Preflight is not atomic. Controlled targets and a durable per-order claim with

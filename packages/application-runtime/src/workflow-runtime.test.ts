@@ -269,7 +269,7 @@ describe('durable activity boundaries', () => {
 
 it('deduplicates starts and scopes commands to the current tenant', async () => {
   const { TestWorkflowEnvironment } = await import('@temporalio/testing');
-  const { createExceptionClient, createDeskWorkflowReader } =
+  const { createExceptionClient, createDeskWorkflowClient } =
     await import('@luma/workflow-temporal');
   const env = await TestWorkflowEnvironment.createLocal();
   const identity = {
@@ -284,7 +284,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     },
     identity,
   );
-  const reader = createDeskWorkflowReader(
+  const desk = createDeskWorkflowClient(
     {
       address: env.address,
       namespace: 'default',
@@ -294,7 +294,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     identity,
   );
   try {
-    expect(await reader.get(context, 'missing-incident')).toBeNull();
+    expect(await desk.get(context, 'missing-incident')).toBeNull();
     const first = await client.start(context, input.source);
     expect(await client.start(context, input.source)).toEqual(first);
     const other = makeTenantContext(
@@ -330,14 +330,14 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
       ),
       'reader-request',
     );
-    expect(await reader.get(member, 'incident')).toMatchObject({
+    expect(await desk.get(member, 'incident')).toMatchObject({
       phase: 'escalated',
       reason: 'workflow_interrupted',
     });
     await expect(client.start(member, input.source)).rejects.toMatchObject({
       statusCode: 403,
     });
-    expect(await reader.get(other, 'missing-incident')).toBeNull();
+    expect(await desk.get(other, 'missing-incident')).toBeNull();
     const history = await env.client.workflow
       .getHandle(first.workflowId)
       .fetchHistory();
@@ -346,6 +346,24 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
         (event) => event.workflowExecutionStartedEventAttributes,
       ),
     ).toHaveLength(1);
+    // The desk wakes the workflow bound to the case. A case without a running workflow has
+    // nothing to wake, and only people who may respond can send the hint.
+    await desk.notifyApproval(context, 'missing-incident');
+    await desk.notifyApproval(context, 'incident', input.source);
+    const bound = { kind: 'detection' as const, id: 'awaiting-approval' };
+    const waiting = await client.start(context, bound);
+    await desk.notifyApproval(context, 'case', bound);
+    await expect(
+      desk.notifyApproval(member, 'case', bound),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    const signals = (
+      await env.client.workflow.getHandle(waiting.workflowId).fetchHistory()
+    ).events?.filter(
+      (event) =>
+        event.workflowExecutionSignaledEventAttributes?.signalName ===
+        'approvalChanged',
+    );
+    expect(signals).toHaveLength(1);
     identity.refreshContext.mockRejectedValue(
       notFound('Organization not found'),
     );
@@ -356,7 +374,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
       'Organization not found',
     );
   } finally {
-    await reader.close();
+    await desk.close();
     await client.close();
     await env.teardown();
   }

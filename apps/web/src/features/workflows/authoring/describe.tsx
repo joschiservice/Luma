@@ -24,7 +24,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../../kit/identity/data';
+import { IdentityError, onClearPrivate } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import {
   acceptProposal,
@@ -65,7 +65,15 @@ const improvementOutcomes: Record<string, () => string> = {
 };
 
 // Explanations stay in this browser tab only; the server keeps provenance, not the model's text.
+// Keys are `organizationId/draftId`, so leaving a workspace or signing out forgets its entries.
 const recent = new Map<string, Generation>();
+const recentKey = (organizationId: string, draftId: string) =>
+  `${organizationId}/${draftId}`;
+onClearPrivate((organizationId) => {
+  for (const key of recent.keys())
+    if (!organizationId || key.startsWith(`${organizationId}/`))
+      recent.delete(key);
+});
 
 /** Explains that describing workflows is unavailable, using the server's reason. */
 function Unavailable({ reason }: { reason: string | null }) {
@@ -116,7 +124,7 @@ export function DescribeDialog({
         body,
         abort.current.signal,
       );
-      recent.set(result.draft.id, result.generation);
+      recent.set(recentKey(organizationId, result.draft.id), result.generation);
       await client.invalidateQueries({ queryKey: draftsKey(organizationId) });
       await navigate({
         to: '/app/$organizationId/workflows/drafts/$draftId',
@@ -226,7 +234,7 @@ export function GenerationAssistant({
   highlight(questions: Generation['questions']): void;
 }) {
   const availability = useQuery(generationAvailabilityOptions(organizationId));
-  const generation = recent.get(draft.id);
+  const generation = recent.get(recentKey(organizationId, draft.id));
   const [instruction, setInstruction] = useState('');
   const [sourceLink, setSourceLink] = useState('');
   const [selectedRun, setSelectedRun] = useState('');
@@ -293,7 +301,7 @@ export function GenerationAssistant({
             saveId: crypto.randomUUID(),
           },
         );
-        recent.set(result.draft.id, proposal);
+        recent.set(recentKey(organizationId, result.draft.id), proposal);
         setProposal(null);
         setInstruction('');
         reload();

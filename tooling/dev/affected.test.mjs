@@ -104,3 +104,17 @@ test('every journey is mapped and every declared path exists', () => {
       `apps/api/e2e/journey-areas.mjs: ${pattern} matches no tracked file`,
     );
 });
+
+test('agent skills and directory instructions select no journeys', () => {
+  assert.deepEqual(
+    selectJourneys(
+      [
+        '.agents/skills/verify-change/SKILL.md',
+        '.claude/skills',
+        'packages/ui/AGENTS.md',
+      ],
+      journeyManifest(),
+    ),
+    { journeys: [] },
+  );
+});

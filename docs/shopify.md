@@ -157,6 +157,26 @@ following a restart and rebuild cost knowledge conservatively. Valkey's asynchro
 replication cannot guarantee lossless admission state across failover; provider throttles
 remain the final limit, and execution claims and audits remain durable in PostgreSQL.
 
+```mermaid
+sequenceDiagram
+    participant Shopify
+    participant API as Luma API
+    participant DB as PostgreSQL
+    participant Sync as Sync runner
+    Shopify->>API: Change webhook with topic and event ID
+    alt invalid HMAC or shop
+        API-->>Shopify: 401
+    else connection removed or reassigned
+        API-->>Shopify: 204, ignored
+    else verified
+        API->>DB: Store deduplicated refresh hint
+        API-->>Shopify: 204
+    end
+    Sync->>DB: Turn hints into stream hint times after 10 s
+    Sync->>Shopify: Incremental read through the Admin API
+    Sync->>DB: Import changed records
+```
+
 Webhooks are verified with HMAC-SHA256 over the original request bytes and the expected
 shop, and deduplicated by tenant, connection, topic and event ID. They only produce
 refresh hints for [commerce sync](commerce-sync.md#change-notifications); partial webhook
@@ -189,6 +209,26 @@ People with `connections.manage` choose **Connect Shopify** and enter the store'
 `*.myshopify.com` hostname; Shopify asks them to approve access and Luma verifies it on
 return. **Reconnect Shopify** reauthorizes the same connection, including disconnected or
 revoked ones.
+
+```mermaid
+sequenceDiagram
+    actor Person
+    participant Luma
+    participant Shopify
+    Person->>Luma: Connect Shopify with shop hostname
+    Luma->>Luma: Check connections.manage and installed app, store hashed state
+    Luma-->>Person: Redirect to Shopify authorization
+    Person->>Shopify: Approve requested scopes
+    Shopify-->>Luma: Callback with code, state and HMAC
+    Luma->>Luma: Verify HMAC, consume state once for the same session and shop
+    Luma->>Shopify: Exchange code for expiring tokens
+    Luma->>Shopify: Register uninstall and scope-update webhooks
+    Luma->>Shopify: Verify granted reads
+    Luma->>Luma: Store encrypted tokens, active or degraded
+```
+
+A denied approval consumes the state and changes nothing. Credentials are stored even when
+grants are missing, so a degraded connection can be repaired by reconnecting.
 
 - The start route requires current `connections.manage`, the installed app and a trusted
   request origin. State is random, stored as a hash, expires after ten minutes and is

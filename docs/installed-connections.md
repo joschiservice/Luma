@@ -32,6 +32,22 @@ internal fixtures and deployments without OAuth.
 
 ## Verification and permissions
 
+```mermaid
+stateDiagram-v2
+    [*] --> pending: install
+    pending --> active: all grants confirmed
+    pending --> degraded: grants missing or check fails
+    degraded --> active: check succeeds
+    active --> degraded: check fails or permission denied
+    active --> revoked: credentials rejected
+    revoked --> pending: rotate
+```
+
+Rotation returns any state except `disconnected` to `pending`, and disconnect moves any
+state to `disconnected`. Only `active` connections advertise capabilities or release credentials. OAuth
+connections (Shopify, Gmail) skip `pending`: authorization and reconnect verify the grants
+at once and set `active` or `degraded`, from any state and with the same connection ID.
+
 New installations start `pending`. `check` calls the app's verifier with the bound
 account and decrypted credentials. The verifier must authenticate, confirm the expected
 account and return only provider-confirmed capabilities; never echo requested
@@ -78,11 +94,18 @@ and returns to `pending`; call `check` to activate the replacement. An in-flight
 verification cannot overwrite a newer rotation or revocation. A paginated request stops
 if credentials change during it; callers start a fresh read.
 
+People disconnect; only providers revoke. When a provider that records access failures
+rejects the current credentials, the connection becomes `revoked`; a permission denial
+makes it `degraded`. Both clear the grants, and only revocation erases the secret.
+Failures reported for an older credential version change nothing.
+
 Disconnect and revoke erase the local ciphertext and deny further use. They do not revoke
 the provider's token remotely or cancel a request already sent; revoke the token with the
-provider when removing authorization there. A disconnected or revoked record cannot be
-reactivated through `check`; install a new connection (Shopify reconnect reuses the
-connection ID, see [Shopify](shopify.md#authorization-and-recovery-guarantees)).
+provider when removing authorization there. Neither can be reactivated through `check`. A
+revoked connection returns to `pending` through rotation and keeps its mappings and
+history. A disconnected connection cannot be rotated; install a new one, or reconnect it
+through OAuth, which reuses the connection ID (see
+[Shopify](shopify.md#authorization-and-recovery-guarantees)).
 
 ## Secrets and key management
 

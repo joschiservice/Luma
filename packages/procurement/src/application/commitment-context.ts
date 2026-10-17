@@ -81,6 +81,11 @@ export interface CommitmentContext {
     request: unknown,
     operation: (tx: CommitmentTransaction) => Promise<T>,
   ): Promise<T>;
+  /** Reads the suppliers of `orders` in one query, keyed by ID; unknown suppliers are absent. */
+  suppliersOf(
+    tx: CommitmentTransaction,
+    orders: PurchaseOrder[],
+  ): Promise<Map<string, Supplier>>;
   /** The supplier's follow-up terms, with defaults for unset values. */
   terms(supplier: Supplier | null): { confirmationHours: number };
   /** The order's latest submission and its progress from `data`. */
@@ -182,6 +187,19 @@ export function createCommitmentContext(
     });
   }
 
+  async function suppliersOf(
+    tx: CommitmentTransaction,
+    orders: PurchaseOrder[],
+  ) {
+    const ids = [...new Set(orders.map((o) => o.supplierId))];
+
+    return new Map(
+      (ids.length ? await tx.suppliers(ids) : []).map(
+        (supplier) => [supplier.id, supplier] as const,
+      ),
+    );
+  }
+
   const terms = (supplier: Supplier | null) => ({
     confirmationHours:
       supplier?.confirmationHours ?? defaultSupplierTerms.confirmationHours,
@@ -261,6 +279,7 @@ export function createCommitmentContext(
     authorize,
     audit,
     command,
+    suppliersOf,
     terms,
     progressFor,
     lineMapping,

@@ -36,6 +36,22 @@ mapped to an item on that connection. Luma stores the submission and asks Action
 to bind the exact high-risk `purchase-orders.submit` action. Policy then requires approval under the [workspace rules](workspace-settings.md#approval-preference), with `decisions.respond` and the purchasing capability's permission, such as
 `jtl:purchase_orders.submit`. Requests expire after 24 hours.
 
+```mermaid
+stateDiagram-v2
+  [*] --> approval_required: requested
+  approval_required --> approved: approved, or policy allows
+  approval_required --> rejected
+  approval_required --> expired: after 24 hours
+  approval_required --> failed: policy denies
+  approval_required --> not_executed: observe-only
+  approved --> submitting: dispatch
+  submitting --> submitted: independent read finds the order
+  submitting --> failed: withheld or not created
+  submitting --> uncertain: no confirmation
+  uncertain --> submitted: reconciled by reading
+  uncertain --> failed: reconciled by reading
+```
+
 Approval dispatches immediately as the requester through a resolved workflow context; the
 approver gains no execution authority. The background pass also dispatches approved
 submissions. Execution reserves `v0:<action ID>` before dispatch; the JTL adapter derives

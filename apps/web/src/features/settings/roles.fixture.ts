@@ -111,7 +111,7 @@ export const rolesFixture: RolesSnapshot = {
       'decisions.respond',
       'issues',
       'Approve or reject changes',
-      'Respond to approval requests from other people.',
+      'Respond to approval requests. When the workspace requires approval from another person, the approver can’t be the person who proposed the change.',
       true,
     ),
     permission(

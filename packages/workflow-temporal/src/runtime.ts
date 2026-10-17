@@ -479,6 +479,10 @@ export async function createExceptionClient(
       connection.withDeadline(Date.now() + 2000, () =>
         commands.progress(context, source),
       ),
+    notifyApproval: (context: TenantContext, source: WorkflowSource) =>
+      connection.withDeadline(Date.now() + 2000, () =>
+        commands.notifyApproval(context, source),
+      ),
     close: async () => {
       data.close();
       await connection.close();
@@ -486,26 +490,36 @@ export async function createExceptionClient(
   };
 }
 
-/** Connect lazily so persisted reads remain available while Temporal is offline. */
-export function createDeskWorkflowReader(
+/**
+ * Gives the case desk its view of a case's exception workflow. It connects lazily, so persisted
+ * reads remain available while Temporal is offline, and bounds each call to two seconds.
+ * `source` is the workflow source bound to the case; without one, the incident is the source.
+ */
+export function createDeskWorkflowClient(
   settings: TemporalSettings,
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   let pending: ReturnType<typeof createExceptionClient> | undefined;
   let closed = false;
 
+  async function connect() {
+    if (closed) throw new Error('Desk workflow client closed');
+    pending ??= createExceptionClient(settings, identity).catch((error) => {
+      pending = undefined;
+      throw error;
+    });
+
+    return pending;
+  }
+
   return {
+    /** Reads workflow progress, or null when no workflow was started for the case. */
     async get(
       context: TenantContext,
       exceptionId: string,
       source: WorkflowSource | null = null,
     ) {
-      if (closed) throw new Error('Workflow reader closed');
-      pending ??= createExceptionClient(settings, identity).catch((error) => {
-        pending = undefined;
-        throw error;
-      });
-      const client = await pending;
+      const client = await connect();
       try {
         return await client.progress(
           context,
@@ -513,6 +527,27 @@ export function createDeskWorkflowReader(
         );
       } catch (error) {
         if (error instanceof WorkflowNotFoundError) return null;
+        throw error;
+      }
+    },
+    /**
+     * Wakes a workflow waiting for an approval response after the response committed. The
+     * signal carries no authority; a missing workflow is ignored, and the workflow's poll
+     * recovers any other failure. Requires `decisions.respond`.
+     */
+    async notifyApproval(
+      context: TenantContext,
+      exceptionId: string,
+      source: WorkflowSource | null = null,
+    ) {
+      const client = await connect();
+      try {
+        await client.notifyApproval(
+          context,
+          source ?? { kind: 'incident', id: exceptionId },
+        );
+      } catch (error) {
+        if (error instanceof WorkflowNotFoundError) return;
         throw error;
       }
     },

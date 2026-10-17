@@ -8,9 +8,12 @@ approval and verification path.
 
 ## Install and enable
 
-Run `pnpm setup:code`. It installs the runtime into this checkout's `.luma/code-runtime` and
-compiles the guest ahead of time, so runs do not spend their wall-time budget on
-compilation. Rerun it when an installation reports the runtime as unavailable. `pnpm dev`
+`pnpm run setup` installs the runtime; `pnpm setup:code` installs it alone. It goes into this
+checkout's `.luma/code-runtime`, and the guest is compiled ahead of time so runs do not spend
+their wall-time budget on compilation. A rerun skips an installation whose pinned release,
+compile flags and file hashes still match; `pnpm setup:code --force` reinstalls. Setup reports
+platforms without a pinned runtime (Linux on x64/arm64 and macOS on arm64 are supported) and
+continues with Code Steps unavailable, while `pnpm setup:code` fails on them. `pnpm dev`
 and `pnpm dev:workflows` pass it to the API and the workflow worker; restart them after
 installing. An explicit `LUMA_CODE_RUNTIME_DIR` in `apps/api/.env` takes precedence.
 
@@ -56,6 +59,33 @@ function main(input, luma) {
   does.
 
 ## Replay, approval and cancellation
+
+```mermaid
+sequenceDiagram
+  participant P as Process runtime
+  participant H as Code host
+  participant S as Sandbox
+  participant D as Domain adapter
+  P->>H: run Code Step
+  H->>H: authorize, bind inputs and fixed time
+  H->>S: main(input, luma)
+  S->>H: luma.request("grant-id")
+  H->>H: refresh authorization, check the grant
+  alt reply already journaled
+    H-->>S: saved reply
+  else new request
+    H->>D: granted read, or action through Action Admission
+    alt approval pending
+      H-->>P: awaiting_approval, sandbox released
+    else accepted and verified
+      D-->>H: verified values and evidence
+      H->>H: journal the reply
+      H-->>S: reply
+    end
+  end
+  S-->>H: returned fields
+  H-->>P: outputs with artifact and input hashes
+```
 
 The host refreshes authorization before each request. Inputs and the fixed time are bound
 before the first call, and replies are journaled in order before code resumes. A retry

@@ -159,6 +159,7 @@ function fixture() {
             ReturnType<CreationAdmission['decision']>
           >)
         : null,
+    decisions: unused,
     execute: async () => {
       executions++;
       reserved = true;

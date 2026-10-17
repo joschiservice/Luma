@@ -6,7 +6,9 @@ tests and search show everything else, and they stay current without anyone main
 them.
 
 Start with the [codebase map](codebase-map.md) to find the owning package. Product guides
-for Luma's users live in `apps/web/content/docs`.
+for Luma's users live in `apps/web/content/docs`. Step-by-step procedures for extending a
+recurring pattern, such as adding a migration, a workspace app or an operational scenario,
+are [agent skills](../.agents/skills) that people can read as well.
 
 ## Guides
 
@@ -17,7 +19,6 @@ for Luma's users live in `apps/web/content/docs`.
 - [Performance measurement](benchmarking.md): budgets, benchmarks and fair comparisons.
 - [Observability](observability.md): hosted telemetry, data policy and local Grafana.
 - [Synthetic pilot](pilot-environment.md) and [commerce simulator](simulator.md).
-- [Adding an operational scenario](adding-operational-scenarios.md).
 
 **Platform**
 
@@ -99,14 +100,13 @@ get something wrong. Write it for that reader.
 - Traps: non-obvious coupling, ordering requirements, things that look safe to change but
   are not.
 - Procedures people run: setup, credential rotation, recovery, backfills that remain
-  supported.
+  supported. Procedures for extending a recurring pattern belong in a skill instead (see
+  [Skills and directory instructions](#skills-and-directory-instructions)).
 
 **Leave out:**
 
 - File, function, route, table and migration catalogs. Name the owning package once if
-  it helps; the reader finds files by searching. Recipes for extending a recurring
-  pattern, such as [adding an operational scenario](adding-operational-scenarios.md),
-  may list the files to touch.
+  it helps; the reader finds files by searching. Skills may list the files to touch.
 - Test lists and validation command blocks. Tests are colocated with the code they
   verify; general commands are in [local development](development.md). Mention a command
   only when it is not discoverable, such as an opt-in benchmark variable.
@@ -123,13 +123,51 @@ get something wrong. Write it for that reader.
 - One guide per feature area. Extend the existing guide instead of adding a file per
   change, and split by concern, not by pull request. Most guides stay under 150 lines.
 - Use short sentences, concrete terms and tables only for genuinely tabular rules.
+- Draw flows, lifecycles, sequences and topology as diagrams (see [Diagrams](#diagrams))
+  rather than describing them only in prose.
 - Explain local implementation details in code comments next to the code instead.
 - Record cross-cutting decisions with their alternatives as
   [architecture decisions](architecture/README.md).
 
 **Maintain:**
 
-- Update or delete guidance in the same change that makes it inaccurate.
+- Update or delete guidance, including diagrams, in the same change that makes it
+  inaccurate.
 - Add new guides to the index above with a one-line description.
 - `pnpm test:architecture` checks relative links, heading anchors and repository paths in
   backticks across Markdown files.
+
+## Diagrams
+
+Diagrams give a reader the shape of a feature before its rules. Write them as Mermaid in a
+fenced `mermaid` block: GitHub renders them, reviewers see changes in the diff, and agents
+read them as text.
+
+- Use `flowchart` for flows and decisions, `stateDiagram-v2` for lifecycles and
+  `sequenceDiagram` for interactions between processes and providers.
+- Draw only what the code does. Name states as the code does, show the failure, uncertain
+  and stale paths the guide's rules depend on, and update the diagram when the code changes.
+- One idea per diagram, ideally no more than 15 nodes. Prefer `TD` for chains longer than
+  about six steps and keep sequence diagrams to five or six participants: GitHub scales a
+  diagram to the page width, so wide diagrams become unreadable.
+- Don't style diagrams (`classDef`, `style`, colors, themes or init directives). GitHub picks
+  colors for its light and dark themes; custom ones break one of them.
+- Put the diagram after the opening summary or in the section it explains, followed by the
+  rules. A diagram supplements rules; it never replaces them.
+- Render a changed diagram before review, for example in GitHub's preview or the
+  [Mermaid live editor](https://mermaid.live).
+
+## Skills and directory instructions
+
+Agents and people share two other kinds of guidance:
+
+- **Skills** in `.agents/skills/<name>/SKILL.md` (`.claude/skills` links to the same
+  directory) are procedures for extending a recurring pattern. The `description` in the
+  front matter says when to use the skill; agents load the full text only when a task
+  matches. A skill links to the guides that hold the rules instead of repeating them.
+- **Directory instructions** in an `AGENTS.md` next to the code hold local rules and traps for
+  work inside that directory, and link to its guides. The root `AGENTS.md` holds the rules
+  for the whole repository.
+
+`pnpm test:architecture` also checks that each skill's front matter names its directory and
+describes when to use it, and that diagrams carry no styling.

@@ -7,6 +7,17 @@ Predictions and operator comparisons stay separate from live verified-success me
 `@luma/resolution` owns the service; every operation requires a freshly refreshed context
 with `playbooks.activate`.
 
+```mermaid
+flowchart LR
+  workflow["Shadow workflow: detect, diagnose, prepare candidate"] --> evaluation
+  direct["Direct: existing proposal without an attempt"] --> evaluation
+  evaluation["Immutable evaluation: policy preview and simulation, executed false"]
+  evaluation --> report["Comparison report"]
+  review["Operator review after acting"] --> report
+  outcome["Later authoritative verification, same evaluator"] --> report
+  evaluation -.->|"never"| live["Execute, reconcile or live verification"]
+```
+
 Workspace and connection observe-only controls protect the normal execution path for
 all installed write capabilities while keeping detection, diagnosis and proposals running.
 They record intended work as `not_executed`, without predicting its outcome. Shadow Mode

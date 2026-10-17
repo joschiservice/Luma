@@ -73,6 +73,29 @@ record receives its own reviewed change and result. A durable claim precedes dis
 an interruption, uncertainty remains until the record owner reconciles its command. Replaying
 a retained command does not dispatch it again.
 
+```mermaid
+sequenceDiagram
+  actor Member
+  participant V as View actions
+  participant O as Record owner
+  Member->>V: preview selected records
+  V->>O: reviewed change per record from fresh evidence
+  V-->>Member: changes and review digest
+  Member->>V: run with the digest and a command ID
+  alt command ID already recorded
+    V-->>Member: retained results, nothing dispatched
+  else new command
+    V->>V: digest still matches, otherwise 409
+    V->>V: durable claim marks every record uncertain
+    loop each record
+      V->>O: propose the owner command, reauthorized
+      O-->>V: proposed, approval_required, verified or failed
+      V->>V: save the receipt
+    end
+    V-->>Member: one result per record
+  end
+```
+
 The supplier follow-up action prepares a draft in the Operations Inbox. Sending, independent
 send verification and the next supplier check remain owned by the existing inbox and procurement
 services. Mail acceptance is not supplier confirmation.

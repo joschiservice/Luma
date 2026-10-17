@@ -14,6 +14,19 @@ methods require a resolved tenant context; ingestion and mapping require `sync.m
 
 ## Ingest and reconcile
 
+```mermaid
+flowchart TD
+    Observation["Validated observation"] --> Store["Store observation under its ingest key"]
+    Store --> Mapped["Every source identity mapped?"]
+    Mapped -->|no| Pending["pending: lists missing identities"]
+    Pending -->|bind with evidence, replay the ingest key| Store
+    Mapped -->|yes| Owner["Owner writes an immutable snapshot"]
+    Owner --> Order["Projection rules"]
+    Order -->|replaces current| Applied["applied"]
+    Order -->|older evidence| Retained["retained as history"]
+    Order -->|snapshot already exists| Duplicate["duplicate"]
+```
+
 - Ingest keys must be stable across retries of the same poll-run/page/item or provider
   event; a new poll uses a new key. The connection must belong to the tenant and be
   active or degraded.
@@ -112,6 +125,23 @@ and optional provider-reported `remainingQuantity`. Absent or null facts stay un
 Shopify reports both quantities; JTL ERP 2.2 exposes no per-line cancellation quantity,
 so JTL cancellations stay unknown. Quantity edits create new snapshots and never rewrite
 the prior evidence. Order and fulfillment schema versions 1 and 2 remain readable.
+
+```mermaid
+flowchart TD
+    Incoming["Incoming snapshot"] --> Same["Same observation as the current snapshot?"]
+    Same -->|yes| Replace["Becomes current"]
+    Same -->|no| Updated["Both have source update times, and they differ?"]
+    Updated -->|yes| Newer["Incoming update time later?"]
+    Newer -->|yes| Replace
+    Newer -->|no| Keep["Retained as history"]
+    Updated -->|no| Observed["Observation times differ?"]
+    Observed -->|yes| Later["Incoming observed later?"]
+    Later -->|yes| Replace
+    Later -->|no| Keep
+    Observed -->|no| Id["Both or neither have update times, and incoming observation ID greater?"]
+    Id -->|yes| Replace
+    Id -->|no| Keep
+```
 
 Each source has its own current snapshot. An incoming snapshot replaces it when:
 

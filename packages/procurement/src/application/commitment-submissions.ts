@@ -21,7 +21,11 @@ import {
   type createSubmissionExecution,
   submissionAction,
 } from './commitment-execution.js';
-import type { CommitmentTransaction, SubmissionView } from './commitments.js';
+import type {
+  CommitmentTransaction,
+  SubmissionDecision,
+  SubmissionView,
+} from './commitments.js';
 
 /**
  * Approval-controlled submissions: readiness, requesting approval, deciding, sending and
@@ -34,23 +38,54 @@ export function createSubmissionRequests(
     settle,
   }: Pick<ReturnType<typeof createSubmissionExecution>, 'dispatch' | 'settle'>,
 ) {
+  /**
+   * Admission reads for submission views within one service call. `decisions` holds decisions
+   * already read in a batch; write modes are read once per connection.
+   */
+  function admissionReads(
+    context: TenantContext,
+    decisions?: Map<string, SubmissionDecision | null>,
+  ) {
+    const modes = new Map<
+      string,
+      Promise<'observe_only' | 'writes_enabled' | undefined>
+    >();
+
+    return {
+      async decision(id: string) {
+        if (!deps.admission) return null;
+        if (decisions?.has(id)) return decisions.get(id) ?? null;
+
+        return deps.admission.decision(context, id);
+      },
+      writeMode(connectionId: string) {
+        let mode = modes.get(connectionId);
+        if (!mode) {
+          mode = Promise.resolve(
+            deps.admission?.writeMode?.(context, connectionId),
+          );
+          modes.set(connectionId, mode);
+        }
+
+        return mode;
+      },
+    };
+  }
+
   /** What a person can do with a submission now, from persisted state and admission. */
   async function submissionView(
     context: TenantContext,
     submission: Submission,
+    reads = admissionReads(context),
   ): Promise<SubmissionView> {
-    const decision =
-      submission.decisionId && deps.admission
-        ? await deps.admission.decision(context, submission.decisionId)
-        : null;
+    const decision = submission.decisionId
+      ? await reads.decision(submission.decisionId)
+      : null;
     const expired = approvalExpired(submission, deps.now().getTime());
     const observeOnly =
       submission.state === 'not_executed' ||
       (['approval_required', 'approved'].includes(submission.state) &&
-        (await deps.admission?.writeMode?.(
-          context,
-          submission.connectionId,
-        )) === 'observe_only');
+        (await reads.writeMode(submission.connectionId)) === 'observe_only');
     const requester = context.actor.id === submission.requestedBy;
     const manager = hasPermission(context, 'procurement.manage');
     // Approvers also need permission to approve changes and any app permission the
@@ -117,6 +152,7 @@ export function createSubmissionRequests(
 
   return {
     submissionView,
+    admissionReads,
     readiness,
     /**
      * Requests approval to place an order in the supplier's purchasing system. The request ID
@@ -265,8 +301,9 @@ export function createSubmissionRequests(
       );
     },
     /**
-     * Approves or rejects a submission. Approval comes from someone other than the requester who
-     * can manage procurement; Luma then dispatches it as the requester, exactly once.
+     * Approves or rejects a submission. Approval comes from someone who can manage procurement,
+     * and from someone other than the requester when the workspace requires independent
+     * approval. Luma then dispatches it as the requester, exactly once.
      */
     async decideSubmission(
       context: TenantContext,

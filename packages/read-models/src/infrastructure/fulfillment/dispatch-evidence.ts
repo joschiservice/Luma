@@ -251,7 +251,7 @@ export function createShipmentDispatchOptionsReader(database: TenantDatabase) {
    WITH target AS (SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND scope_key='' AND external_id=$3)
    SELECT DISTINCT m.connection_id::text AS "downstreamConnectionId",m.external_id AS "shipmentId",concat(c.document->>'label',' · ',COALESCE(s.document#>>'{data,tracking,0,number}',m.external_id)) AS label
    FROM target t JOIN orders_snapshots s ON s.tenant_id=$1 AND s.order_id=t.canonical_id AND s.kind='fulfillment'
-   JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+   JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.connection_id=s.connection_id AND p.snapshot_id=s.id
    JOIN connector_source_mappings m ON m.tenant_id=p.tenant_id AND m.canonical_id=p.entity_id AND m.connection_id=p.connection_id AND m.resource='fulfillment'
    JOIN connector_installations c ON c.tenant_id=m.tenant_id AND c.id=m.connection_id
    WHERE (SELECT count(*) FROM target)=1 AND c.document->>'appId'='starshipit' AND c.document->>'status'='active' AND s.document->'data'->>'kind'='shipment' AND NOT (s.document->>'deleted')::boolean

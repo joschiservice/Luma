@@ -110,7 +110,6 @@ on `insights.e2e.mjs`.
 
 ## Adding a chart
 
-Write the counting rule once, as owner SQL or an owner function, and use it for both the chart
-and its records. Add the chart to the insights contract, the read model, the web definitions
-with wording people can check against the records, and the point-to-records reconciliation
-check in `insights.e2e.mjs`. State what the chart can't claim in its `limit`.
+Follow the [add-insights-chart](../.agents/skills/add-insights-chart/SKILL.md) skill. Write the
+counting rule once and use it for both the chart and its records, and state what the chart
+can't claim in its `limit`.

@@ -11,12 +11,29 @@ Code: `@luma/app-shopify`.
 
 ## Shared rules
 
+```mermaid
+flowchart TD
+    Preview["Exact preview saved"] --> Approval["Approved under the workspace approval rules"]
+    Approval --> Recheck["Fresh Shopify read and authority recheck"]
+    Recheck -->|changed or ineligible| NoEffect["Ends without effect; claim released"]
+    Recheck --> Claim["Target claim and one dispatch"]
+    Claim -->|receipt| Accepted["Accepted, not yet verified"]
+    Claim -->|Shopify rejects| NoEffect
+    Claim -->|lost or unclear response| Uncertain["Uncertain: claim kept"]
+    Uncertain -->|"reconcile by reading, never resend"| Accepted
+    Uncertain -->|read proves no effect| NoEffect
+    Accepted --> Verify["Fresh, complete Shopify read"]
+    Verify -->|expected outcome| Verified["Verified"]
+    Verify -->|anything else| Unverified["Unverified: inspect or check again"]
+```
+
 **Preview and approval.**
 
 - A preview binds the exact connection, source records, revision or quantities, and the
   chosen option. Only a saved preview ID enters execution; no client-supplied quantity,
   destination or model output can bypass these controls.
-- The requester and approver must be different people. Both need the action's app
+- When the workspace [requires independent approval](workspace-settings.md#approval-preference),
+  the requester and approver must be different people. Both need the action's app
   permission; the approver also needs `decisions.respond`.
 - A preview stays open for a four-hour decision window.
 - Before dispatch, Luma reads Shopify again and rechecks membership, installation, grants,
@@ -160,6 +177,15 @@ may restock removed units. Luma never adds products or changes prices, discounts
   approved quantities), recalculates in a new
   session and withholds the edit when quantities or money differ from the approved
   calculation.
+
+```mermaid
+stateDiagram-v2
+    [*] --> reserved: dispatch
+    reserved --> withheld: facts changed or fenced
+    reserved --> sent: commit
+    sent --> accepted: order returned
+    sent --> rejected: user errors
+```
 
 Shopify has no idempotency key for order edits. Luma records a durable fence for each
 operation: `reserved` before calculating, `sent` immediately before `orderEditCommit`, then

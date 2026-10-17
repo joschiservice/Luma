@@ -6,6 +6,25 @@ outcome is an independently verified **purchase-order draft**, not a supplier su
 received goods; sending the order is a separately admitted step (see
 [Supplier commitments](supplier-commitments.md)).
 
+```mermaid
+flowchart TD
+  trigger["Stock below minimum"] --> inventory["Read inventory"]
+  inventory --> fresh{"Fresh stock?"}
+  fresh -->|no| escalated["Escalated"]
+  fresh -->|yes| proposal["Read proposal: quantity and existing orders"]
+  proposal --> eligible{"Eligible?"}
+  eligible -->|"no, e.g. an open order exists"| ended["Ends without an order"]
+  eligible -->|yes| admission["Create draft through Action Admission"]
+  admission --> approval{"Approved within four hours?"}
+  approval -->|"rejected or expired"| denied["Denied"]
+  approval -->|yes| reread{"Fresh stock gives the same quantity?"}
+  reread -->|no| stopped["Run stops; the next check proposes again"]
+  reread -->|yes| draft["Purchase-order draft created"]
+  draft --> verify{"Independent read matches?"}
+  verify -->|yes| verified["Verified draft"]
+  verify -->|"no or unavailable"| unverified["Failed or inconclusive"]
+```
+
 ## Rule and authority
 
 Someone with `procurement.manage` activates a rule for one exact position, source

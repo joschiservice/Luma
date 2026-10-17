@@ -227,6 +227,24 @@ const recordTypeCase = `CASE cap ${Object.entries(recordCapabilities)
   .map(([type, capability]) => `WHEN '${capability}' THEN '${type}'`)
   .join(' ')} END`;
 
+/**
+ * Folds a stream's ledger count changes into one row. Ledger triggers append a row per
+ * statement; the page commit, which holds the stream lock, keeps the rows per stream few.
+ * Changes appended by uncommitted transactions are folded by a later page.
+ */
+async function foldItemCounts(tx: SqlTransaction, scope: unknown[]) {
+  await tx.query(
+    `WITH folded AS (
+      DELETE FROM commerce_sync_item_counts c WHERE c.tenant_id=$1 AND c.connection_id=$2 AND c.record_type=$3
+        AND (SELECT count(*) FROM commerce_sync_item_counts WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3)>1
+      RETURNING c.*
+    ) INSERT INTO commerce_sync_item_counts(tenant_id,connection_id,record_type,total,current,pending,failed,retired,missing)
+    SELECT $1,$2,$3,sum(total),sum(current),sum(pending),sum(failed),sum(retired),sum(missing)
+    FROM folded HAVING count(*)>0`,
+    scope,
+  );
+}
+
 async function lockStream(
   tx: SqlTransaction,
   tenantId: string,
@@ -563,7 +581,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           (
             await tx.query<ItemKey>(
               `SELECT resource,scope_key AS "scopeKey",external_id AS "externalId" FROM commerce_sync_items
-              WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND missing_since < $4
+              WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND missing_since < $4 AND status<>'retired'
               ORDER BY missing_since,external_id LIMIT $5`,
               [tenantId, connectionId, recordType, before, limit],
             )
@@ -720,7 +738,11 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               AND i.resource=e.resource AND i.scope_key=e."scopeKey" AND i.external_id=e."externalId"`,
             [...scope, JSON.stringify(page.forget)],
           );
-        if (!page.complete) return true;
+        if (!page.complete) {
+          await foldItemCounts(tx, scope);
+
+          return true;
+        }
         if (
           current.record_type === 'products' ||
           current.record_type === 'orders'
@@ -759,6 +781,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             ).rows[0]!.count,
           );
         }
+        await foldItemCounts(tx, scope);
         await tx.query(
           `UPDATE commerce_sync_runs SET outcome='completed',finished_at=$3,missing=$4
           WHERE tenant_id=$1 AND id=$2`,
@@ -909,20 +932,26 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               newest: Date | null;
               problems: string[] | null;
             }>(
-              `SELECT s.id AS stream_id,count(i.external_id) AS total,
-                count(*) FILTER (WHERE i.status='current') AS current,
-                count(*) FILTER (WHERE i.status='pending') AS pending,
-                count(*) FILTER (WHERE i.status='failed') AS failed,
-                count(*) FILTER (WHERE i.status='retired') AS retired,
-                count(*) FILTER (WHERE i.missing_since IS NOT NULL AND i.status<>'retired') AS missing,
-                min(i.source_created_at) AS oldest,max(i.source_created_at) AS newest,
+              // Counts come from the ledger's count changes, written with each ledger change, so
+              // they are as current as the ledger in this snapshot. Creation dates use the
+              // stream's creation-date index; problems use the partial attention and missing indexes.
+              `SELECT s.id AS stream_id,COALESCE(c.total,0) AS total,COALESCE(c.current,0) AS current,
+                COALESCE(c.pending,0) AS pending,COALESCE(c.failed,0) AS failed,
+                COALESCE(c.retired,0) AS retired,COALESCE(c.missing,0) AS missing,
+                (SELECT min(i.source_created_at) FROM commerce_sync_items i WHERE i.tenant_id=s.tenant_id
+                  AND i.connection_id=s.connection_id AND i.record_type=s.record_type) AS oldest,
+                (SELECT max(i.source_created_at) FROM commerce_sync_items i WHERE i.tenant_id=s.tenant_id
+                  AND i.connection_id=s.connection_id AND i.record_type=s.record_type) AS newest,
                 (SELECT array_agg(p.problem) FROM (SELECT DISTINCT x.problem FROM commerce_sync_items x
                   WHERE x.tenant_id=s.tenant_id AND x.connection_id=s.connection_id AND x.record_type=s.record_type
-                  AND (x.status IN ('pending','failed') OR x.missing_since IS NOT NULL) AND x.problem IS NOT NULL ORDER BY x.problem LIMIT 5) p) AS problems
+                  AND (x.status IN ('pending','failed') OR (x.missing_since IS NOT NULL AND x.status<>'retired'))
+                  AND x.problem IS NOT NULL ORDER BY x.problem LIMIT 5) p) AS problems
               FROM commerce_sync_streams s
-              LEFT JOIN commerce_sync_items i ON i.tenant_id=s.tenant_id AND i.connection_id=s.connection_id
-                AND i.record_type=s.record_type
-              WHERE s.tenant_id=$1 GROUP BY s.tenant_id,s.id,s.connection_id,s.record_type`,
+              LEFT JOIN (SELECT connection_id,record_type,sum(total) AS total,sum(current) AS current,
+                  sum(pending) AS pending,sum(failed) AS failed,sum(retired) AS retired,sum(missing) AS missing
+                FROM commerce_sync_item_counts WHERE tenant_id=$1 GROUP BY connection_id,record_type) c
+                ON c.connection_id=s.connection_id AND c.record_type=s.record_type
+              WHERE s.tenant_id=$1`,
               [tenantId],
             )
           ).rows.map((row): StreamCoverage => ({

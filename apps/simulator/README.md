@@ -9,4 +9,4 @@ The host stores runs in its own PostgreSQL database, migrated from [migrations](
 ## Further reading
 
 - [Simulator](../../docs/simulator.md)
-- [Adding an operational scenario](../../docs/adding-operational-scenarios.md)
+- [Adding an operational scenario](../../.agents/skills/add-operational-scenario/SKILL.md)

@@ -14,6 +14,27 @@ pnpm pilot:worker
 
 Open the printed web URL and sign in as `pilot-operator@example.test` with the password in `.luma/demo.json`, then select **Synthetic pilot · approval-required**. The requester, `pilot-requester@example.test`, uses the same password and owns the organization; the operator is an admin. `pilot-warehouse@example.test`, a member, answers the tasks workflows hand to the warehouse. High-risk actions need approval from a different user than the requester. All accounts are synthetic; a pilot seeded before the warehouse member existed needs `pnpm pilot:reset` to get it.
 
+```mermaid
+flowchart TD
+  browser["Browser"] --> web
+  subgraph serve ["pnpm pilot"]
+    web["Web app"] -->|"/api proxy"| api["HTTP API"]
+  end
+  api -->|"start, signal"| temporal["Temporal: run-specific queue"]
+  subgraph workerProcess ["pnpm pilot:worker"]
+    worker["Temporal worker"]
+  end
+  temporal --> worker
+  api --> db[("PostgreSQL")]
+  worker --> db
+  api --> fetch["Injected fetch"]
+  worker --> fetch
+  fetch --> provider["Synthetic provider file"]
+```
+
+Both processes compose the same application services; only the provider transport is
+synthetic.
+
 The API and worker use a dedicated Temporal task queue per pilot run, so `pnpm dev:workflows`' ordinary worker does not pick up pilot work; use `pilot:worker`. The pilot shares this checkout's web and API ports with `pnpm dev`, so stop one before starting the other. The worker prints its PID for the recovery drill.
 
 ## Hostname and Tailscale
@@ -87,6 +108,23 @@ pnpm pilot:reset recovery
 pnpm pilot
 # Second terminal:
 pnpm pilot:worker
+```
+
+```mermaid
+sequenceDiagram
+  participant T as Temporal
+  participant W as Pilot worker
+  participant P as Synthetic provider
+  T->>W: run the approved correction
+  W->>W: reserve and persist the action
+  W->>P: PATCH with idempotency key
+  P->>P: commit the effect, withhold the response
+  Note over W: operator kills the worker
+  T->>W: retry the activity on the restarted worker
+  W->>W: stored receipt forces reconciliation
+  W->>P: read the order, no second PATCH
+  W->>P: independent business read
+  W-->>T: verified, the case resolves
 ```
 
 The scenario approves the correction automatically. When the worker prints `PILOT_EFFECT_COMMITTED`, run `kill -KILL <worker-pid>` with the PID it printed, then restart `pnpm pilot:worker` without resetting. Allow up to 90 seconds for Temporal's activity timeout and retry. The execution receipt forces read-only reconciliation, so the action is not dispatched again, and the case resolves after the independent business read. The provider file must show exactly one effect and `patchRequests: 1`. If you don't kill the worker, the simulated lost response exercises the same reconciliation after 40 seconds. Never kill the API or database for this drill.

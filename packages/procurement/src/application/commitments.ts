@@ -112,6 +112,12 @@ export type SubmissionExecution =
   | { state: 'failed'; reason: string }
   | { state: 'uncertain' };
 
+/** A submission's policy decision with its recorded human response. */
+export type SubmissionDecision = PolicyDecision & {
+  approval?: { outcome: 'approved' | 'rejected'; approverId: string };
+  requireIndependentApproval?: boolean;
+};
+
 /** Binds submissions to Action Admission, workspace policy and audited execution. */
 export interface SubmissionAdmission {
   /** Reads effective workspace and connection write controls without provider calls. */
@@ -128,13 +134,12 @@ export interface SubmissionAdmission {
   decision(
     context: TenantContext,
     id: string,
-  ): Promise<
-    | (PolicyDecision & {
-        approval?: { outcome: 'approved' | 'rejected'; approverId: string };
-        requireIndependentApproval?: boolean;
-      })
-    | null
-  >;
+  ): Promise<SubmissionDecision | null>;
+  /** Reads decisions as `decision` does, refreshing authorization once for the whole read. Unknown IDs map to null. */
+  decisions(
+    context: TenantContext,
+    ids: string[],
+  ): Promise<Map<string, SubmissionDecision | null>>;
   respond(
     context: TenantContext,
     decisionId: string,
@@ -182,6 +187,8 @@ export interface CommitmentTransaction {
     ids: string[],
   ): Promise<CustomFieldDefinition[]>;
   supplier(id: string): Promise<Supplier | null>;
+  /** Suppliers among `ids`; unknown IDs are absent. */
+  suppliers(ids: string[]): Promise<Supplier[]>;
   updateSupplier(supplier: Supplier): Promise<void>;
   history(orderId: string): Promise<ProcurementEvent[]>;
   /** Reads admitted plans, revisions and stock-action proof without provider calls. */
@@ -196,9 +203,11 @@ export interface CommitmentTransaction {
   saveSubmission(submission: Submission, settled: boolean): Promise<void>;
   /** Unsettled submissions in active states, oldest first. */
   liveSubmissions(principalId: string): Promise<Submission[]>;
+  /** Newest first; reads at most `limit` messages when given. */
   communications(filter: {
     orderIds?: string[];
     supplierId?: string;
+    limit?: number;
   }): Promise<Communication[]>;
   communication(id: string): Promise<Communication | null>;
   communicationByKey(key: string): Promise<Communication | null>;

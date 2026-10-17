@@ -54,7 +54,7 @@ import {
 } from '@luma/resolution';
 import { createPlaybookStore } from '@luma/resolution/composition';
 import {
-  createDeskWorkflowReader,
+  createDeskWorkflowClient,
   createProcessClient,
 } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
@@ -487,10 +487,10 @@ export async function createPilot(
         };
       },
     };
-    const reader = temporal
-      ? createDeskWorkflowReader(temporal, identity.service)
+    const deskWorkflow = temporal
+      ? createDeskWorkflowClient(temporal, identity.service)
       : null;
-    if (reader) resources.add(reader.close);
+    if (deskWorkflow) resources.add(deskWorkflow.close);
     const processClient = temporal
       ? await createProcessClient(
           { ...temporal, taskQueue: `${temporal.taskQueue}-procurement` },
@@ -522,18 +522,6 @@ export async function createPilot(
         : {}),
       desk: {
         capability: supported,
-        notifyDecision: async (actor, exceptionId) => {
-          if (!runtime) return;
-          const client = await runtime.createClient();
-          try {
-            await client.notifyApproval(actor, {
-              kind: 'incident',
-              id: exceptionId,
-            });
-          } finally {
-            await client.close();
-          }
-        },
         refreshProposal: async (_actor, exceptionId) => {
           await refreshProposal(exceptionId);
           if (runtime) {
@@ -549,7 +537,12 @@ export async function createPilot(
             }
           }
         },
-        ...(reader ? { workflow: reader.get } : {}),
+        ...(deskWorkflow
+          ? {
+              workflow: deskWorkflow.get,
+              notifyApproval: deskWorkflow.notifyApproval,
+            }
+          : {}),
       },
     });
     const {
