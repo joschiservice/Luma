@@ -88,6 +88,24 @@ describe('policyAudit', () => {
     );
   });
 
+  it('accepts a replay of evidence recorded in the earlier shape', async () => {
+    const append = vi.fn(async (entry: { details: Record<string, string> }) => {
+      if (Object.keys(entry.details).length > 2)
+        throw new Error('Audit event key conflicts with existing evidence');
+    });
+
+    await policyAudit({ append })({
+      type: 'approval.responded',
+      document: approval,
+    });
+
+    expect(append).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        details: { outcome: 'approved', policyVersion: 'v0.1' },
+      }),
+    );
+  });
+
   it('propagates audit failures', async () => {
     const append = vi.fn(async () => {
       throw new Error('audit unavailable');

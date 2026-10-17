@@ -59,6 +59,19 @@ function policyAuditEntry(evidence: PolicyEvidence): PolicyAuditEntry {
  */
 export function policyAudit(audit: PolicyAuditLog) {
   return async (evidence: PolicyEvidence) => {
-    await audit.append(policyAuditEntry(evidence));
+    const entry = policyAuditEntry(evidence);
+    try {
+      await audit.append(entry);
+    } catch (error) {
+      // App-owned policy services once recorded only the outcome and policy version, and every
+      // service flushes the shared outbox. A replay of evidence they already appended must still
+      // be delivered, so accept it when the stored entry has that earlier shape.
+      const { outcome, policyVersion } = evidence.document;
+      try {
+        await audit.append({ ...entry, details: { outcome, policyVersion } });
+      } catch {
+        throw error;
+      }
+    }
   };
 }
