@@ -6,8 +6,12 @@ import type { AppFactoryContext } from '@luma/app-host';
 import { ConnectorError, secretBinding } from '@luma/connections';
 import { createInstallationRepository } from '@luma/connections/composition';
 import { AdmissionRejected } from '@luma/execution';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 
@@ -33,7 +37,7 @@ export function registerStarshipitRoutes(
       async (request, reply) => {
         reply.header('cache-control', 'no-store');
         if (!request.tenantContext)
-          throw new IdentityError(
+          throw new ServiceError(
             401,
             'UNAUTHENTICATED',
             'Sign in to continue.',
@@ -42,21 +46,17 @@ export function registerStarshipitRoutes(
           return await updates[command](request.tenantContext, request.body);
         } catch (error) {
           if (error instanceof ZodError)
-            throw new IdentityError(
+            throw new ServiceError(
               422,
               'CONFLICT',
               'Select existing lines and whole nonnegative quantities.',
             );
           if (error instanceof AdmissionRejected)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This correction is no longer eligible. Refresh and review it again.',
             );
           if (error instanceof ConnectorError)
-            throw new IdentityError(
-              503,
-              'SERVICE_UNAVAILABLE',
+            throw unavailable(
               'Starshipit could not confirm the correction. Check its status before continuing.',
             );
           throw error;
@@ -94,7 +94,7 @@ export function registerStarshipitRoutes(
         record.connection.appId !== 'starshipit' ||
         record.connection.target.kind !== 'starshipit'
       )
-        throw new IdentityError(
+        throw new ServiceError(
           401,
           'UNAUTHENTICATED',
           'Invalid shipping webhook.',
@@ -113,7 +113,7 @@ export function registerStarshipitRoutes(
           createHash('sha256').update(expected).digest(),
         )
       )
-        throw new IdentityError(
+        throw new ServiceError(
           401,
           'UNAUTHENTICATED',
           'Invalid shipping webhook.',
@@ -135,7 +135,7 @@ export function registerStarshipitRoutes(
           )
         ).rows[0];
         if (current?.version !== record.connection.appInstallationVersion)
-          throw new IdentityError(
+          throw new ServiceError(
             401,
             'UNAUTHENTICATED',
             'Invalid shipping webhook.',

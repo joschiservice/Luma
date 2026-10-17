@@ -6,7 +6,7 @@ import { simulationTransport } from '@luma/connections/adapters';
 import { createClient, parse } from '@luma/connector-starshipit';
 import * as s from '@luma/connector-starshipit/schemas';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { notFound } from '@luma/platform';
 
 import { installationCredentials } from '../domain/installation-validation.js';
 import { revision } from './mapping.js';
@@ -37,11 +37,7 @@ export function createUpdateProvider(
       current.connection.target.kind !== 'starshipit' ||
       current.connection.appInstallationVersion !== installedVersion
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Starshipit connection not found.',
-      );
+      throw notFound('Starshipit connection not found.');
     const fetch = simulationTransport(current.connection, context.simulation);
 
     return createClient({

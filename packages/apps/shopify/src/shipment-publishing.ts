@@ -18,8 +18,7 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, notFound } from '@luma/platform';
 import { createPolicies, policyAudit } from '@luma/policies/composition';
 
 import {
@@ -76,11 +75,7 @@ export function createShopifyPublishing(
       current.connection.target.kind !== 'shopify' ||
       current.connection.appInstallationVersion !== version
     )
-      throw new IdentityError(
-        404,
-        'NOT_FOUND',
-        'Shopify connection not found.',
-      );
+      throw notFound('Shopify connection not found.');
 
     return current;
   }
@@ -110,11 +105,7 @@ export function createShopifyPublishing(
       accessToken: async () => {
         const fresh = await credential(tenant, connectionId, capability);
         if (fresh.connection.target.shop !== shop)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Connection changed. Refresh fulfillment details.',
-          );
+          throw conflict('Connection changed. Refresh fulfillment details.');
 
         return fresh.credentials.token;
       },
@@ -158,9 +149,7 @@ export function createShopifyPublishing(
       !connection.permissions.includes('fulfillment.read') ||
       !connection.granted.includes('fulfillment.read')
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'Choose an installed, readable downstream fulfillment source.',
       );
 

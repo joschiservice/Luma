@@ -1,6 +1,6 @@
 import { ConnectorError } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 
@@ -15,7 +15,7 @@ it('requires workspace authentication and never caches records or exposes provid
       request.tenantContext = { tenantId: 'tenant-a' } as TenantContext;
   });
   server.setErrorHandler((error, _request, reply) => {
-    const known = error instanceof IdentityError;
+    const known = error instanceof ServiceError;
 
     return reply
       .status(known ? error.statusCode : 500)
