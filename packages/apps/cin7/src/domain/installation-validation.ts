@@ -1,4 +1,4 @@
-import { accountId } from '@luma/connector-cin7';
+import { accountId } from '@luma/connector-cin7/schemas';
 import { z } from 'zod';
 
 const installationPermissions = z.enum([

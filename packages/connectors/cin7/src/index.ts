@@ -1,4 +1,6 @@
-export { API_VERSION, accountId, createClient } from './client.js';
+export { API_VERSION, createClient } from './client.js';
+
+export { accountId } from './schemas.js';
 
 export type { Cin7TransportOptions } from './client.js';
 

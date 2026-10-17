@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+/** Cin7 account IDs are GUIDs sent with every API request. */
+export const accountId = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
 /** Cin7 record IDs are GUIDs; the all-zero GUID means none. */
 export const guid = z
   .string()
