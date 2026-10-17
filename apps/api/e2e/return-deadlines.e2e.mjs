@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 
 import { caseWorkflowFixture } from './case-workflows-fixture.mjs';
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  citedReturnReads,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
 
 const policy = () => ({
   commandId: randomUUID(),
@@ -270,6 +273,21 @@ it('keeps native pending refunds overdue, verifies late actual payment and prese
       await f.call('runs/operations/records/shopify?kind=Refund&limit=100')
     ).items.filter((r) => r.data.order === f.providerOrderId).length;
     expect(count).toBe(1);
+
+    // The money proof each wait verified with, and every other cited read, resolves to one stored read.
+    const reads = await citedReturnReads(f, f.detail.case.id);
+    expect(reads.stored.map((row) => row.id)).toEqual(reads.cited);
+    const money = paid.episodes[0].evidenceRefs;
+    expect(money.length).toBeGreaterThan(0);
+    expect(reads.stored.filter((row) => money.includes(row.id))).toEqual(
+      money.map(() =>
+        expect.objectContaining({
+          purpose: 'settlement',
+          subject_id: refund.id,
+          document: expect.objectContaining({ completeness: 'complete' }),
+        }),
+      ),
+    );
   } finally {
     vi.useRealTimers();
   }

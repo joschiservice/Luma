@@ -265,3 +265,46 @@ export async function settlementFixture(
     evidence,
   };
 }
+
+/**
+ * Every provider read that a return case's verifications, audit entries, stored quotes and
+ * proofs, exchange checks and deadline waits cite, with the stored orders evidence each ID
+ * resolves to. References to the case itself and its revisions name Luma's own records and are
+ * left out.
+ */
+export async function citedReturnReads(f, caseId) {
+  const org = f.manifest.organizationId;
+  const refs = await f.db.owner.query(
+    `WITH proposals AS (
+       SELECT (document->>'actionId')::uuid AS id FROM orders_return_creations WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT (document->>'actionId')::uuid FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT (document->>'actionId')::uuid FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+     ), waits AS (
+       SELECT id::text AS id,document FROM orders_return_waits WHERE tenant_id=$1 AND case_id=$2
+     ), cited AS (
+       SELECT jsonb_array_elements_text(document->'attempt'->'verification'->'observationRefs') AS id
+         FROM executed_actions WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
+       UNION SELECT jsonb_array_elements_text(document->'result'->'observationRefs')
+         FROM execution_verifications WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
+       UNION SELECT jsonb_array_elements_text(document->'evidenceRefs') FROM audit_entries
+         WHERE tenant_id=$1 AND document->>'eventType' LIKE 'return%'
+           AND (document->>'correlationId'=$2::text OR document->>'correlationId' IN (SELECT id FROM waits))
+       UNION SELECT jsonb_array_elements_text(document->'evidenceRefs') FROM waits
+       UNION SELECT jsonb_array_elements_text(document->'quote'->'evidenceRefs') FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'proof'->'evidenceRefs') FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'quote'->'evidenceRefs') FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'proof'->'evidenceRefs') FROM orders_return_exchange_steps WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'availability'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
+       UNION SELECT jsonb_array_elements_text(document->'completion'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
+     )
+     SELECT id FROM cited WHERE id<>$2::text AND id NOT LIKE 'case:%' ORDER BY id`,
+    [org, caseId],
+  );
+  const cited = refs.rows.map((row) => row.id);
+  const stored = await f.db.owner.query(
+    'SELECT id,case_id,purpose,subject_id,document FROM orders_return_read_evidence WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id',
+    [org, cited],
+  );
+
+  return { cited, stored: stored.rows };
+}

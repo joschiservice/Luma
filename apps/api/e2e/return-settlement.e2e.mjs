@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  citedReturnReads,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
 
 it('separately verifies resale stock and a lost-response refund without restocking damaged units or duplicating money', async (t) => {
   const f = await settlementFixture(t);
@@ -197,6 +200,29 @@ it('separately verifies resale stock and a lost-response refund without restocki
     ),
   ).toHaveLength(1);
   expect((await request(path)).case.state).toBe('open');
+
+  // Every read the stock and refund quotes, proofs, verifications and audit cite is stored once.
+  const reads = await citedReturnReads(f, detail.case.id);
+  expect(reads.stored.map((row) => row.id)).toEqual(reads.cited);
+  const bySubject = (id) => reads.stored.filter((row) => row.subject_id === id);
+  expect(bySubject(stock.id).length).toBeGreaterThan(1);
+  expect(bySubject(refund.id).length).toBeGreaterThan(1);
+  for (const row of bySubject(stock.id))
+    expect(row).toMatchObject({
+      purpose: 'settlement',
+      document: {
+        source: { provider: 'jtl', resource: 'sku' },
+        completeness: 'complete',
+      },
+    });
+  for (const row of bySubject(refund.id))
+    expect(row).toMatchObject({
+      purpose: 'settlement',
+      document: {
+        source: { provider: 'shopify', connectionId: f.connectionId },
+        completeness: 'complete',
+      },
+    });
   // The same identity in another tenant cannot reveal or execute this action.
   const other = await f.pilot.app.inject({
     method: 'POST',

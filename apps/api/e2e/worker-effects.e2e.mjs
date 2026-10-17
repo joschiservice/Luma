@@ -5,7 +5,10 @@ import { expect, it } from 'vitest';
 
 import { inboxFixture } from './inbox-fixture.mjs';
 import { purchasingWorker } from './purchasing-worker-fixture.mjs';
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  citedReturnReads,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 // Background workers compose the same service graph as the API through applicationOptionsFor.
@@ -444,6 +447,27 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+
+  // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
+  const reads = await citedReturnReads(f, f.detail.case.id);
+  expect(reads.cited.length).toBeGreaterThan(1);
+  expect(reads.stored.map((row) => row.id).sort()).toEqual(
+    [...reads.cited].sort(),
+  );
+  for (const row of reads.stored)
+    expect(row).toMatchObject({
+      case_id: f.detail.case.id,
+      purpose: 'settlement',
+      subject_id: refund.id,
+      document: {
+        source: {
+          provider: 'shopify',
+          connectionId: f.connectionId,
+          resource: 'refund',
+        },
+        completeness: 'complete',
+      },
+    });
 });
 
 /** Makes a return write due for the follow-up pass, which rereads a write at most once a minute. */
@@ -520,6 +544,23 @@ it('refunds an approved return from the sync worker once and verifies it after a
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+
+  // Every read the quote, the verifications and the settlement audit cite resolves to stored evidence.
+  const reads = await citedReturnReads(f, f.detail.case.id);
+  expect(reads.cited.length).toBeGreaterThan(1);
+  expect(reads.stored.map((row) => row.id).sort()).toEqual(
+    [...reads.cited].sort(),
+  );
+  for (const row of reads.stored)
+    expect(row).toMatchObject({
+      purpose: 'settlement',
+      subject_id: refund.id,
+      document: {
+        caseId: f.detail.case.id,
+        source: { provider: 'shopify', connectionId: f.connectionId },
+        completeness: 'complete',
+      },
+    });
 });
 
 it('creates an approved return from the sync worker once and records it after a lost response and restart', async (t) => {
@@ -583,6 +624,30 @@ it('creates an approved return from the sync worker once and records it after a 
   expect(found.approvers).toEqual([f.manifest.requesterId]);
   expect(found).toMatchObject({ prepared: 1, completed: 1 });
   expect(found.reconciled).toBeGreaterThan(0);
+
+  // Every read the verifications and the creation audit cite resolves to the stored return read.
+  const reads = await citedReturnReads(f, f.detail.case.id);
+  expect(reads.cited.length).toBeGreaterThan(0);
+  expect(reads.stored.map((row) => row.id).sort()).toEqual(
+    [...reads.cited].sort(),
+  );
+  const created = await current();
+  for (const row of reads.stored)
+    expect(row).toMatchObject({
+      purpose: 'creation',
+      subject_id: creation.id,
+      document: {
+        caseId: f.detail.case.id,
+        source: {
+          provider: 'shopify',
+          connectionId: f.connectionId,
+          resource: 'return',
+          externalId: created.externalReturn.externalId,
+        },
+        completeness: 'complete',
+        data: { lumaCaseId: f.detail.case.id },
+      },
+    });
 });
 
 it('records an approved return refund that was never sent as expired once its approval ends', async (t) => {

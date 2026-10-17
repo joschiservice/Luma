@@ -2,7 +2,27 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
-import { settlementFixture } from './return-settlement-fixture.mjs';
+import {
+  citedReturnReads,
+  settlementFixture,
+} from './return-settlement-fixture.mjs';
+
+/**
+ * Every read the case's exchange steps, exchange operation, settlements and audit cite resolves
+ * to one stored, complete read; the operation's own reads are stored under its ID.
+ */
+async function expectStoredReads(f, operationId) {
+  const reads = await citedReturnReads(f, f.detail.case.id);
+  expect(reads.cited.length).toBeGreaterThan(0);
+  expect(reads.stored.map((row) => row.id)).toEqual(reads.cited);
+  for (const row of reads.stored)
+    expect(row).toMatchObject({
+      case_id: f.detail.case.id,
+      document: { caseId: f.detail.case.id, completeness: 'complete' },
+    });
+
+  return reads.stored.filter((row) => row.subject_id === operationId);
+}
 
 it('tracks an even exchange through lost responses without a second replacement fulfillment', async (t) => {
   const f = await settlementFixture(t, { resolution: 'exchange' }),
@@ -109,6 +129,7 @@ it('tracks an even exchange through lost responses without a second replacement 
   const caseView = await request(path);
   expect(caseView.case.state).toBe('open');
   expect(caseView.sourceReturn).not.toBeNull();
+  await expectStoredReads(f, body.operationId);
 });
 
 it('keeps a price difference unpaid and held until actual merchant payment and independently approved release', async (t) => {
@@ -188,6 +209,7 @@ it('keeps a price difference unpaid and held until actual merchant payment and i
     proof: { payment: 'paid', fulfillmentReady: true },
   });
   expect((await request(path)).case.state).toBe('open');
+  await expectStoredReads(f, operationId);
 });
 
 it('verifies a cheaper replacement refund only after actual money settlement and does not restock through Shopify', async (t) => {
@@ -260,6 +282,7 @@ it('verifies a cheaper replacement refund only after actual money settlement and
   const paid = await request(`${path}/exchange/steps/${process.id}/check`, {});
   expect(paid.proof.payment).toBe('paid');
   expect((await request(path)).case.state).toBe('open');
+  await expectStoredReads(f, operationId);
 });
 
 it('owns an unavailable replacement and hands off to refund only after governed cancellation without changing resale stock', async (t) => {
@@ -368,4 +391,10 @@ it('owns an unavailable replacement and hands off to refund only after governed 
       await f.call('runs/operations/records/jtl?kind=stock-change&limit=100')
     ).items.filter((r) => r.data.comment === `luma-rs:${stock.id}`),
   ).toHaveLength(1);
+  // The operation stores the read that showed the replacement unavailable.
+  const operationReads = await expectStoredReads(f, operationId);
+  expect(operationReads.map((row) => row.id)).toEqual(
+    expect.arrayContaining(current.operation.availability.evidenceRefs),
+  );
+  expect(operationReads[0]).toMatchObject({ purpose: 'exchange' });
 });
