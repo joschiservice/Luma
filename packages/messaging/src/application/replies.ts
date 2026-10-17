@@ -24,6 +24,7 @@ import {
   replySubject,
   stateMessages,
 } from '../domain/replies.js';
+import { type SendAcceptance, sendReceipt } from '../domain/send-receipts.js';
 import type { Address } from '../domain/threads.js';
 import type { AttachmentReader } from './document-ports.js';
 import type { Ingest } from './ingest.js';
@@ -1577,6 +1578,38 @@ export function createReplies(deps: ReplyDependencies) {
       );
     },
     forAction,
+    /**
+     * Stores the mailbox's acceptance of a reply send as messaging's send receipt and returns
+     * its ID, which execution cites. It records what already happened, so it does not recheck
+     * authority. Throws when the reply is unknown or the acceptance belongs to another mailbox;
+     * execution then cites nothing and the send stays uncertain until the thread is read.
+     */
+    async storeSendReceipt(
+      context: TenantContext,
+      outboundId: string,
+      acceptance: SendAcceptance,
+    ) {
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const outbound = await tx.outbound.get(outboundId);
+        if (
+          !outbound ||
+          outbound.connectionId !== acceptance.connectionId ||
+          acceptance.capability !== 'messages.send'
+        )
+          throw conflict('The receipt does not belong to this reply.');
+        const receipt = sendReceipt(
+          context.tenantId,
+          outbound,
+          deps.uuid(
+            `send-receipt:${context.tenantId}:${acceptance.idempotencyKey}`,
+          ),
+          acceptance,
+        );
+        await tx.outbound.recordSendReceipt(receipt);
+
+        return receipt.id;
+      });
+    },
     /**
      * Verification for the execution adapter: reads the thread again and looks for the message
      * with the Message-ID derived from the reply. New messages are stored as any thread read.

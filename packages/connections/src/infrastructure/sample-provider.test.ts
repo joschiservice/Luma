@@ -14,6 +14,7 @@ import type {
   CapabilityOutput,
 } from '../domain/capabilities.js';
 import { ConnectorError } from '../domain/capabilities.js';
+import type { WriteAcceptance } from '../domain/write-receipts.js';
 import { createSampleConnector } from './sample-provider.js';
 
 // Identity's brand and membership checks have their own tests; these fixtures isolate connector scoping.
@@ -351,6 +352,108 @@ it('withholds dispatch if adapter risk changes after policy resolution', async (
     adapter!.execute(intent, write.idempotencyKey),
   ).rejects.toMatchObject({ failure: { code: 'conflict', effect: 'none' } });
   expect(run).not.toHaveBeenCalled();
+});
+
+describe('owner-stored write receipts', () => {
+  const intent: EffectIntent = {
+    tenantId: context.tenantId,
+    connectionId: write.connectionId,
+    capability: write.capability,
+    capabilityVersion: '0',
+    target: { kind: 'sku', id: 'sku-a' },
+    parameters: {},
+    preconditions: { evidenceRefs: [], validUntil: '2026-09-18T00:00:00Z' },
+    expectedPostcondition: {},
+  };
+  const bind = (
+    runtime: ReturnType<typeof fixture>['runtime'],
+    storeReceipt: (
+      context: TenantContext,
+      intent: EffectIntent,
+      acceptance: WriteAcceptance,
+    ) => Promise<string>,
+  ) =>
+    runtime.effects({
+      capability: 'inventory.write',
+      map: async () => input,
+      checkPreconditions: async () => true,
+      verify: async () => ({
+        outcome: 'inconclusive',
+        observationRefs: [],
+        observedAt: '2026-09-17T00:00:00Z',
+        evaluatorVersion: '0',
+      }),
+      storeReceipt,
+    });
+
+  it('cites only the receipt the owner stored, with the normalized acceptance', async () => {
+    const { runtime } = fixture();
+    const stored: WriteAcceptance[] = [];
+    const adapter = await bind(runtime, async (_context, action, value) => {
+      expect(action).toEqual(intent);
+      stored.push(value);
+
+      return 'receipt-a';
+    }).resolve(context, intent);
+    const result = await adapter!.execute(intent, write.idempotencyKey);
+
+    expect(result).toEqual({
+      evidenceRefs: ['receipt-a'],
+      providerRequestId: null,
+    });
+    expect(stored).toEqual([
+      {
+        provider: 'sample',
+        connectionId: 'connection-a',
+        capability: 'inventory.write',
+        adapterVersion: 'sample/0',
+        dispatchIdentity: adapter!.dispatchIdentity,
+        idempotencyKey: write.idempotencyKey,
+        acceptedAt: expect.any(String),
+        providerRequestId: null,
+        records: [],
+      },
+    ]);
+  });
+
+  it('cites nothing and reports a dispatched, unknown write when the receipt cannot be stored', async () => {
+    const { runtime } = fixture();
+    const adapter = await bind(runtime, async () => {
+      throw new Error('storage unavailable');
+    }).resolve(context, intent);
+
+    await expect(
+      adapter!.execute(intent, write.idempotencyKey),
+    ).rejects.toMatchObject({
+      failure: {
+        code: 'internal',
+        effect: 'unknown',
+        retry: 'reconcile',
+        dispatch: 'dispatched',
+      },
+    });
+  });
+
+  it('stores nothing when the provider response is lost', async () => {
+    const { connection, runtime } = fixture();
+    vi.spyOn(
+      connection.capabilities['inventory.write']!,
+      'run',
+    ).mockRejectedValue(
+      new ConnectorError({
+        code: 'transient',
+        effect: 'unknown',
+        retry: 'reconcile',
+      }),
+    );
+    const storeReceipt = vi.fn(async () => 'receipt-a');
+    const adapter = await bind(runtime, storeReceipt).resolve(context, intent);
+
+    await expect(
+      adapter!.execute(intent, write.idempotencyKey),
+    ).rejects.toMatchObject({ failure: { effect: 'unknown' } });
+    expect(storeReceipt).not.toHaveBeenCalled();
+  });
 });
 
 it('carries a declared app permission to the resolved adapter', async () => {

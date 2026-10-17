@@ -9,7 +9,10 @@ import {
   type CommitmentTransaction,
   createSupplierCommitments,
 } from '../application/commitments.js';
-import type { PurchasingReadEvidence } from '../application/purchasing-reads.js';
+import type {
+  PurchasingReadEvidence,
+  PurchasingWriteReceipt,
+} from '../application/purchasing-reads.js';
 import type {
   Commitment,
   FollowUp,
@@ -87,6 +90,7 @@ export function commitmentFixture() {
   const submissions: Submission[] = [];
   const audits: AuditEntry[] = [];
   const reads = new Map<string, PurchasingReadEvidence>();
+  const receipts = new Map<string, PurchasingWriteReceipt>();
   const commands = new Map<string, { digest: string; result: unknown }>();
   const tx: CommitmentTransaction = {
     order: async (id) => (id === order.id ? order : null),
@@ -130,6 +134,10 @@ export function commitmentFixture() {
     recordRead: async (evidence) => {
       if (!reads.has(evidence.id))
         reads.set(evidence.id, structuredClone(evidence));
+    },
+    recordWriteReceipt: async (receipt) => {
+      if (!receipts.has(receipt.id))
+        receipts.set(receipt.id, structuredClone(receipt));
     },
     followUps: async () => followUps,
     insertFollowUp: async (value) => {
@@ -227,6 +235,7 @@ export function commitmentFixture() {
     submissions,
     audits,
     reads,
+    receipts,
     deps,
     request,
     now: (value: string) => {

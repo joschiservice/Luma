@@ -9,7 +9,10 @@ import type {
   PurchaseOrderChange,
   PurchaseOrderRevision,
 } from '../domain/purchase-order-changes.js';
-import { insertPurchasingRead } from './purchasing-reads.js';
+import {
+  insertPurchasingRead,
+  insertPurchasingWriteReceipt,
+} from './purchasing-reads.js';
 
 /** Commits immutable order revisions and audit under the procurement tenant lock. */
 export function createPurchaseOrderChangeStore(
@@ -178,6 +181,8 @@ export function createPurchaseOrderChangeStore(
           },
           recordRead: (evidence) =>
             insertPurchasingRead(tx, tenantId, evidence),
+          recordWriteReceipt: (receipt) =>
+            insertPurchasingWriteReceipt(tx, tenantId, receipt),
         });
       }),
   };

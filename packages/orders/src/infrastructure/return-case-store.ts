@@ -12,7 +12,7 @@ import type {
 import type { ReturnCase } from '../domain/return-cases.js';
 import type { ExchangeConsistencyReport } from '../domain/return-consistency.js';
 import type { ReturnCreation, SourceRef } from '../domain/return-creations.js';
-import { insertReturnRead } from './return-reads.js';
+import { insertReturnRead, insertReturnWriteReceipt } from './return-reads.js';
 
 type OrderData = Extract<CommerceData, { type: 'order' }>;
 
@@ -363,6 +363,8 @@ export function createReturnCaseStore(
           },
           audit: (entry) => log.append(entry),
           recordRead: (evidence) => insertReturnRead(tx, tenantId, evidence),
+          recordWriteReceipt: (receipt) =>
+            insertReturnWriteReceipt(tx, tenantId, receipt),
         });
       }),
   };

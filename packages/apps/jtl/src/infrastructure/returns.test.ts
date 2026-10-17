@@ -530,6 +530,7 @@ describe('JTL return creation', () => {
         status: 'accepted',
         evidenceRefs: [returnAcceptanceId('tenant-a', 'connection-a', '81')],
         providerRequestId: null,
+        records: [{ resource: 'return', externalId: '81' }],
       },
     });
     expect(f.posts).toHaveLength(1);

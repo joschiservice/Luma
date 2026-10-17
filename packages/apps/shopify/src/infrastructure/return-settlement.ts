@@ -11,6 +11,7 @@ import type {
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
+  acceptedRecordsSchema,
   returnSettlementProofSchema,
   returnSettlementQuotedSchema,
   returnSettlementQuoteSchema,
@@ -421,6 +422,7 @@ export function createShopifySettlementCapabilities(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().uuid()),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(v),
@@ -506,6 +508,7 @@ export function createShopifySettlementCapabilities(
           )
         ).evidenceRefs,
         providerRequestId: null,
+        records: [{ resource: 'refund', externalId: result.data.refund.id }],
       };
     },
   };

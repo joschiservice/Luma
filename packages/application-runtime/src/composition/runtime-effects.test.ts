@@ -167,6 +167,7 @@ const binding = {
     observedAt: new Date().toISOString(),
     evaluatorVersion: 'synthetic/1',
   }),
+  storeReceipt: async () => 'synthetic-receipt',
 };
 
 /** Resolves each provider-write family through a runtime's installed provider runtimes. */

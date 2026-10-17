@@ -13,6 +13,7 @@ import type {
   OutboundState,
   ReplyLanguage,
 } from '../domain/replies.js';
+import type { SendReceipt } from '../domain/send-receipts.js';
 import type {
   Address,
   MessageDocument,
@@ -400,6 +401,8 @@ export interface OutboundRepository {
   markMessageSent(messageId: string): Promise<void>;
   /** Supplier sends needing an owner handoff or a later read for delivery failures. */
   supplierChecks?(limit: number): Promise<OutboundRow[]>;
+  /** Stores a send receipt; an already stored receipt is kept unchanged. */
+  recordSendReceipt(receipt: SendReceipt): Promise<void>;
 }
 
 interface CommandRepository {

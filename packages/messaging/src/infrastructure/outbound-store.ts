@@ -120,5 +120,19 @@ export function outboundRepository(
         [tenantId, messageId],
       );
     },
+    async recordSendReceipt(receipt) {
+      await tx.query(
+        `INSERT INTO messaging_send_receipts(tenant_id,id,outbound_id,connection_id,accepted_at,document)
+        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+        [
+          tenantId,
+          receipt.id,
+          receipt.outboundId,
+          receipt.source.connectionId,
+          receipt.observedAt,
+          receipt,
+        ],
+      );
+    },
   };
 }

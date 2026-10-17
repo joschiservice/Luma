@@ -188,6 +188,8 @@ export function createReturnCreationEffects(
             observedAt: new Date().toISOString(),
             evaluatorVersion: 'return-case-creation/1',
           }),
+          storeReceipt: (current, _action, acceptance) =>
+            returnCases().storeWriteReceipt(current, creation.id, acceptance),
         })
         .resolve(context, intent);
     },

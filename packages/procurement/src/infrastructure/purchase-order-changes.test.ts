@@ -18,7 +18,10 @@ import {
   type PurchaseOrderChangeAdmission,
   type PurchaseOrderChangeStore,
 } from '../application/purchase-order-changes.js';
-import type { PurchasingReadEvidence } from '../application/purchasing-reads.js';
+import type {
+  PurchasingReadEvidence,
+  PurchasingWriteReceipt,
+} from '../application/purchasing-reads.js';
 import {
   defaultSupplierTerms,
   orderProgress,
@@ -161,7 +164,8 @@ function fixture() {
   };
   const changes = new Map<string, PurchaseOrderChange>(),
     revisions: PurchaseOrderRevision[] = [],
-    storedReads = new Map<string, PurchasingReadEvidence>();
+    storedReads = new Map<string, PurchasingReadEvidence>(),
+    storedReceipts = new Map<string, PurchasingWriteReceipt>();
   const store: PurchaseOrderChangeStore = {
     transaction: async (tenant, _write, fn) =>
       fn({
@@ -201,6 +205,10 @@ function fixture() {
         recordRead: async (evidence) => {
           if (!storedReads.has(evidence.id))
             storedReads.set(evidence.id, structuredClone(evidence));
+        },
+        recordWriteReceipt: async (receipt) => {
+          if (!storedReceipts.has(receipt.id))
+            storedReceipts.set(receipt.id, structuredClone(receipt));
         },
       }),
   };
@@ -314,6 +322,7 @@ function fixture() {
     changes,
     revisions,
     storedReads,
+    storedReceipts,
     admission,
     setPrepareFailure: (value: boolean) => {
       failPrepare = value;

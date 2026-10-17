@@ -1,4 +1,9 @@
-import type { SupplierOrderSnapshot } from '@luma/connections';
+import type {
+  SupplierOrderSnapshot,
+  WriteAcceptance,
+  WriteReceiptEvidence,
+} from '@luma/connections';
+import { writeReceiptEvidence } from '@luma/connections';
 
 import type { PurchasingOrder } from './commitments.js';
 
@@ -58,5 +63,33 @@ export function purchasingReadEvidence(
     adapterVersion: read.adapterVersion,
     completeness: read.completeness,
     data: read.data,
+  };
+}
+
+/**
+ * The receipt of a purchasing-system write procurement dispatched for a submission or an order
+ * revision. Its ID is the reference the execution attempt and its audit entry cite.
+ */
+export interface PurchasingWriteReceipt extends WriteReceiptEvidence {
+  tenantId: string;
+  purchaseOrderId: string;
+  purpose: PurchasingReadEvidence['purpose'];
+  subjectId: string;
+}
+
+/** Builds the stored receipt for one accepted purchasing-system write under the given ID. */
+export function purchasingWriteReceipt(
+  tenantId: string,
+  purchaseOrderId: string,
+  subject: { purpose: PurchasingReadEvidence['purpose']; id: string },
+  id: string,
+  acceptance: WriteAcceptance,
+): PurchasingWriteReceipt {
+  return {
+    ...writeReceiptEvidence(id, acceptance),
+    tenantId,
+    purchaseOrderId,
+    purpose: subject.purpose,
+    subjectId: subject.id,
   };
 }

@@ -14,6 +14,7 @@ import {
   type SupplierOrderStatus,
   type SupplierSnapshot,
 } from '@luma/connections';
+import { acceptedRecordsSchema } from '@luma/connections/adapters';
 import {
   API_VERSION,
   createClient,
@@ -498,6 +499,7 @@ export function createJtlPurchaseOrderCapabilities(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().min(1)).length(1),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(value),
@@ -606,6 +608,12 @@ export function createJtlPurchaseOrderCapabilities(
           ),
         ],
         providerRequestId,
+        records: [
+          {
+            resource: 'purchase_order',
+            externalId: String(created.data.purchaseOrderId),
+          },
+        ],
       };
     },
   };

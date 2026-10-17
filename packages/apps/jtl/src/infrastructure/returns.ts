@@ -14,6 +14,7 @@ import {
   type ReturnOptionSnapshot,
   type SourceIdentity,
 } from '@luma/connections';
+import { acceptedRecordsSchema } from '@luma/connections/adapters';
 import {
   API_VERSION,
   createClient,
@@ -399,6 +400,7 @@ export function createJtlReturnCapabilities(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().min(1)).length(1),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(value),
@@ -488,6 +490,7 @@ export function createJtlReturnCapabilities(
           ),
         ],
         providerRequestId,
+        records: [{ resource: 'return', externalId: String(accepted.data.id) }],
       };
     },
   };

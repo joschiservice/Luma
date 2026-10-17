@@ -22,6 +22,7 @@ import {
 import type { CapabilityInput } from '../../domain/capabilities.js';
 import { ConnectorError } from '../../domain/capabilities.js';
 import type { InstallationCapability } from '../../domain/installation.js';
+import type { WriteAcceptance } from '../../domain/write-receipts.js';
 
 export interface InstalledRuntimeOptions extends ProviderRuntimeOptions {
   providers: readonly ConnectionProvider[];
@@ -152,6 +153,19 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
   return Object.freeze({ read: runtime.read, discover: runtime.discover });
 }
 
+/**
+ * Stores a provider's write acceptance as the owner's receipt, in the tenant's transaction, and
+ * returns the receipt ID that execution cites. Owner-bound provider writes must store receipts.
+ * @public Declaration emit names it in the binding interfaces that extend it.
+ */
+export interface WriteReceiptStore {
+  storeReceipt(
+    context: TenantContext,
+    intent: EffectIntent,
+    acceptance: WriteAcceptance,
+  ): Promise<string>;
+}
+
 /** Supplies shipping-method effects through the same installation-gated runtime. */
 export function createInstalledShippingMethodEffects(
   options: InstalledRuntimeOptions,
@@ -161,7 +175,7 @@ export function createInstalledShippingMethodEffects(
 }
 
 /** Maps revision operations to the same installation-controlled runtime as submissions. */
-export interface PurchaseOrderRevisionBinding {
+export interface PurchaseOrderRevisionBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,
@@ -177,7 +191,7 @@ export interface PurchaseOrderRevisionBinding {
 }
 
 /** Maps, prechecks and verifies purchase-order submissions; the runtime fixes the capability. */
-export interface PurchaseOrderSubmissionBinding {
+export interface PurchaseOrderSubmissionBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,
@@ -216,7 +230,7 @@ export type InstalledPurchaseOrderRuntime = ReturnType<
 >;
 
 /** Maps, prechecks and verifies message sends; the runtime fixes the capability. */
-export interface MessageSendBinding {
+export interface MessageSendBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,
@@ -253,7 +267,7 @@ export type InstalledMessageRuntime = ReturnType<
 >;
 
 /** Maps, prechecks and verifies return creation; the runtime fixes the capability. */
-export interface ReturnCreationBinding {
+export interface ReturnCreationBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,
@@ -269,7 +283,7 @@ export interface ReturnCreationBinding {
 }
 
 /** Maps a frozen settlement to its fixed, governed provider capability. */
-export interface ReturnSettlementBinding {
+export interface ReturnSettlementBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,
@@ -285,7 +299,7 @@ export interface ReturnSettlementBinding {
 }
 
 /** Maps and independently verifies one frozen exchange step through its fixed provider capability. */
-export interface ReturnExchangeBinding {
+export interface ReturnExchangeBinding extends WriteReceiptStore {
   map(
     context: TenantContext,
     intent: EffectIntent,

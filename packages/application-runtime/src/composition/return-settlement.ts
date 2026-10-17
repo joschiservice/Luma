@@ -97,6 +97,8 @@ export function createReturnSettlementEffects(
               observedAt: new Date().toISOString(),
               evaluatorVersion: 'return-settlement/1',
             }),
+            storeReceipt: (current, _action, acceptance) =>
+              actions().storeWriteReceipt(current, bound.value.id, acceptance),
           },
         )
         .resolve(context, intent);

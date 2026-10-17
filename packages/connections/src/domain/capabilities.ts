@@ -584,11 +584,23 @@ export interface RefundSnapshot {
   transactions: RefundTransaction[];
 }
 
-/** Acceptance is not proof that the expected business state was reached. */
+/** A provider record that an accepted write created or changed, as the response named it. */
+export interface AcceptedRecord {
+  resource: string;
+  externalId: string;
+}
+
+/**
+ * Acceptance is not proof that the expected business state was reached. `evidenceRefs` name
+ * receipts the adapter stored itself; when an owner binding stores the receipt, execution cites
+ * the owner's receipt ID instead.
+ */
 export interface WriteReceipt {
   status: 'accepted';
   evidenceRefs: string[];
   providerRequestId: string | null;
+  /** Provider records the response named; absent when the adapter reports none. */
+  records?: AcceptedRecord[];
 }
 
 /** A supplier in the merchant's purchasing system. Contact details are descriptive only. */

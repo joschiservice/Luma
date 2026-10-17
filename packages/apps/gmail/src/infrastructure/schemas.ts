@@ -1,3 +1,4 @@
+import { acceptedRecordsSchema } from '@luma/connections/adapters';
 import { gmailId, mailboxFilter } from '@luma/connector-gmail';
 import { z } from 'zod';
 
@@ -176,6 +177,7 @@ const receipt = z
     status: z.literal('accepted'),
     evidenceRefs: z.array(z.string().uuid()).length(1),
     providerRequestId: z.null(),
+    records: acceptedRecordsSchema,
   })
   .strict();
 

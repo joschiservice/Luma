@@ -167,6 +167,8 @@ export function createReplyEffects(
             ...(await replies().verify(current, intent.target.id)),
             evaluatorVersion: 'message-reply/2',
           }),
+          storeReceipt: (current, _action, acceptance) =>
+            replies().storeSendReceipt(current, intent.target.id, acceptance),
         })
         .resolve(context, intent);
     },

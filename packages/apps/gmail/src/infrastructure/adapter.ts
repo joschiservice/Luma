@@ -481,6 +481,10 @@ export function createGmailConnector(
               sentEvidenceId(options.tenantId, options.connectionId, sent.id),
             ],
             providerRequestId: null,
+            records: [
+              { resource: 'message', externalId: sent.id },
+              { resource: 'thread', externalId: sent.threadId },
+            ],
           } satisfies WriteReceipt;
         },
       ),

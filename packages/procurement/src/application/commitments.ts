@@ -41,7 +41,10 @@ import type {
   StoredPurchaseOrderSort,
 } from './lists.js';
 import type { ProcurementEvent } from './procurement.js';
-import type { PurchasingReadEvidence } from './purchasing-reads.js';
+import type {
+  PurchasingReadEvidence,
+  PurchasingWriteReceipt,
+} from './purchasing-reads.js';
 
 /**
  * A connection that can act as a purchasing system.
@@ -232,6 +235,8 @@ export interface CommitmentTransaction {
   insertObservation(observation: PurchasingObservation): Promise<void>;
   /** Stores a cited purchasing-system read; an already stored read is kept unchanged. */
   recordRead(evidence: PurchasingReadEvidence): Promise<void>;
+  /** Stores a write receipt; an already stored receipt is kept unchanged. */
+  recordWriteReceipt(receipt: PurchasingWriteReceipt): Promise<void>;
   followUps(orderIds?: string[]): Promise<FollowUp[]>;
   /** Returns false when the key was already answered. */
   insertFollowUp(followUp: FollowUp): Promise<boolean>;
@@ -417,6 +422,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     tick: execution.tick,
     eligible: execution.eligible,
     verify: execution.verify,
+    storeWriteReceipt: execution.storeWriteReceipt,
     submissionForAction: execution.submissionForAction,
   };
 }

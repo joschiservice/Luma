@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { WriteAcceptance } from '@luma/connections';
 import { describe, expect, it } from 'vitest';
 
 import type { PurchasingOrder } from '../application/commitments.js';
@@ -178,5 +179,62 @@ describe('submission verification evidence', () => {
       observationRefs: [],
     });
     expect(f.reads.size).toBe(0);
+  });
+});
+
+describe('submission write receipts', () => {
+  const acceptance = (connectionId: string): WriteAcceptance => ({
+    provider: 'jtl',
+    connectionId,
+    capability: 'purchase-orders.submit',
+    adapterVersion: 'jtl-wawi/2.2',
+    dispatchIdentity: '["jtl","jtl-wawi/2.2"]',
+    idempotencyKey: 'v0:submission-action',
+    acceptedAt: observedAt,
+    providerRequestId: 'jtl-request-1',
+    records: [{ resource: 'purchase_order', externalId: '50' }],
+  });
+
+  it('stores the accepted submission under the ID execution cites', async () => {
+    const f = fixture();
+    const id = await f.service.storeWriteReceipt(
+      f.context(),
+      f.submission.id,
+      acceptance(f.connectionId),
+    );
+    expect([...f.receipts.values()]).toEqual([
+      {
+        kind: 'write_receipt',
+        id,
+        tenantId: f.order.tenantId,
+        purchaseOrderId: f.order.id,
+        purpose: 'submission',
+        subjectId: f.submission.id,
+        source: { provider: 'jtl', connectionId: f.connectionId },
+        capability: 'purchase-orders.submit',
+        adapterVersion: 'jtl-wawi/2.2',
+        dispatchIdentity: '["jtl","jtl-wawi/2.2"]',
+        idempotencyKey: 'v0:submission-action',
+        observedAt,
+        status: 'accepted',
+        providerRequestId: 'jtl-request-1',
+        records: [{ resource: 'purchase_order', externalId: '50' }],
+      },
+    ]);
+  });
+
+  it('refuses an acceptance from another connection or capability', async () => {
+    const f = fixture();
+    for (const value of [
+      acceptance(randomUUID()),
+      {
+        ...acceptance(f.connectionId),
+        capability: 'purchase-orders.revise' as const,
+      },
+    ])
+      await expect(
+        f.service.storeWriteReceipt(f.context(), f.submission.id, value),
+      ).rejects.toThrow('The receipt does not belong to this submission.');
+    expect(f.receipts.size).toBe(0);
   });
 });

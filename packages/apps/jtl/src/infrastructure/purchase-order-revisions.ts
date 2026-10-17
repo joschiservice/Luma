@@ -6,6 +6,7 @@ import {
   type ConnectorFailure,
   type SupplierOrderSnapshot,
 } from '@luma/connections';
+import { acceptedRecordsSchema } from '@luma/connections/adapters';
 import { purchaseOrderRevisionInputSchema } from '@luma/connections/composition';
 import { createClient, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
@@ -60,6 +61,7 @@ export function createJtlPurchaseOrderRevision(
           status: z.literal('accepted'),
           evidenceRefs: z.array(z.string().uuid()).length(1),
           providerRequestId: z.string().nullable(),
+          records: acceptedRecordsSchema,
         })
         .strict()
         .parse(output),
@@ -191,6 +193,9 @@ export function createJtlPurchaseOrderRevision(
           `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`,
         ],
         providerRequestId,
+        records: [
+          { resource: 'purchase_order', externalId: input.order.externalId },
+        ],
       };
     },
   };

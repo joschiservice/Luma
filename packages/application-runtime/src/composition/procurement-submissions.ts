@@ -191,6 +191,8 @@ export function createSubmissionEffects(
             ...(await commitments().verify(current, submission.id)),
             evaluatorVersion: 'purchase-order-submission/1',
           }),
+          storeReceipt: (current, _action, acceptance) =>
+            commitments().storeWriteReceipt(current, submission.id, acceptance),
         })
         .resolve(context, intent);
     },

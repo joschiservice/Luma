@@ -152,7 +152,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
           executor: { kind: 'connector', id: 'fake-mailbox' },
           checkPreconditions: (action) =>
             binding.checkPreconditions(ctx, action),
-          async execute() {
+          async execute(action, idempotencyKey) {
             const messageId = `luma.${input.outboundId}@shop.example`;
             if (!mailbox.some((m) => m.data.rfcMessageId === messageId)) {
               sends.push(input.outboundId);
@@ -192,8 +192,28 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
               });
             }
             if (loseResponse) throw new Error('connection lost after send');
+            // Like the installed runtime: the owner stores the acceptance and its ID is cited.
+            const sent = mailbox.find(
+              (m) => m.data.rfcMessageId === messageId,
+            )!;
 
-            return { evidenceRefs: [randomUUID()] };
+            return {
+              evidenceRefs: [
+                await binding.storeReceipt(ctx, action, {
+                  provider: 'gmail',
+                  connectionId: action.connectionId,
+                  capability: 'messages.send',
+                  adapterVersion: 'fake-mailbox/1',
+                  dispatchIdentity: 'fake-mailbox/1',
+                  idempotencyKey,
+                  acceptedAt: new Date().toISOString(),
+                  providerRequestId: null,
+                  records: [
+                    { resource: 'message', externalId: sent.providerMessageId },
+                  ],
+                }),
+              ],
+            };
           },
           verify: (action) => binding.verify(ctx, action),
         };
@@ -818,9 +838,81 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     expect(detail.events.map((e) => e.type)).toEqual(
       expect.arrayContaining(['reply_requested', 'sent']),
     );
-    expect(
-      (await safety.execution.get(alice(), (await action(reply.id))!))?.state,
-    ).toBe('succeeded');
+    const executed = await safety.execution.get(
+      alice(),
+      (await action(reply.id))!,
+    );
+    expect(executed?.state).toBe('succeeded');
+
+    // The cited send receipt resolves to exactly one stored, append-only, tenant-scoped row.
+    const refs =
+      executed && 'record' in executed
+        ? (executed.record.attempt.effectEvidenceRefs ?? [])
+        : [];
+    expect(refs).toHaveLength(1);
+    const database = createTenantDatabase(runtime);
+    await database.transaction(tenant, async (tx) => {
+      const stored = await tx.query<{
+        id: string;
+        outbound_id: string;
+        connection_id: string;
+        document: Record<string, unknown>;
+      }>(
+        'SELECT id,outbound_id,connection_id,document FROM messaging_send_receipts WHERE id=ANY($1::uuid[])',
+        [refs],
+      );
+      expect(stored.rows).toEqual([
+        {
+          id: refs[0],
+          outbound_id: reply.id,
+          connection_id: connectionId,
+          document: expect.objectContaining({
+            kind: 'write_receipt',
+            tenantId: tenant,
+            outboundId: reply.id,
+            status: 'accepted',
+            source: { provider: 'gmail', connectionId },
+            idempotencyKey: expect.stringContaining((await action(reply.id))!),
+            records: [{ resource: 'message', externalId: expect.any(String) }],
+          }),
+        },
+      ]);
+      // Recipients, subject and text are never part of the receipt.
+      expect(JSON.stringify(stored.rows[0]!.document)).not.toContain(
+        'checking this for you',
+      );
+    });
+    for (const statement of [
+      'DELETE FROM messaging_send_receipts WHERE id=$1',
+      "UPDATE messaging_send_receipts SET document=document||'{}' WHERE id=$1",
+    ])
+      await expect(
+        database.transaction(tenant, (tx) =>
+          tx.query(statement, refs).then(() => {}),
+        ),
+      ).rejects.toThrow('permission denied');
+    await database.transaction(otherTenant, async (tx) => {
+      expect(
+        (await tx.query('SELECT id FROM messaging_send_receipts')).rows,
+      ).toEqual([]);
+    });
+    await expect(
+      database.transaction(otherTenant, (tx) =>
+        tx
+          .query(
+            `INSERT INTO messaging_send_receipts(tenant_id,id,outbound_id,connection_id,accepted_at,document)
+             VALUES($1,$2,$3,$4,now(),$5)`,
+            [
+              tenant,
+              randomUUID(),
+              reply.id,
+              connectionId,
+              { tenantId: tenant, outboundId: reply.id },
+            ],
+          )
+          .then(() => {}),
+      ),
+    ).rejects.toThrow('row-level security');
   });
 
   it('ignores cached matches when a fresh read is empty or incomplete', async () => {
@@ -1010,6 +1102,25 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     await messaging.replies.check(alice(), reply.id);
     await messaging.replies.pass(alice());
     expect(await sendCount(reply.id)).toBe(1);
+
+    // A lost response has no receipt: nothing is stored and the attempt cites none.
+    const executed = await safety.execution.get(
+      alice(),
+      (await action(reply.id))!,
+    );
+    expect(
+      executed && 'record' in executed
+        ? (executed.record.attempt.effectEvidenceRefs ?? [])
+        : null,
+    ).toEqual([]);
+    expect(
+      (
+        await owner.query(
+          'SELECT id FROM messaging_send_receipts WHERE tenant_id=$1 AND outbound_id=$2',
+          [tenant, reply.id],
+        )
+      ).rows,
+    ).toEqual([]);
   });
 
   it('settles an uncertain send in the background pass by reading only', async () => {
