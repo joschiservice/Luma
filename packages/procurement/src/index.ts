@@ -43,10 +43,7 @@ export type { FollowUp, Submission } from './domain/commitments.js';
 
 export type { PurchaseOrder } from './domain/procurement.js';
 
-export type {
-  NativeReceiptStage,
-  PurchasingTimelineEntry,
-} from './domain/purchasing-timeline.js';
+export type { PurchasingTimelineEntry } from './domain/purchasing-timeline.js';
 
 export {
   nativeReceiptEntryId,
