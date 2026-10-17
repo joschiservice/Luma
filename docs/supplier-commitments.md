@@ -40,9 +40,12 @@ Approval dispatches immediately as the requester through a resolved workflow con
 approver gains no execution authority. The background pass also dispatches approved
 submissions. Execution reserves `v0:<action ID>` before dispatch; the JTL adapter derives
 its `Idempotency-Key` from it and refuses to post while an order with the same marker
-exists. Adapter acceptance is not the outcome: verification reads JTL independently. An
-uncertain dispatch stays `uncertain` and only ever reconciles by reading. A verified draft
-moves to open with an audited reason.
+exists. Adapter acceptance is not the outcome: verification reads JTL independently. Only a
+complete read that finds exactly one matching order passes; two matching orders fail, and a
+partial read is inconclusive. Procurement stores every read that verification or the
+submission audit cites, with the connection, source order, read time and completeness, so
+each cited ID resolves to that read. An uncertain dispatch stays `uncertain` and only ever
+reconciles by reading. A verified draft moves to open with an audited reason.
 
 Live JTL installations are not granted `purchase-orders.submit` until a sandbox smoke test
 confirms the write; simulated installations are.
@@ -119,7 +122,8 @@ is Open or Released. These writes have no provider idempotency guarantee. An exe
 attempt is recorded before dispatch and sent once; after uncertainty or process restart,
 Luma reconciles through an independent read. It appends the previous and new local revisions
 only after the full requested source shape is verified. An incomplete or stale read does not
-advance the local revision. Local lifecycle transitions cannot run while a revision awaits
+advance the local revision. The read that verification, the revision and its audit cite is
+stored the same way as a submission's. Local lifecycle transitions cannot run while a revision awaits
 approval or verification.
 
 JTL-Wawi 2.2 does not expose purchase-order cancellation. Marking a source order Completed

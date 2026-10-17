@@ -57,9 +57,13 @@ worker's return step follow-up also reads sent refunds and exchange processing w
 return money. No worker activity proposes or approves these writes; it only executes or
 reconciles the bound action under its recorded approval.
 
-Provider runtimes record no capability telemetry and keep no read observations. Each owner
-stores the evidence it uses, such as procurement's purchase-order observations, so
-verification does not depend on the runtime that read.
+Provider runtimes record no capability telemetry and keep no read observations, so a read's
+ID resolves only where its owner stored it. Owners that cite reads as verification evidence
+store them in their own tables, in the tenant's transaction, before returning the result:
+Shopify corrections and fulfillment recovery, Starshipit updates, and procurement's submission
+and revision reads. Mailbox verification cites the messages and outgoing send it stored.
+Return creation, settlement and exchange verification cite provider reads that are not
+stored, so those IDs do not resolve to evidence.
 
 ## Observe-only
 
@@ -143,7 +147,9 @@ certainty explicitly. Provider request IDs are kept in the attempt and completio
 when supplied.
 
 Verification performs a fresh authoritative read, checks the expected postcondition and
-returns the outcome, observation IDs, observation time and evaluator version. Observations
+returns the outcome, observation IDs, observation time and evaluator version. Each returned
+observation ID must name a read the owner has already stored with its source identity, read
+time and completeness; a verifier that cannot store a read must not cite it. Observations
 predating the attempt, malformed responses and thrown reads produce an unknown outcome;
 only a passed check is success. The verifier must prove the selected business postcondition: a
 corrected shipping method, for example, does not prove that fulfillment resumed. Closing
