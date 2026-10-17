@@ -7,6 +7,25 @@ retries, restarts and redelivery never dispatch a second write. `@luma/policies`
 `@luma/execution` and `@luma/audit` own the rules; `@luma/application-runtime` composes
 them with identity, an eligibility reader and the trusted effect registry.
 
+```mermaid
+flowchart TD
+  step["Run step by reference"] --> admission{"Admission: artifact, authority, eligibility"}
+  admission -->|fails| stop["Rejected, no effect"]
+  admission -->|passes| mode{"Write mode"}
+  mode -->|observe_only| notExecuted["not_executed, reason observe_only"]
+  mode -->|writes_enabled| policy{"Policy decision"}
+  policy -->|denied| denied["denied"]
+  policy -->|approval_required| approval{"Approval response"}
+  approval -->|"rejected or expired"| newProposal["Needs a new proposal"]
+  approval -->|approved| policy
+  policy -->|allowed| reserve["Reserve the single attempt"]
+  reserve --> audit["Prepared event reaches audit"]
+  audit --> recheck{"Recheck admission, mode and preconditions"}
+  recheck -->|changed| withheld["Withheld, not_dispatched"]
+  recheck -->|unchanged| dispatch["Dispatch to provider"]
+  dispatch --> verify["Fresh authoritative read checks the postcondition"]
+```
+
 ## Action admission
 
 Callers execute a run step by reference only (`runId`, `stepId`). Passing a proposal,
@@ -118,6 +137,23 @@ either side of the provider call. A withheld call records `not_dispatched`, an a
 response `dispatched`. Thrown calls stay uncertain unless the adapter reports dispatch
 certainty explicitly. Provider request IDs are kept in the attempt and completion audit
 when supplied.
+
+```mermaid
+stateDiagram-v2
+  [*] --> prepared: reservation, uncertain and pending
+  prepared --> failed: not dispatched, or verification failed
+  prepared --> unknown: dispatch or verification inconclusive
+  prepared --> succeeded: verification or reconciliation passed
+  unknown --> succeeded: reconciliation read passed
+  succeeded --> [*]
+  failed --> [*]
+  note right of unknown
+    Callers see reconciliation_required
+    for prepared and unknown. Negative or
+    inconclusive reads keep the attempt
+    blocked; nothing redispatches.
+  end note
+```
 
 Verification performs a fresh authoritative read, checks the expected postcondition and
 returns the outcome, observation IDs, observation time and evaluator version. Observations

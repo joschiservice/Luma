@@ -123,6 +123,21 @@ Failure decisions hash the seed, the request identity and how often that request
 
 Each incident kind in `@luma/simulator-core` declares the case class Luma should open, or none where Luma shows it elsewhere or has no rule yet. Incidents emerge at the chaos rates or are injected from the panel or API. Stock and provider incidents start immediately; order incidents place a new order that carries the incident and stay **planned** until the order reaches the affected step. **Recover** repairs the cause the way the merchant would. Drift incidents also end on their own when the shop matches JTL again, for example after Luma's governed stock correction. **Stock sync stalled** stops the stock sync to one shop for every SKU; ERP changes queue and reach the shop only on **Recover**. It runs only when injected.
 
+```mermaid
+stateDiagram-v2
+  [*] --> active: stock or provider incident starts
+  [*] --> planned: order incident placed
+  planned --> active: order reaches the affected step
+  planned --> recovered: Recover
+  active --> recovered: Recover
+  active --> recovered: condition clears, such as drift corrected through Luma
+  recovered --> [*]
+```
+
+Recovery is idempotent: recovering a `recovered` incident changes nothing. The incident's
+status is ground truth about the merchant world; whether Luma noticed is the scorecard's
+question.
+
 Ground truth stays in the simulator database. The scorecard compares it with Luma's cases, which the pilot lists through a simulator-only API route:
 
 - **Detected:** a case of the expected class with the incident's provider records or connection in its evidence. Time to detect counts from the incident's start.
@@ -175,6 +190,6 @@ The control API at `/api` requires the bearer token (`LUMA_SIMULATOR_TOKEN`), an
 
 - **Provider behavior** belongs to `@luma/simulator-shopify`, `@luma/simulator-jtl`, `@luma/simulator-cin7` and `@luma/simulator-gmail`. Simulator packages depend only on simulator core, so the host composes the Cin7 account with the JTL package's ERP model. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Simulator compatibility does not prove live-provider compatibility.
 - **Merchant behavior** belongs to the simulator engine, profile data to `@luma/simulator-commerce` and failure decisions to `@luma/simulator-core`.
-- **New incident kinds** need a kind entry, a start in the engine, a recovery, and an expected case class once a detector exists. Follow the [operational scenario recipe](adding-operational-scenarios.md).
+- **New incident kinds** need a kind entry, a start in the engine, a recovery, and an expected case class once a detector exists. Follow the [add-operational-scenario](../.agents/skills/add-operational-scenario/SKILL.md) skill.
 
 Platform tests use `setupSimulator(t)`: a disposable simulator database, a paused `test` run with `calm` failures, and a workspace. They advance time and call `pilot.observe()` explicitly. `observe()` waits for Shopify bulk exports still being prepared, so later provider changes aren't hidden behind an import that finishes from an older export.

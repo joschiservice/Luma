@@ -29,13 +29,18 @@ it has to confirm a sent order. Link changes are revision-checked and audited.
 
 ## Lifecycle
 
-All new orders start as drafts.
+All new orders start as drafts. Only Luma-owned orders change state locally.
 
-| From               | Allowed next states |
-| ------------------ | ------------------- |
-| Draft              | Open, Cancelled     |
-| Open               | Closed, Cancelled   |
-| Closed / Cancelled | None                |
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> open: opened, or a verified submission
+  draft --> cancelled
+  open --> closed
+  open --> cancelled
+  closed --> [*]
+  cancelled --> [*]
+```
 
 Opening records an operational commitment; it does not send the order. A verified
 submission moves a draft to open. Closing records completion, not receipt; receipt is read

@@ -52,8 +52,27 @@ retains the replaced diff during renewal so the person can compare it with the f
 
 ## Decisions
 
-Escalation and manual closure need `issues.manage` (**Work on issues**). Approval and rejection need `decisions.respond` and an
-approver who is not the proposal's requester. On submission the server checks membership,
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Desk as Case desk (API)
+  participant DB as PostgreSQL
+  participant Workflow as Waiting workflow
+  Client->>Desk: GET review
+  Desk-->>Client: revisions, proposal, decisionId, permittedDecisions
+  Client->>Desk: POST decision with commandId and reason
+  Desk->>Desk: Recheck membership, role, revisions, policy, expiry, preconditions
+  Desk->>DB: One transaction: decision, audit, receipt
+  Desk--)Workflow: Approve or reject: best-effort wake-up after commit
+  Desk-->>Client: Receipt
+  Workflow->>DB: Read committed response (wake-up or 30-second poll)
+  Note over Client,Desk: After a timeout, read the receipt by commandId or resend the identical body
+```
+
+Escalation and manual closure need `issues.manage` (**Work on issues**). Approval and
+rejection need `decisions.respond`; when the workspace
+[requires independent approval](workspace-settings.md#approval-preference), the approver
+must not be the proposal's requester. On submission the server checks membership,
 role, current case and diagnosis revisions, the immutable proposal ID and version, policy
 decision and version, expiry and current capability preconditions again. Unknown or
 unavailable capabilities cannot be approved.

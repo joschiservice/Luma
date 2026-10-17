@@ -60,6 +60,33 @@ function main(input, luma) {
 
 ## Replay, approval and cancellation
 
+```mermaid
+sequenceDiagram
+  participant P as Process runtime
+  participant H as Code host
+  participant S as Sandbox
+  participant D as Domain adapter
+  P->>H: run Code Step
+  H->>H: authorize, bind inputs and fixed time
+  H->>S: main(input, luma)
+  S->>H: luma.request("grant-id")
+  H->>H: refresh authorization, check the grant
+  alt reply already journaled
+    H-->>S: saved reply
+  else new request
+    H->>D: granted read, or action through Action Admission
+    alt approval pending
+      H-->>P: awaiting_approval, sandbox released
+    else accepted and verified
+      D-->>H: verified values and evidence
+      H->>H: journal the reply
+      H-->>S: reply
+    end
+  end
+  S-->>H: returned fields
+  H-->>P: outputs with artifact and input hashes
+```
+
 The host refreshes authorization before each request. Inputs and the fixed time are bound
 before the first call, and replies are journaled in order before code resumes. A retry
 replays saved replies and reuses the existing action identity. Inputs and replies use

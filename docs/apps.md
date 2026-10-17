@@ -76,7 +76,11 @@ write capability requires the app's `actions.execute` scope. Installations store
 manifest's permission definitions, so roles can show permissions of a missing app
 package; those grant nothing. See [ADR-009](architecture/009-permissions-and-roles.md).
 
-## Add an app
+## App package contract
+
+Every app package meets these requirements. The
+[add-workspace-app](../.agents/skills/add-workspace-app/SKILL.md) skill covers the full
+procedure, including the protocol client, simulator, pilot and tests.
 
 1. Create `packages/apps/<app-id>` exporting `createApp(context): AppDefinition`. Use the
    same stable ID for the directory, manifest and connector contribution. Validate

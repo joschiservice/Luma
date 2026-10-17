@@ -11,6 +11,22 @@ provides durability. Workflows must not depend on Resolution or Exceptions. Reso
 definitions keep their own interpreter and format; see
 [Resolution workflows](resolution-playbooks.md).
 
+```mermaid
+flowchart TD
+  draft["Draft"] -->|"validate, publish"| version["Immutable version"]
+  version -->|"activate with grants"| activation["Activation"]
+  trigger["Trigger start"] --> run["Run bound to version, subject and snapshot"]
+  activation --> run
+  run --> action["Action step"]
+  action --> admission["Action Admission"]
+  admission -->|"denied or rejected"| stopped["Run ends without the effect"]
+  admission -->|"approved, dispatched"| verification["Independent verification"]
+  verification --> outcome["verified, failed or inconclusive"]
+```
+
+Each arrow is a separate authority check: publishing does not activate, a trigger does not
+admit an action, and a dispatch does not verify its outcome.
+
 ## Contracts
 
 A version's digest covers its complete contract: trigger, subject kind, typed inputs and
@@ -161,6 +177,23 @@ Legacy starts continue to use the version's trigger when no subscription is supp
 Each version declares one trigger: `manual`, `schedule` (one UTC `at` time), `event` (its
 context kind is the event type), `condition` (one declared context field against a typed
 scalar) or `exception`. Trigger delivery is explicit; it grants no authority.
+
+A start is stored as a trigger run before any process step runs:
+
+```mermaid
+stateDiagram-v2
+  [*] --> scheduled: schedule trigger
+  [*] --> awaiting_admission: manual, event, condition or exception
+  scheduled --> awaiting_admission: due, workspace active
+  scheduled --> skipped: due, workspace suspended or closed
+  scheduled --> cancelled
+  awaiting_admission --> cancelled: before the first admitted action, or at a human or event wait
+  cancelled --> [*]
+  skipped --> [*]
+```
+
+An adapter runs the process steps of an `awaiting_admission` run; the run's progress and
+outcome come from its step outputs, not from this state.
 
 People with `workflows.triggers.manage` submit starts with the reviewed version digest, an
 explicit subject, a source ID and occurrence time, and a typed snapshot. The server binds

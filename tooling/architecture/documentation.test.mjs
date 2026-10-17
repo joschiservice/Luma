@@ -66,6 +66,44 @@ test('relative Markdown links point to existing files and headings', () => {
   assert.deepEqual(broken, []);
 });
 
+test('Mermaid diagrams use the theme GitHub chooses', () => {
+  // Custom colors and themes stay readable in only one of GitHub's light and dark themes.
+  const styled = markdown.flatMap((file) =>
+    [
+      ...readFileSync(join(root, file), 'utf8').matchAll(
+        /^```mermaid\n([\s\S]*?)^```$/gm,
+      ),
+    ]
+      .filter(([, diagram]) =>
+        /^\s*(classDef|class|style|linkStyle)\s|%%\{\s*init|:::/m.test(diagram),
+      )
+      .map(() => file),
+  );
+
+  assert.deepEqual(styled, []);
+});
+
+test('skills declare their name and when to use them', () => {
+  const problems = markdown
+    .filter((file) => /^\.agents\/skills\/[^/]+\/SKILL\.md$/.test(file))
+    .flatMap((file) => {
+      const front = /^---\n([\s\S]*?)\n---\n/.exec(
+        readFileSync(join(root, file), 'utf8'),
+      )?.[1];
+      const name = /^name: (.+)$/m.exec(front ?? '')?.[1];
+      const description = /^description: (.+)$/m.exec(front ?? '')?.[1];
+
+      return [
+        ...(name === file.split('/')[2] ? [] : [`${file}: name`]),
+        ...(description && /\bUse (when|whenever|before)\b/.test(description)
+          ? []
+          : [`${file}: description must say when to use the skill`]),
+      ];
+    });
+
+  assert.deepEqual(problems, []);
+});
+
 /** Returns the paths Git ignores, such as local `.env` files and build output. */
 function ignored(paths) {
   try {

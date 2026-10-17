@@ -171,6 +171,21 @@ to the marker; its text, addresses, prices and notes are never returned or captu
   marker report `each`, because Luma submits only countable items; other orders report
   `unknown` and must not be compared by quantity.
 
+```mermaid
+flowchart TD
+    Dispatch["Admitted submission"] --> Prices["Read supplier price and VAT per item"]
+    Prices -->|missing| Refuse["conflict, not dispatched"]
+    Prices --> Scan["Scan recent orders for the luma-po marker"]
+    Scan -->|"marker found, or scan incomplete"| Refuse
+    Scan -->|none| Post["POST once with marker and Idempotency-Key"]
+    Post -->|201| Accepted["Accepted: JTL recorded the order"]
+    Post -->|4xx rejection| NoEffect["No effect"]
+    Post -->|"timeout, 5xx or malformed"| Unknown["Unknown effect"]
+    Unknown -->|"marker read finds the order; never resent"| Accepted
+```
+
+Return creation follows the same pattern with the `luma-rc` case marker.
+
 `purchase-orders.submit` creates one order (**high** minimum risk, `provider_key`
 idempotency, a single attempt). It requires granted `purchase-orders.read` because it
 reads before writing. Quantities must be positive and in `each`.

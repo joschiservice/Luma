@@ -8,7 +8,8 @@ writes to a source. Code: `@luma/commerce-sync`; the process runs in `apps/worke
 ## Streams, scans and runs
 
 A **stream** exists per connection and record type (`orders`, `fulfillments`, `products`,
-`inventory`, `customers`, `returns`) whose read capability the connection grants. Each
+`inventory`, `customers`, `returns`, `inventory_transfers`, `inventory_shipments`) whose
+read capability the connection grants. Each
 stream runs as a person, initially the one who installed the connection, with that
 person's current permissions. Each stream has one active **scan**; every scan is a
 **run**.
@@ -29,6 +30,21 @@ completed recent window where supported.
 
 ## Pages, checkpoints and retries
 
+```mermaid
+flowchart TD
+    Lease["Lease a due stream for 5 minutes"] --> Read["Read the next page through the capability"]
+    Read -->|admission deferred| Defer["Release the lease, keep the cursor; not a failure"]
+    Read -->|read failed or page incomplete| Fail["Keep the cursor, back off 30 s to 1 h"]
+    Read -->|cursor rejected| Restart["Restart the scan"]
+    Read -->|complete page| Compare["Compare digests with the ledger"]
+    Compare -->|unchanged| Commit
+    Compare -->|changed| Import["Import changed records in one ingestion transaction"]
+    Import --> Commit["Commit ledger, counters and next cursor together"]
+    Commit -->|more pages| Lease
+    Commit -->|last page| Done["Scan complete; schedule the next scan"]
+    Fail -->|five consecutive failures| Failing["Stream is failing"]
+```
+
 The runner leases one stream for 5 minutes and requests a page of 100 records; adapters
 may return fewer (Shopify returns at most 25, or 5 for fulfillments and returns). It
 imports the page's changed records in one ingestion transaction, then commits ledger
@@ -38,8 +54,9 @@ the next attempt re-imports idempotently.
 
 Transports first retry a transient read briefly (see
 [connectors](connectors.md#errors-retries-and-evidence)). A page failure keeps the cursor
-and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. A rejected
-cursor restarts the scan. After five consecutive failures the stream is **failing**.
+and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. A page the
+adapter reports as incomplete fails the same way, because it cannot establish coverage. A
+rejected cursor restarts the scan. After five consecutive failures the stream is **failing**.
 `failing_since` marks when the current run of failures began and is cleared by a
 successful page; scheduled detection uses it for the sync-failure retry window
 ([exception detection](exception-detection.md#scheduled-detection)). Stored messages are
@@ -64,6 +81,22 @@ requests are always processed. After reactivation the stored hints and due strea
 like any other, and scheduled scans cover what changed meanwhile.
 
 ## Ledger and coverage
+
+```mermaid
+stateDiagram-v2
+    [*] --> current: imported
+    [*] --> pending: related record not imported yet
+    [*] --> failed: fails validation
+    pending --> current: a later scan imports it
+    failed --> current: a later read passes validation
+    current --> missing: a full scan does not return it
+    missing --> current: any later read returns it
+    missing --> retired: complete point lookup confirms deletion
+    retired --> current: the source reports it again
+```
+
+`missing` is the `missing_since` mark on a record, not a status, and never means deletion.
+Failed, partial or history-limited lookups leave a record missing.
 
 The ledger holds one row per source record: a digest of the normalized observation,
 status, source creation and update times, first/last seen and the last scan that saw it.

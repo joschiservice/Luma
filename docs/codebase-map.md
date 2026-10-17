@@ -44,6 +44,33 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
 `apps/simulator-web` (synthetic providers), and `apps/staff-api` / `apps/staff` (isolated staff API and web application). Local environments live in `tooling/pilot` and
 `tooling/simulator`.
 
+```mermaid
+flowchart LR
+  subgraph processes [Processes]
+    api["apps/api: HTTP"]
+    worker["apps/worker: Temporal worker"]
+    sync["apps/worker: sync and detection"]
+    pilot["tooling/pilot"]
+  end
+  runtime["@luma/application-runtime: composition"]
+  domains["Domain packages"]
+  apps["Workspace apps and adapters"]
+  providers["Provider APIs"]
+  simulator["apps/simulator: synthetic providers"]
+
+  api --> runtime
+  worker --> runtime
+  sync --> runtime
+  pilot --> runtime
+  runtime --> domains
+  runtime --> apps
+  apps --> providers
+  apps -. "pilot connections" .-> simulator
+```
+
+Each process builds its services through its own composition path in
+`@luma/application-runtime`, so the same change may need wiring in several of them.
+
 ## Conventions
 
 - **Layers:** domain packages split `src` into `domain` (rules), `application` (use cases,
@@ -77,6 +104,20 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
 
 **Provider state → observation → detection → case → recovery → fresh verification**
 
+```mermaid
+flowchart TD
+  provider["Provider state"] -- "adapter read" --> observation["Observation with completeness and freshness"]
+  observation -- "commerce sync" --> canonical["Canonical records"]
+  canonical --> detect{"Complete, current evidence?"}
+  detect -- no --> wait["No conclusion yet"]
+  detect -- "rule matches" --> case["Case with evidence"]
+  case --> recovery["Recovery: policy, approval, execution"]
+  recovery --> receipt["Provider write receipt"]
+  receipt --> verify{"Fresh verification read"}
+  verify -- "outcome confirmed" --> closed["Case resolved"]
+  verify -- "failed, incomplete or stale" --> case
+```
+
 Adapters read provider state through installed capabilities and record observations with
 completeness and freshness. Commerce sync projects them into canonical records. The
 scheduled detection monitor in the sync process evaluates exception rules on complete,
@@ -88,7 +129,7 @@ The pilot and simulator run the same services. They cover sync failures, linked 
 stuck fulfillment, not every exception type; the simulator scorecard shows which incident
 kinds Luma detects. Before adding a scenario, check that its collection, detection,
 diagnosis and verification are actually wired. See
-[adding an operational scenario](adding-operational-scenarios.md).
+the [add-operational-scenario](../.agents/skills/add-operational-scenario/SKILL.md) skill.
 
 ## Placement rules
 

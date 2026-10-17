@@ -68,6 +68,29 @@ invalid input/output and observations with mismatched provenance. Discovery retu
 descriptors for the active connection only; the static provider catalog is neither
 capability discovery nor authorization.
 
+```mermaid
+flowchart TD
+    Request["Capability request"] --> Resolve["Active connection of this tenant?"]
+    Resolve -->|no| Unavailable["unavailable"]
+    Resolve -->|yes| Handler["Handler for this capability and version?"]
+    Handler -->|no| Unsupported["unsupported_capability or unsupported_version"]
+    Handler -->|yes| Input["parseInput accepts? Write has an idempotency key?"]
+    Input -->|no| Invalid["invalid_input"]
+    Input -->|yes| Started["Record started evidence"]
+    Started -->|hook fails| Blocked["Not dispatched"]
+    Started --> Run["Adapter run: one provider interaction"]
+    Run -->|throws| Failed["Normalized failure: effect none or unknown"]
+    Run --> Output["parseOutput accepts and provenance matches?"]
+    Output -->|no| BadResponse["invalid_response; unknown effect for writes"]
+    Output -->|yes| Result["Observations, or a write receipt"]
+    Failed --> Finished["Record succeeded or failed evidence"]
+    BadResponse --> Finished
+    Result --> Finished
+```
+
+An unknown effect always returns retry advice `reconcile`. A receipt is acceptance only;
+verification is a separate read.
+
 The in-memory sample connector in `@luma/connections` is a conformance fixture for
 reads and conditional writes through API and browser mechanisms. It is not registered by
 the server, and its deduplication lives only as long as its instance.

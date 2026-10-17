@@ -875,6 +875,19 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       { kind: 'position', deleted: false },
       { kind: 'product', deleted: false },
     ]);
+    // A retired record the source returns again is re-imported, even with an unchanged digest.
+    expect(
+      (
+        await owner.query(
+          'SELECT status,missing_since FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 ORDER BY record_type',
+          [tenant, shop],
+        )
+      ).rows,
+    ).toEqual([
+      { status: 'current', missing_since: null },
+      { status: 'current', missing_since: null },
+      { status: 'current', missing_since: null },
+    ]);
     expect(
       (
         await owner.query(

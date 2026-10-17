@@ -79,6 +79,26 @@ before returning a page. Dropped messages are fetched but never stored or return
 
 ## Sending
 
+```mermaid
+sequenceDiagram
+    participant Execution
+    participant Adapter as Gmail adapter
+    participant Gmail
+    Execution->>Adapter: Send once for the reserved action
+    Adapter->>Gmail: Search spam and trash too for the reply's Message-ID
+    alt message already exists
+        Adapter-->>Execution: conflict, nothing sent
+    else not found
+        Adapter->>Gmail: Send
+        alt response received
+            Adapter-->>Execution: Accepted, not delivered
+        else server error, timeout or lost response
+            Adapter-->>Execution: Unknown effect
+        end
+    end
+    Execution->>Gmail: Verify by reading the thread, never by sending again
+```
+
 The adapter derives the RFC Message-ID `<luma.<outbound ID>@<mailbox domain>>`. Before
 sending it searches the mailbox, including spam and trash, for that ID and refuses another send when it exists. A search hit is a conflict, not
 acceptance evidence; only independent verification can establish acceptance. Messages are plain-text UTF-8, threaded with
@@ -106,6 +126,27 @@ first page of each message read renews `users.watch` (INBOX and SENT) when the r
 expires within 24 hours, and failures never fail the read. Gmail registrations last seven
 days; uninstalling deletes Luma's records without calling Google, and later notifications
 for an unbound mailbox are acknowledged and ignored.
+
+```mermaid
+sequenceDiagram
+    participant Gmail
+    participant PubSub as Pub/Sub
+    participant API as Luma API
+    participant Inbox as Inbox reader
+    Gmail->>PubSub: Mailbox changed
+    PubSub->>API: Push with OIDC token
+    alt push not configured
+        API-->>PubSub: 503
+    else token invalid
+        API-->>PubSub: 401
+    else unknown mailbox or malformed payload
+        API-->>PubSub: 204, ignored
+    else verified
+        API->>API: Store a read hint for the bound mailbox
+        API-->>PubSub: 204
+        Inbox->>Gmail: Read the mailbox within seconds
+    end
+```
 
 `POST /api/v1/gmail/push` accepts only Pub/Sub's OIDC token: RS256 from Google's keys, issuer
 `accounts.google.com`, the configured audience, and the configured service account with a

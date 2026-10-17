@@ -8,6 +8,27 @@ describes the feature for users.
 
 ## Request path
 
+```mermaid
+sequenceDiagram
+  actor Member
+  participant A as Assistant
+  participant G as Model gateway
+  participant R as Owner read services
+  Member->>A: question and up to 20 earlier turns
+  A->>A: refresh context, require assistant.use
+  loop until an answer or a budget runs out
+    A->>G: prompt with the permitted read-only tools
+    G-->>A: tool calls or an answer
+    opt tool calls
+      A->>A: refresh context again
+      A->>R: reads as the member
+      R-->>A: records with citation markers
+    end
+  end
+  A->>A: keep citations only for records read
+  A-->>Member: answer with resolved citations
+```
+
 - The context is refreshed and must hold `assistant.use` with an unchanged actor. The
   model is offered only the tools the person's permissions allow, and each tool checks its
   permission again.

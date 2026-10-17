@@ -68,14 +68,11 @@ once, then restart `pnpm db:studio`.
 The migration administrator is used only during initialization. Runtime logins never have
 superuser, database creation, role creation or RLS bypass privileges.
 
-- `luma_api` inherits `luma_identity`, `luma_connectors`, `luma_case_reader`, `luma_desk`
-  and `luma_commerce_sync`.
-- `luma_worker` inherits `luma_exceptions`, `luma_policies`, `luma_execution`,
-  `luma_audit`, `luma_connectors`, `luma_orders`, `luma_inventory`, `luma_desk`,
-  `luma_commerce_sync` and `luma_customers`.
-
+The local logins `luma_api`, `luma_worker` and `luma_staff` inherit domain group roles such as
+`luma_identity`, `luma_desk` and `luma_connectors`; `tooling/dev/database.mjs` defines which.
 A migration that adds a table grants it to the owning role and, where needed, to reader
-roles. See [ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
+roles; follow the [add-migration](../.agents/skills/add-migration/SKILL.md) skill. See
+[ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
 
 ### API source imports
 

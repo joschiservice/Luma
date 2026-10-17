@@ -235,6 +235,27 @@ A support view shows the customer app as one member sees it, read-only, for up t
 minutes. [ADR-011](architecture/011-support-view.md) records the design. Start it from the
 workspace page under a workspace grant, with a reason; the target must be an active member.
 
+```mermaid
+sequenceDiagram
+  actor Staff
+  participant SA as Staff API
+  participant CA as Customer API
+  Staff->>SA: start view (workspace grant, member, reason)
+  SA->>SA: check consent, or emergency permission
+  SA-->>Staff: customer app link with a single-use token (2 minutes)
+  Staff->>CA: exchange the token
+  CA-->>Staff: support view cookie
+  loop every request
+    Staff->>CA: read request
+    CA->>CA: support_view_resolve: time, admission, staff session, consent
+    alt view still valid
+      CA-->>Staff: read-only response as the member
+    else view ended
+      CA-->>Staff: 401
+    end
+  end
+```
+
 - **Consent.** `staff.view-as` needs the workspace's current consent, which people with
   `support_access.manage` give in Settings › Luma support for 24 hours, 3 days or 7 days. Without
   consent, staff can request it with a reason and duration; owners are emailed and approve or
