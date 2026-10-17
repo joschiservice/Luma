@@ -11,7 +11,7 @@ import type {
   Permission,
   TenantContext,
 } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
+import { hasPermission } from '@luma/identity';
 import type {
   MailboxConnections,
   MemberDirectory,
@@ -21,6 +21,7 @@ import type {
   RecordDirectory,
 } from '@luma/messaging';
 import type { TenantDatabase } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 import type { SupplierCommitments } from '@luma/procurement/composition';
 import { createMessageRecordDirectory } from '@luma/read-models/composition';
 
@@ -185,10 +186,10 @@ export function createProcurementHandoff(
 
         return result.duplicate ? 'duplicate' : 'recorded';
       } catch (error) {
-        if (error instanceof IdentityError && error.statusCode === 403)
+        if (error instanceof ServiceError && error.statusCode === 403)
           return 'forbidden';
         // The same message was recorded under an earlier request.
-        if (error instanceof IdentityError && error.statusCode === 409)
+        if (error instanceof ServiceError && error.statusCode === 409)
           return 'duplicate';
         throw error;
       }

@@ -1,8 +1,5 @@
-import {
-  builtInMembership,
-  IdentityError,
-  makeTenantContext,
-} from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 import type { LearningService } from '@luma/resolution';
 import { expect, it, vi } from 'vitest';
 
@@ -163,9 +160,7 @@ it('rejects cross-tenant, unverified, unsupported and claimed-only resolutions, 
   await expect(adapter.evidence(context, source)).rejects.toMatchObject({
     statusCode: 409,
   });
-  read.mockRejectedValue(
-    new IdentityError(403, 'FORBIDDEN', 'Access changed.'),
-  );
+  read.mockRejectedValue(forbidden('Access changed.'));
   await expect(adapter.evidence(context, source)).rejects.toMatchObject({
     statusCode: 403,
   });

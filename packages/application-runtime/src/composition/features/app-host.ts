@@ -1,7 +1,7 @@
 import { apiContract } from '@luma/api-contract';
 import { appRoutes } from '@luma/app-host/http';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -12,14 +12,9 @@ export function appHostHttp(services: AppDependencies) {
   const os = implement(apiContract.stockProtection).$context<HttpContext>();
   const stockProtection = (request: FastifyRequest) => {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
     const service = services.appRegistry?.stockProtection()[0];
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Stock protection is unavailable.',
-      );
+    if (!service) throw unavailable('Stock protection is unavailable.');
 
     return { service, context: request.tenantContext };
   };

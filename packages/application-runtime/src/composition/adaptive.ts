@@ -48,12 +48,7 @@ import { createAuditLog } from '@luma/audit/composition';
 import { createConnectionDirectory } from '@luma/connections/composition';
 import type { CaseService } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import {
-  hasPermission,
-  IdentityError,
-  isPermission,
-  requirePermission,
-} from '@luma/identity';
+import { hasPermission, isPermission, requirePermission } from '@luma/identity';
 import { createRoleIdentityReader } from '@luma/identity/composition';
 import type {
   FeatureFlag,
@@ -61,7 +56,14 @@ import type {
   Observability,
   TenantDatabase,
 } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import type {
   SupplierCommitments,
@@ -419,7 +421,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
         owners.supplierEmail.status(c, id),
       ]);
       if (!status.mailboxes.some((m) => m.connectionId === connectionId))
-        throw new IdentityError(
+        throw new ServiceError(
           409,
           'NOT_READY',
           'The selected Operations Inbox cannot send.',
@@ -430,9 +432,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
           ['confirmation_overdue', 'delivery_overdue'].includes(a.kind),
       );
       if (!attention)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'This overdue supplier commitment is no longer current.',
         );
 
@@ -465,11 +465,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     propose: async (c, id, commandId, input, review) => {
       const checked = await followUp.review(c, id, input);
       if (checked.evidence !== review.evidence)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'The supplier evidence changed. Review again.',
-        );
+        throw conflict('The supplier evidence changed. Review again.');
       const result = await owners.supplierEmail.followUp(c, id, {
         id: commandId,
         connectionId: input.connectionId,
@@ -493,8 +489,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     released: (c) => released(c, 'adaptive-view-actions'),
     view: async (c, id) => {
       const view = await views.get(c, id);
-      if (view.archived)
-        throw new IdentityError(404, 'NOT_FOUND', 'View not found.');
+      if (view.archived) throw notFound('View not found.');
 
       return view;
     },
@@ -707,11 +702,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
               )
             ).find((v) => v.version === version.version);
             if (!current || current.digest !== review.evidence)
-              throw new IdentityError(
-                409,
-                'CONFLICT',
-                'This published workflow version is unavailable.',
-              );
+              throw conflict('This published workflow version is unavailable.');
             const occurredAt = new Date().toISOString();
             const result = await owners.workflows.fire(
               context,
@@ -801,12 +792,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     validateRoles: async (c: TenantContext, roleIds: readonly string[]) => {
       const roles = new Set(await createRoleIdentityReader(database)(c));
       for (const id of roleIds)
-        if (!roles.has(id))
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Choose an existing workspace role.',
-          );
+        if (!roles.has(id)) throw invalid('Choose an existing workspace role.');
     },
     trace: (c: TenantContext) => ({
       requestId: c.requestId,
@@ -851,9 +837,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
           (candidate) => candidate.key === field.definition.key,
         );
         if (found)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A package field key already belongs to another definition.',
           );
         const made = await f.create(c, {
@@ -909,9 +893,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
           compiled.definition.id,
         );
         if (existing.length)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'The package workflow already belongs to another installation.',
           );
         await createWorkflowCatalogStore(db).publish(c, compiled);
@@ -951,9 +933,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
         } else {
           const detail = await owners.workflows.detail(c, resource.id);
           if (detail.activations.some((a) => a.active))
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'Revoke the package workflow through its normal review before removing this package.',
             );
           await createPackageWorkflowArchive(db).archive(
@@ -979,11 +959,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
           !hasPermission(c, field.definition.readPermission) ||
           !hasPermission(c, field.definition.writePermission)
         )
-          throw new IdentityError(
-            403,
-            'FORBIDDEN',
-            'Your role cannot grant these field permissions.',
-          );
+          throw forbidden('Your role cannot grant these field permissions.');
       }
       for (const view of configured.views) {
         const checked = adaptiveViewInputSchema.parse({

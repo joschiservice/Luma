@@ -1,10 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 
-import { IdentityError } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
 } from '@luma/identity/composition';
+import { conflict, ServiceError } from '@luma/platform';
 import type {
   LearningEventSources,
   LearningRunSources,
@@ -137,11 +137,7 @@ function fixture() {
       const prior = runs.get(key);
       if (prior) {
         if (!isDeepStrictEqual(prior.request, request))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Run ID already belongs to a different selection',
-          );
+          throw conflict('Run ID already belongs to a different selection');
 
         return structuredClone(prior.document);
       }
@@ -156,11 +152,7 @@ function fixture() {
       const prior = events.get(key);
       if (prior) {
         if (!isDeepStrictEqual(prior.request, request))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Event ID already belongs to a different record',
-          );
+          throw conflict('Event ID already belongs to a different record');
 
         return structuredClone(prior.document);
       }
@@ -255,10 +247,10 @@ it.each(['tenant', 'actor', 'role'] as const)(
     );
     await expect(
       service.start(context(), incidentId, selection),
-    ).rejects.toBeInstanceOf(IdentityError);
+    ).rejects.toBeInstanceOf(ServiceError);
     await expect(
       service.append(context(), incidentId, runId, command),
-    ).rejects.toBeInstanceOf(IdentityError);
+    ).rejects.toBeInstanceOf(ServiceError);
     expect(store.recordRun).not.toHaveBeenCalled();
     expect(store.recordEvent).not.toHaveBeenCalled();
   },

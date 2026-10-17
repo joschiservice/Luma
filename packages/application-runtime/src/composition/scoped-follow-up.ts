@@ -5,9 +5,8 @@ import { ConnectorError } from '@luma/connections';
 import type { BoundActionStep } from '@luma/execution';
 import { parseAction } from '@luma/execution/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, ServiceError } from '@luma/platform';
 import type { ProposedAction, ScopedResponsibilityFacts } from '@luma/policies';
 import { createLatestPolicyDecisionReader } from '@luma/policies/composition';
 import {
@@ -171,7 +170,7 @@ export function createScopedSupplierFollowUp(options: {
             });
           } catch (error) {
             if (
-              error instanceof IdentityError &&
+              error instanceof ServiceError &&
               [409, 422].includes(error.statusCode)
             )
               throw new ConnectorError({
@@ -332,21 +331,13 @@ export function createScopedSupplierFollowUp(options: {
       async respond(context, plan, decisionId, outcome) {
         const readiness = await this.refreshability(context, plan);
         if (!readiness.refreshable)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'The original workflow or scoped release is unavailable. Existing attempts can still be verified.',
           );
         if ((await latestDecision(context, plan.id)) !== decisionId)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Decision changed. Refresh the review.',
-          );
+          throw conflict('Decision changed. Refresh the review.');
         if (!(await valid(context, plan)))
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Proposal is stale or superseded. Refresh it; approval is not carried forward.',
           );
         await options.safety.policies.respond(

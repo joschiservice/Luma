@@ -38,10 +38,14 @@ import {
 import { createCustomerProfiles } from '@luma/customers/composition';
 import { defaultConfiguration } from '@luma/exceptions';
 import { parseAction } from '@luma/execution/composition';
-import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
-import { createFailureLog } from '@luma/platform';
+import {
+  conflict,
+  createFailureLog,
+  notFound,
+  ServiceError,
+} from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createProposalRefresher,
@@ -187,7 +191,7 @@ export async function createPilot(
           actor.tenantId !== manifest.organizationId ||
           !Object.values(manifest.connections).includes(connectionId)
         )
-          throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+          throw notFound('Connection not found');
 
         return installations.check(actor, connectionId, version);
       },
@@ -691,7 +695,7 @@ export async function createPilot(
               try {
                 await deskService.refresh(actor, exceptionId);
               } catch (error) {
-                if (error instanceof IdentityError && error.statusCode === 409)
+                if (error instanceof ServiceError && error.statusCode === 409)
                   return null;
                 throw error;
               }
@@ -810,11 +814,7 @@ export async function createPilot(
 
     async function refreshProposal(exceptionId) {
       if (exceptionId !== id || !runtime)
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This case needs a new investigation.',
-        );
+        throw conflict('This case needs a new investigation.');
 
       return createProposalRefresher({
         desk: deskService,

@@ -30,12 +30,12 @@ import {
   parseInput,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
 } from '@luma/identity/composition';
 import type { ModelGateway } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { createDecisionQueue } from '@luma/read-models/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
@@ -1540,7 +1540,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         }),
       ).rejects.toMatchObject({ status: 400 });
       resolveTenant.mockRejectedValueOnce(
-        new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue'),
+        new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue'),
       );
       await expect(
         client.exceptions.evidence({
@@ -1549,7 +1549,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         }),
       ).rejects.toMatchObject({ status: 401 });
       resolveTenant.mockRejectedValueOnce(
-        new IdentityError(404, 'NOT_FOUND', 'Organization not found'),
+        new ServiceError(404, 'NOT_FOUND', 'Organization not found'),
       );
       await expect(
         client.exceptions.evidence({ params, query: {} }),
@@ -2473,13 +2473,9 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       .fn<IdentityService['resolveTenant']>()
       .mockImplementation(async (credentials, tenant) => {
         if (!credentials.cookie || revoked)
-          throw new IdentityError(
-            401,
-            'UNAUTHENTICATED',
-            'Sign in to continue',
-          );
+          throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
         if (tenant !== tenantId)
-          throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+          throw new ServiceError(404, 'NOT_FOUND', 'Organization not found');
 
         return decisionActor();
       });
