@@ -23,8 +23,8 @@ import {
   returnQuerySchema,
   upgradeAdaptiveViewQuery,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { JsonValue, ModelSchema } from '@luma/platform';
+import { ServiceError } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -72,7 +72,7 @@ function ownerViewQuery(
       Object.hasOwn(query.filters, key),
     )
   )
-    throw new IdentityError(
+    throw new ServiceError(
       422,
       'VALIDATION_ERROR',
       'Pagination and sorting belong to the query controls.',
@@ -88,7 +88,7 @@ function ownerViewQuery(
     raw.count = 'exact';
   const parsed = schema.safeParse(raw);
   if (!parsed.success)
-    throw new IdentityError(
+    throw new ServiceError(
       422,
       'VALIDATION_ERROR',
       'This list does not support one of the requested filters or sort fields.',
@@ -127,7 +127,7 @@ export const viewDraftModelSchema: ModelSchema<
 };
 
 function refuse(message: string): never {
-  throw new IdentityError(422, 'VALIDATION_ERROR', message);
+  throw new ServiceError(422, 'VALIDATION_ERROR', message);
 }
 
 const customFieldTypes: Record<CustomField['type'], CollectionFieldType> = {

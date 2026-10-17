@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  hasPermission,
-  IdentityError,
-  pausesBackgroundWork,
-} from '@luma/identity';
+import { hasPermission, pausesBackgroundWork } from '@luma/identity';
+import { ServiceError } from '@luma/platform';
 
 import type { Mailbox, MailboxCursor, ScanCursor } from '../domain/mailbox.js';
 import {
@@ -266,7 +263,7 @@ export function createMailboxSync(deps: SyncDependencies) {
       } catch (error) {
         if (pausesBackgroundWork(error)) return;
         if (
-          error instanceof IdentityError &&
+          error instanceof ServiceError &&
           [401, 403, 404].includes(error.statusCode)
         ) {
           await deps.store.transaction(scope.tenantId, (tx) =>

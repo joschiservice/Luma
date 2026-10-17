@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { InstallationRepository } from '../../application/installations.js';
 import type { InstalledConnection } from '../../domain/installation.js';
@@ -53,11 +53,7 @@ export function createInstallationRepository(
           )
         ).rows[0]?.document;
         if (before?.provider === 'luma-erp')
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Built-in source is managed by Luma',
-          );
+          throw conflict('Built-in source is managed by Luma');
         const result =
           expectedVersion === null
             ? await tx.query(

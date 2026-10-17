@@ -1,11 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict } from '@luma/platform';
+import { conflict, forbidden, unavailable } from '@luma/platform';
 
 import type { OrderProgress, Submission } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
@@ -158,7 +157,7 @@ export function createSupplierEmail(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, 'procurement.read');
     requirePermission(fresh, 'messages.read');
     if (write) {
@@ -175,11 +174,7 @@ export function createSupplierEmail(deps: {
     feature: 'submission' | 'follow_up',
   ) {
     if (!(await deps.available(context, feature)))
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Supplier email is not enabled for this workspace.',
-      );
+      throw unavailable('Supplier email is not enabled for this workspace.');
     const mailbox = (await deps.inbox.mailboxes(context)).items.find(
       (m) => m.connectionId === connectionId,
     );

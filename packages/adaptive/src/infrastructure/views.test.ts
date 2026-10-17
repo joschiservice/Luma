@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import type { TenantContext } from '@luma/identity';
 import {
   builtInMembership,
-  IdentityError,
   makeTenantContext,
   PermissionSet,
 } from '@luma/identity';
 import type { ModelGateway } from '@luma/platform';
+import { conflict } from '@luma/platform';
 import { describe, expect, it } from 'vitest';
 
 import type { ViewsStore } from '../application/views.js';
@@ -91,7 +91,7 @@ function fixture(
         save: async (value, changedBy, expected) => {
           const current = documents.get(value.id);
           if (expected !== null && current?.revision !== expected)
-            throw new IdentityError(409, 'CONFLICT', 'Revision changed');
+            throw conflict('Revision changed');
           documents.set(value.id, structuredClone(value));
           revisions.set(value.id, [
             { ...structuredClone(value), changedBy },

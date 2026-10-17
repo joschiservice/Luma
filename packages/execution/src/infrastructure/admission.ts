@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson as canonical } from '@luma/platform';
+import { canonicalJson as canonical, conflict } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -192,9 +192,7 @@ export function createAdmissionStore(db: TenantDatabase) {
           [context.tenantId, input.runId],
         );
         if (workflow.rows[0]?.state === 'cancelled')
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This workflow run was cancelled before its action was bound.',
           );
         const run = {

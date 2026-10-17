@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, invalid, notFound } from '@luma/platform';
 
 import type {
   CaseOwner,
@@ -29,7 +29,7 @@ export function createCaseOwnerStore(
         [context.tenantId, id],
       )
     ).rows[0];
-    if (!incident) throw new IdentityError(404, 'NOT_FOUND', 'Case not found.');
+    if (!incident) throw notFound('Case not found.');
 
     return (
       await tx.query<{ document: CaseOwner }>(
@@ -55,11 +55,7 @@ export function createCaseOwnerStore(
         ).rows[0]
       : null;
     if (input.userId && !person)
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'Choose a current workspace member.',
-      );
+      throw invalid('Choose a current workspace member.');
     const owner: CaseOwner = {
       userId: input.userId,
       name: person?.name ?? null,
@@ -107,11 +103,7 @@ export function createCaseOwnerStore(
             previous.assignedBy === context.actor.id
           )
             return previous;
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The case owner changed. Refresh the case.',
-          );
+          throw conflict('The case owner changed. Refresh the case.');
         }
 
         return change(tx, context, id, previous, input);

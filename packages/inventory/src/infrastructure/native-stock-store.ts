@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
-import { canonicalJson, type TenantDatabase } from '@luma/platform';
+import { requireTenant } from '@luma/identity';
+import { canonicalJson, notFound, type TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type { StockEvidence } from '../application/ledger.js';
@@ -261,11 +261,7 @@ export function createNativeStockStore(
                   return scope(row);
                 }
                 if (!connectionId)
-                  throw new IdentityError(
-                    404,
-                    'NOT_FOUND',
-                    'Stock ownership scope not found',
-                  );
+                  throw notFound('Stock ownership scope not found');
 
                 return {
                   connectionId,

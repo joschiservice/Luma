@@ -1,7 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, invalid, notFound } from '@luma/platform';
 
 import type {
   ReplenishmentActivation,
@@ -113,11 +112,7 @@ export function createReplenishmentStore(
             ),
           ))
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Invalid stock choices cursor.',
-        );
+        throw invalid('Invalid stock choices cursor.');
       const search = query.q?.trim() ?? '';
       const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
 
@@ -209,9 +204,7 @@ export function createReplenishmentStore(
             canonicalJson({ ...existing.document, reviewedAt: '' }) !==
             canonicalJson({ ...activation, reviewedAt: '' })
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This activation ID is already bound to a different rule.',
             );
 
@@ -222,9 +215,7 @@ export function createReplenishmentStore(
           [context.tenantId, activation.positionId],
         );
         if (overlap.rowCount)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Revoke the existing rule for this stock position before replacing it.',
           );
         await tx.query(
@@ -254,12 +245,7 @@ export function createReplenishmentStore(
             [context.tenantId, id, context.actor.id],
           )
         ).rows[0];
-        if (!row)
-          throw new IdentityError(
-            404,
-            'NOT_FOUND',
-            'Replenishment activation not found.',
-          );
+        if (!row) throw notFound('Replenishment activation not found.');
 
         return {
           ...row.document,

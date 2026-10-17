@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { conflict, invalid } from '@luma/platform';
 
 import type {
   AutonomyAudit,
@@ -130,9 +130,7 @@ export function createAutonomyRepository(
         ).rows[0];
         if (previousCommand) {
           if (previousCommand.fingerprint !== fingerprint)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'Command ID is already bound to another reviewed change.',
             );
 
@@ -146,9 +144,7 @@ export function createAutonomyRepository(
             )
           ).rows[0]?.document ?? null;
         if ((current?.revision ?? 0) !== expectedRevision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'Policy changed. Refresh it before making another decision.',
           );
         const history = (
@@ -167,9 +163,7 @@ export function createAutonomyRepository(
             (policy.scope.connectionIds.includes(context.tenantId) ? 1 : 0) !==
           policy.scope.connectionIds.length
         )
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
+          throw invalid(
             'Every scoped connection must belong to this workspace.',
           );
         await persistRevision(tx, policy, {
@@ -234,9 +228,7 @@ export async function reserveAutonomy(
     evaluateAutonomy(policy, admission.facts, now.getTime(), 'low', 'low')
       .outcome === 'denied'
   )
-    throw new IdentityError(
-      409,
-      'CONFLICT',
+    throw conflict(
       'Scoped policy or evidence changed before reservation. Review a fresh proposal.',
     );
   const day = now.toISOString().slice(0, 10);
@@ -255,9 +247,7 @@ export async function reserveAutonomy(
     limit === null ||
     previous + quantity > limit
   )
-    throw new IdentityError(
-      409,
-      'CONFLICT',
+    throw conflict(
       'The scoped daily quantity limit is exhausted. No action was dispatched.',
     );
   const exposure = admission.facts.exposure?.amount ?? null;
@@ -271,9 +261,7 @@ export async function reserveAutonomy(
       moneyLimit === null ||
       spent + amount > moneyLimit
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
+      throw conflict(
         'The scoped daily exposure limit is exhausted or unknown. No action was dispatched.',
       );
   }

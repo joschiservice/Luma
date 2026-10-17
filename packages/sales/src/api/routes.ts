@@ -1,6 +1,6 @@
 import { apiContract, salesOrderSchema } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound, ServiceError } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { SalesService } from '../application/service.js';
@@ -11,9 +11,8 @@ export function salesRoutes(service?: SalesService) {
 
   function current(context: HttpContext) {
     if (!context.request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(404, 'NOT_FOUND', 'Luma orders are unavailable');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw notFound('Luma orders are unavailable');
 
     return { service, tenant: context.request.tenantContext };
   }
@@ -21,7 +20,7 @@ export function salesRoutes(service?: SalesService) {
   return os.router({
     availability: os.availability.handler(async ({ context }) => {
       if (!context.request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
       return {
         enabled: service

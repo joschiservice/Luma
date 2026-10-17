@@ -4,8 +4,8 @@ import {
   apiContract,
   collectionMemberStateResponseSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { invalid, ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { CollectionStates } from '../application/collection-states.js';
@@ -20,13 +20,8 @@ export function collectionRoutes(
 
   function use(request: HttpContext['request']) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'List settings are unavailable.',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+    if (!service) throw unavailable('List settings are unavailable.');
 
     return { service, context: request.tenantContext };
   }
@@ -57,19 +52,10 @@ export function collectionRoutes(
     ),
     export: os.export.handler(({ context: { request }, input }) => {
       if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
-      if (!exports)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Exports are unavailable.',
-        );
+        throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+      if (!exports) throw unavailable('Exports are unavailable.');
       if (input.body.query.domain !== input.params.domain)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'The query belongs to another list.',
-        );
+        throw invalid('The query belongs to another list.');
 
       return exports.export(
         request.tenantContext,

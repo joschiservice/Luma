@@ -1,13 +1,12 @@
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isPermission,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { invalid } from '@luma/platform';
+import { conflict, forbidden, invalid, notFound } from '@luma/platform';
 
 import type {
   AdaptiveRecordType,
@@ -154,15 +153,11 @@ export function createFieldsService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, permission);
     if (permission !== 'adaptive.fields.read') requireChangesAllowed(fresh);
     if (!(await deps.released(fresh)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Custom fields are not enabled for this workspace.',
-      );
+      throw forbidden('Custom fields are not enabled for this workspace.');
 
     return fresh;
   }
@@ -181,18 +176,10 @@ export function createFieldsService(deps: {
   ) {
     const permission = write ? field.writePermission : field.readPermission;
     if (!isPermission(permission))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'This field permission is unavailable.',
-      );
+      throw forbidden('This field permission is unavailable.');
     requirePermission(context, permission);
     if (write && (field.archived || field.source !== 'luma'))
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Archived and provider-observed fields cannot be edited.',
-      );
+      throw conflict('Archived and provider-observed fields cannot be edited.');
   }
 
   function scope(context: TenantContext, type: AdaptiveRecordType) {
@@ -215,14 +202,13 @@ export function createFieldsService(deps: {
   ) {
     assertRecordType(type);
     assertUuid(id);
-    if (!(await tx.recordExists(type, id)))
-      throw new IdentityError(404, 'NOT_FOUND', 'Record not found.');
+    if (!(await tx.recordExists(type, id))) throw notFound('Record not found.');
   }
 
   async function get(tx: FieldsTransaction, id: string) {
     assertUuid(id);
     const field = await tx.get(id);
-    if (!field) throw new IdentityError(404, 'NOT_FOUND', 'Field not found.');
+    if (!field) throw notFound('Field not found.');
 
     return field;
   }
@@ -290,9 +276,7 @@ export function createFieldsService(deps: {
         const prior = await tx.command(commandId);
         if (prior) {
           if (prior.digest !== digest)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'This request ID was already used for different fields.',
             );
 
@@ -303,11 +287,7 @@ export function createFieldsService(deps: {
             (f) => f.key === definition.key,
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'A field with this key already exists.',
-          );
+          throw conflict('A field with this key already exists.');
         await tx.save(permissionProbe);
         await tx.event(
           event(context, permissionProbe.id, 'created', null, permissionProbe),
@@ -333,20 +313,12 @@ export function createFieldsService(deps: {
         fieldPermission(context, before, false);
         fieldPermission(context, before, true);
         if (before.revision !== revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This field changed. Reload before saving.',
-          );
+          throw conflict('This field changed. Reload before saving.');
         if (
           definition.recordType !== before.recordType ||
           definition.key !== before.key
         )
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'A field’s record type and key cannot change.',
-          );
+          throw invalid('A field’s record type and key cannot change.');
         if (await tx.hasValues(id)) {
           if (
             definition.type !== before.type ||
@@ -354,9 +326,7 @@ export function createFieldsService(deps: {
               (c) => !definition.choices.some((next) => next.key === c.key),
             )
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
+            throw conflict(
               'Clear existing values before changing the field type or removing choices.',
             );
         }
@@ -387,11 +357,7 @@ export function createFieldsService(deps: {
         scope(context, before.recordType);
         fieldPermission(context, before, false);
         if (before.revision !== revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This field changed. Reload before archiving.',
-          );
+          throw conflict('This field changed. Reload before archiving.');
         const after = {
           ...before,
           archived: true,
@@ -418,17 +384,9 @@ export function createFieldsService(deps: {
         scope(context, before.recordType);
         fieldPermission(context, before, false);
         if (!before.archived || before.source !== 'luma')
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Only archived Luma fields can be restored.',
-          );
+          throw conflict('Only archived Luma fields can be restored.');
         if (before.revision !== revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'This field changed. Reload before restoring.',
-          );
+          throw conflict('This field changed. Reload before restoring.');
         const after = {
           ...before,
           archived: false,
@@ -504,11 +462,7 @@ export function createFieldsService(deps: {
         assertRevision(change.revision, 0);
       }
       if (new Set(input.map((v) => v.fieldId)).size !== input.length)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Each field may be changed once per request.',
-        );
+        throw invalid('Each field may be changed once per request.');
 
       return deps.store.transaction(context.tenantId, true, async (tx) => {
         await record(tx, type, recordId);
@@ -516,31 +470,19 @@ export function createFieldsService(deps: {
         for (const change of input) {
           const field = await get(tx, change.fieldId);
           if (field.recordType !== type)
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'This field belongs to another record type.',
-            );
+            throw invalid('This field belongs to another record type.');
           fieldPermission(context, field, false);
           fieldPermission(context, field, true);
           const value = deps.parseValue(field, change.value);
           const before = prior.find((v) => v.fieldId === field.id);
           if ((before?.revision ?? 0) !== change.revision)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'A field value changed. Reload before saving.',
-            );
+            throw conflict('A field value changed. Reload before saving.');
           if (
             field.type === 'person' &&
             typeof value === 'string' &&
             !(await tx.personExists(value))
           )
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'Choose an active person in this workspace.',
-            );
+            throw invalid('Choose an active person in this workspace.');
           const after = {
             fieldId: field.id,
             value,
@@ -610,40 +552,24 @@ export function createFieldsService(deps: {
         const prior = await tx.effect(input.commandId);
         if (prior) {
           if (prior.digest !== digest)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'This effect ID was used for another field change.',
-            );
+            throw conflict('This effect ID was used for another field change.');
 
           return prior.result;
         }
         if (field.revision !== input.fieldRevision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The field definition changed after review.',
-          );
+          throw conflict('The field definition changed after review.');
         const value = deps.parseValue(field, input.value);
         const before = (await tx.values(input.recordType, input.recordId)).find(
           (v) => v.fieldId === field.id,
         );
         if ((before?.revision ?? 0) !== input.revision)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The field value changed after review.',
-          );
+          throw conflict('The field value changed after review.');
         if (
           field.type === 'person' &&
           typeof value === 'string' &&
           !(await tx.personExists(value))
         )
-          throw new IdentityError(
-            422,
-            'VALIDATION_ERROR',
-            'Choose an active person in this workspace.',
-          );
+          throw invalid('Choose an active person in this workspace.');
         const after = {
           fieldId: field.id,
           value,
@@ -685,11 +611,7 @@ export function createFieldsService(deps: {
         for (const selection of selections) {
           const field = await get(tx, selection.fieldId);
           if (field.recordType !== type || field.archived)
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'Choose an active field for this record type.',
-            );
+            throw invalid('Choose an active field for this record type.');
           fieldPermission(context, field, false);
           const value =
             values.find((v) => v.fieldId === field.id)?.value ?? null;
@@ -698,9 +620,7 @@ export function createFieldsService(deps: {
               !selection.choiceKey ||
               !field.choices.some((c) => c.key === selection.choiceKey)
             )
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
+              throw invalid(
                 'Choose which multiple-choice option the workflow reads.',
               );
             result[`${field.key}.${selection.choiceKey}`] =
@@ -709,11 +629,7 @@ export function createFieldsService(deps: {
                 : Array.isArray(value) && value.includes(selection.choiceKey);
           } else {
             if (selection.choiceKey || Array.isArray(value))
-              throw new IdentityError(
-                422,
-                'VALIDATION_ERROR',
-                'This field does not have multiple choices.',
-              );
+              throw invalid('This field does not have multiple choices.');
             result[field.key] = value;
           }
         }
@@ -748,11 +664,7 @@ export function createFieldsService(deps: {
       assertBounded(input.limit ?? 50, 1, 100);
       assertBounded(input.offset ?? 0, 0, 100000);
       if ((input.filters?.length ?? 0) > 20)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Use at most 20 field filters.',
-        );
+        throw invalid('Use at most 20 field filters.');
 
       return deps.store.transaction(context.tenantId, false, async (tx) => {
         const fields = await tx.list(input.recordType);
@@ -765,11 +677,7 @@ export function createFieldsService(deps: {
           assertUuid(id);
           const field = fields.find((f) => f.id === id);
           if (!field)
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'Choose an active field for this record type.',
-            );
+            throw invalid('Choose an active field for this record type.');
           fieldPermission(context, field, false);
         }
         for (const filter of input.filters ?? []) {
@@ -799,17 +707,9 @@ export function createFieldsService(deps: {
             field.type !== 'number' &&
             field.type !== 'date'
           )
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'Ranges require a number or date field.',
-            );
+            throw invalid('Ranges require a number or date field.');
           if (filter.operator === 'contains' && field.type !== 'multi_choice')
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'Contains requires a multiple choice field.',
-            );
+            throw invalid('Contains requires a multiple choice field.');
         }
         if (input.sort && !['asc', 'desc'].includes(input.sort.direction))
           throw invalidInput();

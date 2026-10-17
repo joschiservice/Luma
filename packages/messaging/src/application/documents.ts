@@ -1,11 +1,7 @@
 import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
-import { conflict, invalid, notFound } from '@luma/platform';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { conflict, forbidden, invalid, notFound } from '@luma/platform';
 
 import type { ReadOutcome } from '../domain/documents.js';
 import {
@@ -111,7 +107,7 @@ export function createDocuments(deps: DocumentDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }

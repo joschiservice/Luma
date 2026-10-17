@@ -1,11 +1,11 @@
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
   type TenantContext,
 } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict, forbidden } from '@luma/platform';
 
 import type { NativePublicationBinding } from '../application/publication.js';
 import { addressSchema } from './ledger-validation.js';
@@ -23,8 +23,7 @@ export function createNativePublicationFence(
   ): Promise<T> => {
     const fresh = await refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Actor changed.');
+    if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed.');
     requirePermission(fresh, 'inventory.manage');
     requireChangesAllowed(fresh);
     const binding = { ...input, scope: scopeSchema.parse(input.scope) };
@@ -38,11 +37,7 @@ export function createNativePublicationFence(
       binding.scope.mode !== 'own' ||
       binding.scope.locationId !== binding.locationId
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Publication needs this exact owned stock location.',
-      );
+      throw conflict('Publication needs this exact owned stock location.');
 
     return db.transaction(fresh.tenantId, async (tx) => {
       await tx.query(
@@ -65,11 +60,7 @@ export function createNativePublicationFence(
         scope.version !== binding.scope.version ||
         scope.transition !== binding.scope.lastTransitionId
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Ownership changed. Review a new allocation.',
-        );
+        throw conflict('Ownership changed. Review a new allocation.');
       const accounts = (
         await tx.query<{ id: string; version: string; balance: string }>(
           `SELECT id,version::text,trim_scale(balance)::text balance
@@ -89,11 +80,7 @@ export function createNativePublicationFence(
             ),
         )
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Native stock changed. Review a new allocation.',
-        );
+        throw conflict('Native stock changed. Review a new allocation.');
 
       return operation();
     });

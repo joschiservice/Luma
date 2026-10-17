@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type {
   FollowUpPlan,
@@ -76,11 +76,7 @@ export function createFollowUpPlanStore(db: TenantDatabase): FollowUpPlanStore {
             prior.previous_id !== previous.id ||
             prior.actor_id !== context.actor.id
           )
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Renewal command is bound to another review.',
-            );
+            throw conflict('Renewal command is bound to another review.');
 
           return prior.document;
         }
@@ -91,11 +87,7 @@ export function createFollowUpPlanStore(db: TenantDatabase): FollowUpPlanStore {
           )
         ).rows[0];
         if (head?.proposal_id !== previous.id)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'Proposal was already renewed. Refresh the review.',
-          );
+          throw conflict('Proposal was already renewed. Refresh the review.');
         // Deliberate cross-owner safety read under the same dispatch fence. Any reserved or
         // uncertain attempt must reconcile first; a known withheld attempt can be reviewed anew.
         const attempt = (
@@ -113,9 +105,7 @@ export function createFollowUpPlanStore(db: TenantDatabase): FollowUpPlanStore {
             attempt.attempt.dispatch === 'not_dispatched'
           )
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'This proposal has a reserved or dispatched attempt. Reconcile it before renewal.',
           );
         await tx.query(

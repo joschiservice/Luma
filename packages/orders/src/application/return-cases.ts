@@ -2,7 +2,6 @@ import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   MembershipSuspendedError,
   requirePermission,
@@ -11,6 +10,7 @@ import {
 import {
   canonicalJson,
   conflict,
+  forbidden,
   invalid,
   notFound,
   unavailable,
@@ -489,11 +489,9 @@ function rule<T>(operation: () => T): T {
     return operation();
   } catch (error) {
     if (!(error instanceof ReturnCaseError)) throw error;
-    if (error.code === 'invalid')
-      throw new IdentityError(422, 'VALIDATION_ERROR', error.message);
-    if (error.code === 'conflict')
-      throw new IdentityError(409, 'CONFLICT', error.message);
-    throw new IdentityError(404, 'NOT_FOUND', error.message);
+    if (error.code === 'invalid') throw invalid(error.message);
+    if (error.code === 'conflict') throw conflict(error.message);
+    throw notFound(error.message);
   }
 }
 
@@ -513,7 +511,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, write ? 'returns.manage' : 'returns.read');
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -1852,9 +1850,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         await deps.store.transaction(context.tenantId, true, async (tx) =>
           saveCreation(tx, creation, { state: 'failed', failure: 'not_sent' }),
         );
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
+        throw unavailable(
           'Approval could not be requested. Nothing was sent. Try again.',
         );
       }

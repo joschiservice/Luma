@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -20,13 +20,9 @@ export function returnCaseRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Return cases are unavailable. Try again later.',
-      );
+      throw unavailable('Return cases are unavailable. Try again later.');
 
     return { context: request.tenantContext, service };
   }
@@ -35,36 +31,21 @@ export function returnCaseRoutes(
 
   function settlement(request: FastifyRequest) {
     const current = use(request);
-    if (!actions)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Return settlement is unavailable',
-      );
+    if (!actions) throw unavailable('Return settlement is unavailable');
 
     return { context: current.context, service: actions };
   }
 
   function exchange(request: FastifyRequest) {
     const current = use(request);
-    if (!exchanges)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Exchange coordination unavailable',
-      );
+    if (!exchanges) throw unavailable('Exchange coordination unavailable');
 
     return { context: current.context, service: exchanges };
   }
 
   function waiting(request: FastifyRequest) {
     const current = use(request);
-    if (!deadlines)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Return waiting is unavailable',
-      );
+    if (!deadlines) throw unavailable('Return waiting is unavailable');
 
     return { context: current.context, service: deadlines };
   }

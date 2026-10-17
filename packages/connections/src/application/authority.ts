@@ -1,9 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import {
-  IdentityError,
-  requirePermission,
-  requireTenant,
-} from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
+import { forbidden } from '@luma/platform';
 
 import type {
   AuthorityConnection,
@@ -84,8 +81,7 @@ export function createAuthorityService(
     async change(context, input) {
       const fresh = await refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+      if (fresh.actor.id !== context.actor.id) throw forbidden('Actor changed');
       requirePermission(fresh, 'workspace.settings.manage');
 
       return repository.change(fresh.tenantId, fresh.actor.id, input);

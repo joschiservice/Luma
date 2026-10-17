@@ -2,11 +2,16 @@ import type { AuditEntry } from '@luma/audit';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict, invalid, notFound } from '@luma/platform';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 
 import type { RecordKind } from '../domain/linking.js';
 import type {
@@ -137,11 +142,7 @@ function decodeCursor(
   } catch {
     // Reported below.
   }
-  throw new IdentityError(
-    422,
-    'VALIDATION_ERROR',
-    'This list position is not valid. Start from the first page.',
-  );
+  throw invalid('This list position is not valid. Start from the first page.');
 }
 
 /**
@@ -156,7 +157,7 @@ export function createMessagingService(deps: MessagingDependencies) {
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
 
     return fresh;
   }
@@ -1341,11 +1342,7 @@ export function createMessagingService(deps: MessagingDependencies) {
     async refreshThread(context: TenantContext, threadId: string) {
       context = await authorize(context, 'messages.read');
       if (!deps.reader)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Reading mailboxes is unavailable. Try again later.',
-        );
+        throw unavailable('Reading mailboxes is unavailable. Try again later.');
       const { thread, mailbox, rules } = await deps.store.transaction(
         context.tenantId,
         async (tx) => {
@@ -1368,11 +1365,7 @@ export function createMessagingService(deps: MessagingDependencies) {
           cursor,
         });
         if (!result.ok)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'The mailbox could not be read. Try again later.',
-          );
+          throw unavailable('The mailbox could not be read. Try again later.');
         inserted += await deps.ingest(context, mailbox, rules, result.items);
         if (!result.nextCursor) return { inserted, complete: true };
         cursor = result.nextCursor;

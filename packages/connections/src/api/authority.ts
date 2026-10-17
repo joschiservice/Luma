@@ -1,6 +1,6 @@
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -10,13 +10,8 @@ import type { AuthoritySettings } from '../application/authority.js';
 export function sourceAuthorityRoutes(service?: AuthoritySettings) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Source authority is unavailable',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (!service) throw unavailable('Source authority is unavailable');
 
     return { service, context: request.tenantContext };
   }

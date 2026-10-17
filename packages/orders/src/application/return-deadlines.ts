@@ -2,11 +2,17 @@ import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { conflict, notFound, unavailable } from '@luma/platform';
+import {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from '@luma/platform';
 
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
@@ -75,7 +81,7 @@ export function createReturnDeadlines(deps: {
     const current = await deps.refreshContext(context);
     requireTenant(current, context.tenantId);
     if (current.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue');
+      throw forbidden('Sign in again to continue');
     requirePermission(current, write ? 'returns.manage' : 'returns.read');
 
     return current;
@@ -315,9 +321,7 @@ export function createReturnDeadlines(deps: {
         input.sourceMaxAgeSeconds < 30 ||
         input.sourceMaxAgeSeconds > 300
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'Choose whole hours between 1 and 2160. Source freshness must be between 30 and 300 seconds.',
         );
       const digest = deps.digest([context.actor.id, input]);
@@ -374,7 +378,7 @@ export function createReturnDeadlines(deps: {
           await refresh(context, c.id);
         } catch (error) {
           if (
-            !(error instanceof IdentityError) ||
+            !(error instanceof ServiceError) ||
             ![404, 409, 503].includes(error.statusCode)
           )
             throw error;

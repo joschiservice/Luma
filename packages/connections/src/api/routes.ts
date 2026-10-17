@@ -1,6 +1,6 @@
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { notFound } from '@luma/platform';
 import { implement } from '@orpc/server';
 
 import type { ProviderCatalog } from '../application/providers.js';
@@ -18,8 +18,7 @@ export function createProviderRoutes(catalog: ProviderCatalog) {
     })),
     get: os.get.handler(async ({ input: { params } }) => {
       const provider = catalog.get(params.providerId);
-      if (!provider)
-        throw new IdentityError(404, 'NOT_FOUND', 'Provider not found');
+      if (!provider) throw notFound('Provider not found');
 
       return provider;
     }),

@@ -1,9 +1,9 @@
 import {
   builtInMembership,
-  IdentityError,
   makeTenantContext,
   PermissionSet,
 } from '@luma/identity';
+import { conflict, invalid } from '@luma/platform';
 import { expect, it } from 'vitest';
 
 import type { ViewActionResult } from '../domain/actions.js';
@@ -48,11 +48,7 @@ function fixture() {
     inputs: { reference: 'string' },
     validateInputs: (input) => {
       if (typeof input.reference === 'string' && input.reference.length > 80)
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Reference is too long.',
-        );
+        throw invalid('Reference is too long.');
     },
     available: async () => null,
     review: async (_c, id) => ({
@@ -115,8 +111,7 @@ function fixture() {
     receipts: {
       get: async (_c, id, digest) => {
         const r = receipts.get(id);
-        if (r && r.digest !== digest)
-          throw new IdentityError(409, 'CONFLICT', 'Command reused');
+        if (r && r.digest !== digest) throw conflict('Command reused');
 
         return r?.results ?? null;
       },

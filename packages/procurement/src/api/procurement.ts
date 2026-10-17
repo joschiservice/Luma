@@ -10,8 +10,8 @@ import {
   procurementCatalog,
   suppliersCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -99,13 +99,9 @@ export function procurementRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service || !commitments)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Procurement is unavailable. Try again later.',
-      );
+      throw unavailable('Procurement is unavailable. Try again later.');
 
     return { context: request.tenantContext, service, commitments };
   }
@@ -114,12 +110,7 @@ export function procurementRoutes(
 
   function purchases(request: FastifyRequest) {
     const s = use(request);
-    if (!purchasing)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Purchasing is unavailable.',
-      );
+    if (!purchasing) throw unavailable('Purchasing is unavailable.');
 
     return { context: s.context, service: purchasing };
   }
@@ -129,11 +120,7 @@ export function procurementRoutes(
       async ({ context: { request } }) => {
         const s = use(request);
         if (!outcomes)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Purchasing outcomes are unavailable.',
-          );
+          throw unavailable('Purchasing outcomes are unavailable.');
 
         return outcomes.read(s.context);
       },
@@ -142,11 +129,7 @@ export function procurementRoutes(
       async ({ context: { request }, input: { body } }) => {
         const s = use(request);
         if (!outcomes)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Purchasing outcomes are unavailable.',
-          );
+          throw unavailable('Purchasing outcomes are unavailable.');
 
         return outcomes.ignore(s.context, body);
       },
@@ -154,12 +137,7 @@ export function procurementRoutes(
     incomingStock: os.incomingStock.handler(
       async ({ context: { request }, input: { body } }) => {
         const s = use(request);
-        if (!incoming)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Incoming stock is unavailable.',
-          );
+        if (!incoming) throw unavailable('Incoming stock is unavailable.');
 
         return await incoming.read(s.context, body);
       },
@@ -216,12 +194,7 @@ export function procurementRoutes(
     supplierTerms: os.supplierTerms.handler(
       async ({ context: { request }, input: { query } }) => {
         const s = use(request);
-        if (!terms)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Purchasing terms are unavailable.',
-          );
+        if (!terms) throw unavailable('Purchasing terms are unavailable.');
 
         return terms.list(s.context, query);
       },
@@ -229,12 +202,7 @@ export function procurementRoutes(
     saveSupplierTerms: os.saveSupplierTerms.handler(
       async ({ context: { request }, input: { body } }) => {
         const s = use(request);
-        if (!terms)
-          throw new IdentityError(
-            503,
-            'SERVICE_UNAVAILABLE',
-            'Purchasing terms are unavailable.',
-          );
+        if (!terms) throw unavailable('Purchasing terms are unavailable.');
 
         return terms.save(s.context, body);
       },

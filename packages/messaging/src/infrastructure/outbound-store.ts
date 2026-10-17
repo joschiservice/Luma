@@ -1,5 +1,5 @@
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
+import { conflict } from '@luma/platform';
 
 import type { OutboundRepository, OutboundRow } from '../application/store.js';
 
@@ -74,9 +74,7 @@ export function outboundRepository(
           'code' in error &&
           error.code === '23505'
         )
-          throw new IdentityError(
-            409,
-            'CONFLICT',
+          throw conflict(
             'A submission already exists for this order. Refresh the Operations Inbox before drafting again.',
           );
         throw error;

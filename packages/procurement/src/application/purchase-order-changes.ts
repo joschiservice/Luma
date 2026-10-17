@@ -6,12 +6,17 @@ import type {
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   isAppPermission,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson, conflict } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type { OrderProgress, Submission } from '../domain/commitments.js';
@@ -149,7 +154,7 @@ export function createPurchaseOrderChangeService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
 
     return fresh;
@@ -157,9 +162,7 @@ export function createPurchaseOrderChangeService(deps: {
 
   async function released(context: TenantContext) {
     if (!(await deps.released(context)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
+      throw forbidden(
         'Purchase-order changes are not enabled for this workspace.',
       );
   }
@@ -168,8 +171,7 @@ export function createPurchaseOrderChangeService(deps: {
     const change = await deps.store.transaction(context.tenantId, false, (tx) =>
       tx.change(id),
     );
-    if (!change)
-      throw new IdentityError(404, 'NOT_FOUND', 'Order change not found.');
+    if (!change) throw notFound('Order change not found.');
 
     return change;
   }
@@ -177,8 +179,7 @@ export function createPurchaseOrderChangeService(deps: {
   async function save(context: TenantContext, change: PurchaseOrderChange) {
     return deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = await tx.change(change.id);
-      if (!current)
-        throw new IdentityError(404, 'NOT_FOUND', 'Order change not found.');
+      if (!current) throw notFound('Order change not found.');
       const transitions: Record<
         PurchaseOrderChange['state'],
         PurchaseOrderChange['state'][]
@@ -266,11 +267,7 @@ export function createPurchaseOrderChangeService(deps: {
     await authorize(principal, true);
     await released(principal);
     if (!deps.admission)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Governed execution is unavailable.',
-      );
+      throw unavailable('Governed execution is unavailable.');
     if (reconcile) {
       if (!['submitting', 'uncertain'].includes(change.state)) return change;
     } else {

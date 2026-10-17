@@ -1,10 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 import {
-  IdentityError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
+import { conflict, forbidden, invalid, notFound } from '@luma/platform';
 
 import type { ProposedAction } from '../domain/action.js';
 import {
@@ -102,9 +102,7 @@ function validateScope(scope: AutonomyScope) {
     scope.maxEvidenceAgeSeconds < 1 ||
     scope.maxEvidenceAgeSeconds > 300
   )
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
+    throw invalid(
       'Use a bounded internal follow-up scope with valid quantity and freshness limits.',
     );
   for (const ids of [
@@ -118,11 +116,7 @@ function validateScope(scope: AutonomyScope) {
       ids.some((id) => !uuid.test(id)) ||
       new Set(ids).size !== ids.length
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'Scope IDs must be unique workspace record identifiers.',
-      );
+      throw invalid('Scope IDs must be unique workspace record identifiers.');
   if (scope.money) {
     const per = autonomyDecimal(scope.money.perAction),
       total = autonomyDecimal(scope.money.daily);
@@ -132,11 +126,7 @@ function validateScope(scope: AutonomyScope) {
       total === null ||
       total < per
     )
-      throw new IdentityError(
-        422,
-        'VALIDATION_ERROR',
-        'Use known monetary limits in one currency.',
-      );
+      throw invalid('Use known monetary limits in one currency.');
   }
 }
 
@@ -164,7 +154,7 @@ export function createScopedAutonomy(deps: {
     const current = await deps.refreshContext(context);
     requireTenant(current, context.tenantId);
     if (current.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(current, 'workspace.approval_policy.manage');
     if (write) requireChangesAllowed(current);
 
@@ -180,11 +170,7 @@ export function createScopedAutonomy(deps: {
 
   async function requireEnabled(tenantId: string) {
     if (!(await deps.enabled(tenantId)))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Scoped autonomy is not enabled for this workspace.',
-      );
+      throw forbidden('Scoped autonomy is not enabled for this workspace.');
   }
 
   const scopeHash = (scope: AutonomyScope) =>
@@ -260,9 +246,7 @@ export function createScopedAutonomy(deps: {
         !draft.reason.trim() ||
         draft.reason.length > 1000
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
+        throw invalid(
           'Provide valid command and policy IDs, a name and a review reason.',
         );
       const fingerprint = deps.hash({ actor: current.actor.id, ...draft });
@@ -275,11 +259,7 @@ export function createScopedAutonomy(deps: {
         draft.reason,
         (previous) => {
           if (previous?.revoked)
-            throw new IdentityError(
-              409,
-              'CONFLICT',
-              'Revoked policies cannot be changed.',
-            );
+            throw conflict('Revoked policies cannot be changed.');
           const hash = scopeHash(draft.scope);
 
           return {
@@ -325,11 +305,7 @@ export function createScopedAutonomy(deps: {
         !command.reason.trim() ||
         command.reason.length > 1000
       )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Provide valid IDs and a review reason.',
-        );
+        throw invalid('Provide valid IDs and a review reason.');
       const saved = await deps.repository.mutate(
         current,
         id,
@@ -338,17 +314,12 @@ export function createScopedAutonomy(deps: {
         command.expectedRevision,
         command.reason,
         async (policy, history) => {
-          if (!policy || policy.revoked)
-            throw new IdentityError(404, 'NOT_FOUND', 'Policy not found.');
+          if (!policy || policy.revoked) throw notFound('Policy not found.');
           if (
             command.connectionId &&
             !policy.scope.connectionIds.includes(command.connectionId)
           )
-            throw new IdentityError(
-              422,
-              'VALIDATION_ERROR',
-              'This connection is outside the policy scope.',
-            );
+            throw invalid('This connection is outside the policy scope.');
           const next = {
             ...policy,
             revision: policy.revision + 1,
@@ -376,19 +347,13 @@ export function createScopedAutonomy(deps: {
           }
           if (command.kind === 'assist' || command.kind === 'promote') {
             if (policy.paused || policy.pausedConnectionIds.length)
-              throw new IdentityError(
-                409,
-                'CONFLICT',
-                'Resume the policy before changing its mode.',
-              );
+              throw conflict('Resume the policy before changing its mode.');
             if (
               command.kind === 'promote' &&
               !(await trackRecord(current, history, policy.scopeHash))
                 .promotionEligible
             )
-              throw new IdentityError(
-                409,
-                'CONFLICT',
+              throw conflict(
                 'Autonomous mode needs at least 20 live reviewed and verified actions, at least 95% acceptance and verification, and no failed verification or uncertain dispatch in the evaluated history.',
               );
             next.mode = command.kind === 'promote' ? 'autonomous' : 'assisted';
@@ -408,8 +373,7 @@ export function createScopedAutonomy(deps: {
       const policy = (await deps.repository.list(current.tenantId)).find(
         (entry) => entry.id === id,
       );
-      if (!policy)
-        throw new IdentityError(404, 'NOT_FOUND', 'Policy not found.');
+      if (!policy) throw notFound('Policy not found.');
       const history = await deps.repository.history(current.tenantId, id);
 
       return {

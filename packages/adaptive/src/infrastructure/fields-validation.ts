@@ -1,4 +1,5 @@
-import { IdentityError, isPermission } from '@luma/identity';
+import { isPermission } from '@luma/identity';
+import { invalid } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -74,11 +75,7 @@ export function validateCustomField(input: unknown): CustomFieldInput {
     !isPermission(field.readPermission) ||
     !isPermission(field.writePermission)
   )
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
-      'Choose permissions from the permission catalog.',
-    );
+    throw invalid('Choose permissions from the permission catalog.');
   const keys = new Set(field.choices.map((c) => c.key));
   if (
     keys.size !== field.choices.length ||
@@ -86,9 +83,7 @@ export function validateCustomField(input: unknown): CustomFieldInput {
       ? !keys.size
       : keys.size > 0)
   )
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
+    throw invalid(
       'Choice fields require unique choices; other fields cannot have choices.',
     );
 
@@ -124,11 +119,7 @@ export function validateCustomFieldValue(
                   value.every((v) => choices.has(v)) &&
                   new Set(value).size === value.length;
   if (!valid)
-    throw new IdentityError(
-      422,
-      'VALIDATION_ERROR',
-      'The value does not match this field’s type or choices.',
-    );
+    throw invalid('The value does not match this field’s type or choices.');
 
   return value;
 }

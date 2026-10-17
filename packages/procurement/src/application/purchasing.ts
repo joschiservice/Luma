@@ -2,11 +2,16 @@ import type { BoundActionStep } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
-  IdentityError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  forbidden,
+  notFound,
+  unavailable,
+} from '@luma/platform';
 
 import type { PurchaseOrderInput } from '../domain/procurement.js';
 import type {
@@ -97,7 +102,7 @@ export function createPurchasingService(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      throw forbidden('Sign in again to continue.');
     requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
 
     return fresh;
@@ -108,17 +113,12 @@ export function createPurchasingService(deps: {
       !(await deps.released(context, 'purchasing-workbench')) ||
       (write && !(await deps.released(context, 'purchasing-plans')))
     )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Purchasing is not enabled for this workspace.',
-      );
+      throw conflict('Purchasing is not enabled for this workspace.');
   }
 
   async function get(context: TenantContext, id: string) {
     const plan = await deps.store.plan(context, id);
-    if (!plan)
-      throw new IdentityError(404, 'NOT_FOUND', 'Purchasing plan not found.');
+    if (!plan) throw notFound('Purchasing plan not found.');
 
     return plan;
   }
@@ -163,11 +163,7 @@ export function createPurchasingService(deps: {
         prior.requestedBy !== context.actor.id ||
         canonicalJson(prior.request) !== canonicalJson(request)
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'This plan ID already belongs to a different request.',
-        );
+        throw conflict('This plan ID already belongs to a different request.');
       if (prior.decisionId || prior.state !== 'approval_required') return prior;
       const decision = await deps.admission!.prepare(context, prior);
       const updated = {
@@ -184,11 +180,7 @@ export function createPurchasingService(deps: {
     }
     const current = await overview(context);
     if (request.sourceOrderId && (!request.attentionKey || !deps.shortfall))
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Review the source shortfall before reordering.',
-      );
+      throw conflict('Review the source shortfall before reordering.');
     const shortfall = request.sourceOrderId
       ? await deps.shortfall!(
           context,
@@ -197,11 +189,7 @@ export function createPurchasingService(deps: {
         )
       : null;
     if (shortfall?.supplierId === request.supplierId)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'Choose another supplier for the remainder.',
-      );
+      throw conflict('Choose another supplier for the remainder.');
     const suggestions: PurchasingPlan['suggestions'] = [];
     const lines: PurchaseOrderInput['lines'] = [];
     for (const [index, line] of request.lines.entries()) {
@@ -241,18 +229,14 @@ export function createPurchasingService(deps: {
               ) *
                 rec.packSize!))
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Inputs changed or are unavailable. Refresh and review this purchasing plan.',
         );
       if (
         line.quantity % rec.packSize! !== 0 ||
         line.quantity < rec.minimumQuantity!
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Review the pack size and minimum quantity for each line.',
         );
       const stock = rec.stocks.find((s) => s.locationId === line.locationId)!;
@@ -317,9 +301,7 @@ export function createPurchasingService(deps: {
         (total === null || total < purchasingAmountUnits(minimum.amount)) &&
         !request.reason
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
+        throw conflict(
           'Record a reason for an order below or unable to verify the supplier minimum value.',
         );
     }
@@ -390,11 +372,7 @@ export function createPurchasingService(deps: {
       return plan;
     }
     if (!deps.admission)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Purchasing execution is unavailable.',
-      );
+      throw unavailable('Purchasing execution is unavailable.');
     if (!reconcile) await released(context, true);
     const requester = await deps.principal(
       context.tenantId,
@@ -486,11 +464,7 @@ export function createPurchasingService(deps: {
         plan.decisionId !== input.decisionId ||
         !deps.admission
       )
-        throw new IdentityError(
-          409,
-          'CONFLICT',
-          'Review the current plan decision.',
-        );
+        throw conflict('Review the current plan decision.');
       await deps.admission.respond(context, plan, input.outcome);
       if (input.outcome === 'approved') return execute(context, id);
       const updated = { ...plan, state: 'rejected' as const };

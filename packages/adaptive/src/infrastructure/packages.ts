@@ -1,6 +1,6 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { notFound } from '@luma/platform';
 import { z } from 'zod';
 
 import type { PackageStore } from '../application/packages.js';
@@ -99,7 +99,7 @@ export function createPackageStore(
         const scoped: TenantDatabase = {
           transaction: async (tenantId, operation) => {
             if (tenantId !== context.tenantId)
-              throw new IdentityError(404, 'NOT_FOUND', 'Resource not found.');
+              throw notFound('Resource not found.');
 
             return operation(tx);
           },

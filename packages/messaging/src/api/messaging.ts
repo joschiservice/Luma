@@ -5,8 +5,8 @@ import {
   collectionQueryIssue,
   inboxCatalog,
 } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -38,13 +38,9 @@ export function messagingRoutes(
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
     if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'The inbox is unavailable. Try again later.',
-      );
+      throw unavailable('The inbox is unavailable. Try again later.');
 
     return { context: request.tenantContext, service };
   }
@@ -52,11 +48,7 @@ export function messagingRoutes(
   function useReplies(request: FastifyRequest) {
     const { context } = use(request);
     if (!replies)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Replies are unavailable. Try again later.',
-      );
+      throw unavailable('Replies are unavailable. Try again later.');
 
     return { context, replies };
   }
@@ -64,11 +56,7 @@ export function messagingRoutes(
   function useDocuments(request: FastifyRequest) {
     const { context } = use(request);
     if (!documents)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Documents are unavailable. Try again later.',
-      );
+      throw unavailable('Documents are unavailable. Try again later.');
 
     return { context, documents };
   }

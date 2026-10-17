@@ -1,8 +1,8 @@
 import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
-import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
+import { ServiceError, unavailable } from '@luma/platform';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
@@ -14,13 +14,8 @@ export function purchaseOrderChangeRoutes(service?: PurchaseOrderChanges) {
 
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Order changes are unavailable.',
-      );
+      throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
+    if (!service) throw unavailable('Order changes are unavailable.');
 
     return { service, context: request.tenantContext };
   }
