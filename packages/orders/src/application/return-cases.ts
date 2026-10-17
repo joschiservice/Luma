@@ -1932,8 +1932,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     },
 
     /**
-     * Approves or rejects a creation. Approval comes from someone other than the requester; Luma
-     * then dispatches it as the requester, exactly once.
+     * Approves or rejects a creation. When the workspace requires independent approval, it comes
+     * from someone other than the requester. Luma then dispatches it as the requester, exactly
+     * once.
      */
     async decideCreation(
       context: TenantContext,

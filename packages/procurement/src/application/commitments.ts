@@ -2127,8 +2127,9 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       );
     },
     /**
-     * Approves or rejects a submission. Approval comes from someone other than the requester who
-     * can manage procurement; Luma then dispatches it as the requester, exactly once.
+     * Approves or rejects a submission. Approval comes from someone who can manage procurement,
+     * and from someone other than the requester when the workspace requires independent
+     * approval. Luma then dispatches it as the requester, exactly once.
      */
     async decideSubmission(
       context: TenantContext,
