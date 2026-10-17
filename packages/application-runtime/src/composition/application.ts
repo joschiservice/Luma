@@ -25,12 +25,9 @@ import {
   type InstalledReturnRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
+import { createPendingStockSyncReader } from '@luma/exceptions/composition';
 import type { BoundActionStep } from '@luma/execution';
-import {
-  hasPermission,
-  type IdentityService,
-  type TenantContext,
-} from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   createPurchaseIncoming,
   createPurchaseIncomingStore,
@@ -41,6 +38,7 @@ import {
   createReturnCaseService,
   createReturnDeadlineService,
   createReturnExchangeService,
+  createReturnMoneySource,
   orderStateQueries,
   type ReturnActions,
   type ReturnCases,
@@ -65,7 +63,9 @@ import {
   createPurchasingOutcomesService,
   createPurchasingOverview,
   createPurchasingStore,
+  createPurchasingTimelineActors,
   createReplenishmentReviewContext,
+  createShortfallAcknowledgement,
   createSupplierCommitmentService,
   createSupplierEmailService,
   createSupplierTerms,
@@ -75,6 +75,7 @@ import {
   appDecisionProvider,
   createActionDiffReader,
   createSourceOrderLines,
+  readNativePurchaseIncoming,
 } from '@luma/read-models/composition';
 import {
   createReturnStepFollowUp,
@@ -106,7 +107,10 @@ import {
 
 import { createActiveDiagnosisRereader } from './active-diagnosis.js';
 import { createAdaptiveWorkspaceRuntime } from './adaptive.js';
-import { createAdmissionEligibility } from './admission.js';
+import {
+  createAdmissionEligibility,
+  routeAdmissionEligibility,
+} from './admission.js';
 import {
   createCaseWorkflowServices,
   createFollowUpWorkflows,
@@ -131,7 +135,6 @@ import {
   createReplyAdmission,
   createReplyEffects,
 } from './messaging-replies.js';
-import { readNativePurchaseIncoming } from './native-purchase-incoming.js';
 import { createNativeStockRuntime } from './native-stock.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
@@ -553,29 +556,32 @@ export function createApplicationServices(
       : {}),
     responsibilityFacts: async (context, action) =>
       (await scopedFollowUp?.facts(context, action)) ?? null,
-    eligible: (context, step) =>
-      isFieldWriteCapability(step.action.capability)
-        ? adaptiveFieldEligibility(context, step)
-        : step.subject?.kind === 'purchase_order_change'
-          ? orderChanges.eligible(context, step)
-          : step.subject?.kind === 'purchasing_plan'
-            ? purchasing.eligible(context, step)
-            : step.subject?.kind === 'purchase_order_submission'
-              ? commitments.eligible(context, step)
-              : step.subject?.kind === 'message_outbound'
-                ? messaging.replies.eligible(context, step)
-                : step.subject?.kind === 'return_case_creation'
-                  ? returnCases.eligible(context, step)
-                  : step.subject?.kind === 'return_case_settlement'
-                    ? returnActions.eligible(context, step)
-                    : step.subject?.kind === 'return_case_exchange'
-                      ? returnExchanges.eligible(context, step)
-                      : step.subject?.kind === 'supplier_follow_up'
-                        ? (scopedFollowUp?.eligible(context, step) ??
-                          Promise.resolve(false))
-                        : step.subject
-                          ? replenishment.eligible(context, step)
-                          : resolutionEligible(context, step),
+    // Owners are composed below; each route reads its owner only when a step is checked.
+    eligible: routeAdmissionEligibility({
+      fieldWrite: {
+        matches: isFieldWriteCapability,
+        eligible: (context, step) => adaptiveFieldEligibility(context, step),
+      },
+      subjects: {
+        purchase_order_change: (context, step) =>
+          orderChanges.eligible(context, step),
+        purchasing_plan: (context, step) => purchasing.eligible(context, step),
+        purchase_order_submission: (context, step) =>
+          commitments.eligible(context, step),
+        message_outbound: (context, step) =>
+          messaging.replies.eligible(context, step),
+        return_case_creation: (context, step) =>
+          returnCases.eligible(context, step),
+        return_case_settlement: (context, step) =>
+          returnActions.eligible(context, step),
+        return_case_exchange: (context, step) =>
+          returnExchanges.eligible(context, step),
+        supplier_follow_up: (context, step) =>
+          scopedFollowUp?.eligible(context, step) ?? Promise.resolve(false),
+      },
+      otherSubject: (context, step) => replenishment.eligible(context, step),
+      noSubject: resolutionEligible,
+    }),
   });
   const purchasing = createPurchasing({
     store: createPurchasingStore(database, createAuditLog),
@@ -595,15 +601,7 @@ export function createApplicationServices(
         : null,
     shortfall: (context, orderId, key) =>
       commitments.shortfall(context, orderId, key),
-    acknowledgeShortfall: async (context, plan) => {
-      await commitments.respond(context, plan.request.sourceOrderId!, {
-        id: plan.id,
-        key: plan.request.attentionKey!,
-        response: 'accepted',
-        note: `Remainder covered by verified draft ${plan.order.reference}`,
-        nextCheckAt: null,
-      });
-    },
+    acknowledgeShortfall: createShortfallAcknowledgement(() => commitments),
     now: () => new Date(),
     uuid: (key) => {
       const hex = createHash('sha256')
@@ -624,100 +622,7 @@ export function createApplicationServices(
     database,
     createAuditLog,
     {
-      timelineActors: async (context, entries, workflowRunId) =>
-        database.transaction(context.tenantId, async (tx) => {
-          const automated = new Map(
-            (
-              await tx.query<{
-                key: string;
-                id: string;
-                name: string | null;
-                principalId: string;
-              }>(
-                `WITH sources AS (
-               SELECT 'execution:'||x.id AS key,a.run_id FROM executed_actions x
-               JOIN action_admission_steps a ON a.tenant_id=x.tenant_id AND a.proposal_id=x.proposal_id
-               WHERE x.tenant_id=$1 AND x.id::text=ANY($2::text[])
-               UNION ALL
-               SELECT 'submission:'||s.id AS key,a.run_id FROM procurement_submissions s
-               JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id::text=s.document->>'actionId'
-               WHERE s.tenant_id=$1 AND s.id::text=ANY($3::text[])
-              ) SELECT s.key,r.id,r.document->'actor'->>'id' AS "principalId",v.document->'definition'->>'name' AS name
-              FROM sources s JOIN workflow_trigger_runs r ON r.tenant_id=$1 AND r.id=s.run_id
-              LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version`,
-                [
-                  context.tenantId,
-                  entries
-                    .filter((entry) => entry.id.startsWith('execution:'))
-                    .map((entry) => entry.id.slice('execution:'.length)),
-                  entries
-                    .filter((entry) => entry.id.startsWith('submission:'))
-                    .map((entry) => entry.id.split(':')[1]),
-                ],
-              )
-            ).rows.map((run) => [run.key, run]),
-          );
-          const ids = [
-            ...new Set([
-              ...entries.flatMap((entry) =>
-                entry.actorId ? [entry.actorId] : [],
-              ),
-              ...[...automated.values()].map((run) => run.principalId),
-            ]),
-          ];
-          const people = new Map(
-            (
-              await tx.query<{
-                id: string;
-                name: string | null;
-                email: string | null;
-                member: boolean;
-              }>(
-                'SELECT user_id::text AS id,name,email,is_member AS member FROM workspace_people WHERE tenant_id=$1 AND user_id::text=ANY($2::text[])',
-                [context.tenantId, ids],
-              )
-            ).rows.map((person) => [person.id, person]),
-          );
-          const workflow = workflowRunId
-            ? (
-                await tx.query<{ id: string; name: string | null }>(
-                  `SELECT r.id,v.document->'definition'->>'name' AS name FROM workflow_trigger_runs r LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version WHERE r.tenant_id=$1 AND r.id::text=$2`,
-                  [context.tenantId, workflowRunId],
-                )
-              ).rows[0]
-            : undefined;
-
-          return entries.map((entry) => {
-            const provenance = ['approved', 'rejected'].includes(entry.stage)
-              ? undefined
-              : automated.get(
-                  entry.id.startsWith('submission:')
-                    ? entry.id.split(':').slice(0, 2).join(':')
-                    : entry.id,
-                );
-            const actorId = entry.actorId ?? provenance?.principalId;
-            const person = actorId ? people.get(actorId) : undefined;
-
-            return {
-              ...entry,
-              actor: {
-                kind: person?.member
-                  ? ('member' as const)
-                  : actorId
-                    ? ('former_member' as const)
-                    : ('unrecorded' as const),
-                id: actorId ?? null,
-                name: person?.name ?? null,
-                email: person?.email ?? null,
-                workflow: provenance
-                  ? { id: provenance.id, name: provenance.name }
-                  : entry.detail === 'created' && workflow
-                    ? workflow
-                    : null,
-              },
-            };
-          });
-        }),
+      timelineActors: createPurchasingTimelineActors(database),
       incomingChanged: projectIncoming,
       additionalTimeline: createPurchaseReceiptTimeline(
         () => nativeStock.ledger,
@@ -758,9 +663,7 @@ export function createApplicationServices(
       model: {
         gateway: options.modelGateway ?? null,
         available: options.supplierExtraction?.available ?? false,
-        reason:
-          options.supplierExtraction?.reason ??
-          'Automatic extraction of supplier commitments isn’t set up on this server. Connected mailbox messages are still available in Inbox.',
+        reason: options.supplierExtraction?.reason ?? null,
       },
       trace: (context) => supplierTrace(context.requestId),
       ...(options.supplierMessageRetentionDays
@@ -835,9 +738,7 @@ export function createApplicationServices(
       extraction: {
         gateway: options.modelGateway ?? null,
         available: options.documentExtraction?.available ?? false,
-        reason:
-          options.documentExtraction?.reason ??
-          'Reading documents automatically isn’t set up on this server.',
+        reason: options.documentExtraction?.reason ?? null,
       },
     },
     retentionDays: options.messaging?.retentionDays,
@@ -930,41 +831,17 @@ export function createApplicationServices(
     createAuditLog,
     {
       refreshContext: identity.refreshContext,
-      source: {
-        async money(context, value, refund, exchange) {
-          const step = value.proposal?.kind === 'exchange' ? exchange : refund;
-          if (!step?.sent)
-            return {
-              state: 'not_requested',
-              readable: true,
-              complete: true,
-              observedAt: value.proposal?.at ?? null,
-              evidenceRefs: [`case:${value.id}:${value.revision}`],
-              requestedAt: step?.requestedAt ?? null,
-            };
-          if (!options.returns)
-            throw new Error('Return financial reads unavailable');
-          const proof =
-            value.proposal?.kind === 'exchange' && exchange
-              ? await returnExchanges.observe(context, value.id, exchange.id)
-              : refund
-                ? await returnActions.observe(context, value.id, refund.id)
-                : null;
-
-          return {
-            state: proof?.payment ?? 'unknown',
-            readable: true,
-            complete:
-              !!proof &&
-              proof.payment !== null &&
-              proof.payment !== 'unknown' &&
-              proof.evidenceRefs.length > 0,
-            observedAt: proof?.observedAt ?? null,
-            evidenceRefs: proof?.evidenceRefs ?? [],
-            requestedAt: step.requestedAt,
-          };
-        },
-      },
+      // Without installed return connections, sent money cannot be read.
+      source: createReturnMoneySource(
+        options.returns
+          ? {
+              refund: (context, caseId, id) =>
+                returnActions.observe(context, caseId, id),
+              exchange: (context, caseId, id) =>
+                returnExchanges.observe(context, caseId, id),
+            }
+          : null,
+      ),
     },
   );
   const desk = createDeskServices(database, identity, combinedEffects, {
@@ -1185,10 +1062,7 @@ export function createApplicationServices(
     contextualEnabled: (context) =>
       purchasingRelease(context.tenantId, 'contextual-record-assistance'),
     gateway: options.modelGateway ?? null,
-    availability: options.assistant ?? {
-      available: false,
-      reason: 'Asking Luma isn’t set up on this server.',
-    },
+    availability: options.assistant ?? { available: false, reason: null },
     reads: {
       orders,
       issues: detection.cases,
@@ -1286,20 +1160,7 @@ export function createApplicationServices(
         createConnectionCoverage(database),
         () => new Date(),
         createResolutionMetricReader(database),
-        async (context) => {
-          if (!hasPermission(context, 'inventory.read')) return undefined;
-
-          return database.transaction(
-            context.tenantId,
-            async (tx) =>
-              (
-                await tx.query<{ count: number; until: string | null }>(
-                  `SELECT count(*)::int AS count,to_char(min(wait_until) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS until FROM exception_pending_sync WHERE tenant_id=$1 AND subject_kind='sku'`,
-                  [context.tenantId],
-                )
-              ).rows[0]!,
-          );
-        },
+        createPendingStockSyncReader(database),
       ),
       orderChanges,
       orders,

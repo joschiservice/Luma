@@ -28,6 +28,10 @@ import type {
   ShadowComparison,
   StockEvidence,
 } from './ledger.js';
+import {
+  canReviewLedgerChange,
+  ledgerReviewPermissions,
+} from './ledger-review.js';
 
 const reviewId = (
   hash: (value: unknown) => string,
@@ -1028,9 +1032,9 @@ export function createLedgerService(deps: LedgerDependencies) {
         const review = await tx.review(id);
         if (!review)
           throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
-        if (review.command.purchaseReceipt)
-          requirePermission(fresh, 'procurement.manage');
-        if (review.preparedBy === fresh.actor.id)
+        for (const permission of ledgerReviewPermissions(review))
+          requirePermission(fresh, permission);
+        if (!canReviewLedgerChange(fresh, review))
           throw new LedgerError(
             'review_required',
             'Another member must review this stock change.',

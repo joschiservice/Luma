@@ -27,6 +27,7 @@ import {
   createExceptionWorker,
   createProcessClient,
 } from '@luma/workflow-temporal';
+import { advanceWorkflowSchedules } from '@luma/workflows/composition';
 import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
@@ -35,6 +36,7 @@ import {
   createApplicationServices,
   createOrderLineReader,
 } from './application.js';
+import { applicationOptionsFor } from './application-options.js';
 import {
   createOrderRefreshService,
   createStockRefreshService,
@@ -315,12 +317,12 @@ export async function createDefaultExceptionWorker(
       execution: { kind: 'enabled', effects: { resolve: async () => null } },
       replenishmentTransport: processClient,
       ...(observability ? { observability } : {}),
+      // The worker has no model gateway settings, so model-backed features report unavailable.
       ...(host
         ? {
-            workflowSources: host.registry.workflowSources(),
-            providerCatalog: host.providerCatalog,
-            connectionEnvironment: host.connectionEnvironment,
-            actionPermission: host.registry.actionPermission,
+            ...applicationOptionsFor(host, {
+              ...(observability ? { observability } : {}),
+            }),
             refreshStock,
           }
         : {}),
@@ -375,7 +377,7 @@ export async function createDefaultExceptionWorker(
     async function advanceSchedules() {
       while (!stopSchedules.signal.aborted) {
         try {
-          await pool.query('SELECT advance_workflow_schedules()');
+          await advanceWorkflowSchedules(pool);
         } catch (error) {
           console.error(
             'Scheduled workflow starts could not be advanced; retrying.',

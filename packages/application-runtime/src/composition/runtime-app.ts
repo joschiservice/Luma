@@ -9,9 +9,6 @@ import type {
 import type { ConnectionManagement } from '@luma/connections';
 import {
   createInstallationRepository,
-  createInstalledMessageRuntime,
-  createInstalledPurchaseOrderRuntime,
-  createInstalledReturnRuntime,
   createInstalledRuntime,
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
@@ -43,12 +40,7 @@ import {
   createApplicationServices,
   createOrderLineReader,
 } from './application.js';
-import {
-  assistantAvailability,
-  authoringAvailability,
-  documentExtractionAvailability,
-  supplierExtractionAvailability,
-} from './authoring.js';
+import { applicationOptionsFor } from './application-options.js';
 import { createCommerceSyncService } from './commerce-sync.js';
 import {
   createOrderRefreshService,
@@ -211,88 +203,30 @@ export async function buildRuntimeApp(
         )
       : undefined;
     if (processClient) resources.add(processClient.close);
-    const mailboxRuntime =
-      connections && 'registry' in installedConnections
-        ? createInstalledMessageRuntime({
-            installations: installedConnections.connections,
-            providers: installedConnections.registry.providers(),
-            record: async () => undefined,
-            recordObservations: async () => undefined,
-          })
-        : undefined;
+    const { messaging: mailboxes, ...shared } = applicationOptionsFor(
+      installedConnections,
+      {
+        // Without connection settings, purchase orders, returns and mailboxes stay local.
+        providerRuntimes: !!connections,
+        ...(modelGateway && modelSettings
+          ? { model: { gateway: modelGateway, settings: modelSettings } }
+          : {}),
+        ...(observability ? { observability } : {}),
+      },
+    );
     const application = createApplicationServices({
       database: tenantDatabase(),
       identity: identity.service,
-      providerCatalog: installedConnections.providerCatalog,
-      ...('connectionEnvironment' in installedConnections
-        ? { connectionEnvironment: installedConnections.connectionEnvironment }
-        : {}),
+      ...shared,
       execution: processClient
         ? { kind: 'enabled', effects: { resolve: async () => null } }
         : { kind: 'disabled' },
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
-      ...(installedConnections
-        ? {
-            decisionSources: installedConnections.decisionSources(),
-            workflowSources: installedConnections.registry.workflowSources(),
-            actionPermission: installedConnections.registry.actionPermission,
-            ...(stockRefresh ? { refreshStock } : {}),
-            nativeStockReader: createInstalledRuntime({
-              installations: installedConnections.connections,
-              providers: installedConnections.registry.providers(),
-              record: async () => undefined,
-              recordObservations: async () => undefined,
-            }),
-          }
-        : {}),
-      ...(modelGateway ? { modelGateway } : {}),
-      authoring: authoringAvailability(modelSettings, !!modelGateway),
-      supplierExtraction: supplierExtractionAvailability(
-        modelSettings,
-        !!modelGateway,
-      ),
-      assistant: assistantAvailability(modelSettings, !!modelGateway),
-      documentExtraction: documentExtractionAvailability(
-        modelSettings,
-        !!modelGateway,
-      ),
-      ...(observability ? { observability } : {}),
-      ...(connections && 'registry' in installedConnections
-        ? {
-            purchasing: {
-              runtime: createInstalledPurchaseOrderRuntime({
-                installations: installedConnections.connections,
-                providers: installedConnections.registry.providers(),
-                // Procurement stores the purchase-order observations it uses as evidence.
-                record: async () => undefined,
-                recordObservations: async () => undefined,
-              }),
-              installations: installedConnections.connections,
-            },
-            returns: {
-              runtime: createInstalledReturnRuntime({
-                installations: installedConnections.connections,
-                providers: installedConnections.registry.providers(),
-                // Return cases keep the creation evidence they use.
-                record: async () => undefined,
-                recordObservations: async () => undefined,
-              }),
-              installations: installedConnections.connections,
-            },
-          }
-        : {}),
-      // Mailboxes are listed from installed connections; threads are reread on demand.
+      ...(stockRefresh ? { refreshStock } : {}),
+      // Mailboxes are listed from the configured connection service, which may be injected.
       ...(connectionService
-        ? {
-            messaging: {
-              installations: connectionService,
-              // Replies are sent through the same runtime when execution is enabled.
-              ...(mailboxRuntime
-                ? { reader: mailboxRuntime, sender: mailboxRuntime }
-                : {}),
-            },
-          }
+        ? { messaging: { ...mailboxes, installations: connectionService } }
         : {}),
     });
     composed.orders = application.http.orders;

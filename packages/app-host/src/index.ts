@@ -9,6 +9,9 @@ export { createAppRegistry } from './application/registry.js';
 
 export type { AppRegistry } from './application/registry.js';
 
-export { createAppService } from './composition.js';
+export {
+  createAppService,
+  requireWorkspaceAppsReadable,
+} from './composition.js';
 
 export type { AppService } from './application/installations.js';

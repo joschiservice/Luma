@@ -803,7 +803,7 @@ export const journeyAreas = {
     ...decisions,
     ...inventory,
     'packages/inventory/**',
-    'packages/application-runtime/src/composition/native-purchase-incoming.ts',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-incoming.ts',
   ],
   'purchasing-native-receipt.e2e.mjs': [
     ...simulator,
@@ -812,6 +812,7 @@ export const journeyAreas = {
     ...inventory,
     'packages/inventory/**',
     'packages/application-runtime/src/composition/native-stock.ts',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-receipts.ts',
   ],
   'inbox.e2e.mjs': [...simulator, ...procurement, ...decisions],
   'contextual-assistance.browser.mjs': [

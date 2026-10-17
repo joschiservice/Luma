@@ -1,10 +1,9 @@
 import { isAppPermission, type TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import type { Approval, ProposedAction } from '@luma/policies';
-import {
-  type PurchaseOrder,
-  replenishmentApprovalCoversSend,
-} from '@luma/procurement';
+
+import type { PurchaseOrder } from '../domain/procurement.js';
+import { replenishmentApprovalCoversSend } from '../domain/replenishment-approval.js';
 
 /** Reads a prior human grant only for an unchanged, verified replenishment draft and its reviewed supplier destination. */
 export function createReplenishmentApprovalCoverage(

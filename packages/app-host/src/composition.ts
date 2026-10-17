@@ -13,3 +13,5 @@ export function createAppService(
 ) {
   return service(createAppRepository(database), registry, refreshContext);
 }
+
+export { requireWorkspaceAppsReadable } from './infrastructure/readiness.js';

@@ -21,6 +21,7 @@ import {
   governedFollowUpDecisionProvider,
   humanTaskDecisionProvider,
   messageReplyDecisionProvider,
+  nativeReceiptDecision,
   procurementActionDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
@@ -106,24 +107,7 @@ export function createDecisionServices(
             quantity: p.order.lines.reduce((sum, l) => sum + l.quantity, 0),
           })),
           ...revisions,
-          ...receipts.map((r) => ({
-            id: r.id,
-            kind: 'native_receipt' as const,
-            orderId: r.command.purchaseReceipt!.purchaseOrderId,
-            reference: 'Received native stock',
-            state:
-              r.state === 'approved'
-                ? ('approved' as const)
-                : ('approval_required' as const),
-            requestedBy: r.preparedBy,
-            requestedAt: r.createdAt,
-            expiresAt: null,
-            canApprove:
-              r.preparedBy !== context.actor.id &&
-              hasPermission(context, 'inventory.approve') &&
-              hasPermission(context, 'procurement.manage'),
-            quantity: Number(r.command.purchaseReceipt!.cumulativeGood),
-          })),
+          ...receipts.map((r) => nativeReceiptDecision(context, r)),
         ];
       }),
       returnCaseDecisionProvider(async (context) => {

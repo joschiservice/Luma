@@ -6,8 +6,7 @@ import {
   createLedgerStore,
 } from '@luma/inventory/composition';
 import type { TenantDatabase } from '@luma/platform';
-
-import { readNativePurchaseReceipt } from './native-purchase-receipts.js';
+import { readNativePurchaseReceipt } from '@luma/read-models/composition';
 
 /** Composes the shadow ledger with current identity checks and atomic Inventory audit; no provider writer is installed. */
 export function createInventoryLedgerRuntime(
