@@ -6,6 +6,28 @@ configured, and tenant or personal data may only go to a route in the tenant’s
 There is no public generation endpoint: callers reach a model only through their own
 authorized application services.
 
+```mermaid
+flowchart TD
+  caller["Authorized application service"] --> request["Request with profile and dataPolicy"]
+  request --> policy{"Routing policy selects a configured route?"}
+  policy -->|no| denied["route_denied"]
+  policy -->|yes| adapter{"Adapter configured?"}
+  adapter -->|no| unavailable["adapter_unavailable"]
+  adapter -->|yes| data{"Region and retention fit the data policy?"}
+  data -->|no| denied
+  data -->|yes| account{"Bedrock account: no retention, no payload logging?"}
+  account -->|no| unavailable
+  account -->|yes| destinations{"Every profile destination in the jurisdiction?"}
+  destinations -->|no| denied
+  destinations -->|yes| modelCall["One model call, no retry or fallback"]
+  modelCall -->|"provider failure"| failed["provider_error or timeout"]
+  modelCall --> output{"Output parses?"}
+  output -->|no| invalid["invalid_output"]
+  output -->|yes| result["Typed output or tool calls"]
+```
+
+The Bedrock checks apply only to `bedrock` routes; Vercel routes accept public input only.
+
 ## Regional processing
 
 Every request carries the authorized tenant’s `EU`, `AU` or `US` region. The gateway

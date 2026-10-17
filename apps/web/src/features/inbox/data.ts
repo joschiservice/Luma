@@ -40,8 +40,17 @@ const api = createWebApiClient().messaging;
 
 type ThreadPage = Awaited<ReturnType<typeof api.threads>>;
 
-/** Polling interval used beside the live stream, so an interrupted stream still converges. */
+/** Polling interval while the live stream is not delivering, so reads still converge. */
 const inboxPollMs = 30_000;
+
+/**
+ * Whether the screen reading inbox data receives live stream updates. `live` turns the fallback
+ * poll off; a screen without a stream subscription leaves it unset and keeps polling.
+ */
+export type InboxStream = 'connecting' | 'live' | 'interrupted' | undefined;
+
+const fallbackPoll = (stream: InboxStream) =>
+  stream === 'live' ? false : inboxPollMs;
 
 /** The thread list request as the API client accepts it. */
 export type ThreadListQueryInput = z.input<typeof threadQuerySchema>;
@@ -144,27 +153,31 @@ export const messagingKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'messaging'] as const;
 
 /** Lists connected mailboxes with their reading state, settings and rules. */
-export const mailboxesOptions = (organizationId: string) =>
+export const mailboxesOptions = (
+  organizationId: string,
+  stream?: InboxStream,
+) =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: [...messagingKey(organizationId), 'mailboxes'],
-    refetchInterval: inboxPollMs,
+    refetchInterval: fallbackPoll(stream),
     queryFn: ({ signal }) =>
       api.mailboxes({ params: { organizationId } }, { signal }),
   });
 
 /**
  * Pages through threads for a view, or reads every group's first threads of a grouped view. The
- * first page carries the view counts. Polls as a fallback for the live stream.
+ * first page carries the view counts. Polls only while the live stream is not delivering.
  */
 export const threadsOptions = (
   organizationId: string,
   query: ThreadListQueryInput,
+  stream?: InboxStream,
 ) =>
   infiniteQueryOptions({
     ...privateQueryDefaults,
     queryKey: [...messagingKey(organizationId), 'threads', query],
-    refetchInterval: inboxPollMs,
+    refetchInterval: fallbackPoll(stream),
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     initialPageParam: undefined as string | undefined,
@@ -194,9 +207,14 @@ export const threadGroupOptions = (
 
 /**
  * Reads one thread with messages, links, notes, timeline, documents and replies. Polls faster
- * while a reply is being sent, so its confirmation appears without a manual refresh.
+ * while a reply is being sent, so its confirmation appears without a manual refresh; otherwise
+ * polls only while the live stream is not delivering.
  */
-export const threadOptions = (organizationId: string, threadId: string) =>
+export const threadOptions = (
+  organizationId: string,
+  threadId: string,
+  stream?: InboxStream,
+) =>
   queryOptions<ThreadDetail>({
     ...privateQueryDefaults,
     queryKey: [...messagingKey(organizationId), 'thread', threadId],
@@ -204,7 +222,7 @@ export const threadOptions = (organizationId: string, threadId: string) =>
     refetchInterval: (query) =>
       query.state.data?.outbound.some((reply) => reply.state === 'sending')
         ? 5000
-        : inboxPollMs,
+        : fallbackPoll(stream),
     queryFn: ({ signal }): Promise<ThreadDetail> =>
       api.thread({ params: { organizationId, threadId } }, { signal }),
   });
@@ -226,15 +244,22 @@ export const recordThreadsOptions = (
       ),
   });
 
-/** Reads a document's source representation beside the facts proposed from it. */
-export const documentOptions = (organizationId: string, documentId: string) =>
+/**
+ * Reads a document's source representation beside the facts proposed from it. Polls faster while
+ * the document is being read; otherwise polls only while the live stream is not delivering.
+ */
+export const documentOptions = (
+  organizationId: string,
+  documentId: string,
+  stream?: InboxStream,
+) =>
   queryOptions<DocumentDetail>({
     ...privateQueryDefaults,
     queryKey: [...messagingKey(organizationId), 'document', documentId],
     refetchInterval: (query) =>
       ['pending', 'reading'].includes(query.state.data?.document.state ?? '')
         ? 5000
-        : inboxPollMs,
+        : fallbackPoll(stream),
     queryFn: ({ signal }): Promise<DocumentDetail> =>
       api.document({ params: { organizationId, documentId } }, { signal }),
   });

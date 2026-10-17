@@ -7,6 +7,35 @@ and audit evidence. A workflow never resolves an incident on its own; only fresh
 authoritative verification through the exceptions service does. The workflow lives in
 `@luma/workflow-temporal` and is composed in `@luma/application-runtime`.
 
+```mermaid
+stateDiagram-v2
+  [*] --> detecting
+  detecting --> no_incident: nothing detected
+  detecting --> diagnosing
+  diagnosing --> diagnosing: pending or failed, up to five evaluations
+  diagnosing --> shadow_completed: Shadow run
+  diagnosing --> verifying: detector clear
+  diagnosing --> proposing: ready
+  diagnosing --> escalated: not ready or backoff over 24 hours
+  proposing --> executing
+  proposing --> escalated: no supported action
+  executing --> awaiting_approval: approval required
+  awaiting_approval --> executing: response or 30-second poll
+  awaiting_approval --> proposing: renewal before the deadline
+  awaiting_approval --> denied: proposal expired
+  executing --> denied: policy denied
+  executing --> not_executed: observe-only
+  executing --> reconciling: reconciliation required or activity failed
+  executing --> verifying: succeeded
+  reconciling --> verifying: succeeded
+  reconciling --> escalated: not established
+  verifying --> resolved: verification passed
+  verifying --> escalated: verification needs review
+```
+
+These are progress phases, not incident states. `resolved` reports that the exceptions
+service accepted the verification; every escalation leaves the incident unresolved.
+
 ## Run the worker
 
 `pnpm dev:workflows` starts PostgreSQL, the Temporal development server and the worker
@@ -88,8 +117,9 @@ action before returning its reference and records the case/workflow association 
 Policy evaluation and the initial dispatch share execution's preflight boundary; no
 separate policy result authorizes a later write. While awaiting approval, the command
 layer records the response through policies with the approver's authenticated context and,
-after commit, sends a notification signal. The signal is only a wake-up hint with no
-approval or actor claims. A 30-second durable poll covers lost notifications.
+after commit, signals `approvalChanged` to the workflow bound to the case. The signal is only a
+wake-up hint with no approval or actor claims, sent only for approve and reject, bounded to two
+seconds and never failing the decision. A 30-second durable poll covers lost notifications.
 
 Approval waits end at the proposal or evidence expiry, at most 24 hours. When the
 composition installs a proposal refresher (the shipping-method correction), the workflow

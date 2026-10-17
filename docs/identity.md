@@ -114,6 +114,24 @@ Every tenant route declares who may call it: contract routes through `access` in
 
 A path ID selects a tenant; it does not grant access. Each request reads the current session and membership. `activeOrganizationId`, tenant headers and client-supplied context are never authorization inputs.
 
+```mermaid
+flowchart TD
+  request["Tenant route request"] --> origin{"Mutation without a trusted Origin?"}
+  origin -->|yes| badOrigin["403"]
+  origin -->|no| session{"Valid session?"}
+  session -->|no| unauthenticated["401"]
+  session -->|yes| placement{"Workspace placed in this cell?"}
+  placement -->|no| region["503 REGION_UNAVAILABLE"]
+  placement -->|yes| member{"Member of an active workspace?"}
+  member -->|no| notFound["404"]
+  member -->|yes| active{"Membership active?"}
+  active -->|no| suspended["403 ACCESS_SUSPENDED"]
+  active -->|yes| context["Immutable tenantContext"]
+  context --> access{"Route declares access the role holds?"}
+  access -->|no| forbidden["403"]
+  access -->|yes| handler["Handler passes the context to use cases"]
+```
+
 | Situation                                        | Response |
 | ------------------------------------------------ | -------- |
 | Not a member, or the organization does not exist | 404      |

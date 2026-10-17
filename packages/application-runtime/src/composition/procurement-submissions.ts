@@ -221,6 +221,23 @@ function execution(result: ExecutionResult | null): SubmissionExecution {
     : { state: 'uncertain' };
 }
 
+/** Keeps the recorded approval outcome and approver, without the approval's evidence. */
+function decisionView<
+  T extends {
+    approval: { outcome: 'approved' | 'rejected'; approverId: string } | null;
+  },
+>({ approval, ...rest }: T) {
+  return approval
+    ? {
+        ...rest,
+        approval: {
+          outcome: approval.outcome,
+          approverId: approval.approverId,
+        },
+      }
+    : rest;
+}
+
 /** Binds submissions to the shared Action Admission, policy and execution services. */
 export function createSubmissionAdmission(
   safety: ReturnType<typeof createSafetyServices>,
@@ -273,18 +290,17 @@ export function createSubmissionAdmission(
     async decision(context, id) {
       const decision = await safety.policies.decision(context, id);
 
-      if (!decision) return null;
-      const { approval, ...rest } = decision;
+      return decision && decisionView(decision);
+    },
+    async decisions(context, ids) {
+      const decisions = await safety.policies.decisions(context, ids);
 
-      return approval
-        ? {
-            ...rest,
-            approval: {
-              outcome: approval.outcome,
-              approverId: approval.approverId,
-            },
-          }
-        : rest;
+      return new Map(
+        [...decisions].map(([id, decision]) => [
+          id,
+          decision && decisionView(decision),
+        ]),
+      );
     },
     async respond(context, decisionId, outcome, expiresAt) {
       await safety.policies.respond(context, decisionId, outcome, expiresAt);

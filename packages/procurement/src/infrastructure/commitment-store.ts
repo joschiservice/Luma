@@ -244,6 +244,11 @@ export function createCommitmentStore(
                 [tenantId, id],
               )
             )[0] ?? null,
+          suppliers: (ids) =>
+            documents<Supplier>(
+              'SELECT document FROM procurement_suppliers WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+              [tenantId, ids],
+            ),
           updateSupplier: async (supplier) => {
             await tx.query(
               'UPDATE procurement_suppliers SET document=$3 WHERE tenant_id=$1 AND id=$2',
@@ -314,12 +319,12 @@ export function createCommitmentStore(
                AND NOT settled AND state=ANY($3::text[]) ORDER BY created_at,id`,
               [tenantId, principalId, live],
             ),
-          communications: ({ orderIds, supplierId }) =>
+          communications: ({ orderIds, supplierId, limit }) =>
             documents<Communication>(
               `SELECT document FROM procurement_communications WHERE tenant_id=$1
                AND ($2::uuid[] IS NULL OR purchase_order_id=ANY($2::uuid[]))
-               AND ($3::uuid IS NULL OR supplier_id=$3) ORDER BY received_at DESC,id`,
-              [tenantId, orderIds ?? null, supplierId ?? null],
+               AND ($3::uuid IS NULL OR supplier_id=$3) ORDER BY received_at DESC,id LIMIT $4`,
+              [tenantId, orderIds ?? null, supplierId ?? null, limit ?? null],
             ),
           communication: async (id) =>
             (

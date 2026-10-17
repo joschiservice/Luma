@@ -4,6 +4,7 @@ import { createQueryClient } from '../../lib/query-client';
 import {
   clearPrivate,
   IdentityError,
+  onClearPrivate,
   organizationSlug,
   returnPath,
 } from './data';
@@ -68,6 +69,19 @@ describe('identity navigation', () => {
     ).toBe('new tenant');
     await clearPrivate(client);
     expect(client.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it('clears registered private module state with the private cache', async () => {
+    const cleared: (string | undefined)[] = [];
+    const stop = onClearPrivate((organizationId) =>
+      cleared.push(organizationId),
+    );
+    const client = createQueryClient();
+    await clearPrivate(client, 'old');
+    await clearPrivate(client);
+    stop();
+    await clearPrivate(client, 'other');
+    expect(cleared).toEqual(['old', undefined]);
   });
 });
 

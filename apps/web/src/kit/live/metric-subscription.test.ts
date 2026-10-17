@@ -98,3 +98,29 @@ it('detects a silent stream and requests fresh state after reopening it', () => 
   vi.advanceTimersByTime(15000);
   expect(transport).toHaveBeenCalledTimes(2);
 });
+
+it('holds refetches while the tab is hidden and delivers them together when it is visible', () => {
+  const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+  vi.stubGlobal('document', page);
+  const observer = subscriber();
+  cleanup.push(subscribeToWorkspaceMetrics('workspace', observer));
+  const deliver = transport.mock.calls[0]![0].onResync;
+  deliver({ ...event, refetch: true, topics: ['messaging'] });
+  deliver({ ...event, refetch: true, topics: ['decisions'] });
+  expect(observer.onResync).toHaveBeenCalledTimes(2);
+  expect(observer.onResync).toHaveBeenLastCalledWith({
+    ...event,
+    refetch: false,
+    topics: [],
+  });
+
+  page.visibilityState = 'visible';
+  page.dispatchEvent(new Event('visibilitychange'));
+  expect(observer.onResync).toHaveBeenLastCalledWith({
+    ...event,
+    refetch: true,
+    topics: ['messaging', 'decisions'],
+  });
+  page.dispatchEvent(new Event('visibilitychange'));
+  expect(observer.onResync).toHaveBeenCalledTimes(3);
+});

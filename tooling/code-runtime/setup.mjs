@@ -40,11 +40,70 @@ const hashes = {
   ],
 };
 const expected = hashes[`${architecture}-${platform}`];
-if (!expected)
-  throw new Error(
-    'Code runtime requires Linux on x64/arm64 or macOS on arm64.',
-  );
 const hash = (data) => createHash('sha256').update(data).digest('hex');
+const guestDigest =
+  platform === 'linux'
+    ? architecture === 'x86_64'
+      ? '904b98e156dafb36f16d051bbd75a6d529cbbbaa7e715350c1bf3fe7b06f6121'
+      : '23d57b6a7b3f71997b388d288b840eae3e03c6b797efd0292018ecc6216b2d15'
+    : 'a9ebcec73c5d2be040389b2748deb53fd699d2b6367a8fe60127e1874a564ca1';
+// Code generation flags must match the runner's `wasmtime run` flags in
+// packages/workflows/src/infrastructure/code/runner.ts. Wasmtime rejects a mismatched artifact.
+// `fuel=1` only enables fuel metering; each run sets its own fuel budget.
+const compileFlags = [
+  '-C',
+  'cache=n',
+  '-W',
+  'fuel=1,epoch-interruption=y,nan-canonicalization=y,threads=n,shared-memory=n,memory64=n,component-model=n',
+  '-O',
+  'memory-reservation=0,memory-reservation-for-growth=0,memory-guard-size=0,guard-before-linear-memory=n',
+];
+// Identifies what an installation was built from; changing any part reinstalls.
+const release = {
+  wasmtime: 'v49.0.1',
+  javy: 'v9.1.0',
+  archives: expected ?? [],
+  guest: guestDigest,
+  compileFlags,
+};
+const args = process.argv.slice(2);
+// `--optional` (used by `pnpm run setup`) reports an unsupported platform instead of failing.
+const optional = args.includes('--optional');
+const force = args.includes('--force');
+
+/**
+ * Reports whether the destination already holds this release with unmodified files, so a
+ * repeated setup skips the downloads and compilation.
+ */
+async function installed() {
+  try {
+    const manifest = JSON.parse(
+      await readFile(join(destination, 'manifest.json'), 'utf8'),
+    );
+    if (JSON.stringify(manifest.release) !== JSON.stringify(release))
+      return false;
+    for (const [file, digest] of [
+      ['wasmtime', manifest.wasmtime],
+      ['guest.wasm', manifest.guest],
+      ['guest.cwasm', manifest.precompiled],
+    ])
+      if (hash(await readFile(join(destination, file))) !== digest)
+        return false;
+
+    return true;
+  } catch (error) {
+    if (error instanceof SyntaxError || error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+if (!expected) {
+  const message = 'Code runtime requires Linux on x64/arm64 or macOS on arm64.';
+  if (!optional) throw new Error(message);
+  console.log(`${message} Code Steps stay unavailable on this machine.`);
+} else if (!force && (await installed())) {
+  console.log(`Code runtime is already installed in ${destination}.`);
+} else await install();
 
 async function download(repository, version, name, digest) {
   const response = await fetch(
@@ -57,98 +116,86 @@ async function download(repository, version, name, digest) {
   return data;
 }
 
-const staging = await mkdtemp(join(tmpdir(), 'luma-code-'));
-try {
-  const name = `wasmtime-v49.0.1-${architecture}-${platform}`;
-  const archive = join(staging, 'wasmtime.tar.xz');
-  await writeFile(
-    archive,
-    await download('wasmtime', 'v49.0.1', `${name}.tar.xz`, expected[0]),
-  );
-  execFileSync('tar', ['-xJf', archive, '-C', staging, `${name}/wasmtime`]);
-  const javy = join(staging, 'javy');
-  await writeFile(
-    javy,
-    gunzipSync(
+/** Downloads the pinned release, builds and precompiles the guest, then installs it. */
+async function install() {
+  const staging = await mkdtemp(join(tmpdir(), 'luma-code-'));
+  try {
+    const name = `wasmtime-${release.wasmtime}-${architecture}-${platform}`;
+    const archive = join(staging, 'wasmtime.tar.xz');
+    await writeFile(
+      archive,
       await download(
-        'javy',
-        'v9.1.0',
-        `javy-${architecture === 'aarch64' ? 'arm' : architecture}-${platform}-v9.1.0.gz`,
-        expected[1],
+        'wasmtime',
+        release.wasmtime,
+        `${name}.tar.xz`,
+        expected[0],
       ),
-    ),
-  );
-  await chmod(javy, 0o755);
-  const guest = join(staging, 'guest.wasm');
-  execFileSync(
-    javy,
-    [
-      'build',
-      'guest.js',
-      '-C',
-      'dynamic=n',
-      '-C',
-      'deterministic=y',
-      '-C',
-      'source=omitted',
-      '-o',
-      guest,
-    ],
-    { timeout: 60000, cwd: join(root, 'tooling/code-runtime') },
-  );
-  const digest = hash(await readFile(guest));
-  if (
-    digest !==
-    (platform === 'linux'
-      ? architecture === 'x86_64'
-        ? '904b98e156dafb36f16d051bbd75a6d529cbbbaa7e715350c1bf3fe7b06f6121'
-        : '23d57b6a7b3f71997b388d288b840eae3e03c6b797efd0292018ecc6216b2d15'
-      : 'a9ebcec73c5d2be040389b2748deb53fd699d2b6367a8fe60127e1874a564ca1')
-  )
-    throw new Error(`Guest build is not reproducible: ${digest}`);
-  // Code generation flags must match the runner's `wasmtime run` flags in
-  // packages/workflows/src/infrastructure/code/runner.ts. Wasmtime rejects a mismatched artifact.
-  // `fuel=1` only enables fuel metering; each run sets its own fuel budget.
-  const precompiled = join(staging, 'guest.cwasm');
-  execFileSync(
-    join(staging, name, 'wasmtime'),
-    [
-      'compile',
-      '-C',
-      'cache=n',
-      '-W',
-      'fuel=1,epoch-interruption=y,nan-canonicalization=y,threads=n,shared-memory=n,memory64=n,component-model=n',
-      '-O',
-      'memory-reservation=0,memory-reservation-for-growth=0,memory-guard-size=0,guard-before-linear-memory=n',
-      '-o',
-      precompiled,
-      guest,
-    ],
-    { timeout: 120000 },
-  );
-  await mkdir(destination, { recursive: true, mode: 0o700 });
-  for (const [from, to] of [
-    [join(staging, name, 'wasmtime'), 'wasmtime'],
-    [guest, 'guest.wasm'],
-    [precompiled, 'guest.cwasm'],
-  ]) {
-    await writeFile(join(destination, `${to}.new`), await readFile(from), {
-      mode: 0o700,
-    });
-    await rename(join(destination, `${to}.new`), join(destination, to));
+    );
+    execFileSync('tar', ['-xJf', archive, '-C', staging, `${name}/wasmtime`]);
+    const javy = join(staging, 'javy');
+    await writeFile(
+      javy,
+      gunzipSync(
+        await download(
+          'javy',
+          release.javy,
+          `javy-${architecture === 'aarch64' ? 'arm' : architecture}-${platform}-${release.javy}.gz`,
+          expected[1],
+        ),
+      ),
+    );
+    await chmod(javy, 0o755);
+    const guest = join(staging, 'guest.wasm');
+    execFileSync(
+      javy,
+      [
+        'build',
+        'guest.js',
+        '-C',
+        'dynamic=n',
+        '-C',
+        'deterministic=y',
+        '-C',
+        'source=omitted',
+        '-o',
+        guest,
+      ],
+      { timeout: 60000, cwd: join(root, 'tooling/code-runtime') },
+    );
+    const digest = hash(await readFile(guest));
+    if (digest !== guestDigest)
+      throw new Error(`Guest build is not reproducible: ${digest}`);
+    const precompiled = join(staging, 'guest.cwasm');
+    execFileSync(
+      join(staging, name, 'wasmtime'),
+      ['compile', ...compileFlags, '-o', precompiled, guest],
+      { timeout: 120000 },
+    );
+    await mkdir(destination, { recursive: true, mode: 0o700 });
+    for (const [from, to] of [
+      [join(staging, name, 'wasmtime'), 'wasmtime'],
+      [guest, 'guest.wasm'],
+      [precompiled, 'guest.cwasm'],
+    ]) {
+      await writeFile(join(destination, `${to}.new`), await readFile(from), {
+        mode: 0o700,
+      });
+      await rename(join(destination, `${to}.new`), join(destination, to));
+    }
+    await writeFile(
+      join(destination, 'manifest.json'),
+      JSON.stringify({
+        release,
+        wasmtime: hash(await readFile(join(destination, 'wasmtime'))),
+        guest: digest,
+        precompiled: hash(await readFile(join(destination, 'guest.cwasm'))),
+      }) + '\n',
+      { mode: 0o600 },
+    );
+    console.log(
+      `Code runtime installed in ${destination}. pnpm dev and pnpm dev:workflows use it automatically; elsewhere, set LUMA_CODE_RUNTIME_DIR=${destination} for the API and the workflow worker.`,
+    );
+  } finally {
+    await rm(staging, { recursive: true, force: true });
   }
-  await writeFile(
-    join(destination, 'manifest.json'),
-    JSON.stringify({
-      wasmtime: hash(await readFile(join(destination, 'wasmtime'))),
-      guest: digest,
-      precompiled: hash(await readFile(join(destination, 'guest.cwasm'))),
-    }) + '\n',
-    { mode: 0o600 },
-  );
-  console.log(
-    `Code runtime installed in ${destination}. pnpm dev and pnpm dev:workflows use it automatically; elsewhere, set LUMA_CODE_RUNTIME_DIR=${destination} for the API and the workflow worker.`,
-  );
-} finally {
-  await rm(staging, { recursive: true, force: true });
 }

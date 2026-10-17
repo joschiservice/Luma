@@ -919,6 +919,16 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         data: { ...product.data, skus: [] },
       });
       expect(await read(tenant, skuId)).toEqual([]);
+      await save({ ...product, observedAt: '2030-01-04T00:00:00Z' });
+      expect(await read(tenant, skuId)).toEqual([
+        { source: 'shopify', title: 'Blue shirt', sku: 'SHIRT-BLUE' },
+      ]);
+      await save({
+        ...product,
+        kind: 'tombstone',
+        observedAt: '2030-01-05T00:00:00Z',
+      });
+      expect(await read(tenant, skuId)).toEqual([]);
     } finally {
       await owner.query(
         'DELETE FROM connector_read_checks WHERE tenant_id=$1',

@@ -143,13 +143,22 @@ export function decisionListQuery(
   };
 }
 
+/**
+ * Polls Needs you reads as a fallback while the live stream is not delivering. Screens without a
+ * stream subscription leave `stream` unset and keep polling.
+ */
+export const decisionsPollInterval = (
+  stream?: 'connecting' | 'live' | 'interrupted',
+) => (stream === 'live' ? false : 30_000);
+
 /** Caches every Needs you read for one workspace so decisions anywhere can refresh them. */
 export const decisionsKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'decisions'] as const;
 
 /**
  * Loads a page of decisions that need a person, or every group's first decisions. It polls
- * while visible as a fallback for the live stream and refetches on focus and reconnect. Its
+ * while visible as a fallback for the live stream (screens with a live stream override
+ * `refetchInterval` with `decisionsPollInterval`) and refetches on focus and reconnect. Its
  * view counts cover the whole queue, as Home and the sidebar show it.
  */
 export function decisionsOptions(
@@ -162,7 +171,7 @@ export function decisionsOptions(
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...decisionsKey(organizationId), request],
-    refetchInterval: 30_000,
+    refetchInterval: decisionsPollInterval(),
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>

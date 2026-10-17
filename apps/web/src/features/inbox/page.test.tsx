@@ -87,7 +87,6 @@ it('labels notes as internal and explains why a reply needs approval', async () 
       detail={threadDetailFixture}
       access={{ manage: true, send: true, approve: true }}
       people={people}
-      now={inboxNow}
       onClose={() => undefined}
     />,
   );
@@ -108,7 +107,6 @@ it('hides work controls from people who can only read', async () => {
       detail={threadDetailFixture}
       access={threadAccess(threadDetailFixture, () => false)}
       people={people}
-      now={inboxNow}
       onClose={() => undefined}
     />,
   );

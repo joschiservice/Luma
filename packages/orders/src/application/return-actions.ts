@@ -37,10 +37,14 @@ export interface ReturnStockTarget {
 
 /** Tenant-owned settlement persistence; mutations serialize with case decisions. */
 export interface ReturnActionStore {
+  /** Runs one tenant transaction; `readOnlySnapshot` gives reads one consistent view without locks. */
   transaction<T>(
     tenantId: string,
     fn: (tx: {
+      /** Reads the case after taking its order lock and row lock; use only before writes. */
       lock(caseId: string): Promise<ReturnCase | null>;
+      /** Reads the case without locks, so polling does not wait for or block writers. */
+      read(caseId: string): Promise<ReturnCase | null>;
       get(id: string): Promise<ReturnAction | null>;
       list(caseId: string): Promise<ReturnAction[]>;
       save(value: ReturnAction): Promise<void>;
@@ -50,6 +54,7 @@ export interface ReturnActionStore {
       ): Promise<Omit<ReturnStockTarget, 'warehouse'>[]>;
       audit(entry: AuditEntry): Promise<void>;
     }) => Promise<T>,
+    options?: { readOnlySnapshot: true },
   ): Promise<T>;
 }
 
@@ -533,10 +538,11 @@ export function createReturnActions(deps: Dependencies) {
         context.tenantId,
         async (tx) => {
           const c =
-            (await tx.lock(caseId)) ?? fail(404, 'Return case not found');
+            (await tx.read(caseId)) ?? fail(404, 'Return case not found');
 
           return { items: await tx.list(caseId), c };
         },
+        { readOnlySnapshot: true },
       );
 
       const targets = hasPermission(context, 'returns.manage')

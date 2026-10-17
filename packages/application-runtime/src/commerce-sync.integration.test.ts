@@ -448,6 +448,36 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     ).rows[0];
   }
 
+  /** Expects the ledger counts kept with every ledger write to equal a count of the ledger. */
+  async function expectLedgerCounts() {
+    const columns = [
+      'total',
+      'current',
+      'pending',
+      'failed',
+      'retired',
+      'missing',
+    ];
+    const kept = await owner.query(
+      `SELECT connection_id,record_type,${columns.map((name) => `sum(${name})::int AS ${name}`).join(',')}
+      FROM commerce_sync_item_counts WHERE tenant_id=$1 GROUP BY 1,2
+      HAVING ${columns.map((name) => `sum(${name})<>0`).join(' OR ')} ORDER BY 1,2`,
+      [tenant],
+    );
+    const ledger = await owner.query(
+      `SELECT connection_id,record_type,count(*)::int AS total,
+        count(*) FILTER (WHERE status='current')::int AS current,
+        count(*) FILTER (WHERE status='pending')::int AS pending,
+        count(*) FILTER (WHERE status='failed')::int AS failed,
+        count(*) FILTER (WHERE status='retired')::int AS retired,
+        count(*) FILTER (WHERE missing_since IS NOT NULL AND status<>'retired')::int AS missing
+      FROM commerce_sync_items WHERE tenant_id=$1 GROUP BY 1,2 ORDER BY 1,2`,
+      [tenant],
+    );
+    expect(ledger.rows.length).toBeGreaterThan(0);
+    expect(kept.rows).toEqual(ledger.rows);
+  }
+
   async function due() {
     await owner.query(
       'UPDATE commerce_sync_streams SET due_at=now() WHERE tenant_id=$1',
@@ -845,6 +875,19 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       { kind: 'position', deleted: false },
       { kind: 'product', deleted: false },
     ]);
+    // A retired record the source returns again is re-imported, even with an unchanged digest.
+    expect(
+      (
+        await owner.query(
+          'SELECT status,missing_since FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 ORDER BY record_type',
+          [tenant, shop],
+        )
+      ).rows,
+    ).toEqual([
+      { status: 'current', missing_since: null },
+      { status: 'current', missing_since: null },
+      { status: 'current', missing_since: null },
+    ]);
     expect(
       (
         await owner.query(
@@ -853,6 +896,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
       ).rows,
     ).toEqual(before.rows);
+    await expectLedgerCounts();
   }, 30_000);
 
   it('admits independent connections concurrently and enforces connection leases across runners', async () => {
@@ -1163,6 +1207,13 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       "SELECT kind,unchanged FROM commerce_sync_runs r JOIN commerce_sync_streams s ON s.id=r.stream_id WHERE s.record_type='orders' ORDER BY r.started_at",
     );
     expect(runs.rows.at(-1)).toEqual({ kind: 'backfill', unchanged: 3 });
+    await expectLedgerCounts();
+    // Page commits fold their streams' count changes, so each stream keeps one row.
+    const countRows = await owner.query(
+      'SELECT count(*)::int AS rows FROM commerce_sync_item_counts WHERE tenant_id=$1 GROUP BY connection_id,record_type',
+      [tenant],
+    );
+    expect(countRows.rows.every((row) => row.rows === 1)).toBe(true);
 
     // Members read one sync's runs, newest first; other streams' runs stay out.
     const history = await service.runs(context('viewer'), orders!.id);
@@ -1456,6 +1507,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       .find((item) => item.connectionId === shop)
       ?.recordTypes.find((item) => item.recordType === 'orders')?.stream;
     expect(view?.records).toMatchObject({ total: 2, missing: 1 });
+    await expectLedgerCounts();
     expect(
       Number(
         (
@@ -1604,6 +1656,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     expect(
       checks.rows.every((row) => row.document.value.items.length === 0),
     ).toBe(true);
+    await expectLedgerCounts();
   });
 
   it('lists a customer’s orders from every source once and erases the order links with the profile', async () => {
@@ -1979,6 +2032,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       [tenant],
     );
     expect(ledger.rowCount).toBe(0);
+    await expectLedgerCounts();
 
     // Removal is not an erasure: a customer the source reports again is imported again.
     source.set(

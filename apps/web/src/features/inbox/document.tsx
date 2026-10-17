@@ -115,8 +115,8 @@ export function DocumentReviewPage() {
   const { organizationId, documentId } = useParams({
     from: '/app/$organizationId/inbox/documents/$documentId',
   });
-  useInboxUpdates(organizationId);
-  const query = useQuery(documentOptions(organizationId, documentId));
+  const live = useInboxUpdates(organizationId);
+  const query = useQuery(documentOptions(organizationId, documentId, live));
   const { can } = usePermissions(organizationId);
   const people = useMembers(organizationId);
   const failure = readFailure(query.error);

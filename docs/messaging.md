@@ -6,6 +6,18 @@ owner, notes and a reply deadline. Code: `@luma/messaging`; provider protocols l
 mailbox apps, and other owners' records are read only through ports composed in
 `@luma/application-runtime`.
 
+```mermaid
+flowchart TD
+    Rules["Inbox rules"] --> Query["One provider query"]
+    Query --> Read["Read matching messages only"]
+    Read --> Threads["Threads with owner, deadline and notes"]
+    Threads --> Links["Links backed by evidence"]
+    Threads --> Documents["Attachments become documents"]
+    Documents --> Facts["Facts proposed for review"]
+    Links -->|exactly one purchase order| Procurement["Procurement handoff"]
+    Threads --> Replies["Replies: approve when consequential, send once, verify by reading"]
+```
+
 ## Rules decide what Luma receives
 
 A mailbox exists for every connection that asks for `messages.read`. It reads nothing until
@@ -294,11 +306,31 @@ A reply is consequential when its subject or text states a date or deadline (dat
 outstanding), or money (amounts with a currency, refunds, credits, discounts, `Gutschrift`,
 `Erstattung`, `Rabatt`), or when the mailbox setting requires approval for every reply. Cited
 statements count like typed ones, and matching errs towards approval. Consequential replies
-are high risk: policy requires someone other than the requester with `decisions.respond` and
-the mailbox app's send permission (`gmail:messages.send`) to approve the exact text. Other
+are high risk: policy requires approval of the exact text by someone with `decisions.respond`
+and the mailbox app's send permission (`gmail:messages.send`), who must be someone other than
+the requester when the workspace
+[requires independent approval](workspace-settings.md#approval-preference). Other
 replies are low risk and are sent as soon as they are requested, when policy allows.
 
 ### Sending once
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> discarded: author discards
+    draft --> approval_required: author requests
+    approval_required --> discarded: author discards
+    approval_required --> approved: policy allows or approver approves
+    approval_required --> rejected: approver rejects
+    approval_required --> expired: 24 hours pass
+    approval_required --> failed: policy denies
+    approved --> sending
+    sending --> sent: fresh thread read finds it
+    sending --> uncertain: not confirmed
+    uncertain --> sent: a later read finds it
+    sending --> withheld: content, connection or mode changed
+    sending --> failed: nothing dispatched
+```
 
 Requesting a reply binds its exact content: the action carries the reply, connection and
 thread identities and a digest of recipients, subject, text and threading headers, never the

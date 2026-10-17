@@ -168,6 +168,7 @@ test('an inconclusive authoritative refresh withholds a correction without closi
   assert.equal((await f.receipts()).length, 1);
 });
 
+// Three previews, approvals and fresh reads run in sequence, so this journey needs more than the default.
 test('labels, changed authority, and cancelled authoritative orders withhold approved shipping corrections', async (t) => {
   const f = await starshipitUpdatesFixture(t),
     preview = await f.preview();
@@ -243,7 +244,7 @@ test('labels, changed authority, and cancelled authoritative orders withhold app
   await f.pilot.observe({ check: false });
   await f.preview({ status: 409 });
   assert.equal((await f.receipts()).length, 0);
-});
+}, 120_000);
 
 test('observe-only and action-release removal send no shipping correction and another tenant cannot use the saved reference', async (t) => {
   const f = await starshipitUpdatesFixture(t);

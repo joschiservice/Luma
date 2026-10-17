@@ -87,7 +87,7 @@ export function createPlaybookLibraryStore(
           `SELECT r.document, v.document AS version, o.document AS outcome FROM playbook_runs r
          JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version
          LEFT JOIN LATERAL (SELECT document FROM playbook_outcomes WHERE tenant_id=r.tenant_id AND run_id=r.id ORDER BY sequence DESC LIMIT 1) o ON true
-         WHERE r.tenant_id=$1 AND r.definition_id=$2 ORDER BY (r.document->>'createdAt')::timestamptz DESC,r.id DESC LIMIT 50`,
+         WHERE r.tenant_id=$1 AND r.definition_id=$2 ORDER BY r.document->>'createdAt' DESC,r.id DESC LIMIT 50`,
           [context.tenantId, id],
         );
 

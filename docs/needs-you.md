@@ -103,11 +103,6 @@ read the same API.
 
 ## Adding a source
 
-1. Keep the decision and its checks in the owner. Add a read that returns only decisions that
-   need a person now, from persisted state, bounded in size.
-2. Present each decision with a stable, prefixed ID, the reason, why, consequences, exact
-   change, deadline and evidence validity. Say `unknown` for impact without an explicit rule.
-3. Give it a `DecisionOwner` the web can mount, and add a case to the owner review if needed.
-4. Add its tables to the metric notification triggers with the `decisions` topic.
-5. Cover the reader-specific `response`, removal after a response on another surface, and
-   tenant isolation in the decisions e2e suite or the owner's.
+Follow the [add-needs-you-source](../.agents/skills/add-needs-you-source/SKILL.md) skill. Keep
+the decision and its checks in the owner, read persisted state only, and cover tenant
+isolation and removal after a response on another surface.

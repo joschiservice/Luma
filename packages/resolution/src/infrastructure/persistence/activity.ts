@@ -109,6 +109,8 @@ const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception
  * proposals, runs and admission steps targeting the order, admission steps of the runs, and
  * proposals of audit or execution events correlated with a trigger run in the time window.
  * The result may include unrelated IDs; the final subject filter stays the exact check.
+ * Each branch filters one plain or generated column, so every lookup stays index-backed under
+ * row-level security; an OR across them, or a JSON expression, would scan the tenant's rows.
  */
 async function readLinkedKeys(
   tx: SqlTransaction,
@@ -124,13 +126,13 @@ async function readLinkedKeys(
       SELECT id::text FROM workflow_trigger_runs WHERE tenant_id=$1 AND id=ANY($3::uuid[])
     ), proposals AS (
       SELECT unnest($3::uuid[]) AS id
-      UNION SELECT id FROM case_proposals WHERE tenant_id=$1 AND (exception_id IN (SELECT id FROM issues)
-       OR (document->'target'->>'kind'='order' AND document->'target'->>'id'=ANY($4)))
+      UNION SELECT id FROM case_proposals WHERE tenant_id=$1 AND exception_id IN (SELECT id FROM issues)
+      UNION SELECT id FROM case_proposals WHERE tenant_id=$1 AND target_kind='order' AND target_id=ANY($4)
       UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND incident_id=ANY($2::uuid[]::text[])
       UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND target_kind='order' AND target_id=ANY($4)
-      UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND (run_id=ANY($3::uuid[])
-       OR (document->'action'->'target'->>'kind'='order' AND document->'action'->'target'->>'id'=ANY($4))
-       OR (subject_kind='order' AND subject_id=ANY($4)))
+      UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND run_id=ANY($3::uuid[])
+      UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND target_kind='order' AND target_id=ANY($4)
+      UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND subject_kind='order' AND subject_id=ANY($4)
       UNION SELECT proposal_id FROM audit_entries WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM trigger_runs)
        AND created_at>=$5::timestamptz AND created_at<$6::timestamptz
        AND document->>'correlationId' IN (SELECT id FROM trigger_runs)

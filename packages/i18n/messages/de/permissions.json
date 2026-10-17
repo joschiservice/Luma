@@ -56,7 +56,7 @@
   "permissions_decisions_assign_label": "Entscheidungen zuweisen",
   "permissions_decisions_assign_description": "Jede Entscheidung einem Mitglied des Teams zuweisen oder neu zuweisen.",
   "permissions_decisions_respond_label": "Änderungen genehmigen oder ablehnen",
-  "permissions_decisions_respond_description": "Auf Genehmigungsanfragen antworten. Die genehmigende Person muss eine andere sein als die Person, die die Änderung vorgeschlagen hat.",
+  "permissions_decisions_respond_description": "Auf Genehmigungsanfragen antworten. Verlangt der Workspace eine Genehmigung durch eine andere Person, darf die genehmigende Person nicht die sein, die die Änderung vorgeschlagen hat.",
   "permissions_actions_propose_label": "Änderungen vorschlagen",
   "permissions_actions_propose_description": "Luma Änderungen in verbundenen Systemen vorbereiten lassen. Die Genehmigungsregeln legen fest, ob jemand sie genehmigen muss.",
   "permissions_actions_execute_label": "Änderungen anwenden",

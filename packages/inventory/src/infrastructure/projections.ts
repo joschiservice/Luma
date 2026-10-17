@@ -327,7 +327,7 @@ export function createCommerceProjections(
         const column = kind === 'sku' ? 'sku_id' : 'location_id';
         const rows = await tx.query<Dependent>(
           `SELECT p.entity_id AS "entityId",'position' AS kind,p.connection_id AS "connectionId",s.observation_id AS "observationId"
-          FROM inventory_snapshots s JOIN inventory_projections p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+          FROM inventory_snapshots s JOIN inventory_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.connection_id=s.connection_id AND p.snapshot_id=s.id
           WHERE s.tenant_id=$1 AND s.${column}=$2 AND s.kind='position' AND ($3::uuid IS NULL OR p.connection_id=$3)
           UNION ALL
           SELECT p.entity_id,'product',p.connection_id,s.observation_id

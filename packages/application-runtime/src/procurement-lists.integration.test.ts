@@ -448,5 +448,87 @@ describe.skipIf(!databaseUrl)(
         list({ sort: `custom:${randomUUID()}` }),
       ).rejects.toMatchObject({ statusCode: 400 });
     }, 60_000);
+
+    it('reads a supplier with only its orders and its 20 newest messages', async () => {
+      const owner = context();
+      const supplier = (name: string) =>
+        procurement.createSupplier(owner, { id: randomUUID(), name });
+      const [mine, theirs] = [
+        await supplier('Detail Mine'),
+        await supplier('Detail Theirs'),
+      ];
+      const order = (supplierId: string, reference: string) =>
+        procurement.createOrder(owner, {
+          id: randomUUID(),
+          supplierId,
+          reference,
+          lines: [
+            {
+              id: randomUUID(),
+              sku: `${reference}-SKU`,
+              description: 'Tote',
+              quantity: 1,
+              unit: 'each',
+            },
+          ],
+        });
+      const first = await order(mine.id, 'PO-DETAIL-1');
+      await order(theirs.id, 'PO-DETAIL-OTHER');
+      const second = await order(mine.id, 'PO-DETAIL-2');
+      const base = Date.parse('2026-10-01T00:00:00Z');
+      const received = (index: number) =>
+        new Date(base + index * 60_000).toISOString();
+      for (const [supplierId, count] of [
+        [mine.id, 25],
+        [theirs.id, 3],
+      ] as const)
+        for (let index = 0; index < count; index++) {
+          const id = randomUUID();
+          await database.owner.query(
+            'INSERT INTO procurement_communications(tenant_id,id,supplier_id,purchase_order_id,message_key,document,received_at,retain_until,created_at) VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$6)',
+            [
+              tenant,
+              id,
+              supplierId,
+              id,
+              {
+                id,
+                tenantId: tenant,
+                supplierId,
+                purchaseOrderId: null,
+                channel: 'email',
+                from: 'supplier@example.com',
+                subject: `Message ${index}`,
+                body: 'Text',
+                receivedAt: received(index),
+                messageId: null,
+                digest: id,
+                capturedBy: 'operator',
+                capturedAt: received(index),
+                retainUntil: '2027-10-01T00:00:00Z',
+              },
+              received(index),
+              '2027-10-01T00:00:00Z',
+            ],
+          );
+        }
+
+      const detail = await commitments.supplier(owner, mine.id);
+
+      expect(detail.orders.map((row) => row.order.id)).toEqual([
+        second.id,
+        first.id,
+      ]);
+      expect(detail.communications).toHaveLength(20);
+      expect(detail.communications.map((c) => c.subject)).toEqual(
+        Array.from({ length: 20 }, (_, index) => `Message ${24 - index}`),
+      );
+      expect(detail.communications.every((c) => c.supplierId === mine.id)).toBe(
+        true,
+      );
+      await expect(
+        commitments.supplier(context(otherTenant), mine.id),
+      ).rejects.toMatchObject({ statusCode: 404 });
+    }, 60_000);
   },
 );

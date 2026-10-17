@@ -1243,8 +1243,9 @@ export function createReplies(deps: ReplyDependencies) {
       return present(context, outboundId);
     },
     /**
-     * Approves or rejects a reply. The approver must be someone other than the requester; Luma
-     * then sends it once as the requester, whose membership is checked again.
+     * Approves or rejects a reply. When the workspace requires independent approval, the approver
+     * must be someone other than the requester. Luma then sends it once as the requester, whose
+     * membership is checked again.
      */
     async decide(
       context: TenantContext,

@@ -31,6 +31,18 @@ Provider error text is discarded.
 
 ## Read cost
 
+```mermaid
+flowchart TD
+    List["List 25 sales: 1 paced call"] --> Kind["Authorised order or voided sale?"]
+    Kind -->|quote or draft| Skip["Not read"]
+    Kind -->|yes| Cached["Detail cached at the listed update time?"]
+    Cached -->|yes| Reuse["Reuse the cached detail"]
+    Cached -->|no| Detail["Read the sale detail: 1 paced call"]
+    Detail -->|not found| Gone["Skipped: deleted after listing"]
+    Detail --> Normalize["Normalize the observation"]
+    Reuse --> Normalize
+```
+
 Order, fulfilment and return reads list 25 sales per page and then read each sale's
 details, about 26 calls per page. A history of 20,000 orders therefore takes about six
 hours to import. Fulfilment reads skip sales without fulfilments, and quotes and draft

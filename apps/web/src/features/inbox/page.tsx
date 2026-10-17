@@ -226,8 +226,15 @@ const shortcuts = [
   'help',
 ] as const;
 
-function ThreadDue({ thread, now }: { thread: ThreadSummary; now: number }) {
+function ThreadDue({
+  thread,
+  now,
+}: {
+  thread: ThreadSummary;
+  now: number | undefined;
+}) {
   const timeZone = useContext(WorkspaceTimezone);
+  const clock = useNow();
   const due = dueState(thread);
 
   return due === 'overdue' ? (
@@ -242,21 +249,22 @@ function ThreadDue({ thread, now }: { thread: ThreadSummary; now: number }) {
     >
       <Clock aria-hidden="true" />
       {m.messaging_due_in({
-        time: formatRelativeTime(thread.replyDueAt, now),
+        time: formatRelativeTime(thread.replyDueAt, now ?? clock),
       })}
     </span>
   ) : null;
 }
 
-function ThreadTime({ at, now }: { at: string; now: number }) {
+function ThreadTime({ at, now }: { at: string; now: number | undefined }) {
   const timeZone = useContext(WorkspaceTimezone);
+  const clock = useNow();
 
   return (
     <span
       className="case-row-time"
       title={formatWorkspaceInstant(at, timeZone)}
     >
-      <time dateTime={at}>{elapsed(at, now)}</time>
+      <time dateTime={at}>{elapsed(at, now ?? clock)}</time>
     </span>
   );
 }
@@ -286,7 +294,8 @@ export function ThreadList({
   threads: readonly ThreadSummary[];
   members: readonly Member[];
   self: string | undefined;
-  now: number;
+  /** A fixed time for relative times; the shared clock by default. */
+  now?: number | undefined;
   /** More than one mailbox is connected, so rows name theirs. */
   showMailbox: boolean;
   properties?: readonly string[] | undefined;
@@ -516,7 +525,8 @@ export function InboxView({
   onMore?: () => void;
   onChange: (search: InboxSearch) => void;
   onRefresh: () => void;
-  now: number;
+  /** A fixed time for relative times; the shared clock by default. */
+  now?: number | undefined;
   members?: readonly Member[];
   self?: string | undefined;
   detail?: ReactNode;
@@ -841,7 +851,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const navigate = useNavigate({ from: '/app/$organizationId/inbox/' });
   const client = useQueryClient();
   const live = useInboxUpdates(organizationId);
-  const now = useNow();
   const online = useOnline();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
@@ -863,7 +872,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const listView = inboxView(view);
   const state = listView.state;
   const segment = threadView(state.segment);
-  const mailboxes = useQuery(mailboxesOptions(organizationId));
+  const mailboxes = useQuery(mailboxesOptions(organizationId, live));
   const people = useMembers(organizationId);
   const options = {
     members: people.members.map((member) => ({
@@ -881,7 +890,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     : [];
   const query = threadListQuery(state, search.q, timeZone);
   const list = useInfiniteQuery({
-    ...threadsOptions(organizationId, query),
+    ...threadsOptions(organizationId, query, live),
     enabled: ready && !clientIssues.length,
   });
   const serverIssue = collectionServerIssue(list.error);
@@ -1073,7 +1082,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           queryKey: messagingKey(organizationId),
         })
       }
-      now={now}
       members={people.members}
       self={people.self}
       detail={
@@ -1082,8 +1090,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             key={search.thread}
             organizationId={organizationId}
             threadId={search.thread}
+            stream={live}
             people={people}
-            now={now}
             onClose={() => change({ ...search, thread: undefined })}
             navigation={
               <>

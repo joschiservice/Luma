@@ -4,6 +4,7 @@ import { rich } from '@luma/i18n/rich';
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useEffect, useRef } from 'react';
 
 import { connectionsOptions } from '../../kit/connections/data';
 import { FieldWorkflowReview } from '../adaptive/field-workflow-review';
@@ -13,7 +14,10 @@ import { CaseResolution } from '../exceptions/resolution';
 import { ThreadReview } from '../inbox/thread';
 import { PurchaseOrderReview } from '../procurement/detail';
 import { PurchasingPlanReview } from '../procurement/purchasing-workbench';
-import { workflowRunsOptions } from '../workflows/data';
+import {
+  replenishmentReviewOptions,
+  workflowRunsOptions,
+} from '../workflows/data';
 import { HumanTaskReview } from '../workflows/human-task';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
 import { FollowUpReview } from './follow-up-review';
@@ -26,12 +30,18 @@ export function OwnerReview({
   organizationId,
   owner,
   handover = false,
+  refreshedAt = 0,
   onChange,
 }: {
   organizationId: string;
   owner: DecisionOwner;
   /** A workflow handed a follow-up to a person; there is nothing to approve. */
   handover?: boolean;
+  /**
+   * When the queue last read this decision. Reviews that do not poll read their owner again when
+   * it changes, so a change the stream reports for the queue also reaches the open review.
+   */
+  refreshedAt?: number;
   /** Refreshes the queue after the owner reports a completed change. */
   onChange: () => Promise<void>;
 }) {
@@ -148,6 +158,7 @@ export function OwnerReview({
           key={owner.purchaseOrderId}
           organizationId={organizationId}
           purchaseOrderId={owner.purchaseOrderId}
+          refreshedAt={refreshedAt}
         />
       );
     case 'purchasing_plan':
@@ -201,6 +212,11 @@ function CaseReview({
   );
 }
 
+/**
+ * Reads the run from the workflow's recent runs once, then follows the run's own review, which
+ * polls while it is open. The run list is read again only when that review reports a change, so an
+ * open decision does not repeatedly read 50 runs with their step evidence.
+ */
 function RunReview({
   organizationId,
   definitionId,
@@ -212,11 +228,30 @@ function RunReview({
   runId: string;
   onChange: () => Promise<void>;
 }) {
-  const runs = useQuery({
-    ...workflowRunsOptions(organizationId, definitionId),
-    refetchInterval: 5000,
-  });
+  const runs = useQuery(workflowRunsOptions(organizationId, definitionId));
   const run = runs.data?.items.find((item) => item.id === runId);
+  const progress = useQuery({
+    ...replenishmentReviewOptions(organizationId, runId),
+    select: (review) =>
+      JSON.stringify([
+        review.state,
+        review.decision?.outcome,
+        review.purchaseOrder?.status,
+        review.verification.state,
+      ]),
+  }).data;
+  const seen = useRef(progress);
+  const { refetch } = runs;
+  useEffect(() => {
+    const previous = seen.current;
+    seen.current = progress;
+    if (
+      previous !== undefined &&
+      progress !== undefined &&
+      previous !== progress
+    )
+      void refetch();
+  }, [progress, refetch]);
 
   if (runs.isPending) return <p role="status">{m.decisions_run_loading()}</p>;
   if (!run)

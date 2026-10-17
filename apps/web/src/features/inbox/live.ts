@@ -9,10 +9,15 @@ import { messagingKey } from './data';
 
 export type InboxUpdates = 'connecting' | 'live' | 'interrupted';
 
+// Decisions elsewhere in the workspace reach the inbox only through reply approvals, which
+// change thread lists, their counts and open threads, not mailboxes, documents or record lists.
+const approvalReads = new Set(['threads', 'thread']);
+
 /**
- * Refreshes messaging reads when the workspace stream reports a committed change. Bursts coalesce
- * into one refresh per short window and active reads finish first, so a mailbox import does not
- * repeat every read continuously.
+ * Refreshes messaging reads when the workspace stream reports a committed change. Messaging
+ * changes refresh every active inbox read; decision changes refresh only thread lists and open
+ * threads. Bursts coalesce into one refresh per short window and active reads finish first, so a
+ * mailbox import does not repeat every read continuously.
  */
 export function subscribeToMessagingChanges(
   organizationId: string,
@@ -22,6 +27,7 @@ export function subscribeToMessagingChanges(
   let active = true;
   let busy = false;
   let dirty = false;
+  let messaging = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const schedule = () => {
@@ -32,10 +38,20 @@ export function subscribeToMessagingChanges(
   const refresh = async () => {
     timer = undefined;
     dirty = false;
+    const all = messaging;
+    messaging = false;
     busy = true;
     try {
       await client.invalidateQueries(
-        { queryKey: messagingKey(organizationId) },
+        {
+          queryKey: messagingKey(organizationId),
+          ...(all
+            ? {}
+            : {
+                predicate: (query) =>
+                  approvalReads.has(String(query.queryKey[4])),
+              }),
+        },
         { cancelRefetch: false },
       );
     } finally {
@@ -46,6 +62,7 @@ export function subscribeToMessagingChanges(
   const stop = subscribeToWorkspaceMetrics(organizationId, {
     onResync: (event) => {
       onState(event.connected ? 'live' : 'interrupted');
+      if (changesAny(event, ['messaging'])) messaging = true;
       // Replies and their approvals also carry the `decisions` topic.
       if (changesAny(event, ['messaging', 'decisions'])) schedule();
     },
@@ -60,8 +77,9 @@ export function subscribeToMessagingChanges(
 }
 
 /**
- * Keeps inbox reads current from the workspace change stream. Reads also poll, so they converge
- * while the stream is interrupted.
+ * Keeps inbox reads current from the workspace change stream. Pass the returned state to the
+ * read options, which poll only while the stream is not live, so reads still converge while it
+ * is interrupted.
  */
 export function useInboxUpdates(organizationId: string): InboxUpdates {
   const client = useQueryClient();

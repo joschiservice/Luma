@@ -86,6 +86,26 @@ Their evidence appears in the cohort, and no absence assertion can clear them. R
 worker as a user principal or using a manually authored workflow does not count as human
 work.
 
+How the autonomy metric classifies one incident:
+
+```mermaid
+flowchart TD
+  incident["Incident in the detection cohort"] --> environment{"Environment matches the filter (live by default)?"}
+  environment -->|"no, unknown"| excluded["Excluded and disclosed separately"]
+  environment -->|"no, other"| other["Counted only in its own environment"]
+  environment -->|yes| eligibility{"Eligibility"}
+  eligibility -->|ineligible| notCounted["Not in the autonomy denominator"]
+  eligibility -->|unknown| withheld["Unknown: count and rate withheld"]
+  eligibility -->|eligible| attribution{"Human work attribution"}
+  attribution -->|unknown| withheld
+  attribution -->|human| human["Not autonomous: human work"]
+  attribution -->|none| verified{"Independently verified?"}
+  verified -->|no| pending["Not yet: pending"]
+  verified -->|yes| incorrect{"Incorrect action recorded?"}
+  incorrect -->|yes| notAutonomous["Not autonomous: incorrect action"]
+  incorrect -->|no| autonomous["Fully autonomous"]
+```
+
 A **fully autonomous outcome** needs known eligibility, independent verification, complete
 absence-of-human-work attribution and no recorded incorrect action. Its denominator is all
 eligible incidents in the cohort, including pending ones. When relevant eligibility,

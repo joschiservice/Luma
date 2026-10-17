@@ -48,6 +48,7 @@ import { Replies } from './composer';
 import {
   addNote,
   assignThread,
+  type InboxStream,
   readFailure,
   removeMessageText,
   setDeadline,
@@ -93,19 +94,20 @@ export function threadAccess(
 export function ThreadDetail({
   organizationId,
   threadId,
+  stream,
   people,
-  now,
   onClose,
   navigation,
 }: {
   organizationId: string;
   threadId: string;
+  /** The inbox's live stream state, which decides whether the thread polls. */
+  stream: InboxStream;
   people: People;
-  now: number;
   onClose: () => void;
   navigation?: ReactNode;
 }) {
-  const query = useQuery(threadOptions(organizationId, threadId));
+  const query = useQuery(threadOptions(organizationId, threadId, stream));
   const { can } = usePermissions(organizationId);
   const failure = readFailure(query.error);
   if (failure === 'signin') return <SignInRedirect />;
@@ -146,7 +148,6 @@ export function ThreadDetail({
       access={threadAccess(query.data, can)}
       stale={!!query.error}
       people={people}
-      now={now}
       onClose={onClose}
       navigation={navigation}
     />
@@ -163,7 +164,6 @@ export function ThreadDetailView({
   access,
   stale = false,
   people,
-  now,
   onClose,
   navigation,
 }: {
@@ -172,7 +172,6 @@ export function ThreadDetailView({
   access: { manage: boolean; send: boolean; approve: boolean };
   stale?: boolean;
   people: People;
-  now: number;
   onClose: () => void;
   navigation?: ReactNode;
 }) {
@@ -270,7 +269,7 @@ export function ThreadDetailView({
             <summary>
               <h3 id="thread-timeline">{m.messaging_timeline_title()}</h3>
             </summary>
-            <Timeline detail={detail} people={people} now={now} />
+            <Timeline detail={detail} people={people} />
           </Disclosure>
         </section>
       </div>
@@ -819,7 +818,6 @@ function Timeline({
 }: {
   detail: ThreadDetailData;
   people: People;
-  now: number;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
   const events = [...detail.events].sort((a, b) =>

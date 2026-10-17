@@ -166,8 +166,15 @@ export interface DeskDependencies {
   ): Promise<WorkflowProgress | null>;
   /** Read current source facts and publish a new immutable proposal; never carry approvals forward. */
   refreshProposal?(context: TenantContext, id: string): Promise<void>;
-  /** Wake the workflow after a durable decision; polling recovers a failed notification. */
-  notifyDecision?(context: TenantContext, id: string): Promise<void>;
+  /**
+   * Wake the workflow waiting for this case's approval response after it committed. `source`
+   * is the workflow source bound to the case, if any. Polling recovers a failed notification.
+   */
+  notifyApproval?(
+    context: TenantContext,
+    id: string,
+    source: WorkflowSource | null,
+  ): Promise<void>;
   now(): Date;
 }
 
@@ -547,9 +554,17 @@ export function createDeskService(deps: DeskDependencies) {
           return receipt;
         },
       );
-      await deps.notifyDecision?.(context, id).catch(() => {
-        // The decision is committed; the workflow also polls for lost notifications.
-      });
+      const notifyApproval = deps.notifyApproval;
+      if (
+        notifyApproval &&
+        (request.kind === 'approve' || request.kind === 'reject')
+      )
+        await deps.store
+          .workflowSource(context, id)
+          .then((source) => notifyApproval(context, id, source))
+          .catch(() => {
+            // The response is committed; the workflow also polls for lost notifications.
+          });
 
       return receipt;
     },

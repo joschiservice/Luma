@@ -323,7 +323,7 @@ export const permissionCatalog = [
     group: 'issues',
     label: 'Approve or reject changes',
     description:
-      'Respond to approval requests. The approver must be someone other than the person who proposed the change.',
+      'Respond to approval requests. When the workspace requires approval from another person, the approver can’t be the person who proposed the change.',
     consequential: true,
     introduced,
   },

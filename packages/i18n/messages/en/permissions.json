@@ -56,7 +56,7 @@
   "permissions_decisions_assign_label": "Assign decisions",
   "permissions_decisions_assign_description": "Assign or reassign any decision to a teammate.",
   "permissions_decisions_respond_label": "Approve or reject changes",
-  "permissions_decisions_respond_description": "Respond to approval requests. The approver must be someone other than the person who proposed the change.",
+  "permissions_decisions_respond_description": "Respond to approval requests. When the workspace requires approval from another person, the approver can’t be the person who proposed the change.",
   "permissions_actions_propose_label": "Propose changes",
   "permissions_actions_propose_description": "Ask Luma to prepare changes in connected systems. Approval rules decide whether someone must approve them.",
   "permissions_actions_execute_label": "Apply changes",

@@ -7,11 +7,16 @@ import { GenericContainer } from 'testcontainers';
 import { affectedJourneys } from './affected.mjs';
 import { fail, root, run } from './process.mjs';
 import { testCommands } from './test-plan.mjs';
-import { acquireValidation } from './validation-lock.mjs';
+import {
+  acquireJourneySlot,
+  acquireValidation,
+  runsJourneys,
+} from './validation-lock.mjs';
 
 let container;
 let admissionContainer;
 let validation;
+let journeySlot;
 
 /**
  * Names the optional test dependencies present for this run. Turbo hashes the value so cached
@@ -88,7 +93,18 @@ try {
   }
   env.LUMA_TEST_CAPABILITIES = capabilities(env);
   env.LUMA_VALIDATION_OWNER = validation.owner;
-  for (const args of commands) await run('pnpm', args, { env });
+  for (const args of commands) {
+    // Held from the first journey command to the end of the run, so one run's backend and
+    // browser journeys are not interleaved with another checkout's.
+    if (!journeySlot && runsJourneys(args))
+      journeySlot = await acquireJourneySlot(root, {
+        onWait: (holders) =>
+          console.log(
+            `Journeys are running from ${holders.join(', ')}; waiting for a free journey slot.`,
+          ),
+      });
+    await run('pnpm', args, { env });
+  }
 } catch (error) {
   fail(error);
 } finally {
@@ -99,6 +115,10 @@ try {
       await container?.stop();
     }
   } finally {
-    await validation?.release();
+    try {
+      await journeySlot?.release();
+    } finally {
+      await validation?.release();
+    }
   }
 }

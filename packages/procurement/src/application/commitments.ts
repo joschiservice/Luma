@@ -153,6 +153,12 @@ export type SubmissionExecution =
   | { state: 'failed'; reason: string }
   | { state: 'uncertain' };
 
+/** A submission's policy decision with its recorded human response. */
+export type SubmissionDecision = PolicyDecision & {
+  approval?: { outcome: 'approved' | 'rejected'; approverId: string };
+  requireIndependentApproval?: boolean;
+};
+
 /** Binds submissions to Action Admission, workspace policy and audited execution. */
 export interface SubmissionAdmission {
   /** Reads effective workspace and connection write controls without provider calls. */
@@ -169,13 +175,12 @@ export interface SubmissionAdmission {
   decision(
     context: TenantContext,
     id: string,
-  ): Promise<
-    | (PolicyDecision & {
-        approval?: { outcome: 'approved' | 'rejected'; approverId: string };
-        requireIndependentApproval?: boolean;
-      })
-    | null
-  >;
+  ): Promise<SubmissionDecision | null>;
+  /** Reads decisions as `decision` does, refreshing authorization once for the whole read. Unknown IDs map to null. */
+  decisions(
+    context: TenantContext,
+    ids: string[],
+  ): Promise<Map<string, SubmissionDecision | null>>;
   respond(
     context: TenantContext,
     decisionId: string,
@@ -223,6 +228,8 @@ export interface CommitmentTransaction {
     ids: string[],
   ): Promise<CustomFieldDefinition[]>;
   supplier(id: string): Promise<Supplier | null>;
+  /** Suppliers among `ids`; unknown IDs are absent. */
+  suppliers(ids: string[]): Promise<Supplier[]>;
   updateSupplier(supplier: Supplier): Promise<void>;
   history(orderId: string): Promise<ProcurementEvent[]>;
   /** Reads admitted plans, revisions and stock-action proof without provider calls. */
@@ -237,9 +244,11 @@ export interface CommitmentTransaction {
   saveSubmission(submission: Submission, settled: boolean): Promise<void>;
   /** Unsettled submissions in active states, oldest first. */
   liveSubmissions(principalId: string): Promise<Submission[]>;
+  /** Newest first; reads at most `limit` messages when given. */
   communications(filter: {
     orderIds?: string[];
     supplierId?: string;
+    limit?: number;
   }): Promise<Communication[]>;
   communication(id: string): Promise<Communication | null>;
   communicationByKey(key: string): Promise<Communication | null>;
@@ -584,6 +593,20 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     };
   }
 
+  /** Reads the suppliers of `orders` in one query, by ID. */
+  async function suppliersOf(
+    tx: CommitmentTransaction,
+    orders: PurchaseOrder[],
+  ) {
+    const ids = [...new Set(orders.map((o) => o.supplierId))];
+
+    return new Map(
+      (ids.length ? await tx.suppliers(ids) : []).map(
+        (supplier) => [supplier.id, supplier] as const,
+      ),
+    );
+  }
+
   /**
    * Summarizes `orders` at `now` from their submissions, commitments, follow-ups and supplier
    * terms, read in one procurement transaction. Without `ids`, reads related records of every order.
@@ -607,13 +630,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     const submissions = group(await tx.submissions(ids));
     const commitments = group(await tx.commitments(ids));
     const followUps = group(await tx.followUps(ids));
-    const suppliers = new Map(
-      await Promise.all(
-        [...new Set(orders.map((o) => o.supplierId))].map(
-          async (id) => [id, await tx.supplier(id)] as const,
-        ),
-      ),
-    );
+    const suppliers = await suppliersOf(tx, orders);
 
     return new Map(
       orders.map((order) => [
@@ -642,24 +659,55 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         ? summary.attention > 0
         : summary.stage === stage));
 
+  /**
+   * Admission reads for submission views within one service call. `decisions` holds decisions
+   * already read in a batch; write modes are read once per connection.
+   */
+  function admissionReads(
+    context: TenantContext,
+    decisions?: Map<string, SubmissionDecision | null>,
+  ) {
+    const modes = new Map<
+      string,
+      Promise<'observe_only' | 'writes_enabled' | undefined>
+    >();
+
+    return {
+      async decision(id: string) {
+        if (!deps.admission) return null;
+        if (decisions?.has(id)) return decisions.get(id) ?? null;
+
+        return deps.admission.decision(context, id);
+      },
+      writeMode(connectionId: string) {
+        let mode = modes.get(connectionId);
+        if (!mode) {
+          mode = Promise.resolve(
+            deps.admission?.writeMode?.(context, connectionId),
+          );
+          modes.set(connectionId, mode);
+        }
+
+        return mode;
+      },
+    };
+  }
+
   async function submissionView(
     context: TenantContext,
     submission: Submission,
+    reads = admissionReads(context),
   ): Promise<SubmissionView> {
-    const decision =
-      submission.decisionId && deps.admission
-        ? await deps.admission.decision(context, submission.decisionId)
-        : null;
+    const decision = submission.decisionId
+      ? await reads.decision(submission.decisionId)
+      : null;
     const expired =
       submission.state === 'approval_required' &&
       Date.parse(submission.expiresAt) <= deps.now().getTime();
     const observeOnly =
       submission.state === 'not_executed' ||
       (['approval_required', 'approved'].includes(submission.state) &&
-        (await deps.admission?.writeMode?.(
-          context,
-          submission.connectionId,
-        )) === 'observe_only');
+        (await reads.writeMode(submission.connectionId)) === 'observe_only');
     const requester = context.actor.id === submission.requestedBy;
     const manager = hasPermission(context, 'procurement.manage');
     // Approvers also need permission to approve changes and any app permission the
@@ -1803,13 +1851,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             submissions,
             commitments,
             followUps: await tx.followUps(orders.map((o) => o.id)),
-            suppliers: new Map(
-              await Promise.all(
-                [...new Set(orders.map((o) => o.supplierId))].map(
-                  async (id) => [id, await tx.supplier(id)] as const,
-                ),
-              ),
-            ),
+            suppliers: await suppliersOf(tx, orders),
           };
         },
       );
@@ -1822,7 +1864,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         line: PurchaseOrder['lines'][number] | null;
         canRespond: boolean;
       }[] = [];
-      for (const order of data.orders) {
+      const attended = data.orders.flatMap((order) => {
         const { progress, submission } = progressFor(order, {
           ...data,
           supplier: data.suppliers.get(order.supplierId) ?? null,
@@ -1831,9 +1873,22 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         const wanted = progress.attention.filter(
           (attention) => !filter.kinds || filter.kinds.includes(attention.kind),
         );
-        if (!wanted.length) continue;
+
+        return wanted.length ? [{ order, submission, wanted }] : [];
+      });
+      // One authorized admission read covers every listed submission's decision.
+      const decisionIds = attended.flatMap(({ submission }) =>
+        submission?.decisionId ? [submission.decisionId] : [],
+      );
+      const reads = admissionReads(
+        context,
+        deps.admission && decisionIds.length
+          ? await deps.admission.decisions(context, decisionIds)
+          : undefined,
+      );
+      for (const { order, submission, wanted } of attended) {
         const view = submission
-          ? await submissionView(context, submission)
+          ? await submissionView(context, submission, reads)
           : null;
         for (const attention of wanted) {
           if (
@@ -1871,9 +1926,9 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         async (tx) => {
           const supplier = await tx.supplier(supplierId);
           if (!supplier) notFound('Supplier not found');
-          const orders = (await tx.orders()).filter(
-            (o) => o.supplierId === supplierId,
-          );
+          const orders = (
+            await tx.purchaseOrders({ q: '', supplierId }, null, null)
+          ).map((row) => row.record);
           const ids = orders.map((o) => o.id);
 
           return {
@@ -1882,10 +1937,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             submissions: ids.length ? await tx.submissions(ids) : [],
             commitments: ids.length ? await tx.commitments(ids) : [],
             followUps: ids.length ? await tx.followUps(ids) : [],
-            communications: (await tx.communications({ supplierId })).slice(
-              0,
-              20,
-            ),
+            communications: await tx.communications({ supplierId, limit: 20 }),
           };
         },
       );
@@ -2079,8 +2131,9 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       );
     },
     /**
-     * Approves or rejects a submission. Approval comes from someone other than the requester who
-     * can manage procurement; Luma then dispatches it as the requester, exactly once.
+     * Approves or rejects a submission. Approval comes from someone who can manage procurement,
+     * and from someone other than the requester when the workspace requires independent
+     * approval. Luma then dispatches it as the requester, exactly once.
      */
     async decideSubmission(
       context: TenantContext,
