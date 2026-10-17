@@ -50,6 +50,16 @@ export interface ConnectionManagement {
     version: number,
     writeMode: 'observe_only' | null,
   ): Promise<InstalledConnection>;
+  /**
+   * Changes the name people see, using the reviewed version. The target, credentials and grants
+   * stay unchanged, so the connection keeps its state. Requires `connections.manage`.
+   */
+  rename(
+    context: TenantContext,
+    id: string,
+    version: number,
+    label: string,
+  ): Promise<InstalledConnection>;
   /** Lists connections visible to the current tenant without credentials. */
   list(context: TenantContext): Promise<InstalledConnection[]>;
   /** Validates settings and stores encrypted credentials in a pending connection. */
@@ -243,6 +253,31 @@ export function createInstallationService(
         version,
         fresh.actor.id,
         'write_mode_changed',
+      );
+    },
+    async rename(context, id, version, label) {
+      requireChangesAllowed(context);
+      const fresh = await authorize(context, true);
+      const name = typeof label === 'string' ? label.trim() : '';
+      if (!name || name.length > 120)
+        throw new ServiceError(422, 'CONFLICT', 'Invalid connection name');
+      const record = await get(fresh, id);
+      if (record.connection.version !== version) throw changed();
+      if (record.connection.label === name) return record.connection;
+
+      return save(
+        {
+          ...record,
+          connection: {
+            ...record.connection,
+            label: name,
+            version: version + 1,
+            updatedAt: deps.now().toISOString(),
+          },
+        },
+        version,
+        fresh.actor.id,
+        'renamed',
       );
     },
     async list(context: TenantContext) {

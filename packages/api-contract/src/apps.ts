@@ -15,7 +15,13 @@ export const appManifestSchema = z.object({
   name: z.string(),
   description: z.string(),
   version: z.string(),
-  category: z.enum(['storefront', 'erp', 'communication', 'utility']),
+  category: z.enum([
+    'storefront',
+    'erp',
+    'shipping',
+    'communication',
+    'utility',
+  ]),
   ui: z.array(appSlotSchema),
   connectionTypes: z.array(z.object({ kind: z.string(), name: z.string() })),
   /** Permissions the app owns, namespaced `<appId>:<name>`; roles can grant them. */

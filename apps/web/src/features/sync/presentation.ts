@@ -621,29 +621,6 @@ export function runSummary(run: SyncRunView) {
       : m.sync_run_no_records();
 }
 
-/** A one-line sync summary for one connection, or null before any sync exists. */
-export function connectionSummary(
-  connection: SyncConnectionView,
-  asOf: string,
-): { state: OperationalState; text: string } | null {
-  const summary = overallState({
-    connections: [connection],
-    runs: [],
-    canManage: false,
-    asOf,
-  });
-
-  return summary.state === 'idle'
-    ? null
-    : {
-        state: summary.state,
-        text: m.sync_connection_summary({
-          title: summary.title,
-          detail: summary.detail,
-        }),
-      };
-}
-
 /** One sync with the connection it reads from. */
 export interface SyncItem {
   connection: SyncConnectionView;

@@ -85,3 +85,15 @@ export async function changeConnectionWriteMode(
     body: { version: connection.version, writeMode },
   });
 }
+
+/** Renames a connection at the reviewed version; rejects stale versions with a conflict. */
+export async function renameConnection(
+  organizationId: string,
+  connection: InstalledConnection,
+  label: string,
+) {
+  return api.connections.rename({
+    params: { organizationId, connectionId: connection.id },
+    body: { version: connection.version, label },
+  });
+}

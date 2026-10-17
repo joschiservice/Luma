@@ -5,6 +5,9 @@ import type { CoverageReader } from '../application/coverage.js';
 import { summarizeConnectionCoverage } from '../domain/coverage.js';
 import type { InstalledConnection } from '../domain/installation.js';
 
+// The read capability that supplies a sync stream's record type, as in `importedReads`.
+const streamCapability = `(CASE s.record_type WHEN 'fulfillments' THEN 'fulfillment.read' WHEN 'inventory_transfers' THEN 'inventory.transfers.read' WHEN 'inventory_shipments' THEN 'inventory.shipments.read' ELSE s.record_type||'.read' END)`;
+
 /**
  * Creates a tenant-scoped coverage reader using observations through `asOf`.
  * Only permitted, granted capabilities are read, one indexed latest-row lookup per source,
@@ -25,7 +28,7 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
         >;
       }>(
         `SELECT i.document, COALESCE(coverage.observations, '[]'::jsonb) AS observations, (COALESCE(coverage.failed, false) OR EXISTS (SELECT 1 FROM commerce_sync_streams s WHERE s.tenant_id=i.tenant_id AND s.connection_id=i.id AND s.error_code IS NOT NULL) OR EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=i.tenant_id AND e.state<>'resolved' AND e.document->>'exceptionClass'='sync_failure' AND e.subject_id=i.id::text)) AS failed,
-        COALESCE((SELECT jsonb_agg(jsonb_build_object('recordType',s.record_type,'lastSuccessfulAt',to_char(s.last_complete_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'lastError',s.error_code,'issueIds',${hasPermission(context, 'issues.read') ? `(SELECT COALESCE(jsonb_agg(e.id),'[]'::jsonb) FROM exceptions e WHERE e.tenant_id=s.tenant_id AND e.state<>'resolved' AND e.subject_id=i.id::text AND e.document->'subject'->'scope' ? (CASE s.record_type WHEN 'fulfillments' THEN 'fulfillment.read' ELSE s.record_type||'.read' END))` : "'[]'::jsonb"})) FROM commerce_sync_streams s WHERE s.tenant_id=i.tenant_id AND s.connection_id=i.id),'[]'::jsonb) AS streams
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('recordType',s.record_type,'lastSuccessfulAt',to_char(s.last_complete_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'lastError',s.error_code,'issueIds',${hasPermission(context, 'issues.read') ? `(SELECT COALESCE(jsonb_agg(e.id),'[]'::jsonb) FROM exceptions e WHERE e.tenant_id=s.tenant_id AND e.state<>'resolved' AND e.subject_id=i.id::text AND e.document->'subject'->'scope' ? ${streamCapability})` : "'[]'::jsonb"})) FROM commerce_sync_streams s WHERE s.tenant_id=i.tenant_id AND s.connection_id=i.id),'[]'::jsonb) AS streams
         FROM connector_installations i
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(jsonb_build_object('capability',caps.capability,'observed_at',latest.observed_at)) AS observations,
@@ -44,7 +47,7 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
                 ORDER BY r.observed_at DESC LIMIT 1),
               (SELECT max(s.last_success_at) FROM commerce_sync_streams s
                 WHERE s.tenant_id=$1 AND s.connection_id=i.id AND s.last_success_at <= $2::timestamptz
-                  AND (CASE s.record_type WHEN 'fulfillments' THEN 'fulfillment.read' ELSE s.record_type||'.read' END)=caps.capability)
+                  AND ${streamCapability}=caps.capability)
             ) AS observed_at
           ) latest
           LEFT JOIN LATERAL (

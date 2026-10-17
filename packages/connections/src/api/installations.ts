@@ -54,6 +54,20 @@ export function connectionRoutes(
         );
       },
     ),
+    rename: os.rename.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { service, context } = use(request);
+
+        return summary(
+          await service.rename(
+            context,
+            params.connectionId,
+            body.version,
+            body.label,
+          ),
+        );
+      },
+    ),
     list: os.list.handler(async ({ context: { request } }) => {
       const { service, context } = use(request);
 

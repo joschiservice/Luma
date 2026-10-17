@@ -1,8 +1,8 @@
 /* Apps: installed apps, the catalog and each app's connections. */
 .apps-page {
   display: grid;
-  gap: 16px;
-  max-width: 1120px;
+  gap: 20px;
+  max-width: 1080px;
   margin: 0 auto;
   font-size: 13px;
 }
@@ -16,72 +16,79 @@
   font-size: 13px;
 }
 
-.app-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: start;
-  color: var(--foreground-subtle);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
+.apps-note a {
+  color: var(--signal-text);
 }
 
-.app-back:hover {
-  color: var(--foreground);
+.apps-page > [role='status']:empty {
+  display: none;
 }
 
-.connections-section {
+/* Sections */
+.apps-section {
   display: grid;
   gap: 10px;
-  margin-top: 8px;
+  scroll-margin-block-start: 24px;
 }
 
-.connections-section > h2,
-.connections-heading h2 {
+.apps-section-heading {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-height: 32px;
+}
+
+.apps-section-heading h2 {
   font-size: 14px;
   font-weight: 600;
 }
 
-.connections-heading {
+.apps-section-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  text-align: center;
+}
+
+.apps-section-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-
-/* App tiles */
-.connection-providers {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
-  gap: 12px;
-}
-
-.app-tile[data-slot='card'] {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
   gap: 8px;
-  min-width: 0;
+  margin-left: auto;
 }
 
-.app-tile .ui-card-header[data-slot='card-header'] {
-  justify-content: flex-start;
-  flex-wrap: nowrap;
-  gap: 10px;
-  margin: 0;
+.apps-loading {
+  display: grid;
+  gap: 8px;
 }
 
-.app-tile-icon {
+.apps-loading > .lu-skeleton {
+  height: 64px;
+  border-radius: var(--radius-panel);
+}
+
+.apps-loading > .lu-skeleton[data-size='lg'] {
+  height: 220px;
+}
+
+.apps-empty[data-slot='empty'] {
+  border-radius: var(--radius-panel);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+/* App icons: neutral tiles that name the kind of system an app connects. */
+.app-icon {
   display: inline-grid;
   place-items: center;
+  flex-shrink: 0;
   width: 32px;
   height: 32px;
-  flex-shrink: 0;
   border-radius: 9px;
   background: linear-gradient(
     180deg,
@@ -91,16 +98,175 @@
   box-shadow:
     inset 0 0 0 1px var(--line-strong),
     var(--shadow-control);
-  color: var(--foreground);
+  color: var(--foreground-muted);
+}
+
+.app-icon > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app-icon[data-size='lg'] {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.app-icon[data-size='lg'] > svg {
+  width: 21px;
+  height: 21px;
+}
+
+/* Installed apps: one row per app; the name link covers the row so it stays one target. */
+.apps-rows {
+  margin: 0;
+  padding: 0;
+  overflow: clip;
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  list-style: none;
+}
+
+.apps-rows > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.app-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  transition: background-color var(--duration-fast);
+}
+
+.app-row:hover {
+  background: var(--surface-hover);
+}
+
+.app-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-row h3 {
   font-size: 14px;
   font-weight: 600;
 }
 
-.app-tile-icon[data-size='lg'] {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
-  font-size: 17px;
+.app-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.app-row-link:focus-visible {
+  outline: none;
+}
+
+.app-row-link:focus-visible::after {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.app-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.app-row-meta > span + span::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--foreground-faint);
+}
+
+.app-row-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.app-row-count {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-row-chevron {
+  color: var(--foreground-faint);
+}
+
+.app-row:hover .app-row-chevron {
+  color: var(--foreground-muted);
+}
+
+.apps-rows[data-variant='history'] .app-row-main h3 {
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .app-row {
+    grid-template-columns: 32px minmax(0, 1fr) 16px;
+    align-items: start;
+  }
+
+  .app-row-status {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+
+  .app-row-chevron {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+}
+
+/* Catalog tiles */
+.apps-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+}
+
+.app-tile[data-slot='card'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-tile-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-tile-head p {
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }
 
 .app-tile-description {
@@ -108,47 +274,314 @@
   color: var(--foreground-muted);
 }
 
-.app-tile-status {
+/* App page header */
+.app-header-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 6px;
   color: var(--foreground-subtle);
   font-size: 12.5px;
 }
 
-.app-attention {
-  display: inline-flex;
+.app-header-meta > span + span::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--foreground-faint);
+}
+
+.app-pending-access [data-slot='alert-content'] {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--state-warning-text);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-decoration: none;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
-.app-attention:hover {
-  text-decoration: underline;
-}
-
-.app-tile
-  > :is([data-slot='button'], a[data-slot='button'], a[class*='inline-flex']) {
-  margin-top: 4px;
-}
-
-.apps-history {
+/* Connections of one app */
+.connection-list {
   display: grid;
-  gap: 4px;
+  gap: 12px;
+}
+
+.connection[data-slot='card'] {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  scroll-margin: 24px;
+}
+
+.connection:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.connection-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.connection-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection-title h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.connection-title p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 2px;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.connection-target {
+  color: var(--foreground-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.connection-header .lu-state-pill {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.connection-header > button {
+  flex-shrink: 0;
+  margin: -2px -6px 0 0;
+}
+
+.connection-note {
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.connection-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0;
+}
+
+.connection-facts > div {
+  display: grid;
+  gap: 1px;
+}
+
+.connection-facts dt,
+.connection-details dt {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.connection-facts dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Data the connection imports, one cell per record type. */
+.connection-data {
+  display: grid;
+  gap: 6px;
+}
+
+.connection-subheading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.connection-subheading h4 {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.connection-subheading a {
+  color: var(--signal-text);
+  font-size: 12.5px;
+}
+
+.connection-streams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.apps-history a {
-  color: var(--signal-text);
+.connection-streams li {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+
+.connection-streams li[data-failed] {
+  box-shadow: inset 2px 0 0 var(--state-error);
+}
+
+.connection-stream-name {
+  font-weight: 500;
+}
+
+a.connection-stream-name {
+  color: inherit;
   text-decoration: none;
 }
 
-/* Connections of one app */
+a.connection-stream-name:hover {
+  color: var(--signal-text);
+  text-decoration: underline;
+}
+
+.connection-stream-time {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.connection-stream-error {
+  color: var(--state-error-text);
+  font-size: 12px;
+}
+
+.connection-stream-issue {
+  color: var(--signal-text);
+  font-size: 12px;
+}
+
+/* Permissions, details and history: supporting information behind disclosures. */
+.connection-permissions summary,
+.connection-details summary,
+.connection-history-log summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.connection-permissions summary > svg {
+  color: var(--foreground-subtle);
+}
+
+.connection-permissions-count {
+  color: var(--foreground-subtle);
+  font-weight: 400;
+}
+
+.connection-permission-groups {
+  display: grid;
+  gap: 14px;
+  padding-top: 10px;
+}
+
+.connection-permission-group {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.connection-permission-group h4 {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.connection-permission-group p {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.connection-permission-group ul {
+  margin: 0;
+  padding: 0;
+  columns: 3 220px;
+  column-gap: 24px;
+  list-style: none;
+}
+
+.connection-permission-group li {
+  display: flex;
+  break-inside: avoid;
+  padding-block: 2px;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12.5px;
+}
+
+.connection-permission-group li > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--foreground-faint);
+}
+
+.connection-permission-group[data-enabled='true'] li > svg {
+  color: var(--state-success);
+}
+
+.connection-permission-group[data-enabled='false'] li {
+  color: var(--foreground-subtle);
+}
+
+.connection-details dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  padding-top: 10px;
+}
+
+.connection-details dl > div {
+  display: contents;
+}
+
+.connection-details dd {
+  margin: 0;
+}
+
+.connection-history-log ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 0 0;
+  list-style: none;
+}
+
+.connection-history-log li {
+  display: grid;
+  gap: 1px;
+  font-size: 12.5px;
+}
+
+.connection-history-meta {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.connection-history-all {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--signal-text);
+  font-size: 12.5px;
+}
+
+.connection-rename {
+  display: grid;
+  gap: 14px;
+}
+
 .connection-actions {
   display: flex;
   align-items: center;
@@ -156,179 +589,29 @@
   gap: 8px;
 }
 
-.connection-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
-  align-items: start;
-  gap: 12px;
-}
-
-.connection-card[data-slot='card'] {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  scroll-margin: 24px;
-}
-
-.connection-card:target {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-.connection-card .ui-card-header[data-slot='card-header'] {
-  align-items: flex-start;
-  margin: 0;
-}
-
-.connection-identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.connection-identity > svg {
-  box-sizing: content-box;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  padding: 8px;
-  border-radius: 9px;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--foreground-muted);
-}
-
-.connection-identity .eyebrow {
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  text-transform: capitalize;
-}
-
-.connection-target {
-  padding: 6px 10px;
-  border-radius: 7px;
-  background: var(--surface-sunken);
-  color: var(--foreground-muted);
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-}
-
-.connection-description {
-  color: var(--foreground-subtle);
-  font-size: 12.5px;
-}
-
-.connection-sync {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
+.connection-feedback {
   color: var(--foreground-muted);
   font-size: 12.5px;
-  line-height: 1.5;
 }
 
-.connection-sync a {
-  color: var(--signal-text);
-}
-
-.connection-access {
-  overflow: hidden;
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.connection-card h4 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-sunken);
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-.connection-capabilities {
-  margin: 0;
-  padding: 0 12px;
-  list-style: none;
-}
-
-.connection-capabilities li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 0;
-  font-size: 12.5px;
-}
-
-.connection-capabilities li + li {
-  border-top: 1px solid var(--line);
-}
-
-.connection-capabilities li > span:last-child {
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  text-align: right;
-}
-
-.connection-capability-name {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.connection-capability-name svg {
-  flex-shrink: 0;
-  color: var(--foreground-faint);
-}
-
-.connection-capabilities [data-enabled='true'] svg {
-  color: var(--state-success);
-}
-
-.connection-management {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.connection-management > .connection-actions {
-  display: contents;
-}
-
-.connection-management:empty,
-.connection-card > [role='status']:empty,
-.apps-page > [role='status']:empty {
+.connection-feedback:empty {
   display: none;
 }
 
-.connection-empty {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 32px 16px;
-  border-radius: var(--radius-panel);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+.connection[data-terminal] .connection-title h3 {
   color: var(--foreground-muted);
-  text-align: center;
 }
 
-.connection-empty > svg {
-  margin-bottom: 4px;
+.connection-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.connection-history > h3 {
   color: var(--foreground-subtle);
-}
-
-.connection-empty h3 {
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .connection-dialog[data-slot='dialog-content'] {
@@ -336,6 +619,7 @@
   overflow-y: auto;
 }
 
+/* Setup forms that apps render inside the connection dialogs. */
 .connection-setup-form {
   display: grid;
   gap: 14px;
@@ -363,6 +647,23 @@
 }
 
 /* App access: scopes granted to an installation and consent before granting more. */
+.app-access {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  align-items: start;
+  gap: 16px 24px;
+}
+
+.app-access-column {
+  display: grid;
+  gap: 8px;
+}
+
+.app-access-column > h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
 .app-scopes {
   display: grid;
   gap: 0;
@@ -437,6 +738,24 @@
   font-weight: 600;
 }
 
-.connections-section {
-  scroll-margin-block-start: 24px;
+/* Uninstall: last on the page, apart from everyday management. */
+.app-uninstall {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 24px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.app-uninstall h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .app-uninstall {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
 }

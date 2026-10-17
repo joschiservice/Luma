@@ -33,19 +33,41 @@ export interface CapabilityObservation {
 const freshnessWindowMs = 24 * 60 * 60 * 1000;
 
 /**
- * Summarizes permitted, granted reads using the latest observation per capability.
- * Supply valid timestamps at or before `asOf`. Exactly 24 hours old is still fresh;
- * no reads or a missing observation makes coverage unobserved.
+ * Reads that import records through commerce sync, by the record type each supplies. Only these
+ * leave observations, so only they decide whether a connection is importing, current or stale.
+ * Point reads, such as shipping methods, suppliers or mailboxes, never import and would keep a
+ * connection importing forever. Commerce sync's record capabilities must match this map.
+ */
+export const importedReads = {
+  'orders.read': 'orders',
+  'fulfillment.read': 'fulfillments',
+  'products.read': 'products',
+  'inventory.read': 'inventory',
+  'customers.read': 'customers',
+  'returns.read': 'returns',
+  'inventory.transfers.read': 'inventory_transfers',
+  'inventory.shipments.read': 'inventory_shipments',
+} as const;
+
+/**
+ * Summarizes permitted, granted imported reads using the latest observation per capability.
+ * Supply valid timestamps at or before `asOf`. Exactly 24 hours old is still fresh; a missing
+ * observation makes coverage unobserved. A connection without imported reads, such as a
+ * mailbox, has nothing to import and is current once validated; one without any permitted read
+ * stays unobserved.
  */
 export function summarizeConnectionCoverage(
   connection: InstalledConnection,
   observations: readonly CapabilityObservation[],
   asOf: string,
 ): ConnectionCoverage {
-  const reads = connection.granted.filter(
+  const permitted = connection.granted.filter(
     (capability) =>
       capability.endsWith('.read') &&
       connection.permissions.includes(capability),
+  );
+  const reads = permitted.filter((capability) =>
+    Object.hasOwn(importedReads, capability),
   );
   const times = observations
     .filter((observation) =>
@@ -53,7 +75,7 @@ export function summarizeConnectionCoverage(
     )
     .map((observation) => Date.parse(observation.observedAt));
   const missing =
-    reads.length === 0 ||
+    permitted.length === 0 ||
     reads.some(
       (capability) =>
         !observations.some(

@@ -9,7 +9,7 @@ in the workspace apps ([apps](apps.md)).
 
 ## Access
 
-People with `connections.manage` install, check, rotate and disconnect connections.
+People with `connections.manage` install, check, rotate, rename and disconnect connections.
 Every member can list connection summaries and use permitted reads. Every operation
 refreshes membership. Tables enforce tenant RLS even when a query omits its tenant
 predicate; use a restricted login inheriting `luma_connectors`. Lifecycle events are
@@ -88,6 +88,9 @@ permissions.
 
 ## Rotation and removal
 
+Renaming changes only the label, at the reviewed version, and records both names in the
+lifecycle event; target, credentials, grants and status stay as they are.
+
 Mutations require the last returned `version`; concurrent or stale changes conflict.
 Rotation atomically replaces the ciphertext, increments `credentialVersion`, clears grants
 and returns to `pending`; call `check` to activate the replacement. An in-flight
@@ -143,6 +146,10 @@ JTL host and the installation's `X-Tenant-ID`.
 Installation validation is separate from operational health. Home, Apps and connection metrics
 use the same tenant-scoped read of permitted capabilities and sync streams. Current failed
 reads take precedence over import or freshness status; missing record types mean importing,
-even when other data has arrived. “No data yet” requires no successful observations. Connection
+even when other data has arrived. Only reads that import records through commerce sync count
+toward importing and freshness; point reads such as shipping methods, suppliers or mailboxes never
+import, so a connection with only those is current once validated. Commerce sync's record
+capabilities must match this set. A pending connection shows its lifecycle state rather than the
+shared health: it can't read until it is validated, so it is never reported as importing. “No data yet” requires no successful observations. Connection
 settings show each stream's last successful full read, failed-read status and accessible open
 issues. Point reads of individual rows can be newer than a completed full import.
