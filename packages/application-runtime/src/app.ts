@@ -31,6 +31,8 @@ export {
   createOrderLineReader,
 } from './composition/application.js';
 
+export { applicationOptionsFor } from './composition/application-options.js';
+
 export { createResourceScope } from './composition/resources.js';
 
 export { createReadinessCheck } from './composition/readiness.js';

@@ -77,8 +77,12 @@ export function createGmailProvider(
         capability,
       );
       const target = installationTarget.parse(current.connection.target);
+      // A host composed with simulation reaches it from every runtime built on its providers.
       const fetch =
-        simulationTransport(current.connection, runtime.simulation) ??
+        simulationTransport(
+          current.connection,
+          runtime.simulation ?? options.simulation,
+        ) ??
         runtime.fetch ??
         options.fetch;
       const push = options.push;

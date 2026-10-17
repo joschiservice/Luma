@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createJtlConnector } from '@luma/app-jtl';
 import {
+  applicationOptionsFor,
   buildApp,
   createApplicationServices,
   createCommerceServices,
@@ -57,9 +58,6 @@ import { Pool } from 'pg';
 import {
   createInstallationVerifier,
   createInstalledConnections,
-  createInstalledMessageRuntime,
-  createInstalledPurchaseOrderRuntime,
-  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
@@ -496,16 +494,14 @@ export async function createPilot(
         )
       : undefined;
     if (processClient) resources.add(processClient.close);
-    const mailboxRuntime = simulation
-      ? createInstalledMessageRuntime({
-          ...installedOptions,
-          record: async () => undefined,
-        })
-      : undefined;
+    // The same app-host options the API and workers derive. Purchase orders, returns and mailboxes
+    // need simulated providers; the plain pilot keeps them local, like an API without connections.
+    const shared = applicationOptionsFor(installations, {
+      providerRuntimes: !!simulation,
+      ...(observability ? { observability } : {}),
+    });
     const application = createApplicationServices({
-      observability,
-      connectionEnvironment: installations.connectionEnvironment,
-
+      ...shared,
       ...(modelGateway ? { modelGateway } : {}),
       ...(supplierExtraction ? { supplierExtraction } : {}),
       ...(processClient ? { replenishmentTransport: processClient } : {}),
@@ -513,38 +509,12 @@ export async function createPilot(
       identity: identity.service,
       execution: { kind: 'enabled', effects },
       verifier,
-      decisionSources: installations.decisionSources(),
-      providerCatalog: installations.providerCatalog,
-      workflowSources: installations.registry.workflowSources(),
-      actionPermission: installations.registry.actionPermission,
       ...(detectionTiming.followUps
         ? { followUps: detectionTiming.followUps }
         : {}),
       ...(simulation ? { refreshStock } : {}),
-      ...(simulation
-        ? {
-            purchasing: {
-              runtime: createInstalledPurchaseOrderRuntime(installedOptions),
-
-              installations,
-            },
-            returns: {
-              runtime: createInstalledReturnRuntime(installedOptions),
-              installations,
-            },
-          }
-        : {}),
-      // Simulated mailboxes are read through the installed capability runtime, as in the worker.
-      ...(simulation
-        ? {
-            messaging: {
-              installations,
-              // Replies are sent through the same runtime, as in the API and worker.
-              reader: mailboxRuntime,
-              sender: mailboxRuntime,
-              log: failureLog,
-            },
-          }
+      ...(shared.messaging
+        ? { messaging: { ...shared.messaging, log: failureLog } }
         : {}),
       desk: {
         capability: supported,
