@@ -108,8 +108,9 @@ fields, Luma purchase orders and supplier follow-ups, cite the Luma record they 
 ### Reading cited evidence
 
 `@luma/read-models` resolves the references a record cites, so people see the evidence rather
-than IDs. A request names a subject (a purchase order, a purchasing plan, a native stock receipt
-review, a return creation, settlement or exchange step, a reply, a case, or an app decision by
+than IDs. A request names a subject (a purchase order, a purchasing plan, a replenishment run by
+its workflow run ID, a native stock receipt review, a return creation, settlement, exchange or
+exchange step, a return deadline wait by its occurrence ID, a reply, a case, or an app decision by
 its proposal ID) and optionally its references; without them it resolves everything the subject
 cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
 `inventory.read`, `returns.read`, `messages.read` or `issues.read`); an app decision needs the
@@ -118,15 +119,25 @@ read permission of its capability's area (`inventory.*` needs `inventory.read`, 
 
 The subject's owner reports what the subject cites and looks up stored evidence only through the
 subject: procurement's reads and receipts of that order, its lifecycle events, plans and the
-notes people recorded with manual receipts; inventory's receipt reviews and the ledger entries
-that booked them; orders' evidence of that return case; messaging's send receipts and the
-messages of that reply's thread. Tables that are not linked to the subject are read only for
-references the subject cites as reads or receipts: the inventory and order snapshots and ledger
-entries behind a plan's suggestions, and the Shopify, Starshipit and JTL shipping-method
+notes people recorded with manual receipts; a replenishment run's rule, admitted proposal with
+its policy records, the rule's supplier, the orders it counted or drafted and the drafted order's
+events; inventory's receipt reviews and the ledger entries that booked them; orders' evidence of
+that return case; messaging's send receipts and the messages of that reply's thread. Tables that
+are not linked to the subject are read only for references the subject cites as reads or
+receipts: the inventory and order snapshots and ledger entries behind a plan's suggestions or a
+replenishment run's stock check and demand estimate, and the Shopify, Starshipit and JTL shipping-method
 evidence that execution attempts or an app proposal's preconditions cite, through each app's
 `evidence` hook. App rows written before an app recorded adapter versions, completeness or
 accepted records return those fields as null, which the view shows as not recorded. An order's
 email submission names the message it sent, which messaging resolves.
+
+A replenishment run cites what its steps recorded: the stock read of its inventory check, the
+supplier and existing orders its proposal step counted, the policy decision its approval waits
+on, and the drafted order's events its verification found, plus the rule, the admitted proposal,
+and the order reads behind the demand estimate and the orders its approval context froze.
+Contexts frozen before Luma recorded demand reads cite none. A return wait cites the money reads
+or case revision its last check found, and an exchange the reads behind its availability and its
+completion check.
 
 Each reference resolves to a read (source, record, read and source-update times, revision,
 completeness, adapter version and an allowlisted summary of the normalized read), a write
@@ -139,8 +150,9 @@ and version after each. Provider payloads, message text, recipients and attachme
 the owner.
 
 Evidence another area guards is `restricted` for a reader without that area's read permission,
-naming the permission, rather than left out: plan stock reads and ledger entries, native receipts
-and their proof need `inventory.read`, plan demand reads `orders.read`, order emails
+naming the permission, rather than left out: plan and replenishment stock reads and ledger
+entries, native receipts and their proof need `inventory.read`, plan and replenishment demand
+reads `orders.read`, order emails
 `messages.read`, the commitments a receipt books `procurement.read`, and an order's Shopify stock
 bookings with their policy records, receipts and verification reads `inventory.read`. The
 order's timeline still hides stock booking entries from readers without inventory access; its

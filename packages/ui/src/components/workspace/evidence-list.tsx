@@ -53,6 +53,9 @@ const recordLabels: Record<EvidenceRecordKind, () => string> = {
   stock_ownership_change: m.evidence_record_stock_ownership_change,
   stock_booking: m.evidence_record_stock_booking,
   receipt_note: m.evidence_record_receipt_note,
+  replenishment_rule: m.evidence_record_replenishment_rule,
+  replenishment_proposal: m.evidence_record_replenishment_proposal,
+  supplier: m.evidence_record_supplier,
 };
 
 const reviewStates = {

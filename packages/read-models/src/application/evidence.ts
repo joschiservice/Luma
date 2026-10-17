@@ -4,22 +4,14 @@ import type { SqlTransaction } from '@luma/platform';
 import type {
   Citation,
   EvidenceItem,
+  EvidenceSubjectKind,
   RetentionKind,
   StoredEvidence,
 } from '../domain/evidence.js';
 
 /** The record whose cited evidence is read. */
 interface EvidenceSubject {
-  kind:
-    | 'purchase_order'
-    | 'purchasing_plan'
-    | 'native_receipt'
-    | 'app_decision'
-    | 'return_creation'
-    | 'return_settlement'
-    | 'return_exchange_step'
-    | 'reply'
-    | 'case';
+  kind: EvidenceSubjectKind;
   id: string;
 }
 

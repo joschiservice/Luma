@@ -134565,6 +134565,20 @@
                                   "type": "object",
                                   "properties": {
                                     "kind": {
+                                      "const": "replenishment_run"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
                                       "const": "native_receipt"
                                     },
                                     "id": {
@@ -134621,7 +134635,35 @@
                                   "type": "object",
                                   "properties": {
                                     "kind": {
+                                      "const": "return_exchange"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
                                       "const": "return_exchange_step"
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "required": ["kind", "id"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "return_wait"
                                     },
                                     "id": {
                                       "type": "string",
@@ -135930,6 +135972,20 @@
                                     "type": "object",
                                     "properties": {
                                       "kind": {
+                                        "const": "replenishment_run"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
                                         "const": "native_receipt"
                                       },
                                       "id": {
@@ -135986,7 +136042,35 @@
                                     "type": "object",
                                     "properties": {
                                       "kind": {
+                                        "const": "return_exchange"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
                                         "const": "return_exchange_step"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "const": "return_wait"
                                       },
                                       "id": {
                                         "type": "string",
@@ -136610,6 +136694,20 @@
                         "type": "object",
                         "properties": {
                           "kind": {
+                            "const": "replenishment_run"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
                             "const": "native_receipt"
                           },
                           "id": {
@@ -136666,7 +136764,35 @@
                         "type": "object",
                         "properties": {
                           "kind": {
+                            "const": "return_exchange"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
                             "const": "return_exchange_step"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "return_wait"
                           },
                           "id": {
                             "type": "string",
@@ -136765,6 +136891,20 @@
                           "type": "object",
                           "properties": {
                             "kind": {
+                              "const": "replenishment_run"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
                               "const": "native_receipt"
                             },
                             "id": {
@@ -136821,7 +136961,35 @@
                           "type": "object",
                           "properties": {
                             "kind": {
+                              "const": "return_exchange"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
                               "const": "return_exchange_step"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "return_wait"
                             },
                             "id": {
                               "type": "string",
@@ -137158,7 +137326,10 @@
                                       "ledger_entry",
                                       "stock_ownership_change",
                                       "stock_booking",
-                                      "receipt_note"
+                                      "receipt_note",
+                                      "replenishment_rule",
+                                      "replenishment_proposal",
+                                      "supplier"
                                     ],
                                     "type": "string"
                                   },

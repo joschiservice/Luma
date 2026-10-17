@@ -1496,4 +1496,582 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
       await admin.end();
     }
   }, 60_000);
+
+  it('resolves what replenishment runs, return waits and exchanges cite, with per-area access and tenant isolation', async () => {
+    const db = await createMigratedDatabase(databaseUrl!);
+    const role = `evidence_${randomUUID().replaceAll('-', '')}`;
+    const admin = new Pool({ connectionString: databaseUrl });
+    let runtime: Pool | undefined;
+    try {
+      const password = randomUUID();
+      await admin.query(
+        `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
+      );
+      await admin.query(`GRANT luma_desk,luma_connectors TO "${role}"`);
+      const url = new URL(db.owner.options.connectionString!);
+      url.username = role;
+      url.password = password;
+      runtime = new Pool({ connectionString: url.toString() });
+      const reader = createEvidenceReader(
+        createTenantDatabase(runtime),
+        createEvidenceOwners([]),
+      );
+
+      const id = () => randomUUID();
+      const tenantId = id(),
+        otherTenant = id(),
+        shopify = id(),
+        supplierId = id(),
+        openOrder = id(),
+        draftOrder = id(),
+        unrelatedOrder = id(),
+        position = id(),
+        orderEntity = id(),
+        activationId = id(),
+        runId = id(),
+        otherRunId = id(),
+        proposalId = id(),
+        decisionId = id(),
+        stockRead = id(),
+        demandRead = id(),
+        draftEvent = id(),
+        caseId = id(),
+        settlementId = id(),
+        moneyRead = id(),
+        waitId = id(),
+        receiptWaitId = id(),
+        exchangeId = id(),
+        availabilityRead = id(),
+        lostRead = id();
+      const now = new Date().toISOString();
+      for (const tenant of [tenantId, otherTenant])
+        await db.owner.query(
+          "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Shop',$2,'active',now())",
+          [tenant, tenant],
+        );
+
+      const seed = await db.owner.connect();
+      try {
+        await seed.query('BEGIN');
+        // Seed owner rows directly; their own services' constraints are covered elsewhere.
+        await seed.query('SET LOCAL session_replication_role=replica');
+        await seed.query(
+          `INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,'sealed')`,
+          [
+            tenantId,
+            shopify,
+            {
+              tenantId,
+              id: shopify,
+              version: 1,
+              status: 'active',
+              label: 'Shopify store',
+              provider: 'shopify',
+              target: { kind: 'shopify' },
+            },
+          ],
+        );
+        await seed.query(
+          'INSERT INTO procurement_suppliers(tenant_id,id,document) VALUES($1,$2,$3)',
+          [tenantId, supplierId, { tenantId, id: supplierId }],
+        );
+        for (const order of [openOrder, draftOrder, unrelatedOrder])
+          await seed.query(
+            'INSERT INTO procurement_purchase_orders(tenant_id,id,supplier_id,document,created_at) VALUES($1,$2,$3,$4,now())',
+            [
+              tenantId,
+              order,
+              supplierId,
+              {
+                tenantId,
+                id: order,
+                supplierId,
+                status: 'draft',
+                authority: 'luma',
+                lines: [{}],
+              },
+            ],
+          );
+
+        // The stock read the run took and an order read behind its demand estimate.
+        for (const [observation, resource] of [
+          [stockRead, 'sku'],
+          [demandRead, 'order'],
+        ] as const)
+          await seed.query(
+            `INSERT INTO connector_observations(id,tenant_id,connection_id,ingest_key,document) VALUES($1,$2,$3,$4,$5)`,
+            [
+              observation,
+              tenantId,
+              shopify,
+              observation,
+              {
+                observation: {
+                  id: observation,
+                  source: {
+                    tenantId,
+                    connectionId: shopify,
+                    provider: 'shopify',
+                    resource,
+                    externalId: `gid://${resource}/1`,
+                  },
+                },
+              },
+            ],
+          );
+        await seed.query(
+          `INSERT INTO inventory_entities(id,tenant_id,kind,reconciliation_key) VALUES($1,$2,'position','p')`,
+          [position, tenantId],
+        );
+        await seed.query(
+          `INSERT INTO inventory_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,mapping_version,observed_at,document)
+           VALUES($1,$2,$3,'position',$4,$5,'n1','m1',$6,$7)`,
+          [
+            id(),
+            tenantId,
+            position,
+            shopify,
+            stockRead,
+            now,
+            {
+              entityId: position,
+              connectionId: shopify,
+              observationId: stockRead,
+              kind: 'position',
+              data: { available: '4', unit: 'each' },
+            },
+          ],
+        );
+        await seed.query(
+          `INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key) VALUES($1,$2,'order','o')`,
+          [orderEntity, tenantId],
+        );
+        await seed.query(
+          `INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,mapping_version,observed_at,document)
+           VALUES($1,$2,$3,'order',$4,$5,'n1','m1',$6,$7)`,
+          [
+            id(),
+            tenantId,
+            orderEntity,
+            shopify,
+            demandRead,
+            now,
+            {
+              entityId: orderEntity,
+              connectionId: shopify,
+              observationId: demandRead,
+              kind: 'order',
+              data: { status: 'open', lines: [{}] },
+            },
+          ],
+        );
+
+        // A replenishment run waiting for approval of its proposal, and one in another tenant.
+        await seed.query(
+          `INSERT INTO replenishment_activations(tenant_id,id,position_id,principal_id,document,created_at) VALUES($1,$2,$3,'u',$4,now())`,
+          [
+            tenantId,
+            activationId,
+            position,
+            { id: activationId, positionId: position, principalId: 'u', supplierId },
+          ],
+        );
+        for (const [tenant, run] of [
+          [tenantId, runId],
+          [otherTenant, otherRunId],
+        ] as const)
+          await seed.query(
+            `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state)
+             VALUES($1,$2,'inventory-replenishment','1.0.0','v',$4,'r',$3,'awaiting_admission')`,
+            [
+              tenant,
+              run,
+              {
+                tenantId: tenant,
+                id: run,
+                definitionId: 'inventory-replenishment',
+                version: '1.0.0',
+                versionDigest: 'v',
+                requestDigest: 'r',
+                context: { inputs: { activationId } },
+              },
+              `replenishment:${run}`,
+            ],
+          );
+        const step = (
+          stepId: string,
+          state: string,
+          evidenceRefs: string[],
+        ) => ({ stepId, state, evidenceRefs, observedAt: now, recordedAt: now });
+        for (const [stepId, state, refs] of [
+          ['inventory', 'completed', [stockRead]],
+          ['proposal', 'completed', [stockRead, supplierId, openOrder]],
+          ['create-order', 'waiting', [decisionId]],
+          ['verify-order', 'completed', [draftEvent]],
+          ['complete', 'completed', [`temporal:${runId}:complete`]],
+        ] as const)
+          await seed.query(
+            `INSERT INTO workflow_process_steps(tenant_id,run_id,step_id,state,document) VALUES($1,$2,$3,$4,$5)`,
+            [tenantId, runId, stepId, state, step(stepId, state, [...refs])],
+          );
+        await seed.query(
+          `INSERT INTO action_admission_steps(tenant_id,run_id,step_id,proposal_id,artifact_id,artifact_version,document)
+           VALUES($1,$2,'create-order',$3,'a','1',$4)`,
+          [
+            tenantId,
+            runId,
+            proposalId,
+            {
+              tenantId,
+              runId,
+              stepId: 'create-order',
+              action: {
+                id: proposalId,
+                capability: 'procurement.purchase-order.create',
+                target: { kind: 'purchase_order', id: draftOrder },
+                preconditions: { evidenceRefs: [stockRead, supplierId] },
+              },
+            },
+          ],
+        );
+        await seed.query(
+          'INSERT INTO policy_decisions(id,tenant_id,proposal_id,action_hash,document) VALUES($1,$2,$3,$4,$5)',
+          [
+            decisionId,
+            tenantId,
+            proposalId,
+            'a'.repeat(64),
+            { id: decisionId, tenantId, outcome: 'approval_required' },
+          ],
+        );
+        await seed.query(
+          `INSERT INTO replenishment_approval_contexts(tenant_id,run_id,document) VALUES($1,$2,$3)`,
+          [
+            tenantId,
+            runId,
+            {
+              recordedAt: now,
+              demandEvidenceRefs: [demandRead],
+              openOrders: [{ id: openOrder, reference: 'PO-1' }],
+            },
+          ],
+        );
+        await seed.query(
+          `INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document) VALUES($1,$2,'procurement:draft',$3,$4)`,
+          [
+            draftEvent,
+            tenantId,
+            draftOrder,
+            {
+              id: draftEvent,
+              tenantId,
+              eventType: 'purchase_order.created',
+              occurredAt: now,
+              actor: { kind: 'user', id: 'u' },
+              details: { to: 'draft', revision: '1' },
+            },
+          ],
+        );
+
+        // A return case waiting for refund money, a receipt wait and an exchange check.
+        await seed.query(
+          `INSERT INTO orders_return_cases(tenant_id,id,order_id,connection_id,state,revision,document,opened_at,updated_at)
+           VALUES($1,$2,$3,$4,'open',3,$5,now(),now())`,
+          [tenantId, caseId, id(), shopify, { id: caseId, tenantId }],
+        );
+        await seed.query(
+          `INSERT INTO orders_return_actions(tenant_id,id,case_id,connection_id,kind,state,document,requested_at)
+           VALUES($1,$2,$3,$4,'refund','pending',$5,now())`,
+          [
+            tenantId,
+            settlementId,
+            caseId,
+            shopify,
+            {
+              id: settlementId,
+              tenantId,
+              caseId,
+              proof: { observedAt: now, evidenceRefs: [moneyRead] },
+            },
+          ],
+        );
+        for (const [read, purpose, subject] of [
+          [moneyRead, 'settlement', settlementId],
+          [availabilityRead, 'exchange', exchangeId],
+        ] as const)
+          await seed.query(
+            `INSERT INTO orders_return_read_evidence(tenant_id,id,case_id,connection_id,purpose,subject_id,observed_at,document)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [
+              tenantId,
+              read,
+              caseId,
+              shopify,
+              purpose,
+              subject,
+              now,
+              {
+                id: read,
+                tenantId,
+                caseId,
+                purpose,
+                subjectId: subject,
+                source: {
+                  provider: 'shopify',
+                  connectionId: shopify,
+                  resource: purpose === 'settlement' ? 'refund' : 'variant',
+                  externalId: `gid://${purpose}/1`,
+                  scopeKey: '',
+                },
+                observedAt: now,
+                sourceUpdatedAt: null,
+                sourceRevision: null,
+                adapterVersion: 'shopify-returns/1',
+                completeness: 'complete',
+                data:
+                  purpose === 'settlement'
+                    ? { payment: 'pending', customerName: 'Ada Lovelace' }
+                    : { available: 3 },
+              },
+            ],
+          );
+        for (const [wait, phase, refs] of [
+          [waitId, 'financial', [moneyRead]],
+          [receiptWaitId, 'receipt', [`case:${caseId}:3`]],
+        ] as const)
+          await seed.query(
+            `INSERT INTO orders_return_waits(tenant_id,id,case_id,phase,policy_revision,state,document,opened_at,due_at)
+             VALUES($1,$2,$3,$4,1,'waiting',$5,now(),now()+interval '1 day')`,
+            [
+              tenantId,
+              wait,
+              caseId,
+              phase,
+              {
+                id: wait,
+                tenantId,
+                caseId,
+                phase,
+                state: 'waiting',
+                policyRevision: 1,
+                observedAt: now,
+                evidenceRefs: [...refs],
+              },
+            ],
+          );
+        await seed.query(
+          `INSERT INTO orders_return_exchanges(tenant_id,id,case_id,document) VALUES($1,$2,$3,$4)`,
+          [
+            tenantId,
+            exchangeId,
+            caseId,
+            {
+              id: exchangeId,
+              tenantId,
+              caseId,
+              availability: {
+                available: true,
+                observedAt: now,
+                evidenceRefs: [availabilityRead],
+              },
+              completion: {
+                state: 'unresolved',
+                checkedAt: now,
+                evidenceRefs: [lostRead, `case:${caseId}:3`],
+              },
+            },
+          ],
+        );
+        await seed.query('COMMIT');
+      } catch (error) {
+        await seed.query('ROLLBACK');
+        throw error;
+      } finally {
+        seed.release();
+      }
+
+      const reading = readerContext(tenantId);
+      const procurementOnly = readerContext(tenantId, ['procurement.read']);
+      const resolutions = (items: { ref: string; resolution: unknown }[]) =>
+        Object.fromEntries(items.map((item) => [item.ref, item.resolution]));
+
+      // The run: its stock and demand reads through their owners, and its own records.
+      const run = await reader.resolve(reading, {
+        subject: { kind: 'replenishment_run', id: runId },
+      });
+      const runItems = resolutions(run.items);
+      expect(runItems[stockRead]).toMatchObject({
+        kind: 'read',
+        provider: 'shopify',
+        connection: { id: shopify, label: 'Shopify store' },
+        summary: [{ field: 'available', value: '4' }],
+      });
+      expect(runItems[demandRead]).toMatchObject({
+        kind: 'read',
+        summary: [
+          { field: 'status', value: 'open' },
+          { field: 'lines', value: '1' },
+        ],
+      });
+      expect(runItems[activationId]).toEqual({
+        kind: 'luma_record',
+        record: 'replenishment_rule',
+        id: activationId,
+      });
+      expect(runItems[proposalId]).toEqual({
+        kind: 'luma_record',
+        record: 'replenishment_proposal',
+        id: proposalId,
+      });
+      expect(runItems[decisionId]).toEqual({
+        kind: 'luma_record',
+        record: 'policy_decision',
+        id: decisionId,
+      });
+      expect(runItems[supplierId]).toEqual({
+        kind: 'luma_record',
+        record: 'supplier',
+        id: supplierId,
+      });
+      expect(runItems[openOrder]).toEqual({
+        kind: 'luma_record',
+        record: 'purchase_order',
+        id: openOrder,
+      });
+      expect(runItems[draftEvent]).toMatchObject({
+        kind: 'luma_record',
+        record: 'procurement_event',
+        detail: { event: 'created', to: 'draft' },
+      });
+      expect(run.items.find((item) => item.ref === stockRead)?.citedAs).toBe(
+        'read',
+      );
+      expect(Object.keys(runItems)).not.toContain(`temporal:${runId}:complete`);
+      expect(
+        run.items.filter((item) => item.resolution.kind === 'unresolved'),
+      ).toEqual([]);
+
+      // Without inventory and order access its reads are restricted, not dropped.
+      const restrictedRun = resolutions(
+        (
+          await reader.resolve(procurementOnly, {
+            subject: { kind: 'replenishment_run', id: runId },
+          })
+        ).items,
+      );
+      expect(restrictedRun[stockRead]).toEqual({
+        kind: 'restricted',
+        permission: 'inventory.read',
+      });
+      expect(restrictedRun[demandRead]).toEqual({
+        kind: 'restricted',
+        permission: 'orders.read',
+      });
+      expect(restrictedRun[decisionId]).toMatchObject({
+        record: 'policy_decision',
+      });
+      // Orders the run did not cite or draft don't resolve through it.
+      expect(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'replenishment_run', id: runId },
+            refs: [unrelatedOrder, draftOrder],
+          })
+        ).items.map((item) => item.resolution.kind),
+      ).toEqual(['unresolved', 'luma_record']);
+      await expect(
+        reader.resolve(readerContext(tenantId, ['inventory.read']), {
+          subject: { kind: 'replenishment_run', id: runId },
+        }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+
+      // The financial wait cites the money read its last check found; the receipt wait the case.
+      const wait = await reader.resolve(reading, {
+        subject: { kind: 'return_wait', id: waitId },
+      });
+      expect(wait.items).toEqual([
+        expect.objectContaining({
+          ref: moneyRead,
+          citedAs: 'read',
+          resolution: expect.objectContaining({
+            kind: 'read',
+            summary: [{ field: 'payment', value: 'pending' }],
+          }),
+        }),
+      ]);
+      expect(JSON.stringify(wait)).not.toContain('Ada Lovelace');
+      expect(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'return_wait', id: receiptWaitId },
+          })
+        ).items.map((item) => [item.citedAs, item.resolution]),
+      ).toEqual([
+        [
+          'record',
+          {
+            kind: 'luma_record',
+            record: 'return_case',
+            id: `case:${caseId}:3`,
+          },
+        ],
+      ]);
+
+      // The exchange: its availability read, and a completion read that was never stored.
+      const exchange = resolutions(
+        (
+          await reader.resolve(reading, {
+            subject: { kind: 'return_exchange', id: exchangeId },
+          })
+        ).items,
+      );
+      expect(exchange[availabilityRead]).toMatchObject({
+        kind: 'read',
+        summary: [{ field: 'available', value: '3' }],
+      });
+      expect(exchange[lostRead]).toEqual({ kind: 'unresolved' });
+      expect(exchange[`case:${caseId}:3`]).toMatchObject({
+        record: 'return_case',
+      });
+      for (const subject of [
+        { kind: 'return_wait', id: waitId },
+        { kind: 'return_exchange', id: exchangeId },
+      ] as const)
+        await expect(
+          reader.resolve(procurementOnly, { subject }),
+        ).rejects.toMatchObject({ statusCode: 403 });
+
+      // Another tenant sees none of these subjects; its own run resolves none of these references.
+      const outsider = readerContext(otherTenant);
+      for (const subject of [
+        { kind: 'replenishment_run', id: runId },
+        { kind: 'return_wait', id: waitId },
+        { kind: 'return_exchange', id: exchangeId },
+      ] as const)
+        await expect(
+          reader.resolve(outsider, { subject }),
+        ).rejects.toMatchObject({ statusCode: 404 });
+      await expect(
+        reader.resolve(reading, {
+          subject: { kind: 'replenishment_run', id: otherRunId },
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      const foreign = await reader.resolve(outsider, {
+        subject: { kind: 'replenishment_run', id: otherRunId },
+        refs: [activationId, proposalId, decisionId, stockRead, moneyRead],
+      });
+      expect(foreign.items.map((item) => item.resolution.kind)).toEqual([
+        'unresolved',
+        'unresolved',
+        'unresolved',
+        'unresolved',
+        'unresolved',
+      ]);
+    } finally {
+      await runtime?.end();
+      await db.drop();
+      await admin.query(`DROP ROLE IF EXISTS "${role}"`);
+      await admin.end();
+    }
+  }, 60_000);
 });

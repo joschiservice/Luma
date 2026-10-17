@@ -31,9 +31,9 @@ import {
   createOrderMetricReader,
   orderReadEvidence,
   orderStateQueries,
-  returnWriteCitations,
-  returnWriteEvidence,
-  type ReturnWriteKind,
+  returnCitations,
+  returnEvidence,
+  type ReturnEvidenceKind,
 } from '@luma/orders/composition';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { forbidden } from '@luma/platform';
@@ -47,6 +47,8 @@ import {
   purchaseOrderStockRefs,
   purchasingPlanCitations,
   purchasingPlanEvidence,
+  replenishmentRunCitations,
+  replenishmentRunEvidence,
   type SupplierCommitments,
 } from '@luma/procurement/composition';
 import type {
@@ -148,13 +150,12 @@ async function planInputs(
 export function createEvidenceOwners(
   apps: ReturnType<AppRegistry['evidenceSources']>,
 ): EvidenceOwners {
-  const returnWrite = (kind: ReturnWriteKind): EvidenceSubjectOwner => ({
+  const returnRecord = (kind: ReturnEvidenceKind): EvidenceSubjectOwner => ({
     permission: 'returns.read',
     retention: { read: 'return_reads', write_receipt: 'write_receipts' },
-    citations: (tx, tenantId, id) =>
-      returnWriteCitations(tx, tenantId, kind, id),
+    citations: (tx, tenantId, id) => returnCitations(tx, tenantId, kind, id),
     lookup: (tx, tenantId, id, refs) =>
-      returnWriteEvidence(tx, tenantId, kind, id, refs),
+      returnEvidence(tx, tenantId, kind, id, refs),
   });
   const appEvidence = async (
     tx: SqlTransaction,
@@ -303,15 +304,31 @@ export function createEvidenceOwners(
         ];
       },
     },
+    replenishment_run: {
+      permission: 'procurement.read',
+      // Stock and order snapshots were always stored, and the draft's receipt is the Luma order
+      // it created, so nothing the run cites predates storage.
+      retention: { read: null, write_receipt: null },
+      citations: replenishmentRunCitations,
+      async lookup(tx, tenantId, id, refs, access) {
+        return [
+          ...(await replenishmentRunEvidence(tx, tenantId, id, refs)),
+          // The stock read the proposal rests on and the order reads behind its demand.
+          ...(await planInputs(tx, tenantId, refs.cited, access)),
+        ];
+      },
+    },
     reply: {
       permission: 'messages.read',
       retention: { read: null, write_receipt: 'write_receipts' },
       citations: replyCitations,
       lookup: replyEvidence,
     },
-    return_creation: returnWrite('creation'),
-    return_exchange_step: returnWrite('exchange_step'),
-    return_settlement: returnWrite('settlement'),
+    return_creation: returnRecord('creation'),
+    return_exchange: returnRecord('exchange'),
+    return_exchange_step: returnRecord('exchange_step'),
+    return_settlement: returnRecord('settlement'),
+    return_wait: returnRecord('wait'),
   };
 }
 

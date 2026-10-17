@@ -223,7 +223,9 @@ requires the other steps; neither accepted mutation nor one verified step closes
 
 Creations, settlements and exchange steps show what they cite through the
 [evidence reader](execution.md#reading-cited-evidence): the reads their quote, proof and
-verification name and the write receipt, scoped to the case. Proofs recorded before orders stored
+verification name and the write receipt, scoped to the case. Exchanges show the reads behind
+their availability and completion check, and deadline waits the money reads or case revision
+their last check found. Proofs recorded before orders stored
 reads show those reads as not retained; money evidence that names a case revision resolves to the
 return case.
 

@@ -1,6 +1,21 @@
 /** The most references one request resolves. */
 export const evidenceReferenceLimit = 100;
 
+/** The kinds of record whose cited evidence can be read, each resolved by its owner. */
+export type EvidenceSubjectKind =
+  | 'purchase_order'
+  | 'purchasing_plan'
+  | 'replenishment_run'
+  | 'native_receipt'
+  | 'app_decision'
+  | 'return_creation'
+  | 'return_settlement'
+  | 'return_exchange'
+  | 'return_exchange_step'
+  | 'return_wait'
+  | 'reply'
+  | 'case';
+
 const areaPermissions = {
   inventory: 'inventory.read',
   orders: 'orders.read',
@@ -72,6 +87,9 @@ export const evidenceRecordKinds = [
   'stock_ownership_change',
   'stock_booking',
   'receipt_note',
+  'replenishment_rule',
+  'replenishment_proposal',
+  'supplier',
 ] as const;
 
 type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];

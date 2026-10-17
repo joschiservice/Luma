@@ -48,6 +48,8 @@ describe('replenishment approval context', () => {
       dailySales: 2,
       coverBeforeDays: 2,
       coverAfterDays: 27,
+      // The order reads behind the demand estimate, for the decision's evidence.
+      demandEvidenceRefs: ['read'],
       unavailable: [],
     });
   });
@@ -65,6 +67,8 @@ describe('replenishment approval context', () => {
       dailySales: null,
       coverBeforeDays: null,
       coverAfterDays: null,
+      // Unknown demand cites no reads as if they supported an estimate.
+      demandEvidenceRefs: [],
     });
     expect(
       replenishmentReviewContext({

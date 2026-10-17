@@ -1,5 +1,7 @@
 /** Types of the Needs you queue items, shared by presentation rules and the application port. */
 
+import type { EvidenceSubjectKind } from './evidence.js';
+
 type DecisionKind =
   | 'case'
   | 'custom_field'
@@ -56,20 +58,8 @@ export type DecisionOwner =
  * The record whose cited evidence backs a decision, as the evidence resolver names it, and the
  * references the decision relies on when they are only part of what that record cites.
  */
-interface DecisionEvidence {
-  subject: {
-    kind:
-      | 'purchase_order'
-      | 'purchasing_plan'
-      | 'native_receipt'
-      | 'app_decision'
-      | 'return_creation'
-      | 'return_settlement'
-      | 'return_exchange_step'
-      | 'reply'
-      | 'case';
-    id: string;
-  };
+export interface DecisionEvidence {
+  subject: { kind: EvidenceSubjectKind; id: string };
   refs?: string[] | undefined;
 }
 

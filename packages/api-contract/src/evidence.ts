@@ -7,19 +7,24 @@ const instant = z.string().datetime();
 
 /**
  * The record whose cited evidence is read. Each kind needs its own read permission:
- * `procurement.read` for purchase orders and purchasing plans, `inventory.read` for native stock
- * receipts, `returns.read` for return writes, `messages.read` for replies, `issues.read` for
- * cases, and for an app decision the read permission of its change's area (`inventory.read`,
- * `orders.read` or `fulfillment.read`). An app decision is named by its proposal ID.
+ * `procurement.read` for purchase orders, purchasing plans and replenishment runs,
+ * `inventory.read` for native stock receipts, `returns.read` for return writes, exchanges and
+ * deadline waits, `messages.read` for replies, `issues.read` for cases, and for an app decision
+ * the read permission of its change's area (`inventory.read`, `orders.read` or
+ * `fulfillment.read`). An app decision is named by its proposal ID, a replenishment run by its
+ * workflow run ID and a deadline wait by its occurrence ID.
  */
 export const evidenceSubjectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('purchase_order'), id: uuid }).strict(),
   z.object({ kind: z.literal('purchasing_plan'), id: uuid }).strict(),
+  z.object({ kind: z.literal('replenishment_run'), id: uuid }).strict(),
   z.object({ kind: z.literal('native_receipt'), id: uuid }).strict(),
   z.object({ kind: z.literal('app_decision'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_creation'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_settlement'), id: uuid }).strict(),
+  z.object({ kind: z.literal('return_exchange'), id: uuid }).strict(),
   z.object({ kind: z.literal('return_exchange_step'), id: uuid }).strict(),
+  z.object({ kind: z.literal('return_wait'), id: uuid }).strict(),
   z.object({ kind: z.literal('reply'), id: uuid }).strict(),
   z.object({ kind: z.literal('case'), id: uuid }).strict(),
 ]);
@@ -84,6 +89,9 @@ export const evidenceRecordKinds = [
   'stock_ownership_change',
   'stock_booking',
   'receipt_note',
+  'replenishment_rule',
+  'replenishment_proposal',
+  'supplier',
 ] as const;
 
 /** What a purchase order's lifecycle event recorded. */

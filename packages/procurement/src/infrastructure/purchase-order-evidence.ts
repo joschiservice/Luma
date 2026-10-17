@@ -293,7 +293,7 @@ function isEvent(type: string): type is keyof typeof events {
  * The lifecycle events of `orderIds` among the references, with their time, actor and the
  * status change or revision they recorded.
  */
-async function lifecycleEvents(
+export async function lifecycleEvents(
   tx: SqlTransaction,
   tenantId: string,
   orderIds: string[],

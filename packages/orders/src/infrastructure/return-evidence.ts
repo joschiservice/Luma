@@ -3,10 +3,14 @@ import type { SqlTransaction } from '@luma/platform';
 import type { ReturnWriteReceipt } from '../application/return-write-receipts.js';
 import type { ReturnReadEvidence } from '../domain/return-reads.js';
 
-/** The return writes whose cited evidence can be read. */
-export type ReturnWriteKind = 'creation' | 'settlement' | 'exchange_step';
+/**
+ * The return records whose cited evidence can be read: the creation, settlement and exchange
+ * writes, an exchange with its availability and completion checks, and a deadline wait.
+ */
+export type ReturnEvidenceKind =
+  'creation' | 'settlement' | 'exchange_step' | 'exchange' | 'wait';
 
-/** A reference a return write cites, and when the citing record was written. */
+/** A reference a return record cites, and when the citing record was written. */
 interface ReturnCitation {
   ref: string;
   citedAs: 'read' | 'write_receipt' | 'record';
@@ -54,59 +58,85 @@ const tables = {
   creation: 'orders_return_creations',
   settlement: 'orders_return_actions',
   exchange_step: 'orders_return_exchange_steps',
-} as const satisfies Record<ReturnWriteKind, string>;
+  exchange: 'orders_return_exchanges',
+  wait: 'orders_return_waits',
+} as const satisfies Record<ReturnEvidenceKind, string>;
 
 /** Money evidence names the case revision it was read for, as `case:<id>:<revision>`. */
 const caseRevisionRef = /^case:([0-9a-f-]{36}):\d+$/i;
 
+/** A part of a return record that cites reads, with when they were observed or checked. */
+type CitingPart = {
+  observedAt?: unknown;
+  checkedAt?: unknown;
+  evidenceRefs?: unknown;
+} | null;
+
 /**
- * Reads what one return write cites, for the evidence view: its execution action and the reads
- * its proof and quote name, cited when they were observed. Returns null when the tenant has no
- * such write.
+ * Reads what one return record cites, for the evidence view. A write cites its execution action
+ * and the reads its proof and quote name; an exchange the reads behind its availability and its
+ * completion check; a wait the reads or case revision its last observation found. Reads are
+ * cited when they were observed. Returns null when the tenant has no such record.
  */
-export async function returnWriteCitations(
+export async function returnCitations(
   tx: SqlTransaction,
   tenantId: string,
-  kind: ReturnWriteKind,
+  kind: ReturnEvidenceKind,
   id: string,
 ): Promise<{ actionIds: string[]; citations: ReturnCitation[] } | null> {
   const { rows } = await tx.query<{
-    action_id: string | null;
-    proof: { observedAt?: string; evidenceRefs?: unknown } | null;
-    quote: { observedAt?: string; evidenceRefs?: unknown } | null;
-  }>(
-    `SELECT document->>'actionId' AS action_id,document->'proof' AS proof,document->'quote' AS quote
-     FROM ${tables[kind]} WHERE tenant_id=$1 AND id=$2`,
-    [tenantId, id],
-  );
-  const write = rows[0];
-  if (!write) return null;
-  const reads = (part: typeof write.proof): ReturnCitation[] =>
-    part && Array.isArray(part.evidenceRefs)
-      ? part.evidenceRefs
-          .filter((ref): ref is string => typeof ref === 'string')
-          .map((ref) => ({
-            ref,
-            citedAs: caseRevisionRef.test(ref) ? 'record' : 'read',
-            citedAt: part.observedAt ?? null,
-          }))
-      : [];
+    document: {
+      actionId?: unknown;
+      proof?: CitingPart;
+      quote?: CitingPart;
+      availability?: CitingPart;
+      completion?: CitingPart;
+      observedAt?: unknown;
+      evidenceRefs?: unknown;
+    };
+  }>(`SELECT document FROM ${tables[kind]} WHERE tenant_id=$1 AND id=$2`, [
+    tenantId,
+    id,
+  ]);
+  const record = rows[0]?.document;
+  if (!record) return null;
+  const reads = (part: CitingPart | undefined): ReturnCitation[] => {
+    if (!part || !Array.isArray(part.evidenceRefs)) return [];
+    const at = part.observedAt ?? part.checkedAt;
+
+    return part.evidenceRefs
+      .filter((ref): ref is string => typeof ref === 'string')
+      .map((ref) => ({
+        ref,
+        citedAs: caseRevisionRef.test(ref) ? 'record' : 'read',
+        citedAt: typeof at === 'string' ? at : null,
+      }));
+  };
+  const parts =
+    kind === 'exchange'
+      ? [record.availability, record.completion]
+      : kind === 'wait'
+        ? [record]
+        : [record.proof, record.quote];
 
   return {
-    actionIds: write.action_id ? [write.action_id] : [],
-    citations: [...reads(write.proof), ...reads(write.quote)],
+    actionIds:
+      kind !== 'exchange' && kind !== 'wait' && typeof record.actionId === 'string'
+        ? [record.actionId]
+        : [],
+    citations: parts.flatMap(reads),
   };
 }
 
 /**
- * Finds the provider reads and write receipts orders stored for the write's return case, and
+ * Finds the provider reads and write receipts orders stored for the record's return case, and
  * the case's records that the references name. Every query is scoped to that case, so a
  * reference from another case resolves to nothing.
  */
-export async function returnWriteEvidence(
+export async function returnEvidence(
   tx: SqlTransaction,
   tenantId: string,
-  kind: ReturnWriteKind,
+  kind: ReturnEvidenceKind,
   id: string,
   refs: { all: string[]; uuids: string[] },
 ): Promise<ReturnEvidence[]> {
