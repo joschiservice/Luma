@@ -789,6 +789,16 @@ export const journeyAreas = {
     ...inventory,
     'packages/api-contract/src/**/{supplier-email,supplier-terms,purchasing,incoming-stock}.ts',
   ],
+  'worker-effects.e2e.mjs': [
+    'apps/api/e2e/purchasing-reconciliation-worker.mjs',
+    ...simulator,
+    ...procurement,
+    ...supplierCommitments,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
   'purchase-order-changes.e2e.mjs': [
     ...simulator,
     ...procurement,
