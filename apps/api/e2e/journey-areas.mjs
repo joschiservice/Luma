@@ -316,8 +316,8 @@ const caseWorkflows = [
 const procurement = [
   ...rmProcurementContext,
   'packages/procurement/**',
-  'packages/api-contract/src/**/{procurement,procurement-context}.ts',
-  'packages/application-runtime/src/composition/{procurement-effects,procurement-submissions}.ts',
+  'packages/api-contract/src/**/{procurement,procurement-context,purchasing-timeline}.ts',
+  'packages/application-runtime/src/composition/{procurement-effects,procurement-submissions,purchase-receipt-timeline}.ts',
 ];
 const replenishment = [
   'apps/web/src/shared/procurement/approval-context.tsx',
@@ -1148,6 +1148,17 @@ export const journeyAreas = {
     ...webEvidence,
     ...webNeedsYou,
     'packages/api-contract/src/**/{supplier-terms,purchasing,incoming-stock}.ts',
+  ],
+  'purchasing-stock-booking.browser.mjs': [
+    ...simulator,
+    ...procurement,
+    ...inventory,
+    ...shopify,
+    ...webShell,
+    ...webProcurement,
+    ...webEvidence,
+    'apps/web/src/kit/identity/permission-text.ts',
+    'packages/api-contract/src/**/{supplier-terms,purchasing}.ts',
   ],
   'procurement.e2e.mjs': [...procurement, ...activity],
   'products.browser.mjs': [
