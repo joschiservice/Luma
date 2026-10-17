@@ -38,6 +38,7 @@ export default defineConfig(
     files: [
       '**/*.test.{ts,tsx,js,mjs}',
       '**/*.stories.{ts,tsx}',
+      '**/*.fixture.{ts,tsx}',
       '**/test-support/**',
       '**/e2e/**',
     ],

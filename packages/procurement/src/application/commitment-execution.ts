@@ -12,6 +12,7 @@ import type { PurchaseOrder } from '../domain/procurement.js';
 import { matchesSubmission } from '../domain/submissions.js';
 import { type CommitmentContext, hour } from './commitment-context.js';
 import type { PurchasingOrder, SubmissionExecution } from './commitments.js';
+import { purchasingReadEvidence } from './purchasing-reads.js';
 
 /**
  * Executes admitted submissions exactly once and verifies them by reading the purchasing system:
@@ -247,6 +248,15 @@ export function createSubmissionExecution({
           },
           failure: null,
         });
+        await tx.recordRead(
+          purchasingReadEvidence(
+            context.tenantId,
+            saved.connectionId,
+            saved.purchaseOrderId,
+            { purpose: 'submission', id: submissionId },
+            found,
+          ),
+        );
         await tx.audit(
           audit(
             context,
@@ -381,17 +391,24 @@ export function createSubmissionExecution({
         );
       });
     },
-    /** Verification for the execution adapter: an independent read must find exactly this order. */
+    /**
+     * Verification for the execution adapter: an independent read must find exactly this order.
+     * Every read it cites is stored first, so its observation IDs resolve to procurement
+     * evidence. Only a complete read can pass, because a partial one cannot rule out a
+     * duplicate order; a storage failure throws, which execution treats as unknown.
+     */
     async verify(context: TenantContext, submissionId: string) {
+      const inconclusive = {
+        outcome: 'inconclusive' as const,
+        observationRefs: [],
+        observedAt: deps.now().toISOString(),
+      };
       const submission = await deps.store.transaction(
         context.tenantId,
         false,
         (tx) => tx.submission(submissionId),
       );
-      if (!submission)
-        return { outcome: 'inconclusive' as const, observationRefs: [] };
-      if (!deps.purchasing)
-        return { outcome: 'inconclusive' as const, observationRefs: [] };
+      if (!submission || !deps.purchasing) return inconclusive;
       const result = await deps.purchasing.orders(
         context,
         submission.connectionId,
@@ -404,24 +421,38 @@ export function createSubmissionExecution({
           },
         },
       );
-      if (!result.ok)
-        return { outcome: 'inconclusive' as const, observationRefs: [] };
+      if (!result.ok) return inconclusive;
       const matches = result.value.filter(
         (o) => o.data.lumaOrderId === submission.purchaseOrderId,
       );
-      if (matches.length === 0)
-        return { outcome: 'inconclusive' as const, observationRefs: [] };
-      if (matches.length > 1)
-        return {
-          outcome: 'failed' as const,
-          observationRefs: matches.map((m) => m.observationId),
-        };
+      if (matches.length === 0) return inconclusive;
+      await deps.store.transaction(context.tenantId, true, async (tx) => {
+        for (const match of matches)
+          await tx.recordRead(
+            purchasingReadEvidence(
+              context.tenantId,
+              submission.connectionId,
+              submission.purchaseOrderId,
+              { purpose: 'submission', id: submission.id },
+              match,
+            ),
+          );
+      });
+      const cited = {
+        observationRefs: matches.map((m) => m.observationId),
+        observedAt: matches
+          .map((m) => m.observedAt)
+          .reduce((a, b) => (a < b ? a : b)),
+      };
+      if (matches.length > 1) return { outcome: 'failed' as const, ...cited };
+      if (matches[0]!.completeness !== 'complete')
+        return { outcome: 'inconclusive' as const, ...cited };
 
       return {
         outcome: matchesSubmission(submission, matches[0]!.data)
           ? ('passed' as const)
           : ('failed' as const),
-        observationRefs: [matches[0]!.observationId],
+        ...cited,
       };
     },
     /** The submission an action belongs to, for execution adapters. */

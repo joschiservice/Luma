@@ -28,6 +28,10 @@ import type {
 } from '../domain/purchase-order-changes.js';
 import { matchesPurchaseOrderChange } from '../domain/purchase-order-changes.js';
 import type { PurchasingSystem, SubmissionExecution } from './commitments.js';
+import {
+  type PurchasingReadEvidence,
+  purchasingReadEvidence,
+} from './purchasing-reads.js';
 
 export interface PurchaseOrderChangeStore {
   /** Serializes every order change with the procurement owner. */
@@ -58,6 +62,8 @@ export interface PurchaseOrderChangeStore {
         observedAt: string,
         observationRefs: string[],
       ): Promise<void>;
+      /** Stores a cited purchasing-system read; an already stored read is kept unchanged. */
+      recordRead(evidence: PurchasingReadEvidence): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
 }
@@ -486,7 +492,11 @@ export function createPurchaseOrderChangeService(deps: {
           },
         },
       );
-      if (!read.ok || read.value.length !== 1)
+      if (
+        !read.ok ||
+        read.value.length !== 1 ||
+        read.value[0]!.completeness !== 'complete'
+      )
         throw conflict(
           'A complete current purchasing-system read is required before changing this order.',
         );
@@ -842,16 +852,30 @@ export function createPurchaseOrderChangeService(deps: {
         };
       const source = read.value[0]!,
         matches =
+          source.completeness === 'complete' &&
           source.observedAt >= change.requestedAt &&
           matchesPurchaseOrderChange(change, source.data);
-      if (!matches)
+      const evidence = purchasingReadEvidence(
+        context.tenantId,
+        change.connectionId,
+        change.purchaseOrderId,
+        { purpose: 'revision', id: change.id },
+        source,
+      );
+      if (!matches) {
+        await deps.store.transaction(context.tenantId, true, (tx) =>
+          tx.recordRead(evidence),
+        );
+
         return {
           outcome: 'inconclusive',
           observationRefs: [source.observationId],
           observedAt: source.observedAt,
           evaluatorVersion: 'purchase-order-change/1',
         };
+      }
       await deps.store.transaction(context.tenantId, true, async (tx) => {
+        await tx.recordRead(evidence);
         const current = await tx.change(changeId);
         if (!current || current.state === 'verified') return;
         const order = await tx.order(change.purchaseOrderId);

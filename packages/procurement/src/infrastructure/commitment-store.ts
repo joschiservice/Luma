@@ -27,6 +27,7 @@ import {
   type StoredFieldSql,
   storedWhereSql,
 } from './list-sql.js';
+import { insertPurchasingRead } from './purchasing-reads.js';
 import { readPurchasingActionTimeline } from './purchasing-timeline.js';
 
 const live = ['approved', 'submitting', 'uncertain', 'submitted'];
@@ -433,6 +434,8 @@ export function createCommitmentStore(
             );
             await observed?.({ transaction: async (_tenant, fn) => fn(tx) }, o);
           },
+          recordRead: (evidence) =>
+            insertPurchasingRead(tx, tenantId, evidence),
           followUps: (ids) =>
             documents<FollowUp>(
               `SELECT document FROM procurement_follow_ups WHERE tenant_id=$1

@@ -194,6 +194,11 @@ describe.skipIf(!databaseUrl)(
                 {
                   observationId,
                   observedAt: new Date().toISOString(),
+                  provider: 'jtl',
+                  adapterVersion: 'jtl-wawi/2.2',
+                  sourceUpdatedAt: null,
+                  sourceRevision: null,
+                  completeness: 'complete' as const,
                   externalId: '50',
                   scopeKey: 'global',
                   data: source,
@@ -231,7 +236,60 @@ describe.skipIf(!databaseUrl)(
             rows.rows.map((r) => r.document.order.lines[0]!.quantity),
           ).toEqual([12, 6]);
         });
+        const revised = (await createAuditLog(database).list(tenantId, orderId))
+          .filter((e) => e.eventType === 'purchase_order.revised')
+          .flatMap((e) => e.evidenceRefs);
+        await database.transaction(tenantId, async (tx) => {
+          const cited = [
+            ...(
+              await tx.query<{ document: PurchaseOrderChange }>(
+                'SELECT document FROM procurement_order_changes WHERE id=$1',
+                [change.id],
+              )
+            ).rows[0]!.document.observationRefs,
+            ...revised.filter((ref) => ref !== change.id),
+          ];
+          expect(cited).toEqual([observationId, observationId]);
+          const stored = await tx.query<{
+            id: string;
+            purpose: string;
+            subject_id: string;
+            document: Record<string, unknown>;
+          }>(
+            'SELECT id,purpose,subject_id,document FROM procurement_read_evidence WHERE id=ANY($1::uuid[])',
+            [cited],
+          );
+          expect(stored.rows).toEqual([
+            expect.objectContaining({
+              id: observationId,
+              purpose: 'revision',
+              subject_id: change.id,
+              document: expect.objectContaining({
+                source: {
+                  provider: 'jtl',
+                  connectionId,
+                  resource: 'purchase_order',
+                  externalId: '50',
+                  scopeKey: 'global',
+                },
+                completeness: 'complete',
+              }),
+            }),
+          ]);
+        });
+        await expect(
+          database.transaction(tenantId, (tx) =>
+            tx
+              .query('DELETE FROM procurement_read_evidence WHERE id=$1', [
+                observationId,
+              ])
+              .then(() => {}),
+          ),
+        ).rejects.toThrow('permission denied');
         await database.transaction(otherTenant, async (tx) => {
+          expect(
+            (await tx.query('SELECT * FROM procurement_read_evidence')).rows,
+          ).toEqual([]);
           expect(
             (await tx.query('SELECT * FROM procurement_order_changes')).rows,
           ).toEqual([]);

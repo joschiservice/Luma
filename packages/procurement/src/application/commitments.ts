@@ -41,6 +41,7 @@ import type {
   StoredPurchaseOrderSort,
 } from './lists.js';
 import type { ProcurementEvent } from './procurement.js';
+import type { PurchasingReadEvidence } from './purchasing-reads.js';
 
 /**
  * A connection that can act as a purchasing system.
@@ -65,7 +66,14 @@ export interface PurchasingSupplier extends SupplierSnapshot {
 
 export interface PurchasingOrder {
   observationId: string;
+  /** When the read started, on Luma's clock. */
   observedAt: string;
+  provider: string;
+  adapterVersion: string;
+  sourceUpdatedAt: string | null;
+  sourceRevision: string | null;
+  /** Partial when any page of the query was incomplete; it cannot rule out other matches. */
+  completeness: 'complete' | 'partial';
   externalId: string;
   scopeKey: string;
   data: SupplierOrderSnapshot;
@@ -213,6 +221,8 @@ export interface CommitmentTransaction {
     limit: number,
   ): Promise<PurchasingObservation[]>;
   insertObservation(observation: PurchasingObservation): Promise<void>;
+  /** Stores a cited purchasing-system read; an already stored read is kept unchanged. */
+  recordRead(evidence: PurchasingReadEvidence): Promise<void>;
   followUps(orderIds?: string[]): Promise<FollowUp[]>;
   /** Returns false when the key was already answered. */
   insertFollowUp(followUp: FollowUp): Promise<boolean>;

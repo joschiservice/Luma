@@ -18,6 +18,7 @@ import {
   type PurchaseOrderChangeAdmission,
   type PurchaseOrderChangeStore,
 } from '../application/purchase-order-changes.js';
+import type { PurchasingReadEvidence } from '../application/purchasing-reads.js';
 import {
   defaultSupplierTerms,
   orderProgress,
@@ -128,6 +129,11 @@ function fixture() {
   const source: PurchasingOrder = {
     observationId: randomUUID(),
     observedAt: now,
+    provider: 'jtl',
+    adapterVersion: 'jtl-wawi/2.2',
+    sourceUpdatedAt: null,
+    sourceRevision: null,
+    completeness: 'complete',
     externalId: '50',
     scopeKey: 'global',
     data: {
@@ -154,7 +160,8 @@ function fixture() {
     },
   };
   const changes = new Map<string, PurchaseOrderChange>(),
-    revisions: PurchaseOrderRevision[] = [];
+    revisions: PurchaseOrderRevision[] = [],
+    storedReads = new Map<string, PurchasingReadEvidence>();
   const store: PurchaseOrderChangeStore = {
     transaction: async (tenant, _write, fn) =>
       fn({
@@ -190,6 +197,10 @@ function fixture() {
             observationRefs,
           });
           order = structuredClone(change.proposed);
+        },
+        recordRead: async (evidence) => {
+          if (!storedReads.has(evidence.id))
+            storedReads.set(evidence.id, structuredClone(evidence));
         },
       }),
   };
@@ -302,6 +313,7 @@ function fixture() {
     source,
     changes,
     revisions,
+    storedReads,
     admission,
     setPrepareFailure: (value: boolean) => {
       failPrepare = value;
@@ -382,7 +394,34 @@ it('commits an immutable previous revision only after a fresh matching independe
     'inconclusive',
   );
   f.source.data.lines[0]!.sku!.externalId = '1';
-  expect((await f.service.verify(buyer, f.request.id)).outcome).toBe('passed');
+  f.source.completeness = 'partial';
+  expect((await f.service.verify(buyer, f.request.id)).outcome).toBe(
+    'inconclusive',
+  );
+  f.source.completeness = 'complete';
+  f.source.observationId = randomUUID();
+  const passed = await f.service.verify(buyer, f.request.id);
+  expect(passed.outcome).toBe('passed');
+  expect(passed.observationRefs).toEqual([f.source.observationId]);
+  expect(f.storedReads.get(f.source.observationId)).toMatchObject({
+    purpose: 'revision',
+    subjectId: f.changes.values().next().value!.id,
+    purchaseOrderId: orderId,
+    source: {
+      provider: 'jtl',
+      connectionId,
+      resource: 'purchase_order',
+      externalId: '50',
+      scopeKey: 'global',
+    },
+    observedAt: now,
+    completeness: 'complete',
+  });
+  for (const ref of [
+    ...f.revisions[0]!.observationRefs,
+    ...f.changes.values().next().value!.observationRefs,
+  ])
+    expect(f.storedReads.has(ref)).toBe(true);
   expect(f.order().revision).toBe(3);
   expect(f.revisions[0]!.order.lines[0]!.quantity).toBe(12);
   expect(f.order().lines[0]!.quantity).toBe(6);
