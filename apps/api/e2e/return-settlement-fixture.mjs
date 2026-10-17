@@ -269,8 +269,8 @@ export async function settlementFixture(
 /**
  * Every provider read that a return case's verifications, audit entries, stored quotes and
  * proofs, exchange checks and deadline waits cite, with the stored orders evidence each ID
- * resolves to. References to the case itself and its revisions name Luma's own records and are
- * left out.
+ * resolves to. References to the case, its revisions and canonical records such as the store
+ * return it works name Luma's own records and are left out.
  */
 export async function citedReturnReads(f, caseId) {
   const org = f.manifest.organizationId;
@@ -297,7 +297,9 @@ export async function citedReturnReads(f, caseId) {
        UNION SELECT jsonb_array_elements_text(document->'availability'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
        UNION SELECT jsonb_array_elements_text(document->'completion'->'evidenceRefs') FROM orders_return_exchanges WHERE tenant_id=$1 AND case_id=$2
      )
-     SELECT id FROM cited WHERE id<>$2::text AND id NOT LIKE 'case:%' ORDER BY id`,
+     SELECT id FROM cited WHERE id<>$2::text AND id NOT LIKE 'case:%'
+       AND NOT EXISTS (SELECT 1 FROM orders_entities e WHERE e.tenant_id=$1 AND e.id::text=cited.id)
+     ORDER BY id`,
     [org, caseId],
   );
   const cited = refs.rows.map((row) => row.id);
