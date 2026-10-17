@@ -136990,7 +136990,7 @@
                                   },
                                   "summary": {
                                     "type": "array",
-                                    "maxItems": 16,
+                                    "maxItems": 15,
                                     "items": {
                                       "type": "object",
                                       "properties": {
@@ -137010,8 +137010,7 @@
                                             "quantity",
                                             "amount",
                                             "currency",
-                                            "lines",
-                                            "complete"
+                                            "lines"
                                           ],
                                           "type": "string"
                                         },

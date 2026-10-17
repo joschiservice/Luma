@@ -6,11 +6,12 @@ import { readShopifyEvidence } from './evidence-reader.js';
 const observedAt = new Date('2026-10-17T10:00:00.000Z');
 
 function transaction(
-  rows: { id: string; kind: string; document: unknown }[],
+  rows: { id: string; kind: string; document: unknown; inventory?: boolean }[],
 ): SqlTransaction {
   return {
     query: async () => ({
       rows: rows.map((row) => ({
+        inventory: false,
         ...row,
         connection_id: 'connection',
         observed_at: observedAt,
@@ -80,11 +81,18 @@ describe('Shopify evidence reader', () => {
     const evidence = await readShopifyEvidence(
       transaction([
         { id: 'read', kind: 'observation', document: { complete: false } },
+        // An inventory read's `complete` flag meant the item could be corrected.
+        {
+          id: 'inventory',
+          kind: 'observation',
+          document: { complete: false },
+          inventory: true,
+        },
         { id: 'old', kind: 'observation', document: { record: 'invalid' } },
         { id: 'receipt', kind: 'acceptance', document: { adjustmentId: 'x' } },
       ]),
       'tenant',
-      ['read', 'old', 'receipt'],
+      ['read', 'inventory', 'old', 'receipt'],
     );
     expect(evidence).toEqual([
       expect.objectContaining({
@@ -94,6 +102,7 @@ describe('Shopify evidence reader', () => {
         adapterVersion: null,
         completeness: 'partial',
       }),
+      expect.objectContaining({ id: 'inventory', completeness: null }),
       expect.objectContaining({ record: null, completeness: null }),
       expect.objectContaining({
         kind: 'write_receipt',

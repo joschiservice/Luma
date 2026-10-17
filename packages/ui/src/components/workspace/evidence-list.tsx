@@ -95,7 +95,6 @@ const summaryLabels: Record<EvidenceSummaryField, () => string> = {
   amount: m.evidence_summary_amount,
   currency: m.evidence_summary_currency,
   lines: m.evidence_summary_lines,
-  complete: m.evidence_summary_complete,
 };
 
 /**

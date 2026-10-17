@@ -42,7 +42,6 @@ export const evidenceSummaryFields = [
   'amount',
   'currency',
   'lines',
-  'complete',
 ] as const;
 
 export type EvidenceSummaryField = (typeof evidenceSummaryFields)[number];

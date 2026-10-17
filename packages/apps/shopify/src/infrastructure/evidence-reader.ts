@@ -38,7 +38,9 @@ function provenanceOf(document: unknown) {
  * Reads the Shopify corrections, order edits, fulfillment recoveries and shipment publishing
  * evidence with these IDs. The tables are not linked to the citing record, so callers pass only
  * IDs the record cites. Acceptances become write receipts and every other row a read. A read's
- * completeness is the one it recorded; older reads fall back to their own `complete` flag.
+ * completeness is the one it recorded. Older order edit, fulfillment and shipment reads fall back
+ * to their `complete` flag, which recorded the same thing; an older inventory read's `complete`
+ * flag means the item could be corrected, so its completeness reads as not recorded.
  */
 export async function readShopifyEvidence(
   tx: SqlTransaction,
@@ -52,14 +54,15 @@ export async function readShopifyEvidence(
     kind: string;
     observed_at: Date;
     document: unknown;
+    inventory: boolean;
   }>(
-    `SELECT id::text,connection_id::text,kind,observed_at,document FROM shopify_inventory_evidence
+    `SELECT id::text,connection_id::text,kind,observed_at,document,true AS inventory FROM shopify_inventory_evidence
       WHERE tenant_id=$1 AND id=ANY($2::uuid[])
-     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document FROM shopify_order_edit_evidence
+     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document,false FROM shopify_order_edit_evidence
       WHERE tenant_id=$1 AND id=ANY($2::uuid[])
-     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document FROM shopify_fulfillment_evidence
+     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document,false FROM shopify_fulfillment_evidence
       WHERE tenant_id=$1 AND id=ANY($2::uuid[])
-     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document FROM shopify_shipment_evidence
+     UNION ALL SELECT id::text,connection_id::text,kind,observed_at,document,false FROM shopify_shipment_evidence
       WHERE tenant_id=$1 AND id=ANY($2::uuid[])`,
     [tenantId, ids],
   );
@@ -80,7 +83,7 @@ export async function readShopifyEvidence(
         adapterVersion: stored.adapterVersion ?? null,
         dispatchIdentity: stored.dispatchIdentity ?? null,
       };
-    const complete = stored.complete ?? null;
+    const complete = row.inventory ? null : (stored.complete ?? null);
 
     return {
       kind: 'read',

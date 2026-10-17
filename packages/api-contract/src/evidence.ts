@@ -56,7 +56,6 @@ export const evidenceSummaryFields = [
   'amount',
   'currency',
   'lines',
-  'complete',
 ] as const;
 
 /** Luma records a reference can name. */

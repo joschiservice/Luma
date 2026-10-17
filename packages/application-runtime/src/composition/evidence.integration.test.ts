@@ -698,11 +698,10 @@ describe.skipIf(!databaseUrl)('cited evidence on PostgreSQL', () => {
         expect.objectContaining({
           kind: 'read',
           provider: 'shopify',
-          completeness: 'complete',
-          summary: [
-            { field: 'available', value: '4' },
-            { field: 'complete', value: 'true' },
-          ],
+          // This inventory read predates recorded completeness; its `complete` flag meant
+          // the item could be corrected, so neither shows as read completeness.
+          completeness: null,
+          summary: [{ field: 'available', value: '4' }],
         }),
         { kind: 'unresolved' },
         { kind: 'luma_record', record: 'case_proposal', id: caseAction },
