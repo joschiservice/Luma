@@ -145,6 +145,7 @@ export function CaseTimeline({
   loadingHistory = false,
   onLoadMore,
   workflowLink,
+  renderEvidence,
 }: {
   expanded?: boolean;
   progress: CaseProgress;
@@ -163,6 +164,8 @@ export function CaseTimeline({
   workflowLink?:
     | ((run: NonNullable<CaseProgress['workflowRuns']>[number]) => ReactNode)
     | undefined;
+  /** Shows what the change's cited references resolve to; without it, the references are listed. */
+  renderEvidence?: ((refs: string[]) => ReactNode) | undefined;
 }) {
   const Subheading = expanded ? 'h3' : 'h4';
   const firstDetection = recordedTimeline
@@ -520,7 +523,11 @@ export function CaseTimeline({
               <p>{m.issues_execution_unclear_help()}</p>
             ) : null}
             <Subheading>{m.issues_execution_effect_evidence()}</Subheading>
-            <References refs={execution.effectEvidenceRefs} />
+            {renderEvidence && execution.effectEvidenceRefs.length ? (
+              renderEvidence(execution.effectEvidenceRefs)
+            ) : (
+              <References refs={execution.effectEvidenceRefs} />
+            )}
             {verification ? (
               <>
                 <Subheading>
@@ -534,7 +541,11 @@ export function CaseTimeline({
                     version: verification.evaluatorVersion,
                   })}
                 </p>
-                <References refs={verification.observationRefs} />
+                {renderEvidence && verification.observationRefs.length ? (
+                  renderEvidence(verification.observationRefs)
+                ) : (
+                  <References refs={verification.observationRefs} />
+                )}
                 <p>{m.issues_check_values_hidden()}</p>
               </>
             ) : null}

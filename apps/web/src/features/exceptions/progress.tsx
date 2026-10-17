@@ -8,6 +8,7 @@ import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Link } from '@tanstack/react-router';
 
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import type { CaseObservation } from './observation';
 import { CaseOwnerControl } from './owner';
 
@@ -80,6 +81,14 @@ export function LiveCaseDetail({
               connection={connection}
               confirmed={confirmed}
               onRefresh={refresh}
+              renderEvidence={(refs) => (
+                <EvidenceDisclosure
+                  organizationId={observation.organizationId}
+                  subject={{ kind: 'case', id: data.detail.id }}
+                  refs={refs}
+                  count={new Set(refs).size}
+                />
+              )}
               workflowLink={(run) => (
                 <Link
                   to="/app/$organizationId/workflows/$definitionId"

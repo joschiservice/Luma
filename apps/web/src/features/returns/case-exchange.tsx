@@ -19,6 +19,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useNow } from '../../kit/live/now';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { formatMoney } from '../../shared/orders/presentation';
 import {
   exchangeCommands,
@@ -382,6 +383,15 @@ export function ReturnExchange({
                         ) : (
                           <small>{m.returns_settlement_no_proof()}</small>
                         )}
+                        {step.sent || step.proof ? (
+                          <EvidenceDisclosure
+                            organizationId={organizationId}
+                            subject={{
+                              kind: 'return_exchange_step',
+                              id: step.id,
+                            }}
+                          />
+                        ) : null}
                         {step.observeOnly ? (
                           <small>{m.returns_settlement_observe_only()}</small>
                         ) : null}

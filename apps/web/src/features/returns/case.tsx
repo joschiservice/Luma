@@ -38,6 +38,7 @@ import { SignInRedirect } from '../../kit/identity/common';
 import { ApiError } from '../../kit/identity/data';
 import { useNow } from '../../kit/live/now';
 import { membersOptions } from '../../kit/settings/data';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import {
   caseCommands,
   returnCaseError,
@@ -485,6 +486,14 @@ function Creation({
               </div>
             ) : null}
           </dl>
+          {['sending', 'uncertain', 'created', 'failed'].includes(
+            creation.state,
+          ) ? (
+            <EvidenceDisclosure
+              organizationId={organizationId}
+              subject={{ kind: 'return_creation', id: creation.id }}
+            />
+          ) : null}
           <p className="returns-note">
             {creation.state === 'approval_required'
               ? creation.canApprove

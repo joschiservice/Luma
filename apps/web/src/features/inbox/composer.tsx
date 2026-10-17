@@ -13,6 +13,7 @@ import { PenLine, Send } from 'lucide-react';
 import { useId, useState } from 'react';
 import { z } from 'zod';
 
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { DeliveryDecision } from '../../shared/messaging/delivery-decision';
 import { CommandFeedback } from './command-feedback';
 import {
@@ -244,6 +245,13 @@ function ReplyCard({
               queryKey: messagingKey(organizationId),
             })
           }
+        />
+      ) : null}
+      {['sending', 'uncertain', 'sent', 'failed'].includes(reply.state) ? (
+        <EvidenceDisclosure
+          organizationId={organizationId}
+          subject={{ kind: 'reply', id: reply.id }}
+          label={m.messaging_reply_evidence()}
         />
       ) : null}
       {consequential ? (

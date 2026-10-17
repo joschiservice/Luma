@@ -54,6 +54,7 @@ import {
 import { SignInRedirect } from '../../kit/identity/common';
 import { ApiError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import { formatMoney } from '../../shared/orders/presentation';
 import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity } from '../inventory/presentation';
@@ -462,7 +463,10 @@ function PurchaseOrderRecordView({
               />
               {messages}
               <CommitmentHistory record={record} open={setDialog} />
-              <PurchasingTimeline record={record} />
+              <PurchasingTimeline
+                organizationId={organizationId}
+                record={record}
+              />
             </div>
             <aside className="procurement-record-aside">
               <SupplierCard
@@ -608,6 +612,12 @@ function NextStep({
         submission.state,
       ));
   const system = readiness.connection?.label;
+  // The timeline's verified submission entry cites the verifying reads and the write receipt.
+  const verifiedSubmission = submission
+    ? record.timeline.entries.find(
+        (entry) => entry.id === `submission:${submission.id}:verified`,
+      )
+    : undefined;
   const others = progress.attention.filter(
     (a) => !['submission_approval', 'submission_uncertain'].includes(a.kind),
   );
@@ -637,6 +647,16 @@ function NextStep({
         >
           {submission.message}
         </Alert>
+      ) : null}
+      {submission && verifiedSubmission?.evidenceRefs.length ? (
+        <EvidenceDisclosure
+          organizationId={organizationId}
+          subject={{ kind: 'purchase_order', id: order.id }}
+          refs={verifiedSubmission.evidenceRefs}
+          label={m.procurement_submission_evidence({
+            count: verifiedSubmission.evidenceRefs.length,
+          })}
+        />
       ) : null}
       {submission?.state === 'approval_required' ? (
         <dl className="procurement-send-facts">

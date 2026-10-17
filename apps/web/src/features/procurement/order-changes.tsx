@@ -24,6 +24,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
 import { privateQueryDefaults } from '../../lib/private-query';
+import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import {
   createProcurementClient,
   procurementError,
@@ -242,6 +243,14 @@ export function PurchaseOrderChanges({
               {m.procurement_changes_verified()} ·{' '}
               <WorkspaceDate value={change.verifiedAt} />
             </p>
+          ) : null}
+          {change.observationRefs.length ? (
+            <EvidenceDisclosure
+              organizationId={organizationId}
+              subject={{ kind: 'purchase_order', id: order.id }}
+              refs={change.observationRefs}
+              count={change.observationRefs.length}
+            />
           ) : null}
           {change.failure ? (
             <Alert role="status" tone="warning">
