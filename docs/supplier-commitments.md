@@ -166,8 +166,8 @@ same admitted operation and independent verification path.
 The purchasing timeline combines saved plans and approvals, submission, supplier messages,
 append-only commitment and receipt facts, buyer follow-ups, revisions and stock booking proof.
 A recorded manual receipt, an email sent and a supplier observation retain separate labels;
-only independent verification establishes the action's result. Stock proof is visible only
-to readers with inventory access. The history is tenant-scoped and shows at most the latest
+only independent verification establishes the action's result. The history is tenant-scoped
+and shows at most the latest
 500 events, with truncation reported rather than treated as complete evidence.
 Verified submissions and revisions cite their verifying reads and the stored write receipt
 together. Each entry's evidence resolves through the
@@ -179,5 +179,15 @@ as purchase order events with their status change, actor and time, an email subm
 email as a stored message, and notes recorded with a manual receipt as written. Native stock
 receipt reviews and the ledger entries that booked them resolve as inventory records with their
 state, quantity and postings. Readers without the guarding area's access see these as restricted.
-Shopify stock booking proof resolves only for readers with inventory access, like its timeline
-entries. The order number a purchasing system assigned is shown on the order, not cited.
+Shopify stock booking proof resolves only for readers with inventory access. The order number
+a purchasing system assigned is shown on the order, not cited.
+
+Shopify stock bookings of the order's receipts are inventory evidence: the booking, its policy
+decision and approval, and the execution that cites the write receipt and verification read.
+For a reader without `inventory.read` the API returns each of these entries as `restricted`,
+naming the permission, so the timeline and the evidence view agree that the booking exists.
+A restricted entry keeps only its kind, stage, time, source and evidence references; actor,
+reason, quantity, unit, revision and detail are null and no actor or workflow is attributed.
+The API strips them after actor attribution, and the reader skips the booked quantity and its
+inventory snapshot entirely. Native receipt reviews still appear only for inventory readers,
+because Inventory's ledger serves them only with inventory access.
