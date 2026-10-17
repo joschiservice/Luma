@@ -1,11 +1,40 @@
 import type { AppEvidence } from '@luma/app-host';
 import type { SqlTransaction } from '@luma/platform';
+import { z } from 'zod';
+
+const text = z.string().min(1).catch('').transform((value) => value || null);
+const record = z.object({
+  resource: z.string().min(1),
+  externalId: z.string().min(1),
+});
+
+/**
+ * The provenance fields a stored document carries. Rows written before Luma recorded them lack
+ * these fields, so each one reads as null ("not recorded") instead of failing the row.
+ */
+const provenance = z.object({
+  adapterVersion: text.optional(),
+  dispatchIdentity: text.optional(),
+  capability: text.optional(),
+  completeness: z.enum(['complete', 'partial']).optional().catch(undefined),
+  complete: z.boolean().optional().catch(undefined),
+  sourceRevision: text.optional(),
+  sourceUpdatedAt: z.string().datetime().optional().catch(undefined),
+  record: record.optional().catch(undefined),
+  records: z.array(record).optional().catch(undefined),
+});
+
+function provenanceOf(document: unknown) {
+  const parsed = provenance.safeParse(document);
+
+  return parsed.success ? parsed.data : {};
+}
 
 /**
  * Reads the Shopify corrections, order edits, fulfillment recoveries and shipment publishing
  * evidence with these IDs. The tables are not linked to the citing record, so callers pass only
- * IDs the record cites. Acceptances become write receipts and every other row a read; a read's
- * completeness comes from its own `complete` flag when it recorded one.
+ * IDs the record cites. Acceptances become write receipts and every other row a read. A read's
+ * completeness is the one it recorded; older reads fall back to their own `complete` flag.
  */
 export async function readShopifyEvidence(
   tx: SqlTransaction,
@@ -33,37 +62,37 @@ export async function readShopifyEvidence(
 
   return rows.map((row): AppEvidence => {
     const observedAt = row.observed_at.toISOString();
+    const stored = provenanceOf(row.document);
     if (row.kind === 'acceptance')
       return {
         kind: 'write_receipt',
         id: row.id,
         provider: 'shopify',
         connectionId: row.connection_id,
-        capability: null,
+        capability: stored.capability ?? null,
         acceptedAt: observedAt,
-        records: [],
+        records: stored.records ?? [],
         providerRequestId: null,
+        adapterVersion: stored.adapterVersion ?? null,
+        dispatchIdentity: stored.dispatchIdentity ?? null,
       };
-    const complete =
-      row.document &&
-      typeof row.document === 'object' &&
-      'complete' in row.document &&
-      typeof row.document.complete === 'boolean'
-        ? row.document.complete
-        : null;
+    const complete = stored.complete ?? null;
 
     return {
       kind: 'read',
       id: row.id,
       provider: 'shopify',
       connectionId: row.connection_id,
-      record: null,
+      record: stored.record ?? null,
       observedAt,
-      sourceUpdatedAt: null,
-      sourceRevision: null,
-      adapterVersion: null,
+      sourceUpdatedAt: stored.sourceUpdatedAt
+        ? new Date(stored.sourceUpdatedAt).toISOString()
+        : null,
+      sourceRevision: stored.sourceRevision ?? null,
+      adapterVersion: stored.adapterVersion ?? null,
       completeness:
-        complete === null ? null : complete ? 'complete' : 'partial',
+        stored.completeness ??
+        (complete === null ? null : complete ? 'complete' : 'partial'),
       data: row.document,
     };
   });

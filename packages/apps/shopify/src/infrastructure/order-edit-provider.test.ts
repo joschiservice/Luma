@@ -247,8 +247,38 @@ describe('Shopify order edit provider', () => {
       ],
     });
     expect(f.evidence.map((item) => item.kind)).toEqual(['observation']);
+    expect(f.evidence[0]!.document).toMatchObject({
+      adapterVersion: 'shopify-order-edit/1',
+      completeness: 'complete',
+      sourceRevision: snapshot.revision,
+      sourceUpdatedAt: '2026-10-12T09:00:00.000Z',
+      record: { resource: 'order', externalId: f.order.id },
+    });
     f.order.fulfillmentOrders.nodes[0]!.lineItems.pageInfo.hasNextPage = true;
     expect((await f.provider.read(f.order.id)).complete).toBe(false);
+    expect(f.evidence[1]!.document).toMatchObject({ completeness: 'partial' });
+  });
+
+  it('stores the accepted commit with the dispatch identity and the order it changed', async () => {
+    const f = fixture();
+    const context = {
+      ...f.context,
+      adapterVersion: 'shopify-order-edit/1',
+      dispatchIdentity: '["shopify","shopify-order-edit/1"]',
+    };
+    await f.provider.handler.run(context, await f.input());
+    expect(f.evidence.find((item) => item.kind === 'calculation')).toMatchObject(
+      { document: { completeness: 'complete' } },
+    );
+    expect(f.evidence.at(-1)).toMatchObject({
+      kind: 'acceptance',
+      document: {
+        adapterVersion: 'shopify-order-edit/1',
+        dispatchIdentity: context.dispatchIdentity,
+        idempotencyKey: context.idempotencyKey,
+        records: [{ resource: 'order', externalId: f.order.id }],
+      },
+    });
   });
 
   it('calculates without committing and restocks only reductions', async () => {

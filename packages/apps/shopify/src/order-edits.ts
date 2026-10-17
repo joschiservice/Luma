@@ -34,6 +34,7 @@ import {
 import {
   calculationDigest,
   createOrderEditProvider,
+  orderEditAdapterVersion,
 } from './infrastructure/order-edit-provider.js';
 import { createOrderEditStore } from './infrastructure/order-edit-store.js';
 import { shopifyRequestBudget } from './infrastructure/request-budget.js';
@@ -246,9 +247,9 @@ export function createShopifyOrderEdits(
         id: connectionId,
         provider: 'shopify',
         status: 'active',
-        adapterVersion: 'shopify-order-edit/1',
+        adapterVersion: orderEditAdapterVersion,
         mechanism: 'api',
-        executor: { kind: 'connector', id: 'shopify-order-edit/1' },
+        executor: { kind: 'connector', id: orderEditAdapterVersion },
         capabilities: granted.includes(orderEditCapability)
           ? {
               [orderEditCapability]: (

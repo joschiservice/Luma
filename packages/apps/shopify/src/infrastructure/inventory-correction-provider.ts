@@ -9,9 +9,19 @@ import {
 import { z } from 'zod';
 
 import {
+  acceptanceProvenance,
+  type ReadProvenance,
+  settledDispatch,
+  sourceTime,
+  storeAcceptance,
+} from './evidence-provenance.js';
+import {
   type InventoryWriteReceipt,
   readInventoryWriteProofs,
 } from './inventory-write-attribution.js';
+
+/** Identifies the normalization of the correction read; corrections dispatch under it too. */
+export const inventoryCorrectionAdapterVersion = 'shopify-inventory/1';
 
 const gid = (kind: string) =>
   z.string().regex(new RegExp(`^gid://shopify/${kind}/[0-9]+$`));
@@ -216,11 +226,26 @@ export function createInventoryCorrectionProvider(
           }
         : null,
     };
+    // Only the optional collection membership is paged; a cut-short page leaves the read partial.
+    const provenance: ReadProvenance = {
+      adapterVersion: inventoryCorrectionAdapterVersion,
+      completeness:
+        options.includeCollections &&
+        node.variant?.product &&
+        node.variant.product.collections?.pageInfo.hasNextPage !== false
+          ? 'partial'
+          : 'complete',
+      sourceRevision: snapshot.targetRevision,
+      sourceUpdatedAt: sourceTime(level?.updatedAt),
+      record: level
+        ? { resource: 'inventory_level', externalId: level.id }
+        : { resource: 'inventory_item', externalId: inventoryItemId },
+    };
     await options.record({
       id: snapshot.id,
       kind: 'observation',
       observedAt: snapshot.observedAt,
-      document: snapshot,
+      document: { ...snapshot, ...provenance },
     });
 
     return snapshot;
@@ -349,20 +374,25 @@ export function createInventoryCorrectionProvider(
         )
           throw new Error('Ambiguous inventory acceptance');
         const id = randomUUID();
-        await options.record({
-          id,
-          kind: 'acceptance',
-          observedAt: now().toISOString(),
-          document: {
-            inventoryItemId: input.inventoryItemId,
-            locationId: input.locationId,
-            expectedAvailable: input.expectedAvailable,
-            available: input.available,
-            idempotencyKey: context.idempotencyKey,
-            referenceDocumentUri,
-            adjustmentId: result.inventoryAdjustmentGroup.id,
-          },
-        });
+        const adjustmentId = result.inventoryAdjustmentGroup.id;
+        await storeAcceptance(() =>
+          options.record({
+            id,
+            kind: 'acceptance',
+            observedAt: now().toISOString(),
+            document: {
+              inventoryItemId: input.inventoryItemId,
+              locationId: input.locationId,
+              expectedAvailable: input.expectedAvailable,
+              available: input.available,
+              referenceDocumentUri,
+              adjustmentId,
+              ...acceptanceProvenance(context, [
+                { resource: 'inventory_adjustment_group', externalId: adjustmentId },
+              ]),
+            },
+          }),
+        );
 
         return {
           status: 'accepted',
@@ -370,11 +400,7 @@ export function createInventoryCorrectionProvider(
           providerRequestId: null,
         };
       } catch (error) {
-        if (
-          error instanceof ConnectorError &&
-          error.failure.dispatch === 'not_dispatched'
-        )
-          throw error;
+        if (settledDispatch(error)) throw error;
         throw new ConnectorError({
           code:
             error instanceof ConnectorError

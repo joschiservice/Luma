@@ -34,7 +34,10 @@ import {
   correctionBlocker,
   correctionCapabilities,
 } from './domain/inventory-correction.js';
-import { createInventoryCorrectionProvider } from './infrastructure/inventory-correction-provider.js';
+import {
+  createInventoryCorrectionProvider,
+  inventoryCorrectionAdapterVersion,
+} from './infrastructure/inventory-correction-provider.js';
 import { createCorrectionQuery } from './infrastructure/inventory-correction-query.js';
 import { createCorrectionStore } from './infrastructure/inventory-correction-store.js';
 import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
@@ -360,9 +363,9 @@ export function createShopifyInventoryCorrection(
             id: connectionId,
             provider: 'shopify',
             status: 'active',
-            adapterVersion: 'shopify-inventory/1',
+            adapterVersion: inventoryCorrectionAdapterVersion,
             mechanism: 'api',
-            executor: { kind: 'connector', id: 'shopify-inventory/1' },
+            executor: { kind: 'connector', id: inventoryCorrectionAdapterVersion },
             capabilities: scoped.capabilities,
           };
         },
