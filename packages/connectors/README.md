@@ -8,7 +8,7 @@ Low-level provider protocol packages. They take credentials and transports expli
 | `@luma/connector-jtl`     | root, `/schemas`   | Cloud and on-premise transport, provider schemas, shipping-method response validation                                    |
 | `@luma/connector-cin7`    | root, `/schemas`   | Cin7 Core v2 read transport, per-application request pacing, provider schemas                                            |
 | `@luma/connector-gmail`   | root               | Gmail API v1 transport and quota pacing, Google OAuth requests, mailbox query building, MIME parsing and composition     |
-| `@luma/connector-core`    | root, `/transport` | Shared failure types and `ConnectorError`; response parsing and retry helpers                                            |
+| `@luma/connector-core`    | root, `/transport` | Shared failure types and `ConnectorError`; response parsing, retry, page cursor and payload capture helpers              |
 
 Shopify resolves the access token on each request. The JTL transport accepts either cloud credentials or a trusted on-premise API root; the API must approve an on-premise destination before constructing a client. Provider failures share `ConnectorError` across protocol and application adapters.
 

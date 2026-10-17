@@ -13,6 +13,7 @@ import {
   API_VERSION,
   type Cin7TransportOptions,
   createClient,
+  createCursorCodec,
   fail,
   parse,
 } from '@luma/connector-cin7';
@@ -90,6 +91,7 @@ const cursorSchema = z
     last: s.guid.optional(),
   })
   .strict();
+const cursorCodec = createCursorCodec(cursorSchema);
 
 /** Creates the Cin7 Core read adapter for one connection. */
 export function createCin7Connector(
@@ -206,15 +208,7 @@ export function createCin7Connector(
           .digest('hex');
         let cursor: z.infer<typeof cursorSchema> = { binding, page: 1 };
         if (query.cursor) {
-          try {
-            cursor = cursorSchema.parse(
-              JSON.parse(
-                Buffer.from(query.cursor, 'base64url').toString('utf8'),
-              ),
-            );
-          } catch {
-            fail('invalid_input');
-          }
+          cursor = cursorCodec.decode(query.cursor);
           if (cursor.binding !== binding) fail('invalid_input');
         }
         const pageNumber = cursor.page;
@@ -500,13 +494,11 @@ export function createCin7Connector(
         const result = parse<unknown>(outputs[capability], {
           items: observations,
           nextCursor: hasNext
-            ? Buffer.from(
-                JSON.stringify({
-                  binding,
-                  page: pageNumber + 1,
-                  ...(last ? { last } : {}),
-                }),
-              ).toString('base64url')
+            ? cursorCodec.encode({
+                binding,
+                page: pageNumber + 1,
+                ...(last ? { last } : {}),
+              })
             : null,
           completeness: 'complete',
           ...(total === undefined ? {} : { total }),

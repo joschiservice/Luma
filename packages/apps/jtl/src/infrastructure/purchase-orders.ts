@@ -14,12 +14,18 @@ import {
   type SupplierOrderStatus,
   type SupplierSnapshot,
 } from '@luma/connections';
-import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
+import {
+  API_VERSION,
+  createClient,
+  createPayloadCapture,
+  fail,
+  parse,
+} from '@luma/connector-jtl';
 import { z } from 'zod';
 
 import { jtlPermissions } from '../domain/permissions.js';
 import type { JtlConnectorOptions } from './adapter.js';
-import { adapterVersion, outputs } from './outputs.js';
+import { adapterVersion, outputs, pageCursor } from './outputs.js';
 import { createJtlPurchaseOrderRevision } from './purchase-order-revisions.js';
 import * as s from './schemas.js';
 
@@ -161,15 +167,9 @@ export function createJtlPurchaseOrderCapabilities(
   /** Collects allowlisted payloads and observations for one capability call. */
   function session(capability: ReadKind) {
     const observedAt = now().toISOString();
-    const payloads: unknown[] = [];
+    const payloads = createPayloadCapture(options.rawRetentionMs, now);
+    const capture = payloads.capture;
     const observations: Observation<unknown>[] = [];
-
-    function capture<T>(schema: z.ZodType<T>, value: unknown): T {
-      const result = parse(schema, value);
-      if (options.rawRetentionMs !== undefined) payloads.push(result);
-
-      return result;
-    }
 
     async function page<T extends z.ZodTypeAny>(
       path: string,
@@ -288,16 +288,7 @@ export function createJtlPurchaseOrderCapabilities(
         apiVersion: API_VERSION,
         capability,
         observations: result.items,
-        ...(options.rawRetentionMs === undefined
-          ? {}
-          : {
-              raw: {
-                payloads,
-                expiresAt: new Date(
-                  now().getTime() + options.rawRetentionMs,
-                ).toISOString(),
-              },
-            }),
+        ...payloads.raw(),
       });
 
       return result;
@@ -323,22 +314,14 @@ export function createJtlPurchaseOrderCapabilities(
 
   function decodeCursor(cursor: string | undefined, expected: string) {
     if (!cursor) return 1;
-    try {
-      return z
-        .object({
-          binding: z.literal(expected),
-          page: z.number().int().min(2).max(2147483647),
-        })
-        .strict()
-        .parse(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')))
-        .page;
-    } catch {
-      fail('invalid_input');
-    }
+    const decoded = pageCursor.decode(cursor);
+    if (decoded.binding !== expected) fail('invalid_input');
+
+    return decoded.page;
   }
 
   const encodeCursor = (value: string, page: number) =>
-    Buffer.from(JSON.stringify({ binding: value, page })).toString('base64url');
+    pageCursor.encode({ binding: value, page });
 
   const readDescriptor = {
     version: '0',

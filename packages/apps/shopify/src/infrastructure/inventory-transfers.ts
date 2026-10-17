@@ -14,6 +14,7 @@ import {
 import {
   API_VERSION,
   createClient,
+  createCursorCodec,
   fail,
   parse,
 } from '@luma/connector-shopify';
@@ -49,6 +50,7 @@ const inputSchema = z
 const cursorSchema = z
   .object({ context: z.string(), after: z.string().max(4096) })
   .strict();
+const cursorCodec = createCursorCodec(cursorSchema, { canonical: true });
 const lineTransfer =
   'id title totalQuantity pickedForShipmentQuantity shippableQuantity shippedQuantity';
 const lineShipment =
@@ -284,15 +286,9 @@ export function createInventoryTransferCapabilities(
       .digest('hex');
     let after: string | null = null;
     if (input.cursor) {
-      try {
-        const bytes = Buffer.from(input.cursor, 'base64url');
-        if (bytes.toString('base64url') !== input.cursor) fail('invalid_input');
-        const decoded = cursorSchema.parse(JSON.parse(bytes.toString()));
-        if (decoded.context !== context) fail('invalid_input');
-        after = decoded.after;
-      } catch {
-        fail('invalid_input');
-      }
+      const decoded = cursorCodec.decode(input.cursor);
+      if (decoded.context !== context) fail('invalid_input');
+      after = decoded.after;
     }
     const transfer = capability === 'inventory.transfers.read';
     const kind = transfer ? 'InventoryTransfer' : 'InventoryShipment';
@@ -504,9 +500,11 @@ export function createInventoryTransferCapabilities(
     return {
       items: observations,
       nextCursor: page.pageInfo.hasNextPage
-        ? Buffer.from(
-            JSON.stringify({ context, after: page.pageInfo.endCursor }),
-          ).toString('base64url')
+        ? cursorCodec.encode({
+            context,
+            // A next page without a cursor cannot be continued; report it rather than end early.
+            after: page.pageInfo.endCursor ?? fail('invalid_response'),
+          })
         : null,
       completeness: 'complete' as const,
       retryAfterMs: request.nextReadDelay(),

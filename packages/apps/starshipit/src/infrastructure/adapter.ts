@@ -11,6 +11,7 @@ import { commerceSchema } from '@luma/connections/composition';
 import {
   API_VERSION,
   createClient,
+  createCursorCodec,
   fail,
   parse,
   type StarshipitTransportOptions,
@@ -47,6 +48,7 @@ const cursorSchema = z
     page: z.number().int().positive(),
   })
   .strict();
+const cursorCodec = createCursorCodec(cursorSchema);
 const statuses = ['Unshipped', 'Printed', 'Shipped'];
 
 export interface StarshipitConnectorOptions extends StarshipitTransportOptions {
@@ -123,13 +125,7 @@ export function createStarshipitConnector(
           .digest('hex');
         let cursor = { binding, status: 0, page: 1 };
         if (query.cursor) {
-          try {
-            cursor = cursorSchema.parse(
-              JSON.parse(Buffer.from(query.cursor, 'base64url').toString()),
-            );
-          } catch {
-            fail('invalid_input');
-          }
+          cursor = cursorCodec.decode(query.cursor);
           if (cursor.binding !== binding) fail('invalid_input');
         }
         let ids: string[];
@@ -241,9 +237,7 @@ export function createStarshipitConnector(
         }
         const result = this.parseOutput({
           items: observations,
-          nextCursor: next
-            ? Buffer.from(JSON.stringify(next)).toString('base64url')
-            : null,
+          nextCursor: next ? cursorCodec.encode(next) : null,
           completeness: 'complete',
         });
         await options.recordObservations({

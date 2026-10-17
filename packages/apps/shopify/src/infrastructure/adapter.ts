@@ -23,6 +23,8 @@ import type { ShopifyTransportOptions } from '@luma/connector-shopify';
 import {
   API_VERSION,
   createClient,
+  createCursorCodec,
+  createPayloadCapture,
   fail,
   parse,
 } from '@luma/connector-shopify';
@@ -52,6 +54,10 @@ import { createShopifySettlementCapabilities } from './return-settlement.js';
 import * as s from './schemas.js';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
+// Bound to the request that produced it; `after` is Shopify's opaque page cursor.
+const readCursor = createCursorCodec(
+  z.object({ binding: z.string(), after: z.string().min(1) }).strict(),
+);
 
 const ref = (externalId: string, scopeKey = ''): ExternalId => ({
   externalId,
@@ -544,28 +550,13 @@ export function createShopifyConnector(
           .digest('hex');
         let after: string | null = null;
         if (input.cursor) {
-          try {
-            const cursor = z
-              .object({ binding: z.literal(binding), after: z.string().min(1) })
-              .strict()
-              .parse(
-                JSON.parse(
-                  Buffer.from(input.cursor, 'base64url').toString('utf8'),
-                ),
-              );
-            after = cursor.after;
-          } catch {
-            fail('invalid_input');
-          }
+          const cursor = readCursor.decode(input.cursor);
+          if (cursor.binding !== binding) fail('invalid_input');
+          after = cursor.after;
         }
-        const payloads: unknown[] = [];
         // Parse before capture so unexpected fields, customer details and provider errors cannot enter evidence.
-        const capture = <T>(schema: z.ZodType<T>, value: unknown): T => {
-          const parsed = parse(schema, value);
-          if (options.rawRetentionMs !== undefined) payloads.push(parsed);
-
-          return parsed;
-        };
+        const payloads = createPayloadCapture(options.rawRetentionMs, now);
+        const capture = payloads.capture;
         let observedAt = now().toISOString();
         const items: Observation<unknown>[] = [];
 
@@ -716,11 +707,7 @@ export function createShopifyConnector(
             })
           : null;
         const encode = (cursor: string | null) =>
-          cursor
-            ? Buffer.from(JSON.stringify({ binding, after: cursor })).toString(
-                'base64url',
-              )
-            : null;
+          cursor ? readCursor.encode({ binding, after: cursor }) : null;
         if (bulk?.deferred)
           return parse<unknown>(s.outputs[capability], {
             items: [],
@@ -1437,16 +1424,7 @@ export function createShopifyConnector(
           apiVersion: API_VERSION,
           capability,
           observations: validated.items,
-          ...(options.rawRetentionMs === undefined
-            ? {}
-            : {
-                raw: {
-                  payloads,
-                  expiresAt: new Date(
-                    now().getTime() + options.rawRetentionMs,
-                  ).toISOString(),
-                },
-              }),
+          ...payloads.raw(),
         });
 
         return validated;

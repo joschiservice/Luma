@@ -1,4 +1,5 @@
 import { productPurchasingTermsSchema } from '@luma/connections/composition';
+import { createCursorCodec } from '@luma/connector-jtl';
 import { z } from 'zod';
 
 /**
@@ -6,6 +7,16 @@ import { z } from 'zod';
  * whenever the same provider response would normalize differently.
  */
 export const adapterVersion = 'jtl/8';
+
+/** Page cursor for paged JTL reads, bound to the request that produced it. */
+export const pageCursor = createCursorCodec(
+  z
+    .object({
+      binding: z.string(),
+      page: z.number().int().min(2).max(2147483647),
+    })
+    .strict(),
+);
 
 const timestamp = z.string().datetime({ offset: true });
 

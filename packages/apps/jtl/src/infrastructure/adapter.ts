@@ -15,11 +15,17 @@ import {
   type SourceIdentity,
 } from '@luma/connections';
 import type { JtlTransportOptions } from '@luma/connector-jtl';
-import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
+import {
+  API_VERSION,
+  createClient,
+  createPayloadCapture,
+  fail,
+  parse,
+} from '@luma/connector-jtl';
 import { z } from 'zod';
 
 import { createExchangeReservation } from './exchange-reservation.js';
-import { adapterVersion, outputs } from './outputs.js';
+import { adapterVersion, outputs, pageCursor } from './outputs.js';
 import { createJtlPurchaseOrderCapabilities } from './purchase-orders.js';
 import { createJtlSettlementCapabilities } from './return-settlement.js';
 import { createJtlReturnCapabilities } from './returns.js';
@@ -180,30 +186,12 @@ export function createJtlConnector(
           .digest('hex');
         let pageNumber = 1;
         if (input.cursor) {
-          try {
-            pageNumber = z
-              .object({
-                binding: z.literal(binding),
-                page: z.number().int().min(2).max(2147483647),
-              })
-              .strict()
-              .parse(
-                JSON.parse(
-                  Buffer.from(input.cursor, 'base64url').toString('utf8'),
-                ),
-              ).page;
-          } catch {
-            fail('invalid_input');
-          }
+          const cursor = pageCursor.decode(input.cursor);
+          if (cursor.binding !== binding) fail('invalid_input');
+          pageNumber = cursor.page;
         }
-        const payloads: unknown[] = [];
-
-        function capture<T>(schema: z.ZodType<T>, value: unknown): T {
-          const result = parse(schema, value);
-          if (options.rawRetentionMs !== undefined) payloads.push(result);
-
-          return result;
-        }
+        const payloads = createPayloadCapture(options.rawRetentionMs, now);
+        const capture = payloads.capture;
 
         async function page<T extends z.ZodTypeAny>(
           path: string,
@@ -698,9 +686,7 @@ export function createJtlConnector(
         const result = parse<unknown>(outputs[capability], {
           items: observations,
           nextCursor: hasNext
-            ? Buffer.from(
-                JSON.stringify({ binding, page: pageNumber + 1 }),
-              ).toString('base64url')
+            ? pageCursor.encode({ binding, page: pageNumber + 1 })
             : null,
           completeness: 'complete',
           ...(total === undefined ? {} : { total }),
@@ -711,16 +697,7 @@ export function createJtlConnector(
           apiVersion: API_VERSION,
           capability,
           observations: result.items,
-          ...(options.rawRetentionMs === undefined
-            ? {}
-            : {
-                raw: {
-                  payloads,
-                  expiresAt: new Date(
-                    now().getTime() + options.rawRetentionMs,
-                  ).toISOString(),
-                },
-              }),
+          ...payloads.raw(),
         });
 
         return result;
