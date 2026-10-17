@@ -232,7 +232,7 @@ describe.skipIf(!databaseUrl)(
         seed.release();
       }
 
-      const stock = (entries: { kind: string }[]) =>
+      const stock = <Entry extends { kind: string }>(entries: Entry[]) =>
         entries.filter((entry) => entry.kind === 'stock_booking');
 
       // An inventory reader sees the booking with its quantity, requester and approver.
