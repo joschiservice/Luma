@@ -55,6 +55,24 @@ export default defineConfig(
     rules: reactHooks.configs.recommended.rules,
   },
   {
+    // The web client's own `IdentityError` (apps/web/src/lib/api-error.ts) is a separate class.
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(@luma/identity(/.*)?|.*/domain/context(\\.js)?)$',
+              importNames: ['IdentityError'],
+              message:
+                'IdentityError was removed. Throw ServiceError or its helpers (notFound, conflict, invalid, forbidden, unavailable) from @luma/platform.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['apps/**/*.{ts,tsx,js,mjs}', 'packages/**/*.{ts,tsx,js,mjs}'],
     plugins: { architecture },
     rules: { 'architecture/boundaries': 'error' },
