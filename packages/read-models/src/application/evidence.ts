@@ -12,6 +12,9 @@ import type {
 interface EvidenceSubject {
   kind:
     | 'purchase_order'
+    | 'purchasing_plan'
+    | 'native_receipt'
+    | 'app_decision'
     | 'return_creation'
     | 'return_settlement'
     | 'return_exchange_step'
@@ -49,8 +52,11 @@ interface SubjectCitations {
  * subject.
  */
 export interface EvidenceSubjectOwner {
-  /** The read permission of the subject's area. */
-  permission: Permission;
+  /**
+   * The read permission of the subject's area. Null when it depends on the subject, such as an
+   * app decision's change; `citations` then checks `access` and throws forbidden itself.
+   */
+  permission: Permission | null;
   /** When storage began for the reads and write receipts this subject cites. */
   retention: {
     read: RetentionKind | null;
@@ -69,7 +75,8 @@ export interface EvidenceSubjectOwner {
   /**
    * Finds stored evidence and Luma records among the references. Owner tables are matched
    * through the subject; tables that cannot be, such as an app's evidence, only for `cited`
-   * references.
+   * references. Evidence another area guards is returned as `restricted` when `access` lacks
+   * that area's read permission, never left out.
    */
   lookup(
     tx: SqlTransaction,
@@ -81,7 +88,7 @@ export interface EvidenceSubjectOwner {
 }
 
 /** The reader's read permissions, for evidence another area guards. */
-interface EvidenceAccess {
+export interface EvidenceAccess {
   can(permission: Permission): boolean;
 }
 

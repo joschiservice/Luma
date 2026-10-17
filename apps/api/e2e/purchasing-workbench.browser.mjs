@@ -397,6 +397,45 @@ test('reviews grouped purchasing evidence and independently approved drafts acro
   const plans = await api('/procurement/purchasing/plans');
   expect(plans.items).toHaveLength(1);
   const plan = plans.items[0];
+
+  // Needs you: the plan's decision opens the stock reads it relies on, from the keyboard and
+  // on a narrow screen. Nothing is read until the evidence is opened.
+  await page.setViewportSize({ width: 390, height: 844 });
+  let evidenceReads = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/evidence/resolve')) evidenceReads += 1;
+  });
+  await page.goto(
+    `/app/${org}/needs-you?item=${encodeURIComponent(`purchasing:plan:${plan.id}`)}`,
+  );
+  const cites = page.getByText('What this decision cites', { exact: true });
+  await expect(cites).toBeVisible();
+  expect(evidenceReads).toBe(0);
+  await cites.focus();
+  await page.keyboard.press('Enter');
+  const planEvidence = page.getByRole('list', { name: 'Cited evidence' });
+  await expect(
+    planEvidence.getByText(/^Read from Shopify, /).first(),
+  ).toBeVisible();
+  await expect(
+    planEvidence.getByText('Available', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    planEvidence.getByText('Purchasing plan', { exact: true }),
+  ).toBeVisible();
+  await expect(planEvidence.getByText('Not found')).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await t.attach('needs-you-plan-evidence-narrow', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(url);
+
   const verified = await api(
     `/procurement/purchasing/plans/${plan.id}/decision`,
     { decisionId: plan.decisionId, outcome: 'approved' },
@@ -424,6 +463,34 @@ test('reviews grouped purchasing evidence and independently approved drafts acro
   await expect(
     page.getByRole('heading', { name: 'PO-BROWSER-QA', exact: true }),
   ).toBeVisible();
+  // The timeline's references resolve: the plan's stock read and the order's lifecycle events.
+  const timeline = page.getByRole('region', { name: 'Purchasing timeline' });
+  const disclosures = timeline.locator('details');
+  await expect(disclosures.first()).toBeVisible();
+  for (let index = 0; index < (await disclosures.count()); index += 1)
+    await disclosures.nth(index).locator('summary').click();
+  await expect(
+    timeline
+      .getByText('Purchase order event', { exact: true })
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    timeline
+      .getByText(/^Created as /)
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    timeline
+      .getByText(/^Read from Shopify, /)
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    timeline.getByText('Nothing to show for this reference'),
+  ).toHaveCount(0);
+  await expect(timeline.getByText('No stored evidence found')).toHaveCount(0);
   await page.goto(url);
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });

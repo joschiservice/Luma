@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  capabilityReadPermission,
+  evidenceActor,
   missingEvidence,
   resolveEvidence,
   type StoredEvidence,
@@ -186,5 +188,156 @@ describe('resolveEvidence', () => {
       kind: 'read',
       connection: { label: null },
     });
+  });
+
+  it('presents record facts with their actor, messages without text, and restricted evidence', () => {
+    const member = '00000000-0000-4000-8000-0000000000e1';
+    const items = resolveEvidence({
+      refs: ['event', 'message', 'guarded', 'note'],
+      citations: [],
+      found: [
+        {
+          kind: 'luma_record',
+          id: 'event',
+          record: 'procurement_event',
+          at: '2026-10-02T00:00:00.000Z',
+          actorId: member.toUpperCase(),
+          detail: {
+            kind: 'procurement_event',
+            event: 'status_changed',
+            from: 'draft',
+            to: 'open',
+            revision: 2,
+          },
+        },
+        {
+          kind: 'message',
+          id: 'message',
+          provider: 'gmail',
+          connectionId,
+          direction: 'outbound',
+          sender: { address: 'buying@shop.example', name: null },
+          receivedAt: '2026-10-02T00:00:00.000Z',
+          subject: 'x'.repeat(400),
+          senderAuthentication: 'aligned',
+        },
+        { kind: 'restricted', id: 'guarded', permission: 'messages.read' },
+        {
+          kind: 'luma_record',
+          id: 'note',
+          record: 'receipt_note',
+          recordId: 'commitment-1',
+        },
+      ],
+      labels: new Map([[connectionId, 'Purchasing inbox']]),
+      people: new Map([
+        [
+          member,
+          {
+            id: member,
+            name: 'Mara',
+            email: 'mara@example.test',
+            member: true,
+          },
+        ],
+      ]),
+      start: () => null,
+    });
+    expect(items.map((item) => item.resolution)).toEqual([
+      {
+        kind: 'luma_record',
+        record: 'procurement_event',
+        id: 'event',
+        at: '2026-10-02T00:00:00.000Z',
+        actor: {
+          kind: 'member',
+          id: member.toUpperCase(),
+          name: 'Mara',
+          email: 'mara@example.test',
+          workflow: null,
+        },
+        detail: {
+          kind: 'procurement_event',
+          event: 'status_changed',
+          from: 'draft',
+          to: 'open',
+          revision: 2,
+        },
+      },
+      expect.objectContaining({
+        kind: 'message',
+        connection: { id: connectionId, label: 'Purchasing inbox' },
+        subject: 'x'.repeat(300),
+      }),
+      { kind: 'restricted', permission: 'messages.read' },
+      { kind: 'luma_record', record: 'receipt_note', id: 'commitment-1' },
+    ]);
+  });
+
+  it('prefers stored evidence and records to a restricted placeholder for the same reference', () => {
+    const [item] = resolveEvidence({
+      refs: ['r'],
+      citations: [],
+      found: [
+        { kind: 'restricted', id: 'r', permission: 'inventory.read' },
+        { kind: 'luma_record', id: 'r', record: 'ledger_entry' },
+      ],
+      labels: new Map(),
+      start: () => null,
+    });
+    expect(item?.resolution).toEqual({
+      kind: 'luma_record',
+      record: 'ledger_entry',
+      id: 'r',
+    });
+  });
+});
+
+describe('evidenceActor', () => {
+  const people = new Map([
+    [
+      '00000000-0000-4000-8000-0000000000e2',
+      {
+        id: '00000000-0000-4000-8000-0000000000e2',
+        name: 'Former',
+        email: 'former@example.test',
+        member: false,
+      },
+    ],
+  ]);
+
+  it('names Luma, services, former members and unrecorded actors', () => {
+    expect(evidenceActor(undefined, people)).toBeUndefined();
+    expect(evidenceActor(null, people)?.kind).toBe('unrecorded');
+    expect(
+      evidenceActor('00000000-0000-0000-0000-000000000000', people)?.kind,
+    ).toBe('luma');
+    expect(evidenceActor('jtl-sync', people)).toMatchObject({
+      kind: 'service',
+      name: 'jtl-sync',
+    });
+    // Former members keep their name but never their email.
+    expect(
+      evidenceActor('00000000-0000-4000-8000-0000000000e2', people),
+    ).toMatchObject({ kind: 'former_member', name: 'Former', email: null });
+    expect(
+      evidenceActor('00000000-0000-4000-8000-0000000000e3', people),
+    ).toMatchObject({ kind: 'former_member', name: null });
+  });
+});
+
+describe('capabilityReadPermission', () => {
+  it('reads the permission of the capability area', () => {
+    expect(capabilityReadPermission('inventory.available.reconcile')).toBe(
+      'inventory.read',
+    );
+    expect(capabilityReadPermission('orders.quantity.edit')).toBe(
+      'orders.read',
+    );
+    expect(capabilityReadPermission('fulfillment.hold.release')).toBe(
+      'fulfillment.read',
+    );
+    expect(capabilityReadPermission('purchase-orders.submit')).toBeNull();
+    expect(capabilityReadPermission('toString')).toBeNull();
   });
 });

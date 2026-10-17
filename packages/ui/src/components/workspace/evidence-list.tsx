@@ -1,13 +1,15 @@
 import type {
   EvidenceItem,
   EvidenceList as EvidenceListData,
+  EvidenceRecordDetail,
   EvidenceRecordKind,
   EvidenceSummaryField,
 } from '@luma/api-contract';
-import { formatRelativeTime } from '@luma/i18n/format';
+import { formatNumber, formatRelativeTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Fragment, useContext } from 'react';
 
+import { actorLabel } from '../../lib/actor';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Spinner } from '../primitives/spinner';
@@ -45,7 +47,37 @@ const recordLabels: Record<EvidenceRecordKind, () => string> = {
   reply: m.evidence_record_reply,
   case: m.evidence_record_case,
   case_proposal: m.evidence_record_case_proposal,
+  procurement_event: m.evidence_record_procurement_event,
+  stock_receipt_review: m.evidence_record_stock_receipt_review,
+  ledger_entry: m.evidence_record_ledger_entry,
+  stock_ownership_change: m.evidence_record_stock_ownership_change,
+  stock_booking: m.evidence_record_stock_booking,
+  receipt_note: m.evidence_record_receipt_note,
 };
+
+const reviewStates = {
+  pending: m.evidence_review_pending,
+  approved: m.evidence_review_approved,
+  rejected: m.evidence_review_rejected,
+} satisfies Record<
+  Extract<EvidenceRecordDetail, { kind: 'stock_receipt_review' }>['state'],
+  () => string
+>;
+
+const senderAuthentication = {
+  aligned: m.evidence_sender_aligned,
+  unaligned: m.evidence_sender_unaligned,
+  unknown: m.evidence_sender_unknown,
+};
+
+/**
+ * Names the domain values some records carry: a purchase order status, a stock account state or
+ * a ledger entry's purpose. The raw value is shown when the caller doesn't name it.
+ */
+export type EvidenceValueName = (
+  kind: 'order_status' | 'stock_state' | 'ledger_purpose',
+  value: string,
+) => string;
 
 const summaryLabels: Record<EvidenceSummaryField, () => string> = {
   status: m.evidence_summary_status,
@@ -58,6 +90,7 @@ const summaryLabels: Record<EvidenceSummaryField, () => string> = {
   requestedDeliveryDate: m.evidence_summary_requested_delivery_date,
   available: m.evidence_summary_available,
   onHand: m.evidence_summary_on_hand,
+  reserved: m.evidence_summary_reserved,
   quantity: m.evidence_summary_quantity,
   amount: m.evidence_summary_amount,
   currency: m.evidence_summary_currency,
@@ -80,6 +113,14 @@ function kindBadge(resolution: EvidenceItem['resolution'], cited: boolean) {
       return { tone: 'info', label: m.evidence_kind_receipt() } as const;
     case 'luma_record':
       return { tone: 'neutral', label: m.evidence_kind_record() } as const;
+    case 'message':
+      return {
+        tone:
+          resolution.senderAuthentication === 'unaligned' ? 'warning' : 'info',
+        label: m.evidence_kind_message(),
+      } as const;
+    case 'restricted':
+      return { tone: 'neutral', label: m.evidence_kind_restricted() } as const;
     case 'not_retained':
       return {
         tone: 'neutral',
@@ -111,16 +152,131 @@ function Moment({ value, now }: { value: string; now: number }) {
   );
 }
 
+/** What a lifecycle event of a purchase order recorded, such as "Open → Closed". */
+function eventText(
+  detail: Extract<EvidenceRecordDetail, { kind: 'procurement_event' }>,
+  valueName: EvidenceValueName,
+) {
+  const status = (value: string | null) =>
+    value === null
+      ? m.evidence_not_recorded()
+      : valueName('order_status', value);
+  switch (detail.event) {
+    case 'created':
+      return m.evidence_event_created({ status: status(detail.to) });
+    case 'status_changed':
+      return m.evidence_event_status_changed({
+        from: status(detail.from),
+        to: status(detail.to),
+      });
+    case 'revised':
+      return m.evidence_event_revised({
+        revision:
+          detail.revision === null
+            ? m.evidence_not_recorded()
+            : formatNumber(detail.revision),
+      });
+  }
+}
+
+/** The facts a Luma record carries: when and by whom it was written, and what it recorded. */
+function RecordFacts({
+  resolution,
+  now,
+  valueName,
+}: {
+  resolution: Extract<EvidenceItem['resolution'], { kind: 'luma_record' }>;
+  now: number;
+  valueName: EvidenceValueName;
+}) {
+  const { detail } = resolution;
+  if (!resolution.at && !resolution.actor && !detail) return null;
+
+  return (
+    <dl className="evidence-facts">
+      {detail?.kind === 'procurement_event' ? (
+        <>
+          <dt>{m.evidence_field_event()}</dt>
+          <dd>{eventText(detail, valueName)}</dd>
+        </>
+      ) : null}
+      {detail?.kind === 'stock_receipt_review' ? (
+        <>
+          <dt>{m.evidence_field_review()}</dt>
+          <dd>{reviewStates[detail.state]()}</dd>
+          <dt>{m.evidence_field_received_quantity()}</dt>
+          <dd>
+            {detail.quantity === null
+              ? m.evidence_not_recorded()
+              : [detail.quantity, detail.unit].filter(Boolean).join(' ')}
+          </dd>
+        </>
+      ) : null}
+      {detail?.kind === 'ledger_entry' ? (
+        <>
+          <dt>{m.evidence_field_purpose()}</dt>
+          <dd>
+            {valueName('ledger_purpose', detail.purpose)}
+            {detail.reversed ? ` · ${m.evidence_ledger_reversed()}` : ''}
+          </dd>
+          <dt>{m.evidence_field_postings()}</dt>
+          <dd>
+            {detail.postings.length ? (
+              <ul className="evidence-records">
+                {detail.postings.map((posting) => (
+                  <li
+                    key={`${posting.state}:${posting.unit}:${posting.version}`}
+                  >
+                    {m.evidence_ledger_posting({
+                      state: valueName('stock_state', posting.state),
+                      quantity: posting.quantity.startsWith('-')
+                        ? posting.quantity
+                        : `+${posting.quantity}`,
+                      unit: posting.unit,
+                      balance: posting.balanceAfter,
+                      version: formatNumber(posting.version),
+                    })}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              m.evidence_not_recorded()
+            )}
+          </dd>
+        </>
+      ) : null}
+      {resolution.at ? (
+        <>
+          <dt>{m.evidence_field_recorded_at()}</dt>
+          <dd>
+            <Moment value={resolution.at} now={now} />
+          </dd>
+        </>
+      ) : null}
+      {resolution.actor ? (
+        <>
+          <dt>{m.evidence_field_actor()}</dt>
+          <dd>{actorLabel(resolution.actor)}</dd>
+        </>
+      ) : null}
+    </dl>
+  );
+}
+
 function EvidenceEntry({
   item,
   now,
   providerName,
   capabilityName,
+  permissionName,
+  valueName,
 }: {
   item: EvidenceItem;
   now: number;
   providerName: (provider: string) => string;
   capabilityName: (capability: string) => string;
+  permissionName: (permission: string) => string;
+  valueName: EvidenceValueName;
 }) {
   const { resolution } = item;
   // A missing read or receipt the record relies on is a gap; an unknown reference is not.
@@ -149,11 +305,21 @@ function EvidenceEntry({
                 })
               : resolution.kind === 'luma_record'
                 ? recordLabels[resolution.record]()
-                : resolution.kind === 'not_retained'
-                  ? m.evidence_not_retained_title()
-                  : citedEvidence
-                    ? m.evidence_unresolved_title()
-                    : m.evidence_unresolved_reference_title()}
+                : resolution.kind === 'message'
+                  ? (resolution.direction === 'inbound'
+                      ? m.evidence_message_received_title
+                      : m.evidence_message_sent_title)({
+                      connection:
+                        resolution.connection.label ??
+                        m.evidence_connection_removed(),
+                    })
+                  : resolution.kind === 'restricted'
+                    ? m.evidence_restricted_title()
+                    : resolution.kind === 'not_retained'
+                      ? m.evidence_not_retained_title()
+                      : citedEvidence
+                        ? m.evidence_unresolved_title()
+                        : m.evidence_unresolved_reference_title()}
         </strong>
       </div>
       {resolution.kind === 'read' ? (
@@ -244,11 +410,50 @@ function EvidenceEntry({
                 m.evidence_not_reported()
               )}
             </dd>
+            <dt>{m.evidence_field_adapter()}</dt>
+            <dd>{resolution.adapterVersion ?? m.evidence_not_recorded()}</dd>
           </dl>
           <p className="evidence-note">{m.evidence_receipt_note()}</p>
         </>
       ) : resolution.kind === 'luma_record' ? (
-        <p className="evidence-note">{m.evidence_record_note()}</p>
+        <>
+          <RecordFacts
+            resolution={resolution}
+            now={now}
+            valueName={valueName}
+          />
+          <p className="evidence-note">
+            {resolution.record === 'receipt_note'
+              ? m.evidence_receipt_note_detail()
+              : m.evidence_record_note()}
+          </p>
+        </>
+      ) : resolution.kind === 'message' ? (
+        <>
+          <dl className="evidence-facts">
+            <dt>{m.evidence_field_sender()}</dt>
+            <dd>
+              {resolution.sender.name
+                ? `${resolution.sender.name} <${resolution.sender.address}>`
+                : resolution.sender.address}
+            </dd>
+            <dt>{m.evidence_field_sender_verified()}</dt>
+            <dd>{senderAuthentication[resolution.senderAuthentication]()}</dd>
+            <dt>{m.evidence_field_received_at()}</dt>
+            <dd>
+              <Moment value={resolution.receivedAt} now={now} />
+            </dd>
+            <dt>{m.evidence_field_subject()}</dt>
+            <dd>{resolution.subject || m.evidence_no_subject()}</dd>
+          </dl>
+          <p className="evidence-note">{m.evidence_message_note()}</p>
+        </>
+      ) : resolution.kind === 'restricted' ? (
+        <p className="evidence-note">
+          {m.evidence_restricted_detail({
+            permission: permissionName(resolution.permission),
+          })}
+        </p>
       ) : resolution.kind === 'not_retained' ? (
         <p className="evidence-note">
           <NotRetained since={resolution.retentionStartedAt} />
@@ -282,21 +487,26 @@ function NotRetained({ since }: { since: string }) {
 
 /**
  * Shows what a record cites: each provider read with its source, read time, freshness and
- * completeness; each write receipt with what was accepted; Luma records; and references whose
- * evidence was never kept or can't be found. Every state has a text label. Pass names for
- * providers and capabilities when the caller can localize them.
+ * completeness; each write receipt with what was accepted; stored messages without their text;
+ * Luma records with their time, actor and facts; evidence the reader may not see; and references
+ * whose evidence was never kept or can't be found. Every state has a text label. Pass names for
+ * providers, capabilities, permissions and domain values when the caller can localize them.
  */
 export function EvidenceList({
   state,
   now,
   providerName = (provider) => provider,
   capabilityName = (capability) => capability,
+  permissionName = (permission) => permission,
+  valueName = (_kind, value) => value,
 }: {
   state: EvidenceState;
   /** The moment ages are measured from; defaults to when the server resolved the evidence. */
   now?: number;
   providerName?: (provider: string) => string;
   capabilityName?: (capability: string) => string;
+  permissionName?: (permission: string) => string;
+  valueName?: EvidenceValueName;
 }) {
   if (state.status === 'loading')
     return (
@@ -339,6 +549,8 @@ export function EvidenceList({
             now={now ?? Date.parse(state.evidence.asOf)}
             providerName={providerName}
             capabilityName={capabilityName}
+            permissionName={permissionName}
+            valueName={valueName}
           />
         ))}
       </ul>

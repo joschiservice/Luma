@@ -188,6 +188,10 @@ Missing history, stale stock, missing pack sizes or minimum quantities withhold 
 An active replenishment rule can supply its minimum and target without inventing demand.
 Open drafts and orders suppress a second suggestion. A saved plan retains manual quantity
 changes beside the original suggestion and evidence.
+The evidence a plan cites is the stock snapshots, native ledger entries and order snapshots its
+suggestions read. Their owners never change or delete them, so the
+[evidence reader](execution.md#reading-cited-evidence) resolves them in place and procurement
+keeps no copy; a missing one is a defect, not expired history.
 
 Each supplier plan has one immutable request and one governed action. Workspace approval
 rules apply. Independent readback verifies the exact draft, including price and location

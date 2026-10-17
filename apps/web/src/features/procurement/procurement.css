@@ -623,7 +623,7 @@
 }
 .procurement-attention li,
 .procurement-facts li,
-.procurement-commitments li,
+.procurement-commitments > li,
 .procurement-trace li {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -714,8 +714,8 @@
   gap: 6px;
 }
 .procurement-facts li[data-status='rejected'] strong,
-.procurement-commitments li[data-status='rejected'] strong,
-.procurement-commitments li[data-corrected='true'] strong {
+.procurement-commitments > li[data-status='rejected'] strong,
+.procurement-commitments > li[data-corrected='true'] strong {
   color: var(--muted-foreground);
   text-decoration: line-through;
 }
@@ -904,12 +904,12 @@
   }
   .procurement-attention li,
   .procurement-facts li,
-  .procurement-commitments li {
+  .procurement-commitments > li {
     grid-template-columns: auto minmax(0, 1fr);
   }
   .procurement-attention li > :last-child:not(span),
   .procurement-facts li > .procurement-fact-actions,
-  .procurement-commitments li > button {
+  .procurement-commitments > li > button {
     grid-column: 2;
     justify-self: start;
   }

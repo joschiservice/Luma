@@ -151,6 +151,23 @@ export function createDecisionServices(
                 unit: item.line.unit,
               }
             : null,
+          evidenceRefs: [
+            ...(item.submission
+              ? [item.submission.id, item.submission.decisionId]
+              : []),
+            ...(item.commitment
+              ? [
+                  item.commitment.id,
+                  ...(item.commitment.source.kind === 'purchasing_system'
+                    ? [item.commitment.source.observationId]
+                    : item.commitment.source.kind === 'communication'
+                      ? [item.commitment.source.communicationId]
+                      : item.commitment.source.kind === 'manual_receipt'
+                        ? item.commitment.source.evidence
+                        : []),
+                ]
+              : []),
+          ].filter((ref): ref is string => !!ref),
           commitment: item.commitment
             ? {
                 kind: item.commitment.kind,

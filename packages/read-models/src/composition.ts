@@ -24,6 +24,8 @@ export { createDecisionQueue } from './infrastructure/decisions/queue.js';
 
 export { createEvidenceReader } from './infrastructure/evidence/reader.js';
 
+export { capabilityReadPermission } from './domain/evidence.js';
+
 export { createInsights } from './infrastructure/insights/workspace.js';
 
 export {

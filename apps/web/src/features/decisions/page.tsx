@@ -1206,6 +1206,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
                   ? 'none'
                   : assignmentAccess
             }
+            canRead={permissions.can}
             assigning={assignment.isPending}
             assignError={assignError}
             onAssign={(assigneeId) => assignment.mutate({ item, assigneeId })}

@@ -16,6 +16,7 @@ export type {
 } from './application/decisions.js';
 
 export type {
+  EvidenceAccess,
   EvidenceOwners,
   EvidenceSubjectOwner,
 } from './application/evidence.js';

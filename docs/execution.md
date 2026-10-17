@@ -108,28 +108,50 @@ fields, Luma purchase orders and supplier follow-ups, cite the Luma record they 
 ### Reading cited evidence
 
 `@luma/read-models` resolves the references a record cites, so people see the evidence rather
-than IDs. A request names a subject (a purchase order, a return creation, settlement or exchange
-step, a reply, or a case) and optionally its references; without them it resolves everything the
-subject cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
-`returns.read`, `messages.read` or `issues.read`); a subject the tenant doesn't have is not found.
+than IDs. A request names a subject (a purchase order, a purchasing plan, a native stock receipt
+review, a return creation, settlement or exchange step, a reply, a case, or an app decision by
+its proposal ID) and optionally its references; without them it resolves everything the subject
+cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
+`inventory.read`, `returns.read`, `messages.read` or `issues.read`); an app decision needs the
+read permission of its capability's area (`inventory.*` needs `inventory.read`, `orders.*`
+`orders.read`, `fulfillment.*` `fulfillment.read`). A subject the tenant doesn't have is not found.
 
 The subject's owner reports what the subject cites and looks up stored evidence only through the
-subject: procurement's reads and receipts of that order, orders' evidence of that return case,
-messaging's send receipts and the messages of that reply's thread. App evidence tables are not
-linked to a record, so Shopify, Starshipit and JTL shipping-method evidence is read only for
-references the case's execution attempts cite, through each app's `evidence` hook. App rows
-written before an app recorded adapter versions, completeness or accepted records return those
-fields as null, which the view shows as not recorded. Each reference resolves to a read (source,
-record, read and source-update times, revision, completeness, adapter version and an
-allowlisted summary of the normalized read), a write receipt, a Luma record, `not_retained` or
-`unresolved`. Provider payloads, message content and addresses never leave the owner.
+subject: procurement's reads and receipts of that order, its lifecycle events, plans and the
+notes people recorded with manual receipts; inventory's receipt reviews and the ledger entries
+that booked them; orders' evidence of that return case; messaging's send receipts and the
+messages of that reply's thread. Tables that are not linked to the subject are read only for
+references the subject cites as reads or receipts: the inventory and order snapshots and ledger
+entries behind a plan's suggestions, and the Shopify, Starshipit and JTL shipping-method
+evidence that execution attempts or an app proposal's preconditions cite, through each app's
+`evidence` hook. App rows written before an app recorded adapter versions, completeness or
+accepted records return those fields as null, which the view shows as not recorded. An order's
+email submission names the message it sent, which messaging resolves.
+
+Each reference resolves to a read (source, record, read and source-update times, revision,
+completeness, adapter version and an allowlisted summary of the normalized read), a write
+receipt (capability, accepted time, provider records, request ID and, where recorded, the adapter
+version), a stored message (sender, received time, subject and whether the receiving system
+authenticated the sender), a Luma record, `restricted`, `not_retained` or `unresolved`. Records
+that keep them carry their time, actor and facts: a purchase order event its status change or
+revision, a receipt review its state and quantity, a ledger entry its postings with the balance
+and version after each. Provider payloads, message text, recipients and attachments never leave
+the owner.
+
+Evidence another area guards is `restricted` for a reader without that area's read permission,
+naming the permission, rather than left out: plan stock reads and ledger entries, native receipts
+and their proof need `inventory.read`, plan demand reads `orders.read`, order emails
+`messages.read`, and the commitments a receipt books `procurement.read`. Shopify stock booking
+proof of an order is still listed only for readers with inventory access, like its timeline
+entries.
 
 Records written before an owner stored a kind of evidence cite IDs that were never kept and
 cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return
 reads, write receipts); a read or receipt cited before that date is `not_retained`. Everything
-else without stored evidence stays `unresolved`, including citations without a time and message
-reads, which were always stored: a missing read after storage began is a defect, not history.
-Busy views resolve evidence only when a person opens it.
+else without stored evidence stays `unresolved`, including citations without a time and reads
+that were always stored: messages, inventory and order snapshots and ledger entries. A missing
+read after storage began is a defect, not history. Busy views, including Needs you, resolve
+evidence only when a person opens it.
 
 ## Observe-only
 

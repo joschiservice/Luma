@@ -154,7 +154,8 @@ export function purchasingTimeline(input: {
         stage: 'verified',
         at: submission.submittedAt,
         source,
-        evidenceRefs: [submission.id, submission.externalOrder.externalId],
+        // The purchasing system's order number is shown on the order, not cited as evidence.
+        evidenceRefs: [submission.id],
       });
     else if (
       ['submitting', 'uncertain', 'failed', 'not_executed', 'expired'].includes(

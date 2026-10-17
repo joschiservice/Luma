@@ -35,6 +35,7 @@ export { documentExtractionProfile } from './infrastructure/extraction.js';
 export { purgeExpiredMessaging } from './infrastructure/store.js';
 
 export {
+  messageEvidence,
   replyCitations,
   replyEvidence,
 } from './infrastructure/reply-evidence.js';

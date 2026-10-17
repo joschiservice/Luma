@@ -52,6 +52,27 @@ export type DecisionOwner =
   | { kind: 'purchasing_plan'; planId: string }
   | { kind: 'message_thread'; threadId: string };
 
+/**
+ * The record whose cited evidence backs a decision, as the evidence resolver names it, and the
+ * references the decision relies on when they are only part of what that record cites.
+ */
+interface DecisionEvidence {
+  subject: {
+    kind:
+      | 'purchase_order'
+      | 'purchasing_plan'
+      | 'native_receipt'
+      | 'app_decision'
+      | 'return_creation'
+      | 'return_settlement'
+      | 'return_exchange_step'
+      | 'reply'
+      | 'case';
+    id: string;
+  };
+  refs?: string[] | undefined;
+}
+
 export interface DecisionAssignment {
   assigneeId: string | null;
   assignedBy: string;
@@ -100,6 +121,8 @@ export interface DecisionItem {
   subject: { label: string; detail: string | null };
   record: { kind: DecisionRecordKind; id: string } | null;
   owner: DecisionOwner;
+  /** Where the decision's cited evidence resolves; absent when it cites none. */
+  citedEvidence?: DecisionEvidence | undefined;
   group: { key: string; label: string };
 }
 

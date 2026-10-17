@@ -208,6 +208,10 @@
   font-size: 13px;
 }
 
+.decision-evidence {
+  margin-top: 8px;
+}
+
 .decision-links {
   display: flex;
   flex-wrap: wrap;
