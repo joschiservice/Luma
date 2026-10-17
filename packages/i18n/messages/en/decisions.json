@@ -179,5 +179,6 @@
   "decisions_proposal_changed": "This proposal changed during review",
   "decisions_proposal_changed_help": "Review the changed values before answering. The previous approval does not cover a different proposal.",
   "decisions_waiting_others": "Waiting on others",
-  "decisions_waiting_empty": "Nothing is waiting on someone else."
+  "decisions_waiting_empty": "Nothing is waiting on someone else.",
+  "decisions_cited_evidence": "What this decision cites"
 }

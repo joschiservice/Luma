@@ -247,6 +247,246 @@ export const Forbidden: Story = {
   },
 };
 
+const member = {
+  kind: 'member' as const,
+  id: '00000000-0000-4000-8000-0000000000e1',
+  name: 'Mara Lind',
+  email: 'mara@example.test',
+  workflow: null,
+};
+
+/** Records with their time, actor and facts, a stored message and evidence the reader can't open. */
+const records: EvidenceListData = {
+  ...evidence,
+  subject: {
+    kind: 'purchasing_plan',
+    id: '00000000-0000-4000-8000-000000000002',
+  },
+  items: [
+    {
+      ref: '00000000-0000-4000-8000-0000000000b1',
+      citedAs: 'read',
+      citedAt: '2026-10-17T11:40:00Z',
+      resolution: {
+        kind: 'read',
+        provider: 'Shopify',
+        connection: { ...connection, label: 'Shopify store' },
+        record: {
+          resource: 'sku',
+          externalId: 'gid://shopify/InventoryLevel/1',
+        },
+        observedAt: '2026-10-17T11:40:00Z',
+        sourceUpdatedAt: '2026-10-17T11:39:00Z',
+        sourceRevision: null,
+        completeness: null,
+        adapterVersion: 'shopify-inventory/3',
+        summary: [
+          { field: 'available', value: '4' },
+          { field: 'reserved', value: '1' },
+        ],
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b2',
+      citedAs: 'read',
+      citedAt: '2026-10-17T11:58:00Z',
+      resolution: {
+        kind: 'luma_record',
+        record: 'procurement_event',
+        id: '00000000-0000-4000-8000-0000000000b2',
+        at: '2026-10-17T11:58:00Z',
+        actor: member,
+        detail: {
+          kind: 'procurement_event',
+          event: 'status_changed',
+          from: 'draft',
+          to: 'open',
+          revision: 2,
+        },
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b3',
+      citedAs: 'record',
+      citedAt: '2026-10-17T11:30:00Z',
+      resolution: {
+        kind: 'luma_record',
+        record: 'stock_receipt_review',
+        id: '00000000-0000-4000-8000-0000000000b3',
+        at: '2026-10-17T11:30:00Z',
+        actor: { ...member, kind: 'former_member', email: null },
+        detail: {
+          kind: 'stock_receipt_review',
+          state: 'approved',
+          quantity: '24',
+          unit: 'each',
+        },
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b4',
+      citedAs: 'record',
+      citedAt: '2026-10-17T11:31:00Z',
+      resolution: {
+        kind: 'luma_record',
+        record: 'ledger_entry',
+        id: '00000000-0000-4000-8000-0000000000b4',
+        at: '2026-10-17T11:31:00Z',
+        actor: member,
+        detail: {
+          kind: 'ledger_entry',
+          purpose: 'purchase_receipt',
+          reversed: false,
+          postings: [
+            {
+              state: 'available',
+              unit: 'each',
+              quantity: '24',
+              balanceAfter: '30',
+              version: 7,
+            },
+            {
+              state: 'supplier',
+              unit: 'each',
+              quantity: '-24',
+              balanceAfter: '-24',
+              version: 3,
+            },
+          ],
+        },
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b5',
+      citedAs: null,
+      citedAt: null,
+      resolution: {
+        kind: 'message',
+        provider: 'gmail',
+        connection: { ...connection, label: 'Purchasing inbox' },
+        direction: 'outbound',
+        sender: { address: 'buying@shop.example', name: 'Shop buying' },
+        receivedAt: '2026-10-17T10:00:00Z',
+        subject: 'Purchase order PO-2026-118',
+        senderAuthentication: 'aligned',
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b6',
+      citedAs: null,
+      citedAt: null,
+      resolution: {
+        kind: 'message',
+        provider: 'gmail',
+        connection: { ...connection, label: null },
+        direction: 'inbound',
+        sender: { address: 'orders@supplier.example', name: null },
+        receivedAt: '2026-10-17T10:30:00Z',
+        subject: '',
+        senderAuthentication: 'unaligned',
+      },
+    },
+    {
+      ref: '00000000-0000-4000-8000-0000000000b7',
+      citedAs: 'read',
+      citedAt: '2026-10-17T11:40:00Z',
+      resolution: { kind: 'restricted', permission: 'orders.read' },
+    },
+    {
+      ref: 'Delivery note 4471',
+      citedAs: null,
+      citedAt: null,
+      resolution: {
+        kind: 'luma_record',
+        record: 'receipt_note',
+        id: '00000000-0000-4000-8000-0000000000b8',
+      },
+    },
+  ],
+};
+
+const valueNames: Record<string, string> = {
+  draft: 'Draft',
+  open: 'Open',
+  available: 'Available',
+  supplier: 'At supplier',
+  purchase_receipt: 'Purchase receipt',
+};
+
+const recordsArgs = {
+  state: { status: 'ready', evidence: records },
+  now,
+  permissionName: (permission: string) =>
+    permission === 'orders.read' ? 'View orders' : permission,
+  valueName: (_kind: string, value: string) => valueNames[value] ?? value,
+} as const;
+
+export const Records: Story = {
+  args: recordsArgs,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // A stock read the plan relied on.
+    expect(
+      canvas.getByText('Read from Shopify, Shopify store'),
+    ).toBeInTheDocument();
+    expect(canvas.getByText('Reserved')).toBeInTheDocument();
+
+    // A lifecycle event names its change, when and who.
+    expect(canvas.getByText('Purchase order event')).toBeInTheDocument();
+    expect(canvas.getByText('Draft → Open')).toBeInTheDocument();
+    expect(
+      canvas.getAllByText('Mara Lind · mara@example.test').length,
+    ).toBeGreaterThan(0);
+
+    // Native receipt review and the ledger entry that booked it, with its postings.
+    expect(canvas.getByText('Stock receipt review')).toBeInTheDocument();
+    expect(canvas.getByText('24 each')).toBeInTheDocument();
+    expect(
+      canvas.getByText('Available: +24 each, balance 30 (version 7)'),
+    ).toBeInTheDocument();
+    expect(
+      canvas.getByText('At supplier: -24 each, balance -24 (version 3)'),
+    ).toBeInTheDocument();
+
+    // Messages show who sent them and whether that is authenticated, never their text.
+    expect(
+      canvas.getByText('Message sent from Purchasing inbox'),
+    ).toBeInTheDocument();
+    expect(
+      canvas.getByText('Shop buying <buying@shop.example>'),
+    ).toBeInTheDocument();
+    expect(
+      canvas.getByText('No: anyone could have sent this message'),
+    ).toBeInTheDocument();
+    expect(canvas.getByText('(no subject)')).toBeInTheDocument();
+
+    // Evidence another area guards is named, not dropped.
+    expect(canvas.getByText('No access')).toBeInTheDocument();
+    expect(canvas.getByText(/Someone with “View orders”/)).toBeInTheDocument();
+
+    expect(
+      canvas.getByText('Note recorded with a receipt'),
+    ).toBeInTheDocument();
+    expect(canvas.getByText('Delivery note 4471')).toBeInTheDocument();
+  },
+};
+
+export const RecordsDark: Story = {
+  args: recordsArgs,
+  globals: { theme: 'dark' },
+};
+
+export const RecordsNarrow: Story = {
+  args: recordsArgs,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 320 }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 export const NotFound: Story = {
   args: { state: { status: 'not_found' } },
 };

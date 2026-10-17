@@ -136,6 +136,14 @@ export function presentReturnCase(item: {
     subject: { label: value.orderNumber ?? value.id, detail: null },
     record: { kind: 'order', id: value.orderId },
     owner: { kind: 'return_case', caseId: value.id },
+    // A creation cites the reads and receipt of its write; other return work cites none yet.
+    ...(creation?.id
+      ? {
+          citedEvidence: {
+            subject: { kind: 'return_creation' as const, id: creation.id },
+          },
+        }
+      : {}),
     group: { key: 'return-cases', label: 'Returns' },
     ...(creation?.observeOnly ? { observeOnly: true } : {}),
   };

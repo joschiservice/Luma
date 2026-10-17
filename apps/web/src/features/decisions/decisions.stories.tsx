@@ -1,6 +1,11 @@
-import type { DecisionItem, DecisionList } from '@luma/api-contract';
+import type {
+  DecisionItem,
+  DecisionList,
+  EvidenceList,
+} from '@luma/api-contract';
 import { Button } from '@luma/ui/components/primitives/button';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -11,6 +16,7 @@ import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { groupId } from '../../kit/collections/groups';
+import { evidenceOptions } from '../../shared/evidence/evidence';
 import appStyles from '../../styles.css?inline';
 import type { NeedsYouSearch } from './data';
 import { DecisionInspector, type Member } from './inspector';
@@ -127,6 +133,12 @@ const correction: DecisionItem = {
     kind: 'app_inventory',
     appId: 'shopify',
     positionId: '2c1d0e9f-8a7b-4c6d-9e5f-4a3b2c1d0e9f',
+  },
+  citedEvidence: {
+    subject: {
+      kind: 'app_decision',
+      id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+    },
   },
   group: {
     key: 'shopify:inventory_correction:approval',
@@ -247,6 +259,51 @@ const list: DecisionList = {
     { id: 'cases', label: 'Issues', state: 'available' },
     { id: 'replenishment', label: 'Replenishment', state: 'available' },
     { id: 'app:shopify', label: 'Shopify', state: 'available' },
+  ],
+};
+
+/** What the stock correction cites: the Shopify read its preconditions rest on. */
+const correctionEvidence: EvidenceList = {
+  subject: {
+    kind: 'app_decision',
+    id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+  },
+  truncated: false,
+  asOf: '2026-09-30T09:00:00.000Z',
+  items: [
+    {
+      ref: '7e6d5c4b-3a2f-4e1d-8c0b-9a8f7e6d5c4b',
+      citedAs: 'read',
+      citedAt: '2026-09-30T08:57:00.000Z',
+      resolution: {
+        kind: 'read',
+        provider: 'shopify',
+        connection: {
+          id: '8f7e6d5c-4b3a-4f2e-9d1c-0b9a8f7e6d5c',
+          label: 'Berlin store',
+        },
+        record: {
+          resource: 'inventory_level',
+          externalId: 'gid://shopify/InventoryLevel/1',
+        },
+        observedAt: '2026-09-30T08:56:30.000Z',
+        sourceUpdatedAt: null,
+        sourceRevision: null,
+        completeness: 'complete',
+        adapterVersion: 'shopify-inventory/3',
+        summary: [{ field: 'available', value: '12' }],
+      },
+    },
+    {
+      ref: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+      citedAs: 'record',
+      citedAt: '2026-09-30T08:57:00.000Z',
+      resolution: {
+        kind: 'luma_record',
+        record: 'case_proposal',
+        id: '6d5c4b3a-2f1e-4d0c-9b8a-7f6e5d4c3b2a',
+      },
+    },
   ],
 };
 
@@ -398,8 +455,22 @@ function Preview({
       }),
     }),
   );
+  // Evidence loads only when opened; the story answers it from this cache.
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      evidenceOptions(org, correctionEvidence.subject).queryKey,
+      correctionEvidence,
+    );
 
-  return <RouterProvider router={router} />;
+    return queryClient;
+  });
+
+  return (
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 const meta = {
@@ -460,6 +531,32 @@ export const Selected: Story = {
       ).toBeNull(),
     );
   },
+};
+
+export const SelectedEvidence: Story = {
+  args: { initial: { item: correction.id } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const summary = await canvas.findByText('What this decision cites');
+    // Closed until asked for: nothing is read while the reader only scans the decision.
+    await expect(
+      canvas.queryByRole('list', { name: 'Cited evidence' }),
+    ).not.toBeInTheDocument();
+    summary.focus();
+    await userEvent.keyboard('{Enter}');
+    const evidence = await canvas.findByRole('list', {
+      name: 'Cited evidence',
+    });
+    await expect(
+      within(evidence).getByText('Provider read', { exact: true }),
+    ).toBeVisible();
+    await expect(within(evidence).getByText('Proposed change')).toBeVisible();
+  },
+};
+
+export const SelectedEvidenceNarrow: Story = {
+  ...SelectedEvidence,
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const SelectedDark: Story = {
