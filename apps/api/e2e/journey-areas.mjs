@@ -51,6 +51,9 @@ export const sharedPaths = [
   'packages/application-runtime/{migrations,scripts}/**',
   'packages/api-contract/src/{client,common,index,layout,openapi,routes}.ts',
   'packages/api-contract/src/contracts/{identity,system}.ts',
+  // Route groups that make up the API contract and its implementation.
+  'packages/api-contract/src/domains/**',
+  'packages/application-runtime/src/composition/features/**',
   'packages/i18n/src/**',
   'packages/i18n/messages/*/{common,layout,ui}.json',
   // The web shell, its platform kit and shared components.

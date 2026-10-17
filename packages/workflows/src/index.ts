@@ -62,8 +62,6 @@ export type {
   VocabularyContribution,
 } from './domain/vocabulary.js';
 
-export type { WorkflowDrafts } from './application/drafts.js';
-
 export { draftFromVersion } from './domain/draft.js';
 
 export type { TemplateRequirement } from './domain/template.js';
@@ -73,10 +71,7 @@ export {
   templateReadiness,
 } from './domain/template.js';
 
-export type {
-  TemplateSource,
-  WorkflowTemplates,
-} from './application/templates.js';
+export type { TemplateSource } from './application/templates.js';
 
 export { connectionBlockers } from './application/playbook-library.js';
 
@@ -98,15 +93,12 @@ export type {
 export { adaptCase, defaultCase, sameStep } from './domain/draft-test.js';
 
 export type {
-  DraftTests,
   DraftTestStore,
   StoredDraftTestRun,
   TestScenarioSource,
 } from './application/draft-tests.js';
 
 export { createDraftTests } from './application/draft-tests.js';
-
-export type { DraftGeneration } from './application/draft-generation.js';
 
 export type { ReadinessIssue, WorkflowReadiness } from './domain/readiness.js';
 

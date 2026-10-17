@@ -256,59 +256,59 @@ export interface ApplicationServices {
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
-    connectionCoverage: import('@luma/connections').CoverageReader;
+    activity: ReturnType<typeof createWorkspaceActivity>;
     adaptive: ReturnType<typeof createAdaptiveWorkspaceRuntime>;
-    fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
-    shadow: ReturnType<typeof createShadowEvaluations>;
+    assistant: ReturnType<typeof createWorkspaceAssistant>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
-    desk: ReturnType<typeof createDeskServices>;
-    workflows: ReturnType<typeof createWorkflows>;
-    workflowDrafts: ReturnType<typeof createDrafts>;
-    draftTests: ReturnType<typeof createDraftTestRuns>;
-    workflowGeneration: ReturnType<typeof createDraftGenerations>;
-    workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
-    procurement: ReturnType<typeof createProcurement>;
-    supplierTerms: ReturnType<typeof createSupplierTerms>;
-    incoming: ReturnType<typeof createIncomingStock>;
-    purchasing: ReturnType<typeof createPurchasing>;
-    purchasingOutcomes: ReturnType<typeof createPurchasingOutcomesService>;
     commitments: SupplierCommitments;
-    scopedAutonomy: ReturnType<typeof createSafetyServices>['autonomy'];
+    connectionCoverage: import('@luma/connections').CoverageReader;
+    customers: ReturnType<typeof createCustomerWorkspace>;
+    decisionAssignments: ReturnType<typeof createDecisionAssignments>;
+    decisions: ReturnType<typeof createDecisionQueue>;
+    desk: ReturnType<typeof createDeskServices>;
+    draftTests: ReturnType<typeof createDraftTestRuns>;
+    fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
+    fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     governedFollowUps: ReturnType<
       typeof createScopedSupplierFollowUp
     >['service'];
-    orderChanges: ReturnType<typeof createPurchaseOrderChanges>;
-    supplierEmail: ReturnType<typeof createSupplierEmailService>;
-    messaging: ReturnType<typeof createMessaging>['service'];
-    messagingReplies: ReturnType<typeof createMessaging>['replies'];
-    messagingDocuments: ReturnType<typeof createMessaging>['documents'];
-    playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
-    activity: ReturnType<typeof createWorkspaceActivity>;
-    measurements: ReturnType<typeof createResolutionMeasurements>;
-    learning: ReturnType<typeof createResolutionLearning>;
-    operations: ReturnType<typeof createOperationsOverview>;
-    metrics: ReturnType<typeof createOperationalMetrics>;
-    operationalSummary: ReturnType<typeof createOperationalSummary>;
-    records: ReturnType<typeof createRecordExplorer>;
-    inventory: ReturnType<typeof createInventoryWorkspace>;
-    products: ReturnType<typeof createProductWorkspace>;
-    procurementContext: ReturnType<typeof createProcurementContext>;
-    fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
-    returns: ReturnType<typeof createReturnWorkspace>;
-    returnCases: ReturnCases;
-    returnActions: ReturnActions;
-    returnExchanges: ReturnExchanges;
-    returnDeadlines: ReturnDeadlines;
-    customers: ReturnType<typeof createCustomerWorkspace>;
-    orders: ReturnType<typeof createOrderWorkspace>;
-    sales: ReturnType<typeof createSalesRuntime>;
-    inventoryLedger: ReturnType<typeof createInventoryLedgerRuntime>;
-    nativeStock: ReturnType<typeof createNativeStockRuntime>;
-    sourceAuthority: ReturnType<typeof createSourceAuthority>;
-    decisions: ReturnType<typeof createDecisionQueue>;
-    decisionAssignments: ReturnType<typeof createDecisionAssignments>;
+    incoming: ReturnType<typeof createIncomingStock>;
     insights: ReturnType<typeof createInsights>;
-    assistant: ReturnType<typeof createWorkspaceAssistant>;
+    inventory: ReturnType<typeof createInventoryWorkspace>;
+    inventoryLedger: ReturnType<typeof createInventoryLedgerRuntime>;
+    learning: ReturnType<typeof createResolutionLearning>;
+    measurements: ReturnType<typeof createResolutionMeasurements>;
+    messaging: ReturnType<typeof createMessaging>['service'];
+    messagingDocuments: ReturnType<typeof createMessaging>['documents'];
+    messagingReplies: ReturnType<typeof createMessaging>['replies'];
+    metrics: ReturnType<typeof createOperationalMetrics>;
+    nativeStock: ReturnType<typeof createNativeStockRuntime>;
+    operationalSummary: ReturnType<typeof createOperationalSummary>;
+    operations: ReturnType<typeof createOperationsOverview>;
+    orderChanges: ReturnType<typeof createPurchaseOrderChanges>;
+    orders: ReturnType<typeof createOrderWorkspace>;
+    playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
+    procurement: ReturnType<typeof createProcurement>;
+    procurementContext: ReturnType<typeof createProcurementContext>;
+    products: ReturnType<typeof createProductWorkspace>;
+    purchasing: ReturnType<typeof createPurchasing>;
+    purchasingOutcomes: ReturnType<typeof createPurchasingOutcomesService>;
+    records: ReturnType<typeof createRecordExplorer>;
+    returnActions: ReturnActions;
+    returnCases: ReturnCases;
+    returnDeadlines: ReturnDeadlines;
+    returnExchanges: ReturnExchanges;
+    returns: ReturnType<typeof createReturnWorkspace>;
+    sales: ReturnType<typeof createSalesRuntime>;
+    scopedAutonomy: ReturnType<typeof createSafetyServices>['autonomy'];
+    shadow: ReturnType<typeof createShadowEvaluations>;
+    sourceAuthority: ReturnType<typeof createSourceAuthority>;
+    supplierEmail: ReturnType<typeof createSupplierEmailService>;
+    supplierTerms: ReturnType<typeof createSupplierTerms>;
+    workflowDrafts: ReturnType<typeof createDrafts>;
+    workflowGeneration: ReturnType<typeof createDraftGenerations>;
+    workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
+    workflows: ReturnType<typeof createWorkflows>;
   };
 }
 
@@ -1671,53 +1671,49 @@ export function createApplicationServices(
     library,
     messaging,
     http: {
-      connectionCoverage: createConnectionCoverage(database),
-      adaptive,
-      fieldWorkflows: adaptiveFieldWorkflows,
-      supplierEmail,
-      messaging: messaging.service,
-      messagingReplies: messaging.replies,
-      messagingDocuments: messaging.documents,
-      workflows,
-      workflowDrafts: drafts,
-      draftTests,
-      workflowGeneration: generation,
-      workflowTemplates: templates,
-      procurement,
-      supplierTerms,
-      incoming,
-      purchasing,
-      purchasingOutcomes,
-      commitments,
-      scopedAutonomy: safety.autonomy,
-      governedFollowUps: scopedFollowUp.service,
-      orderChanges,
-      shadow: createShadowEvaluations(database, identity.refreshContext),
-      cases: detection.cases,
-      desk,
-      playbooks: library,
       activity: createWorkspaceActivity(
         database,
         identity.refreshContext,
         createAuditLog(database),
       ),
+      adaptive,
+      assistant,
+      cases: detection.cases,
+      commitments,
+      connectionCoverage: createConnectionCoverage(database),
+      customers,
+      decisionAssignments,
+      decisions,
+      desk,
+      draftTests,
+      fieldWorkflows: adaptiveFieldWorkflows,
+      fulfillment,
+      governedFollowUps: scopedFollowUp.service,
+      incoming,
+      insights,
+      inventory,
+      inventoryLedger: createInventoryLedgerRuntime(database, identity),
+      learning: createResolutionLearning(database, identity.refreshContext),
       measurements: createResolutionMeasurements(
         database,
         identity.refreshContext,
       ),
-      learning: createResolutionLearning(database, identity.refreshContext),
+      messaging: messaging.service,
+      messagingDocuments: messaging.documents,
+      messagingReplies: messaging.replies,
+      metrics: createOperationalMetrics(database, {
+        orders: (db) =>
+          createOrderMetricReader(db, orderAttentionQuery, hiddenOrderSources),
+        attentionBoundary: createOrderAttentionBoundaryReader,
+        coverage: createConnectionCoverage,
+      }),
+      nativeStock,
       operationalSummary: createOperationalSummary(database, {
         resolutionInsightsEnabled: (tenantId) =>
           purchasingRelease(tenantId, 'resolution-insights'),
         cases: createCaseMetricReader,
         resolution: createResolutionMetricReader,
         procurement: createProcurementMetricReader,
-        coverage: createConnectionCoverage,
-      }),
-      metrics: createOperationalMetrics(database, {
-        orders: (db) =>
-          createOrderMetricReader(db, orderAttentionQuery, hiddenOrderSources),
-        attentionBoundary: createOrderAttentionBoundaryReader,
         coverage: createConnectionCoverage,
       }),
       operations: createOperationsOverview(
@@ -1740,31 +1736,35 @@ export function createApplicationServices(
           );
         },
       ),
-      inventory,
-      products,
-      procurementContext: createProcurementContext(database),
-      returns,
-      returnCases,
-      returnActions,
-      returnExchanges,
-      returnDeadlines,
-      customers,
-      records: createRecordExplorer(database, hiddenOrderSources),
+      orderChanges,
       orders,
-      inventoryLedger: createInventoryLedgerRuntime(database, identity),
-      nativeStock,
+      playbooks: library,
+      procurement,
+      procurementContext: createProcurementContext(database),
+      products,
+      purchasing,
+      purchasingOutcomes,
+      records: createRecordExplorer(database, hiddenOrderSources),
+      returnActions,
+      returnCases,
+      returnDeadlines,
+      returnExchanges,
+      returns,
       sales: createSalesRuntime(
         database,
         identity,
         (context) => erpEnabledForTenant(context.tenantId),
         authority,
       ),
+      scopedAutonomy: safety.autonomy,
+      shadow: createShadowEvaluations(database, identity.refreshContext),
       sourceAuthority: authority(database),
-      fulfillment,
-      decisions,
-      decisionAssignments,
-      insights,
-      assistant,
+      supplierEmail,
+      supplierTerms,
+      workflowDrafts: drafts,
+      workflowGeneration: generation,
+      workflowTemplates: templates,
+      workflows,
     },
   };
 }

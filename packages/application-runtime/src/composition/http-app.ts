@@ -1,38 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { Socket } from 'node:net';
 
-import type { FieldWorkflowAdapter } from '@luma/adaptive';
-import {
-  adaptiveAvailabilityRoutes,
-  collectionRoutes,
-  fieldsRoutes,
-  operationalPackageRoutes,
-  viewActionRoutes,
-  viewsRoutes,
-} from '@luma/adaptive/http';
 import type { ApiError } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
 import type { AppRegistry, AppService } from '@luma/app-host';
-import { appRoutes } from '@luma/app-host/http';
-import type { Assistant } from '@luma/assistant';
-import { assistantRoutes } from '@luma/assistant/http';
 import type { SyncService } from '@luma/commerce-sync';
-import { syncRoutes } from '@luma/commerce-sync/http';
 import type {
-  AuthoritySettings,
   ConnectionManagement,
   ProviderCatalog,
   SourceEnvironments,
 } from '@luma/connections';
-import {
-  connectionRoutes,
-  createConnectors,
-  sourceAuthorityRoutes,
-  sourceEnvironmentRoutes,
-} from '@luma/connections/http';
-import type { CaseService } from '@luma/exceptions';
-import { caseRoutes } from '@luma/exceptions/http';
 import type {
   IdentityService,
   RolesService,
@@ -41,115 +19,37 @@ import type {
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import {
-  identityRoutes,
   registerContractRoutes,
   registerIdentityGuards,
-  rolesRoutes,
-  settingsRoutes,
 } from '@luma/identity/http';
-import type { NativeStockRuntime } from '@luma/inventory';
-import { nativeStockRoutes } from '@luma/inventory/http';
-import type {
-  DocumentService,
-  MessagingService,
-  Replies,
-} from '@luma/messaging';
-import { messagingRoutes } from '@luma/messaging/http';
-import type {
-  ReturnActions,
-  ReturnCases,
-  ReturnDeadlines,
-  ReturnExchanges,
-} from '@luma/orders/composition';
-import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
-import type { ScopedAutonomy } from '@luma/policies';
-import { scopedAutonomyRoutes } from '@luma/policies/http';
-import type { GovernedFollowUps, ProcurementService } from '@luma/procurement';
-import type {
-  createIncomingStock,
-  PurchaseOrderChanges,
-  PurchasingOutcomes,
-  PurchasingService,
-  SupplierCommitments,
-  SupplierEmail,
-  SupplierTermsService,
-} from '@luma/procurement/composition';
+import type { MetricEvents } from '@luma/resolution';
 import {
-  procurementRoutes,
-  purchaseOrderChangeRoutes,
-  scopedFollowUpRoutes,
-  supplierEmailRoutes,
-} from '@luma/procurement/http';
-import type {
-  CustomerWorkspace,
-  DecisionAssignments,
-  DecisionQueue,
-  FulfillmentWorkspace,
-  Insights,
-  InventoryWorkspace,
-  OperationalMetrics,
-  OperationalSummary,
-  OrderWorkspace,
-  ProcurementContextReader,
-  ProductWorkspace,
-  RecordExplorer,
-  ReturnWorkspace,
-} from '@luma/read-models';
-import {
-  customerRoutes,
-  decisionRoutes,
-  fulfillmentRoutes,
-  insightRoutes,
-  inventoryRoutes,
-  metricRoutes,
-  orderRoutes,
-  procurementContextRoutes,
-  productRoutes,
-  recordRoutes,
-  returnRoutes,
-} from '@luma/read-models/http';
-import type {
-  ActivityService,
-  DeskService,
-  LearningService,
-  MeasurementService,
-  MetricEvents,
-  OperationsOverviewService,
-  PlaybookLibrary,
-  ShadowService,
-} from '@luma/resolution';
-import {
-  activityRoutes,
-  deskRoutes,
-  learningRoutes,
-  operationsRoutes,
-  playbookRoutes,
   registerDeskEvents,
   registerMetricEvents,
-  shadowRoutes,
 } from '@luma/resolution/http';
-import type { SalesService } from '@luma/sales';
-import { salesRoutes } from '@luma/sales/http';
-import type {
-  DraftGeneration,
-  DraftTests,
-  WorkflowCatalog,
-  WorkflowDrafts,
-  WorkflowTemplates,
-} from '@luma/workflows';
-import {
-  draftTestRoutes,
-  workflowDraftRoutes,
-  workflowGenerationRoutes,
-  workflowRoutes,
-} from '@luma/workflows/http';
 import { implement } from '@orpc/server';
 import type { FastifyServerOptions } from 'fastify';
 import Fastify, { LogController } from 'fastify';
 
-import { createTenantFeatureRelease } from './feature-release.js';
+import type { ApplicationServices } from './application.js';
+import { adaptiveHttp } from './features/adaptive.js';
+import { appHostHttp } from './features/app-host.js';
+import { assistantHttp } from './features/assistant.js';
+import { commerceSyncHttp } from './features/commerce-sync.js';
+import { connectionsHttp } from './features/connections.js';
+import { exceptionsHttp } from './features/exceptions.js';
+import { identityHttp } from './features/identity.js';
+import { inventoryHttp } from './features/inventory.js';
+import { messagingHttp } from './features/messaging.js';
+import { ordersHttp } from './features/orders.js';
+import { policiesHttp } from './features/policies.js';
+import { procurementHttp } from './features/procurement.js';
+import { readModelsHttp } from './features/read-models.js';
+import { resolutionHttp } from './features/resolution.js';
+import { salesHttp } from './features/sales.js';
+import { workflowsHttp } from './features/workflows.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -161,77 +61,33 @@ declare module 'fastify' {
   }
 }
 
-export interface AppDependencies {
-  fieldWorkflows?: FieldWorkflowAdapter;
-  adaptive?: ReturnType<
-    typeof import('./adaptive.js').createAdaptiveWorkspaceRuntime
-  >;
-  shadow?: ShadowService;
-  activity?: ActivityService;
-  playbooks?: PlaybookLibrary;
-  workflows?: WorkflowCatalog;
-  workflowDrafts?: WorkflowDrafts;
-  workflowTemplates?: WorkflowTemplates;
-  draftTests?: DraftTests;
-  workflowGeneration?: DraftGeneration;
-  procurement?: ProcurementService;
-  supplierTerms?: SupplierTermsService;
-  incoming?: ReturnType<typeof createIncomingStock>;
-  purchasing?: PurchasingService;
-  purchasingOutcomes?: PurchasingOutcomes;
-  commitments?: SupplierCommitments;
-  orderChanges?: PurchaseOrderChanges;
-  supplierEmail?: SupplierEmail;
-  messaging?: MessagingService;
-  messagingReplies?: Replies;
-  messagingDocuments?: DocumentService;
-  learning?: LearningService;
-  measurements?: MeasurementService;
-  desk?: DeskService;
-  eventSettings?: { intervalMs: number; lifetimeMs: number };
-  operations?: OperationsOverviewService;
-  metrics?: OperationalMetrics;
-  operationalSummary?: OperationalSummary;
-  records?: RecordExplorer;
-  inventory?: InventoryWorkspace;
-  nativeStock?: NativeStockRuntime;
-  products?: ProductWorkspace;
-  procurementContext?: ProcurementContextReader;
-  fulfillment?: FulfillmentWorkspace;
-  returns?: ReturnWorkspace;
-  returnCases?: ReturnCases;
-  returnActions?: ReturnActions;
-  returnExchanges?: ReturnExchanges;
-  returnDeadlines?: ReturnDeadlines;
-  customers?: CustomerWorkspace;
-  orders?: OrderWorkspace;
-  sales?: SalesService;
-  decisions?: DecisionQueue;
-  decisionAssignments?: DecisionAssignments;
-  insights?: Insights;
-  assistant?: Assistant;
-  scopedAutonomy?: ScopedAutonomy;
-  governedFollowUps?: GovernedFollowUps;
-  sync?: SyncService;
-  metricEvents?: MetricEvents;
-  apps?: AppService;
+/** Services and settings the runtime composes outside `createApplicationServices`. */
+interface RuntimeDependencies {
   appRegistry?: AppRegistry;
-  cases?: CaseService;
-  connectionCoverage?: import('@luma/connections').CoverageReader;
-  connections?: ConnectionManagement;
-  sourceAuthority?: AuthoritySettings;
-  sourceEnvironments?: SourceEnvironments;
-  modelGateway?: ModelGateway;
-  identity?: IdentityService;
-  settings?: SettingsService;
-  roles?: RolesService;
-  trustedOrigins?: readonly string[];
-  providerCatalog?: ProviderCatalog;
-  observability?: Observability;
+  apps?: AppService;
   /** Returns whether the services required to handle requests are available. */
   checkReadiness?: () => Promise<boolean>;
+  connections?: ConnectionManagement;
+  eventSettings?: { intervalMs: number; lifetimeMs: number };
+  identity?: IdentityService;
+  metricEvents?: MetricEvents;
+  modelGateway?: ModelGateway;
+  observability?: Observability;
+  providerCatalog?: ProviderCatalog;
   readinessTimeoutMs?: number;
+  roles?: RolesService;
+  settings?: SettingsService;
+  sourceEnvironments?: SourceEnvironments;
+  sync?: SyncService;
+  trustedOrigins?: readonly string[];
 }
+
+/**
+ * Everything `buildApp` can serve. Each omitted service leaves its routes registered but
+ * answering that the feature is unavailable.
+ */
+export type AppDependencies = Partial<ApplicationServices['http']> &
+  RuntimeDependencies;
 
 /**
  * Creates an HTTP server with validated routes, tenant guards, and request tracing. Call
@@ -418,97 +274,27 @@ export function buildApp(
       requestId: request.id,
     });
   });
-  const stockProtection = (request: import('fastify').FastifyRequest) => {
-    if (!request.tenantContext)
-      throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue.');
-    const service = dependencies.appRegistry?.stockProtection()[0];
-    if (!service)
-      throw new IdentityError(
-        503,
-        'SERVICE_UNAVAILABLE',
-        'Stock protection is unavailable.',
-      );
-
-    return { service, context: request.tenantContext };
-  };
   const os = implement(apiContract).$context<HttpContext>();
   registerContractRoutes(
     app,
     apiContract,
     os.router({
-      adaptive: adaptiveAvailabilityRoutes(dependencies.adaptive?.availability),
-      adaptiveFields: fieldsRoutes(
-        dependencies.adaptive?.fields,
-        dependencies.fieldWorkflows,
-      ),
-      adaptiveViews: viewsRoutes(dependencies.adaptive?.views),
-      collections: collectionRoutes(
-        dependencies.adaptive?.collections,
-        dependencies.adaptive?.exports,
-      ),
-      adaptiveActions: viewActionRoutes(dependencies.adaptive?.actions),
-      adaptivePackages: operationalPackageRoutes(
-        dependencies.adaptive?.packages,
-      ),
-      shadow: shadowRoutes(dependencies.shadow),
-      activity: activityRoutes(dependencies.activity),
-      playbooks: playbookRoutes(dependencies.playbooks),
-      workflows: workflowRoutes(dependencies.workflows),
-      workflowDrafts: workflowDraftRoutes(
-        dependencies.workflowDrafts,
-        dependencies.workflowTemplates,
-      ),
-      draftTests: draftTestRoutes(dependencies.draftTests),
-      workflowGeneration: workflowGenerationRoutes(
-        dependencies.workflowGeneration,
-      ),
-      procurementChanges: purchaseOrderChangeRoutes(dependencies.orderChanges),
-      procurement: procurementRoutes(
-        dependencies.procurement,
-        dependencies.commitments,
-        dependencies.supplierTerms,
-        dependencies.purchasing,
-        dependencies.purchasingOutcomes,
-        dependencies.incoming,
-      ),
-      procurementEmail: supplierEmailRoutes(
-        dependencies.supplierEmail,
-        dependencies.procurement,
-      ),
-      messaging: messagingRoutes(
-        dependencies.messaging,
-        dependencies.messagingReplies,
-        dependencies.messagingDocuments,
-      ),
-      exceptions: caseRoutes(dependencies.cases),
-      caseDesk: deskRoutes(dependencies.desk),
-      resolutionLearning: learningRoutes(dependencies.learning),
-      operations: operationsRoutes(
-        dependencies.operations,
-        dependencies.measurements,
-      ),
-      metrics: metricRoutes(
-        dependencies.metrics,
-        dependencies.operationalSummary,
-        (tenantId) =>
-          createTenantFeatureRelease(dependencies.observability)(
-            tenantId,
-            'resolution-insights',
-          ),
-      ),
-      identity: identityRoutes(dependencies.identity),
-      settings: settingsRoutes(dependencies.settings),
-      roles: rolesRoutes(dependencies.roles),
-      apps: appRoutes(dependencies.apps),
-      connections: connectionRoutes(
-        dependencies.connections,
-        dependencies.sales?.enabled,
-        dependencies.connectionCoverage,
-      ),
-      sourceEnvironments: sourceEnvironmentRoutes(
-        dependencies.sourceEnvironments,
-      ),
-      sourceAuthority: sourceAuthorityRoutes(dependencies.sourceAuthority),
+      ...adaptiveHttp(dependencies),
+      ...appHostHttp(dependencies),
+      ...assistantHttp(dependencies),
+      ...commerceSyncHttp(dependencies),
+      ...connectionsHttp(dependencies),
+      ...exceptionsHttp(dependencies),
+      ...identityHttp(dependencies),
+      ...inventoryHttp(dependencies),
+      ...messagingHttp(dependencies),
+      ...ordersHttp(dependencies),
+      ...policiesHttp(dependencies),
+      ...procurementHttp(dependencies),
+      ...readModelsHttp(dependencies),
+      ...resolutionHttp(dependencies),
+      ...salesHttp(dependencies),
+      ...workflowsHttp(dependencies),
       system: {
         health: os.system.health.handler(() => ({ status: 'ok' as const })),
         ready: os.system.ready.handler(async ({ context: { request } }) => {
@@ -545,57 +331,6 @@ export function buildApp(
           throw new IdentityError(503, 'NOT_READY', 'Service is not ready');
         }),
       },
-      connectorProviders: createConnectors(dependencies.providerCatalog),
-      records: recordRoutes(dependencies.records),
-      inventory: inventoryRoutes(dependencies.inventory),
-      nativeStock: nativeStockRoutes(dependencies.nativeStock),
-      products: productRoutes(dependencies.products),
-      procurementContext: procurementContextRoutes(
-        dependencies.procurementContext,
-      ),
-      fulfillment: fulfillmentRoutes(dependencies.fulfillment),
-      orders: orderRoutes(dependencies.orders),
-      sales: salesRoutes(dependencies.sales),
-      returns: returnRoutes(dependencies.returns),
-      returnCases: returnCaseRoutes(
-        dependencies.returnCases,
-        dependencies.returnActions,
-        dependencies.returnExchanges,
-        dependencies.returnDeadlines,
-      ),
-      customers: customerRoutes(dependencies.customers),
-      sync: syncRoutes(dependencies.sync),
-      decisions: decisionRoutes(
-        dependencies.decisions,
-        dependencies.decisionAssignments,
-      ),
-      insights: insightRoutes(dependencies.insights),
-      assistant: assistantRoutes(dependencies.assistant),
-      stockProtection: os.stockProtection.router({
-        view: os.stockProtection.view.handler(
-          async ({ context: { request }, input: { body } }) => {
-            const s = stockProtection(request);
-
-            return s.service.view(s.context, body);
-          },
-        ),
-        save: os.stockProtection.save.handler(
-          async ({ context: { request }, input: { body } }) => {
-            const s = stockProtection(request);
-
-            return s.service.save(s.context, body);
-          },
-        ),
-        control: os.stockProtection.control.handler(
-          async ({ context: { request }, input: { body } }) => {
-            const s = stockProtection(request);
-
-            return s.service.control(s.context, body);
-          },
-        ),
-      }),
-      scopedAutonomy: scopedAutonomyRoutes(dependencies.scopedAutonomy),
-      scopedFollowUps: scopedFollowUpRoutes(dependencies.governedFollowUps),
     }),
   );
   const apps = dependencies.apps;

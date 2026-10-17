@@ -31,12 +31,7 @@ export type {
   ResolutionMetricItem,
 } from './domain/measurement.js';
 
-export type {
-  MeasurementService,
-  ResolutionMetricReader,
-} from './application/measurement.js';
-
-export type { OperationsOverviewService } from './application/overview.js';
+export type { ResolutionMetricReader } from './application/measurement.js';
 
 export type { DeskDependencies, DeskService } from './application/desk.js';
 
@@ -57,10 +52,6 @@ export type {
   LearningRunSources,
   LearningEventSources,
 } from './application/learning.js';
-
-export type { PlaybookLibrary } from '@luma/workflows';
-
-export type { ActivityService } from './application/activity.js';
 
 export type { ActivityActor } from './domain/activity.js';
 

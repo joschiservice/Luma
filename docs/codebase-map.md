@@ -51,7 +51,8 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
   `api` (routes). Other packages import the root export, `/composition` for constructors
   and `/http` for route registration.
 - **Contracts:** `packages/api-contract/src/<feature>.ts` for schemas and `contracts/` for
-  routes.
+  routes. A route area joins the API in `domains/<package>.ts`, the group of the package that
+  serves it.
 - **Web features:** `apps/web/src/features/<feature>`, usually with `page.tsx`,
   `detail.tsx`, URL state in `data.ts` and wording in `presentation.ts`; text comes from the
   feature's namespace in the `@luma/i18n` catalogs. The workspace shell, navigation, command
@@ -62,6 +63,8 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
   has its own in `apps/simulator/migrations`.
 - **Wiring:** `packages/application-runtime/src/composition` assembles services for the API,
   worker, pilot and simulator. A fix in one composition path may be missing in another.
+  `features/<package>.ts` implements the same route group from the services in
+  `ApplicationServices['http']`; keys in these registries stay sorted.
 - **Tests:** unit tests sit next to the code. Database integration tests are
   `packages/application-runtime/src/*.integration.test.ts`. Backend journeys are
   `apps/api/e2e/*.e2e.mjs`, browser journeys `*.browser.mjs`, and both share fixtures in

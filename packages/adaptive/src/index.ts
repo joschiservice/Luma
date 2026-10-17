@@ -29,5 +29,3 @@ export {
 export type { ViewReaderDomain } from './domain/views.js';
 
 export { isFieldWriteCapability } from './application/fields-effects.js';
-
-export type { FieldWorkflowAdapter } from './application/fields-workflows.js';

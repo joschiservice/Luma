@@ -192,7 +192,7 @@ export function violation(from, to) {
         'apps/staff-api/src/index.ts',
         'apps/staff-api/scripts/provision.ts',
       ].includes(from) &&
-      !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from) &&
+      !/^apps\/api\/src\/composition\/(features\/)?[^/]+\.ts$/.test(from) &&
       !/^apps\/staff-api\/src\/composition\/[^/]+\.ts$/.test(from) &&
       !from.startsWith('apps/api/e2e/')
     ) {

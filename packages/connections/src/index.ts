@@ -14,9 +14,11 @@ export type {
 
 export type {
   AuthorityReader,
-  AuthoritySettings,
   AuthoritySnapshot,
 } from './application/authority.js';
+
+/** @public Declaration emit names it in the inferred types of runtime composition. */
+export type { AuthoritySettings } from './application/authority.js';
 
 export type {
   EffectAdapter,

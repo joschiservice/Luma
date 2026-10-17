@@ -77,6 +77,12 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         filename('apps/api/src/composition/services.ts'),
         "import { createCases } from '#modules/exceptions/composition';",
       ),
+      sample(
+        filename(
+          'packages/application-runtime/src/composition/features/procurement.ts',
+        ),
+        "import { procurementRoutes } from '@luma/procurement/http';",
+      ),
       ...[
         'resolution-learning.test.ts',
         'connections.test.ts',

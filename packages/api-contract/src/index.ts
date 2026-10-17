@@ -1,186 +1,100 @@
-import { activityContract } from './contracts/activity.js';
-import { adaptiveContract } from './contracts/adaptive.js';
-import { adaptiveActionsContract } from './contracts/adaptive-actions.js';
-import { adaptiveFieldsContract } from './contracts/adaptive-fields.js';
-import { adaptivePackagesContract } from './contracts/adaptive-packages.js';
-import { adaptiveViewsContract } from './contracts/adaptive-views.js';
-import { appsContract } from './contracts/apps.js';
-import { assistantContract } from './contracts/assistant.js';
-import { sourceAuthorityContract } from './contracts/authority.js';
-import { exceptionsContract } from './contracts/cases.js';
-import { collectionsContract } from './contracts/collections.js';
-import { connectionsContract } from './contracts/connections.js';
-import { customersContract } from './contracts/customers.js';
-import { decisionsContract } from './contracts/decisions.js';
-import { caseDeskContract } from './contracts/desk.js';
-import { draftTestsContract } from './contracts/draft-tests.js';
-import { fulfillmentContract } from './contracts/fulfillment.js';
-import { identityContract } from './contracts/identity.js';
-import { insightsContract } from './contracts/insights.js';
-import { inventoryContract } from './contracts/inventory.js';
-import { resolutionLearningContract } from './contracts/learning.js';
-import { messagingContract } from './contracts/messaging.js';
-import { metricsContract } from './contracts/metrics.js';
-import { nativeStockContract } from './contracts/native-stock.js';
-import { ordersContract } from './contracts/orders.js';
-import { operationsContract } from './contracts/overview.js';
-import { playbooksContract } from './contracts/playbooks.js';
-import { procurementContract } from './contracts/procurement.js';
-import { procurementContextContract } from './contracts/procurement-context.js';
-import { productsContract } from './contracts/products.js';
-import { connectorProvidersContract } from './contracts/providers.js';
-import { procurementChangesContract } from './contracts/purchase-order-changes.js';
-import { recordsContract } from './contracts/records.js';
-import { returnCasesContract } from './contracts/return-cases.js';
-import { returnsContract } from './contracts/returns.js';
-import { rolesContract } from './contracts/roles.js';
-import { salesContract } from './contracts/sales.js';
-import { scopedAutonomyContract } from './contracts/scoped-autonomy.js';
-import { scopedFollowUpsContract } from './contracts/scoped-follow-ups.js';
-import { settingsContract } from './contracts/settings.js';
-import { shadowContract } from './contracts/shadow.js';
-import { sourceEnvironmentsContract } from './contracts/source-environments.js';
-import { stockProtectionContract } from './contracts/stock-protection.js';
-import { supplierEmailContract } from './contracts/supplier-email.js';
-import { syncContract } from './contracts/sync.js';
 import { systemContract } from './contracts/system.js';
-import { workflowDraftsContract } from './contracts/workflow-drafts.js';
-import { workflowGenerationContract } from './contracts/workflow-generation.js';
-import { workflowsContract } from './contracts/workflows.js';
+import { adaptiveContracts } from './domains/adaptive.js';
+import { appHostContracts } from './domains/app-host.js';
+import { assistantContracts } from './domains/assistant.js';
+import { commerceSyncContracts } from './domains/commerce-sync.js';
+import { connectionsContracts } from './domains/connections.js';
+import { exceptionsContracts } from './domains/exceptions.js';
+import { identityContracts } from './domains/identity.js';
+import { inventoryContracts } from './domains/inventory.js';
+import { messagingContracts } from './domains/messaging.js';
+import { ordersContracts } from './domains/orders.js';
+import { policiesContracts } from './domains/policies.js';
+import { procurementContracts } from './domains/procurement.js';
+import { readModelsContracts } from './domains/read-models.js';
+import { resolutionContracts } from './domains/resolution.js';
+import { salesContracts } from './domains/sales.js';
+import { workflowsContracts } from './domains/workflows.js';
 
 /**
  * The route record's type, named so declaration output references each area's contract instead
  * of expanding every route schema into one type that exceeds the compiler's serialization limit.
+ * Add an area to the group of the package that serves it, in `domains`.
  */
-type ApiContract = {
-  adaptivePackages: typeof adaptivePackagesContract;
-  adaptiveActions: typeof adaptiveActionsContract;
-  adaptiveViews: typeof adaptiveViewsContract;
-  adaptiveFields: typeof adaptiveFieldsContract;
-  adaptive: typeof adaptiveContract;
-  collections: typeof collectionsContract;
-  shadow: typeof shadowContract;
-  activity: typeof activityContract;
-  playbooks: typeof playbooksContract;
-  workflows: typeof workflowsContract;
-  workflowDrafts: typeof workflowDraftsContract;
-  workflowGeneration: typeof workflowGenerationContract;
-  draftTests: typeof draftTestsContract;
-  procurement: typeof procurementContract;
-  procurementChanges: typeof procurementChangesContract;
-  procurementEmail: typeof supplierEmailContract;
-  procurementContext: typeof procurementContextContract;
-  messaging: typeof messagingContract;
-  resolutionLearning: typeof resolutionLearningContract;
-  caseDesk: typeof caseDeskContract;
-  operations: typeof operationsContract;
-  metrics: typeof metricsContract;
-  exceptions: typeof exceptionsContract;
-  identity: typeof identityContract;
-  settings: typeof settingsContract;
-  stockProtection: typeof stockProtectionContract;
-  roles: typeof rolesContract;
-  connections: typeof connectionsContract;
-  apps: typeof appsContract;
-  system: typeof systemContract;
-  connectorProviders: typeof connectorProvidersContract;
-  records: typeof recordsContract;
-  fulfillment: typeof fulfillmentContract;
-  inventory: typeof inventoryContract;
-  nativeStock: typeof nativeStockContract;
-  products: typeof productsContract;
-  orders: typeof ordersContract;
-  sales: typeof salesContract;
-  returns: typeof returnsContract;
-  returnCases: typeof returnCasesContract;
-  customers: typeof customersContract;
-  sync: typeof syncContract;
-  decisions: typeof decisionsContract;
-  insights: typeof insightsContract;
-  assistant: typeof assistantContract;
-  scopedAutonomy: typeof scopedAutonomyContract;
-  scopedFollowUps: typeof scopedFollowUpsContract;
-  sourceEnvironments: typeof sourceEnvironmentsContract;
-  sourceAuthority: typeof sourceAuthorityContract;
-};
+type ApiContract = typeof adaptiveContracts &
+  typeof appHostContracts &
+  typeof assistantContracts &
+  typeof commerceSyncContracts &
+  typeof connectionsContracts &
+  typeof exceptionsContracts &
+  typeof identityContracts &
+  typeof inventoryContracts &
+  typeof messagingContracts &
+  typeof ordersContracts &
+  typeof policiesContracts &
+  typeof procurementContracts &
+  typeof readModelsContracts &
+  typeof resolutionContracts &
+  typeof salesContracts &
+  typeof workflowsContracts & {
+    system: typeof systemContract;
+  };
 
 /**
  * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
  * `orders.list`.
  */
 export const apiContract: ApiContract = {
-  adaptivePackages: adaptivePackagesContract,
-  adaptiveActions: adaptiveActionsContract,
-  adaptiveViews: adaptiveViewsContract,
-  adaptiveFields: adaptiveFieldsContract,
-  adaptive: adaptiveContract,
-  collections: collectionsContract,
-  shadow: shadowContract,
-  activity: activityContract,
-  playbooks: playbooksContract,
-  workflows: workflowsContract,
-  workflowDrafts: workflowDraftsContract,
-  workflowGeneration: workflowGenerationContract,
-  draftTests: draftTestsContract,
-  procurement: procurementContract,
-  procurementChanges: procurementChangesContract,
-  procurementEmail: supplierEmailContract,
-  procurementContext: procurementContextContract,
-  messaging: messagingContract,
-  resolutionLearning: resolutionLearningContract,
-  caseDesk: caseDeskContract,
-  operations: operationsContract,
-  metrics: metricsContract,
-  exceptions: exceptionsContract,
-  identity: identityContract,
-  settings: settingsContract,
-  stockProtection: stockProtectionContract,
-  roles: rolesContract,
-  connections: connectionsContract,
-  apps: appsContract,
+  ...adaptiveContracts,
+  ...appHostContracts,
+  ...assistantContracts,
+  ...commerceSyncContracts,
+  ...connectionsContracts,
+  ...exceptionsContracts,
+  ...identityContracts,
+  ...inventoryContracts,
+  ...messagingContracts,
+  ...ordersContracts,
+  ...policiesContracts,
+  ...procurementContracts,
+  ...readModelsContracts,
+  ...resolutionContracts,
+  ...salesContracts,
+  ...workflowsContracts,
   system: systemContract,
-  connectorProviders: connectorProvidersContract,
-  records: recordsContract,
-  fulfillment: fulfillmentContract,
-  inventory: inventoryContract,
-  nativeStock: nativeStockContract,
-  products: productsContract,
-  orders: ordersContract,
-  sales: salesContract,
-  returns: returnsContract,
-  returnCases: returnCasesContract,
-  customers: customersContract,
-  sync: syncContract,
-  decisions: decisionsContract,
-  insights: insightsContract,
-  assistant: assistantContract,
-  scopedAutonomy: scopedAutonomyContract,
-  scopedFollowUps: scopedFollowUpsContract,
-  sourceEnvironments: sourceEnvironmentsContract,
-  sourceAuthority: sourceAuthorityContract,
 };
+
+export * from './action-diff.js';
 
 export * from './activity.js';
 
-export * from './learning.js';
+export * from './adaptive-actions.js';
 
-export * from './desk.js';
+export * from './adaptive-fields.js';
 
-export * from './overview.js';
+export * from './adaptive-packages.js';
 
-export * from './measurement.js';
+export * from './adaptive-view-query.js';
 
-export * from './cases.js';
+export * from './adaptive-views.js';
 
-export * from './connections.js';
+export * from './apps.js';
+
+export { shopifyAccessSchema } from './apps.js';
+
+export * from './assistant.js';
 
 export * from './authority.js';
 
-export * from './sales.js';
+export * from './cases.js';
 
-export { diagnosisSchema } from './diagnosis.js';
+export * from './code-steps.js';
 
-export type { Diagnosis } from './diagnosis.js';
+export * from './collection-catalog.js';
+
+export * from './collection-catalogs.js';
+
+export * from './collections.js';
 
 export {
   anyMember,
@@ -194,7 +108,15 @@ export type { ApiError, RouteAccess } from './common.js';
 /** @public Declaration emit names it in the inferred types of the oRPC routes in each domain package. */
 export type { RouteMeta } from './common.js';
 
-export { contractRoutes } from './routes.js';
+export * from './connections.js';
+
+export {
+  caseEventsContract,
+  metricEventsContract,
+  workspaceTopics,
+} from './contracts/events.js';
+
+export type { WorkspaceTopic } from './contracts/events.js';
 
 export { organizationSchema } from './contracts/identity.js';
 
@@ -205,86 +127,92 @@ export type {
   TenantContextResponse,
 } from './contracts/identity.js';
 
-export * from './roles.js';
+export * from './customers.js';
 
-export {
-  caseEventsContract,
-  metricEventsContract,
-  workspaceTopics,
-} from './contracts/events.js';
+export * from './decisions.js';
 
-export type { WorkspaceTopic } from './contracts/events.js';
+export * from './desk.js';
 
-export * from './playbooks.js';
+export { diagnosisSchema } from './diagnosis.js';
 
-export * from './shadow.js';
-
-export * from './layout.js';
-
-export * from './settings.js';
-
-export * from './apps.js';
-
-export * from './workflows.js';
-
-export * from './workflow-drafts.js';
-
-export * from './workflow-generation.js';
+export type { Diagnosis } from './diagnosis.js';
 
 export * from './draft-tests.js';
 
-export * from './code-steps.js';
+export * from './fulfillment.js';
 
-export * from './procurement.js';
+export * from './incoming-stock.js';
 
-export * from './replenishment.js';
+export * from './insights.js';
+
+export * from './inventory-transfers.js';
+
+export * from './inventory.js';
+
+export * from './layout.js';
+
+export * from './learning.js';
+
+export * from './measurement.js';
+
+export * from './messaging.js';
 
 export * from './metric-summary.js';
 
 export * from './metrics.js';
 
-export * from './operational-metrics.js';
+export * from './native-stock.js';
 
-export * from './records.js';
+export * from './operational-metrics.js';
 
 export * from './orders.js';
 
-export * from './inventory.js';
+export * from './overview.js';
 
-export * from './inventory-transfers.js';
+export * from './playbooks.js';
 
-export * from './fulfillment.js';
+export * from './procurement.js';
 
 export * from './products.js';
 
-export * from './returns.js';
+export type { PurchaseOrderChangeInput } from './purchase-order-changes.js';
 
-export * from './return-cases.js';
+export * from './purchasing-outcomes.js';
 
-export * from './customers.js';
+export * from './purchasing.js';
 
-export * from './sync.js';
+export * from './records.js';
 
-export * from './decisions.js';
-
-export * from './insights.js';
-
-export * from './assistant.js';
-
-export * from './messaging.js';
-
-export { shopifyAccessSchema } from './apps.js';
+export * from './replenishment.js';
 
 export type { ReturnActionView, ReturnActionList } from './return-actions.js';
 
-export type { ReturnExchangesView } from './return-exchanges.js';
+export * from './return-cases.js';
 
 export type {
   ReturnDeadlinePolicyView,
   ReturnWaitingView,
 } from './return-deadlines.js';
 
-export * from './native-stock.js';
+export type { ReturnExchangesView } from './return-exchanges.js';
+
+export * from './returns.js';
+
+export * from './roles.js';
+
+export { contractRoutes } from './routes.js';
+
+export * from './sales.js';
+
+export * from './scoped-autonomy.js';
+
+export * from './settings.js';
+
+export * from './shadow.js';
+
+export * from './stock-protection.js';
+
+export * from './supplier-email.js';
 
 export { supplierTermsInputSchema } from './supplier-terms.js';
 
@@ -293,34 +221,10 @@ export type {
   SupplierTermsInput,
 } from './supplier-terms.js';
 
-export * from './supplier-email.js';
+export * from './sync.js';
 
-export * from './purchasing.js';
+export * from './workflow-drafts.js';
 
-export * from './purchasing-outcomes.js';
+export * from './workflow-generation.js';
 
-export * from './incoming-stock.js';
-
-export type { PurchaseOrderChangeInput } from './purchase-order-changes.js';
-
-export * from './adaptive-fields.js';
-
-export * from './adaptive-views.js';
-
-export * from './collections.js';
-
-export * from './collection-catalog.js';
-
-export * from './collection-catalogs.js';
-
-export * from './adaptive-view-query.js';
-
-export * from './adaptive-actions.js';
-
-export * from './adaptive-packages.js';
-
-export * from './action-diff.js';
-
-export * from './scoped-autonomy.js';
-
-export * from './stock-protection.js';
+export * from './workflows.js';

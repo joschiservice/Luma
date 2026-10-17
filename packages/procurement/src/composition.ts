@@ -193,10 +193,7 @@ export function createPurchasing(
   });
 }
 
-export type {
-  PurchasingService,
-  PurchasingAdmission,
-} from './application/purchasing.js';
+export type { PurchasingAdmission } from './application/purchasing.js';
 
 /** Composes validation for recorded recommendation decisions. */
 export function createPurchasingOutcomesService(
@@ -209,8 +206,6 @@ export function createPurchasingOutcomesService(
 }
 
 export { createPurchasingOutcomePersistence } from './infrastructure/purchasing-outcomes.js';
-
-export type { PurchasingOutcomes } from './application/purchasing-outcomes.js';
 
 /** Composes append-only terms with authorization, release control and transactional audit. */
 export function createSupplierTerms(
@@ -229,8 +224,6 @@ export function createSupplierTerms(
     now: () => new Date(),
   });
 }
-
-export type { SupplierTermsService } from './application/supplier-terms.js';
 
 export type { SupplierEmail } from './application/supplier-email.js';
 
@@ -279,7 +272,5 @@ export function createPurchaseOrderChanges(
     now: () => new Date(),
   });
 }
-
-export type { PurchaseOrderChanges } from './application/purchase-order-changes.js';
 
 export { createFollowUpPlanStore } from './infrastructure/governed-follow-up.js';

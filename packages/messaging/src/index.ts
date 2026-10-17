@@ -1,11 +1,7 @@
-export type { MessagingService } from './application/messaging.js';
-
 export type {
   AttachmentReader,
   DocumentDirectory,
 } from './application/document-ports.js';
-
-export type { DocumentService } from './application/documents.js';
 
 export type {
   MailboxConnection,
