@@ -1782,6 +1782,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     const refreshContext = vi.fn(
       async (actor: ReturnType<typeof context>) => actor,
     );
+    const notifyApproval = vi.fn(async () => undefined);
     const desk = createDeskServices(
       createTenantDatabase(runtime),
       { refreshContext },
@@ -1789,6 +1790,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       {
         capability: (a) =>
           a.capability === 'stock.correct' && a.capabilityVersion === '1',
+        notifyApproval,
         now: () => now,
       },
     );
@@ -1841,6 +1843,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       perform,
       check,
       refreshContext,
+      notifyApproval,
     };
   }
 
@@ -2078,6 +2081,34 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         (await f.safety.execution.execute(context(), f.action)).state,
       ).toBe('denied');
       expect(f.perform).not.toHaveBeenCalled();
+    } finally {
+      await f.safety.close();
+    }
+  });
+  it('wakes the bound workflow after an approval response without risking the decision', async () => {
+    const f = await decisionFixture();
+    try {
+      const source = { kind: 'detection' as const, id: 'durable-delivery' };
+      await f.desk.bindWorkflow(context(), f.incident.id, source);
+      f.notifyApproval.mockRejectedValueOnce(new Error('Temporal offline'));
+      const receipt = await f.desk.decide(
+        decisionActor(),
+        f.incident.id,
+        f.command,
+      );
+      expect(receipt.approvalId).toEqual(expect.any(String));
+      expect(f.notifyApproval.mock.calls).toEqual([
+        [expect.anything(), f.incident.id, source],
+      ]);
+      const review = await f.desk.review(decisionActor(), f.incident.id);
+      await f.desk.decide(decisionActor(), f.incident.id, {
+        commandId: randomUUID(),
+        kind: 'escalate',
+        caseRevision: review.caseRevision,
+        diagnosisRevision: review.diagnosisRevision,
+        reason: 'Needs a specialist',
+      });
+      expect(f.notifyApproval).toHaveBeenCalledTimes(1);
     } finally {
       await f.safety.close();
     }

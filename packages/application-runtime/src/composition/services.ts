@@ -355,7 +355,7 @@ export function createDeskServices(
     capability?: (action: ProposedAction) => boolean;
     workflow?: DeskDependencies['workflow'];
     refreshProposal?: DeskDependencies['refreshProposal'];
-    notifyDecision?: DeskDependencies['notifyDecision'];
+    notifyApproval?: DeskDependencies['notifyApproval'];
     now?: () => Date;
   } = {},
 ): ReturnType<typeof createDeskService> {
@@ -397,8 +397,8 @@ export function createDeskServices(
     ...(options.refreshProposal
       ? { refreshProposal: options.refreshProposal }
       : {}),
-    ...(options.notifyDecision
-      ? { notifyDecision: options.notifyDecision }
+    ...(options.notifyApproval
+      ? { notifyApproval: options.notifyApproval }
       : {}),
   });
 }
