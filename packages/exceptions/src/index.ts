@@ -37,4 +37,6 @@ export { evaluate as evaluateException } from './domain/evaluate.js';
 
 export { caseMetricDefinitions } from './domain/metrics.js';
 
+export { exceptionClassLabel } from './domain/labels.js';
+
 export type { CaseMetricItem } from './domain/metrics.js';

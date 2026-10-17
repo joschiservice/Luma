@@ -1,3 +1,4 @@
+import { exceptionClassLabel } from '@luma/exceptions';
 import { z, type ZodTypeAny } from 'zod';
 
 import { clip, type RecordReference } from '../../domain/answer.js';
@@ -125,7 +126,7 @@ export function issueReference(issue: {
   return {
     kind: 'issue',
     id: issue.id,
-    label: humanize(issue.class),
+    label: exceptionClassLabel(issue.class),
     detail: issue.summary ? clip(issue.summary, 120) : humanize(issue.state),
     sources: (issue.sources ?? []).map((label) => ({ label, system: null })),
     observedAt: issue.observedAt,
