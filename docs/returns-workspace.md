@@ -258,7 +258,8 @@ Unobserved store transitions never supply an inferred timestamp.
 
 The return step follow-up must be activated in Workflows for automatic monitoring. Its bounded
 passes use a persisted cursor and reread each case no more than once per minute. Explicit progress checks use the same service and make no
-provider writes. Each phase has one live occurrence; repeated observations update it rather
+provider writes. Reading sent money also reconciles an uncertain refund, restock or exchange
+attempt; it never sends one again. Each phase has one live occurrence; repeated observations update it rather
 than opening duplicate cases. Policy or anchor changes supersede earlier occurrences. Disabled
 policies and cancelled cases pause their waits without claiming verification.
 
