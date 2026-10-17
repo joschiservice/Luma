@@ -189,5 +189,14 @@ naming the permission, so the timeline and the evidence view agree that the book
 A restricted entry keeps only its kind, stage, time, source and evidence references; actor,
 reason, quantity, unit, revision and detail are null and no actor or workflow is attributed.
 The API strips them after actor attribution, and the reader skips the booked quantity and its
-inventory snapshot entirely. Native receipt reviews still appear only for inventory readers,
-because Inventory's ledger serves them only with inventory access.
+inventory snapshot entirely.
+
+Native stock receipt reviews follow the same rules. Inventory's ledger serves full reviews only
+to inventory readers, so other procurement readers get their entries from Inventory's
+stage-only query instead: each review waiting for approval, approved or rejected, and the
+ledger readback of a posted review as verified or uncertain, with the entry IDs inventory
+readers see. The query returns no quantities, accounts, locations, people, reasons or provider
+IDs. The readback compares the stored receipt with current native ledger balances and reads no
+provider. A restricted native entry cites only its review, which the order's evidence lists as
+restricted. It leaves out the supplier commitments the full entry cites, because a procurement
+reader could open them and read the booked quantity.

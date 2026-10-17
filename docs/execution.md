@@ -158,9 +158,9 @@ entries, native receipts and their proof need `inventory.read`, plan and repleni
 reads `orders.read`, order emails
 `messages.read`, the commitments a receipt books `procurement.read`, and an order's Shopify stock
 bookings with their policy records, receipts and verification reads `inventory.read`. The
-order's timeline agrees: it lists those Shopify stock booking entries as restricted, with only
-their stage and time, and their evidence as restricted, so the reader knows the booking and its
-proof exist. A reference that
+order's timeline agrees: it lists those Shopify stock booking entries and native receipt reviews
+with their ledger readback as restricted, with only their stage and time, and their evidence as
+restricted, so the reader knows the booking and its proof exist. A reference that
 belongs to another subject or tenant is `unresolved`, never `restricted`, so a restricted entry
 reveals nothing the subject does not cite.
 
