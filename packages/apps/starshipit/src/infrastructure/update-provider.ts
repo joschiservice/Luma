@@ -12,6 +12,12 @@ import { installationCredentials } from '../domain/installation-validation.js';
 import { revision } from './mapping.js';
 import type { createUpdateStore } from './update-store.js';
 
+/**
+ * Identifies the normalization of order update reads and acceptances; execution pins it in the
+ * update's dispatch identity.
+ */
+export const updateAdapterVersion = 'starshipit-update/1';
+
 /** Refreshes tenant-bound credentials per request and persists allowlisted independent reads. */
 export function createUpdateProvider(
   context: AppFactoryContext,
@@ -93,6 +99,8 @@ export function createUpdateProvider(
       });
     const id = randomUUID();
     const digest = revision(order);
+    // One order detail is the whole read: a response cut short fails parsing instead of being
+    // stored. Starshipit reports no order update time, so the revision is Luma's fingerprint.
     await store.record(tenant, id, target.connectionId, observedAt, {
       kind: 'observation',
       orderId: order.order_id,
@@ -102,6 +110,9 @@ export function createUpdateProvider(
         id: line.item_id,
         quantity: line.quantity,
       })),
+      adapterVersion: updateAdapterVersion,
+      completeness: 'complete',
+      sourceUpdatedAt: null,
     });
 
     return { id, observedAt, order, revision: digest };
