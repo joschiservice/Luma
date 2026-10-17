@@ -78,7 +78,7 @@ export const evidenceRecordKinds = [
 type EvidenceRecordKind = (typeof evidenceRecordKinds)[number];
 
 /** Facts a Luma record carries for the evidence view. */
-export type EvidenceRecordDetail =
+type EvidenceRecordDetail =
   | {
       kind: 'procurement_event';
       event: 'created' | 'status_changed' | 'revised';

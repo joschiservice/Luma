@@ -93,7 +93,7 @@ export interface EvidenceAccess {
 }
 
 /** The references one request resolves. */
-export interface EvidenceLookup {
+interface EvidenceLookup {
   all: string[];
   /** The references that can name a row: stored evidence and records have UUID IDs. */
   uuids: string[];

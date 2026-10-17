@@ -56,7 +56,7 @@ export type DecisionOwner =
  * The record whose cited evidence backs a decision, as the evidence resolver names it, and the
  * references the decision relies on when they are only part of what that record cites.
  */
-export interface DecisionEvidence {
+interface DecisionEvidence {
   subject: {
     kind:
       | 'purchase_order'
