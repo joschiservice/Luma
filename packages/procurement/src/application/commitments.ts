@@ -48,6 +48,20 @@ import {
   type PurchasingTimelineEntry,
 } from '../domain/purchasing-timeline.js';
 import {
+  approvalExpired,
+  isLiveSubmission,
+  matchesSubmission,
+  submissionActions,
+  submissionApprovalHours,
+  submissionBlockers,
+} from '../domain/submissions.js';
+import {
+  followUpResponseError,
+  lastConfirmed,
+  manualReceiptError,
+  shortfallQuantity,
+} from '../domain/supplier-responses.js';
+import {
   type CustomFieldDefinition,
   customFieldIds,
   customListFields,
@@ -652,9 +666,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       submission.decisionId && deps.admission
         ? await deps.admission.decision(context, submission.decisionId)
         : null;
-    const expired =
-      submission.state === 'approval_required' &&
-      Date.parse(submission.expiresAt) <= deps.now().getTime();
+    const expired = approvalExpired(submission, deps.now().getTime());
     const observeOnly =
       submission.state === 'not_executed' ||
       (['approval_required', 'approved'].includes(submission.state) &&
@@ -672,53 +684,20 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       (!decision?.permission ||
         !isAppPermission(decision.permission) ||
         hasPermission(context, decision.permission));
-    const messages: Record<Submission['state'], string> = {
-      not_executed:
-        'Observe-only. Would run when writes are enabled. Nothing was sent.',
-      approval_required:
-        requester && decision?.requireIndependentApproval !== false
-          ? 'Waiting for someone else who can approve changes to approve sending this order.'
-          : 'Check the supplier, lines and requested date before approving. Luma places the order in the purchasing system right after approval.',
-      approved: 'Approved. Luma is placing the order in the purchasing system.',
-      rejected: 'Sending was rejected. Nothing was sent.',
-      expired: 'The approval request expired. Nothing was sent.',
-      submitting: 'Luma is placing the order in the purchasing system.',
-      uncertain:
-        'The purchasing system did not confirm the request. Luma checks whether the order was created and will not send it again.',
-      submitted:
-        'An independent read found the order in the purchasing system. The purchasing system sends it to the supplier.',
-      failed:
-        submission.failure ?? 'The purchasing system did not create the order.',
-    };
 
     return {
       ...submission,
       observeOnly,
-      state: expired ? 'expired' : submission.state,
       approvalOutcome: decision?.approval?.outcome ?? null,
-      canApprove:
-        submission.channel !== 'email' &&
-        !observeOnly &&
-        !expired &&
-        approver &&
-        (!requester || decision?.requireIndependentApproval === false) &&
-        submission.state === 'approval_required' &&
-        !decision?.approval,
-      canSend:
-        submission.channel !== 'email' &&
-        !observeOnly &&
-        !expired &&
-        requester &&
-        submission.state === 'approved',
-      canCheck:
-        submission.channel !== 'email' &&
-        manager &&
-        ['uncertain', 'submitting'].includes(submission.state),
-      message: observeOnly
-        ? messages.not_executed
-        : expired
-          ? messages.expired
-          : messages[submission.state],
+      ...submissionActions({
+        submission,
+        decision,
+        expired,
+        observeOnly,
+        requester,
+        manager,
+        approver,
+      }),
     };
   }
 
@@ -755,40 +734,21 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     order: PurchaseOrder,
     supplier: Supplier | null,
   ) {
-    const blockers: string[] = [];
-    if (order.authority !== 'luma')
-      blockers.push('This order is managed in an external system.');
-    if (!['draft', 'open'].includes(order.status))
-      blockers.push('Only draft and open orders can be sent.');
-    if (!deps.admission || !deps.purchasing)
-      blockers.push(
-        'Sending orders is unavailable on this server. Ask an administrator to enable execution.',
-      );
     const link = supplier?.link ?? null;
-    if (!link)
-      blockers.push(
-        'Link this supplier to its purchasing-system record before sending orders.',
-      );
-    let connection: PurchasingConnection | null = null;
-    if (link && deps.purchasing) {
-      connection =
-        (await deps.purchasing.connections(context)).find(
-          (c) => c.id === link.connectionId,
-        ) ?? null;
-      if (!connection || connection.status !== 'active')
-        blockers.push(
-          'The supplier’s purchasing-system connection is not active. Check the connection in Apps.',
-        );
-      else if (!connection.canSubmit || !connection.canReadOrders)
-        blockers.push(
-          `${connection.label} is not allowed to create and read purchase orders. Reconnect it with purchase-order access.`,
-        );
-    }
+    const connection =
+      link && deps.purchasing
+        ? ((await deps.purchasing.connections(context)).find(
+            (c) => c.id === link.connectionId,
+          ) ?? null)
+        : undefined;
     const lines = link ? await lineMapping(tx, order, link.connectionId) : [];
-    for (const entry of lines.filter((l) => !l.sku))
-      blockers.push(
-        `${entry.line.sku} has no linked item in ${connection?.label ?? 'the purchasing system'}. Link the SKU in Products first.`,
-      );
+    const blockers = submissionBlockers({
+      order,
+      executionAvailable: !!deps.admission && !!deps.purchasing,
+      linked: !!link,
+      connection,
+      lines: lines.map((l) => ({ sku: l.line.sku, mapped: !!l.sku })),
+    });
 
     return {
       ready: blockers.length === 0,
@@ -851,24 +811,6 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     );
 
     return matches.length === 1 ? matches[0]! : null;
-  }
-
-  /** Whether a purchasing-system order carries exactly the approved supplier and lines. */
-  function matchesSubmission(submission: Submission, order: PurchasingOrder) {
-    if (order.data.supplier.externalId !== submission.supplier.externalId)
-      return false;
-    const lines = order.data.lines;
-
-    return (
-      lines.length === submission.lines.length &&
-      submission.lines.every((line) =>
-        lines.some(
-          (l) =>
-            l.sku?.externalId === line.sku.externalId &&
-            Math.abs(Number(l.quantity.amount) - line.quantity) < 1e-6,
-        ),
-      )
-    );
   }
 
   /** Records an observation and the commitments it evidences; repeated values are not duplicated. */
@@ -1051,7 +993,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         saveSubmission(tx, submission!, { state: 'uncertain' }),
       );
     const found = await locate(context, submission);
-    if (!found || !matchesSubmission(submission, found))
+    if (!found || !matchesSubmission(submission, found.data))
       return deps.store.transaction(context.tenantId, true, async (tx) =>
         saveSubmission(tx, submission!, { state: 'uncertain' }),
       );
@@ -1766,12 +1708,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           const commitments = await tx.commitments();
           const orderIds = new Set([
             ...submissions
-              .filter(
-                (s) =>
-                  !['rejected', 'expired', 'failed', 'not_executed'].includes(
-                    s.state,
-                  ),
-              )
+              .filter(isLiveSubmission)
               .map((s) => s.purchaseOrderId),
             ...commitments.map((c) => c.purchaseOrderId),
           ]);
@@ -1961,25 +1898,16 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           const supplier = await tx.supplier(order.supplierId);
           const ready = await readiness(context, tx, order, supplier);
           if (!ready.ready) conflict(ready.blockers[0]!);
-          const live = (await tx.submissions([orderId])).find(
-            (s) =>
-              !['rejected', 'expired', 'failed', 'not_executed'].includes(
-                s.state,
-              ),
-          );
-          if (
-            live &&
-            !(
-              live.state === 'approval_required' &&
-              Date.parse(live.expiresAt) <= deps.now().getTime()
-            )
-          )
+          const live = (await tx.submissions([orderId])).find(isLiveSubmission);
+          if (live && !approvalExpired(live, deps.now().getTime()))
             conflict('This order already has a submission in progress.');
           if (live) await saveSubmission(tx, live, { state: 'expired' });
           const link = supplier!.link!;
           const mapping = await lineMapping(tx, order, link.connectionId);
           const now = deps.now();
-          const expiresAt = new Date(now.getTime() + 24 * hour).toISOString();
+          const expiresAt = new Date(
+            now.getTime() + submissionApprovalHours * hour,
+          ).toISOString();
           const submission: Submission = {
             id: request.id,
             tenantId: context.tenantId,
@@ -2421,12 +2349,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             .map((line) => ({
               sku: line.sku,
               lineId: line.lineId,
-              quantity:
-                fact?.kind === 'confirmed_quantity'
-                  ? Math.max(0, line.ordered - (fact.quantity ?? line.ordered))
-                  : fact?.kind === 'shortage' || fact?.kind === 'damaged'
-                    ? (fact.quantity ?? 0)
-                    : line.outstanding,
+              quantity: shortfallQuantity(fact, line),
             }))
             .filter((line) => line.quantity > 0),
           evidenceRefs: [orderId, ...(fact ? [fact.id] : [])],
@@ -2459,77 +2382,29 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           async (tx) => {
             const order = await tx.order(orderId);
             if (!order) notFound('Purchase order not found');
-            if (order.authority !== 'luma' || order.status !== 'open')
-              conflict('Only an open Luma purchase order can be reconciled.');
-            if (!order.lines.some((line) => line.id === request.lineId))
-              conflict('That order line does not exist.');
-            if (Date.parse(request.receivedAt) > deps.now().getTime())
-              conflict('Receipt time cannot be in the future.');
             const supplier = await tx.supplier(order.supplierId);
             const submissions = await tx.submissions([orderId]);
-            if (
-              request.kind === 'received' &&
-              (supplier?.link || submissions.some((s) => s.channel !== 'email'))
-            )
-              conflict(
-                'Record receipt in the purchasing system that owns this order.',
-              );
             const commitments = await tx.commitments([orderId]);
-            const latest = commitments
-              .filter(
-                (c) =>
-                  c.lineId === request.lineId &&
-                  c.kind === request.kind &&
-                  c.status === 'confirmed',
-              )
-              .at(-1);
-            if ((latest?.id ?? null) !== request.expectedCommitmentId)
-              conflict(
-                'This quantity changed. Refresh the order before recording it.',
-              );
-            const receipt = commitments
-              .filter(
-                (c) =>
-                  c.lineId === request.lineId &&
-                  c.kind === 'received' &&
-                  c.status === 'confirmed',
-              )
-              .at(-1);
-            const damaged = commitments
-              .filter(
-                (c) =>
-                  c.lineId === request.lineId &&
-                  c.kind === 'damaged' &&
-                  c.status === 'confirmed',
-              )
-              .at(-1);
-            if (
-              request.kind === 'received' &&
-              request.damagedQuantity !== undefined &&
-              (damaged?.id ?? null) !== request.expectedDamagedCommitmentId
-            )
-              conflict(
-                'Damaged quantities changed. Refresh the order before recording receipt.',
-              );
-            if (
-              request.kind === 'damaged' &&
-              request.quantity > (receipt?.quantity ?? 0)
-            )
-              conflict('Damaged units cannot exceed the recorded receipt.');
-            if (
-              request.kind === 'received' &&
-              request.damagedQuantity !== undefined &&
-              request.damagedQuantity > request.quantity
-            )
-              conflict('Damaged units cannot exceed the receipt.');
-            if (
-              request.kind === 'received' &&
-              request.quantity <
-                (request.damagedQuantity ?? damaged?.quantity ?? 0)
-            )
-              conflict(
-                'Receipt cannot be less than the recorded damaged units.',
-              );
+            const error = manualReceiptError({
+              order,
+              request,
+              now: deps.now().getTime(),
+              purchasingSystemOwned:
+                !!supplier?.link ||
+                submissions.some((s) => s.channel !== 'email'),
+              commitments,
+            });
+            if (error) conflict(error);
+            const latest = lastConfirmed(
+              commitments,
+              request.lineId,
+              request.kind,
+            );
+            const damaged = lastConfirmed(
+              commitments,
+              request.lineId,
+              'damaged',
+            );
             const commitment = await tx.insertCommitment(
               {
                 id: request.id,
@@ -2946,45 +2821,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             const attention = current.progress.attention.find(
               (a) => a.key === request.key,
             );
-            if (!attention) {
-              conflict('This no longer needs a response. Refresh the order.');
-            }
-            if (
-              ![
-                'commitment_changed',
-                'confirmation_overdue',
-                'delivery_overdue',
-                'receipt_difference',
-              ].includes(attention.kind)
-            )
-              conflict('Respond to this from its own review.');
-            if (
-              request.response === 'accepted' &&
-              !['commitment_changed', 'receipt_difference'].includes(
-                attention.kind,
-              )
-            )
-              conflict('Record a follow-up and when to check again.');
-            if (
-              ['credited', 'written_off'].includes(request.response) &&
-              attention.kind !== 'receipt_difference'
-            )
-              conflict(
-                'Only a received-goods difference can be credited or written off.',
-              );
             const now = deps.now();
-            if (request.response === 'following_up') {
-              const next = request.nextCheckAt
-                ? Date.parse(request.nextCheckAt)
-                : NaN;
-              if (
-                !(next > now.getTime()) ||
-                next > now.getTime() + 60 * 24 * hour
-              )
-                conflict(
-                  'Choose when to check again, within the next 60 days.',
-                );
-            }
+            const error = followUpResponseError(
+              attention,
+              request,
+              now.getTime(),
+            );
+            if (error) conflict(error);
             const followUp: FollowUp = {
               id: request.id,
               tenantId: context.tenantId,
@@ -3121,7 +2964,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         };
 
       return {
-        outcome: matchesSubmission(submission, matches[0]!)
+        outcome: matchesSubmission(submission, matches[0]!.data)
           ? ('passed' as const)
           : ('failed' as const),
         observationRefs: [matches[0]!.observationId],
