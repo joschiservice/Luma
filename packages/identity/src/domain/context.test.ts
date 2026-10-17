@@ -1,3 +1,4 @@
+import { notFound, ServiceError } from '@luma/platform';
 import { expect, it } from 'vitest';
 
 import {
@@ -186,4 +187,19 @@ it('pauses background work only for an inactive workspace or a suspended member'
     pausesBackgroundWork(new IdentityError(404, 'NOT_FOUND', 'Removed')),
   ).toBe(false);
   expect(pausesBackgroundWork(new Error('Unavailable'))).toBe(false);
+});
+
+it('treats service errors and identity errors as one error type', () => {
+  const thrown = notFound('Order not found');
+
+  expect(thrown).toBeInstanceOf(IdentityError);
+  expect(new IdentityError(409, 'CONFLICT', 'Changed')).toBeInstanceOf(
+    ServiceError,
+  );
+  expect(new WorkspaceInactiveError()).toBeInstanceOf(ServiceError);
+  expect(thrown).toMatchObject({
+    statusCode: 404,
+    code: 'NOT_FOUND',
+    message: 'Order not found',
+  });
 });

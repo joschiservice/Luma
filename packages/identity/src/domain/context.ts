@@ -1,3 +1,5 @@
+import { ServiceError } from '@luma/platform';
+
 import type { AppPermission, Permission } from './permissions.js';
 import type { BuiltInRoleKey, RoleReference } from './roles.js';
 import { builtInReference, PermissionSet } from './roles.js';
@@ -69,25 +71,14 @@ export interface TenantContext {
   readonly supportView?: Readonly<SupportView>;
 }
 
-export class IdentityError extends Error {
-  constructor(
-    readonly statusCode: 401 | 403 | 404 | 409 | 422 | 503,
-    readonly code:
-      | 'VALIDATION_ERROR'
-      | 'UNAUTHENTICATED'
-      | 'FORBIDDEN'
-      | 'ACCESS_SUSPENDED'
-      | 'READ_ONLY'
-      | 'NOT_FOUND'
-      | 'CONFLICT'
-      | 'REGION_UNAVAILABLE'
-      | 'SERVICE_UNAVAILABLE'
-      | 'NOT_READY',
-    message: string,
-  ) {
-    super(message);
-  }
-}
+/**
+ * The former name of `ServiceError`, kept so existing throws and `instanceof` checks behave the
+ * same. Both names refer to one class: an error thrown as either matches checks for both and gets
+ * the same HTTP response. New code throws `ServiceError` or its helpers from `@luma/platform`.
+ */
+export const IdentityError = ServiceError;
+
+export type IdentityError = ServiceError;
 
 /**
  * Rejects a member's suspended or closed workspace. Callers see the same not-found response as

@@ -1,5 +1,19 @@
 export { canonicalJson } from './domain/canonical-json.js';
 
+export {
+  conflict,
+  forbidden,
+  invalid,
+  notFound,
+  ServiceError,
+  unavailable,
+} from './domain/service-error.js';
+
+export type {
+  ServiceErrorCode,
+  ServiceErrorStatus,
+} from './domain/service-error.js';
+
 export { featureFlags } from './application/observability.js';
 
 export type {
