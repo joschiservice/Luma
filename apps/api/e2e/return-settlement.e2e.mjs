@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
+import { expectResolvedEvidence } from './evidence-fixture.mjs';
 import {
   citedReturnReads,
   returnWriteReceipts,
@@ -230,6 +231,23 @@ it('separately verifies resale stock and a lost-response refund without restocki
     [[], []],
     [[], []],
   ]);
+  // The evidence API resolves every reference each settlement cites to its stored read.
+  const settled = await request(`${path}/settlements`);
+  expect(settled.items).toHaveLength(2);
+  for (const action of settled.items) {
+    const items = await expectResolvedEvidence(
+      (body) => request('/evidence/resolve', body),
+      { kind: 'return_settlement', id: action.id },
+    );
+    expect(items.map((item) => item.ref)).toEqual(
+      expect.arrayContaining(action.proof.evidenceRefs),
+    );
+    expect(
+      items.filter((item) => item.resolution.kind === 'read'),
+    ).not.toHaveLength(0);
+    for (const item of items.filter((i) => i.resolution.kind === 'read'))
+      expect(item.resolution.completeness).toBe('complete');
+  }
   // The same identity in another tenant cannot reveal or execute this action.
   const other = await f.pilot.app.inject({
     method: 'POST',
