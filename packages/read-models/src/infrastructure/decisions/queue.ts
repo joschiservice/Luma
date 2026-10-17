@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { exceptionClassLabel } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
@@ -314,7 +315,12 @@ export function createDecisionQueue(
         const queue = result.items.flatMap(
           (row): (RankedDecision & { row: QueueRow })[] => {
             const candidate = row.facts
-              ? presentCase(row.facts, reader, asOf)
+              ? presentCase(
+                  row.facts,
+                  reader,
+                  asOf,
+                  exceptionClassLabel(row.facts.class),
+                )
               : external.get(row.id);
             if (!candidate) return [];
             const { actionReference, ...visible } = candidate;

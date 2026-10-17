@@ -15,7 +15,7 @@ const detail = caseDetailSchema.parse({
   class: 'inventory_mismatch',
   state: 'verifying',
   severity: 'high',
-  summary: 'Inventory mismatch',
+  summary: 'Stock mismatch',
   subject: { kind: 'inventory', id, scope: [] },
   sources: [],
   detectedAt: at,

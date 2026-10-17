@@ -5,6 +5,7 @@ import type {
   MessageSnapshot,
   Page,
 } from '@luma/connections';
+import { exceptionClassLabel } from '@luma/exceptions';
 import type {
   IdentityService,
   Permission,
@@ -156,15 +157,6 @@ export function createMessageReader(runtime: CapabilityReader): MessageReader {
   };
 }
 
-const caseLabels: Record<string, string> = {
-  sync_failure: 'Sync failure',
-  stuck_fulfillment: 'Stuck fulfillment',
-  inventory_mismatch: 'Inventory mismatch',
-  order_quantity_mismatch: 'Order quantity difference',
-  stock_sync_stall: 'Stock sync stalled',
-  workflow_failure: 'Workflow failure',
-};
-
 /**
  * Deliberate cross-owner reads for linking and labels: canonical order numbers, purchase-order
  * references, customer profile emails, supplier names and case kinds. Exact matches only.
@@ -276,7 +268,7 @@ export function createRecordDirectory(
               )
             ).rows.map((row) => ({
               id: row.id,
-              label: caseLabels[row.kind] ?? 'Issue',
+              label: exceptionClassLabel(row.kind),
             })),
           );
 

@@ -25,7 +25,7 @@ describe('resolveCitations', () => {
     const issue: RecordReference = {
       ...order(unread),
       kind: 'issue',
-      label: 'Stuck fulfillment',
+      label: 'Fulfillment delay',
     };
     const result = resolveCitations(
       `Order [[issue:${unread.toUpperCase()}]] and [[order:${read}]], again [[order:${read}]].`,

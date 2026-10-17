@@ -6,7 +6,7 @@ import {
   caseDomain,
   type DecisionReader,
   evidenceState,
-  presentCase,
+  presentCase as presentCaseWithLabel,
   presentReplenishment,
   type ReplenishmentProposal,
 } from './decisions.js';
@@ -17,6 +17,11 @@ const reader = (id: string, respond: boolean): DecisionReader => ({
   can: (permission) => respond && permission === 'decisions.respond',
 });
 const owner = reader('reviewer', true);
+const presentCase = (
+  input: CaseDecisionFacts,
+  by: DecisionReader,
+  at: string,
+) => presentCaseWithLabel(input, by, at, 'Workflow issue');
 
 const facts = (overrides: Partial<CaseDecisionFacts>): CaseDecisionFacts => ({
   exception_id: '6f1c7a52-0f6d-4d0e-9f0b-3a4a5e0f1a2b',

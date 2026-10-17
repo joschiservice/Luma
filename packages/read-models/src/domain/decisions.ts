@@ -21,15 +21,6 @@ export function evidenceState(
   return Date.parse(validUntil) > Date.parse(asOf) ? 'fresh' : 'stale';
 }
 
-const classLabels: Record<string, string> = {
-  inventory_mismatch: 'Stock mismatch',
-  order_quantity_mismatch: 'Quantity difference',
-  stock_sync_stall: 'Stock sync stalled',
-  sync_failure: 'Connection issue',
-  stuck_fulfillment: 'Fulfillment delay',
-  workflow_failure: 'Workflow issue',
-};
-
 const subjectLabels: Record<string, string> = {
   order: 'Order',
   fulfillment: 'Fulfillment',
@@ -154,14 +145,15 @@ export interface DecisionReader {
  * Presents a case that needs a person. Stale diagnoses keep only their identity; their summary
  * and manual step are withheld as the case inbox does. Approvals are decided by readers who can
  * respond to decisions under the workspace approval rules; the other reasons ask the reader to investigate
- * in the issue, which every reader of the case may open.
+ * in the issue, which every reader of the case may open. `label` names the case's class, as
+ * `exceptionClassLabel` from `@luma/exceptions` does.
  */
 export function presentCase(
   facts: CaseDecisionFacts,
   reader: DecisionReader,
   asOf: string,
+  label: string,
 ): DecisionCandidate {
-  const label = classLabels[facts.class] ?? 'Operational issue';
   const kind = facts.subject?.subjectKind ?? null;
   const subject = kind
     ? `${subjectLabels[kind] ?? 'Record'} ${facts.subject?.label ?? (facts.subject?.subjectId && !/^[0-9a-f-]{36}$/i.test(facts.subject.subjectId) ? facts.subject.subjectId : '')}`.trim()

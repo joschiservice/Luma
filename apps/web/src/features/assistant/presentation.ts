@@ -116,7 +116,7 @@ export const recordDomain: Record<AssistantRecordKind, Domain> = {
   purchase_order: 'procurement',
 };
 
-/** "Issue · Stuck fulfillment"; other labels already name their kind. */
+/** "Issue · Fulfillment delay"; other labels already name their kind. */
 export function citationTitle(citation: AssistantCitation) {
   if (citation.kind === 'issue')
     return m.assistant_citation_issue({ label: citation.label });

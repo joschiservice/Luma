@@ -550,7 +550,7 @@ export const PageAuditHistory: Story = {
   },
   decorators: [
     (Story) => (
-      <IssueDetailViews issueTitle="Inventory mismatch">
+      <IssueDetailViews issueTitle="Stock mismatch">
         <Story />
       </IssueDetailViews>
     ),
