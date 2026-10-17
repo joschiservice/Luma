@@ -221,6 +221,12 @@ transaction, as for creation; a partial read never verifies a step. Settlement a
 write receipts are stored as for creation. Case completion still
 requires the other steps; neither accepted mutation nor one verified step closes a case.
 
+Creations, settlements and exchange steps show what they cite through the
+[evidence reader](execution.md#reading-cited-evidence): the reads their quote, proof and
+verification name and the write receipt, scoped to the case. Proofs recorded before orders stored
+reads show those reads as not retained; money evidence that names a case revision resolves to the
+return case.
+
 An admission rejection alone does not release a send fence: another caller may already have reserved
 the same execution. Only the durable execution ledger can establish non-dispatch. Concurrent late
 results retain newer proof, and an exchange's processing fence resets in the same owner transaction

@@ -169,3 +169,10 @@ A recorded manual receipt, an email sent and a supplier observation retain separ
 only independent verification establishes the action's result. Stock proof is visible only
 to readers with inventory access. The history is tenant-scoped and shows at most the latest
 500 events, with truncation reported rather than treated as complete evidence.
+Verified submissions and revisions cite their verifying reads and the stored write receipt
+together. Each entry's evidence resolves through the
+[evidence reader](execution.md#reading-cited-evidence) when opened. Purchasing-system
+observations behind commitment facts resolve as reads that record no completeness; plans,
+approvals, policy decisions, supplier messages and follow-ups show as Luma records. Shopify stock
+booking proof resolves only for readers with inventory access, like its timeline entries. Native
+stock receipt reviews and ledger proof are inventory records the evidence view does not show.

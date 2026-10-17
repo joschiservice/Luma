@@ -354,7 +354,10 @@ reviewed recipients, body, threading headers and attachment bytes. Cached messag
 partial reads never establish acceptance. The found message is marked as sent by Luma and
 linked from the reply, the thread's reply deadline clears as for any reply, and records
 linked to the thread show it there. Approvals, rejections, withheld sends and requests are
-thread events and audit entries.
+thread events and audit entries. A reply's evidence resolves through the
+[evidence reader](execution.md#reading-cited-evidence) to its send receipt and the stored message
+the verifying read found, without addresses, subject or text; an inconclusive check cites the
+reply itself.
 
 ### Uncertain sends
 

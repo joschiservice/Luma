@@ -111,4 +111,16 @@ If you see **Closed manually**, someone closed the issue without a confirmed fix
 
 If progress can’t load, you see **Progress couldn’t be confirmed**. Select **Refresh progress** before you rely on an earlier status.
 
+## Read the evidence
+
+Wherever Luma shows a sent change and how it was checked, open **Evidence** to see what Luma relied on. You find it in a case's change details, on purchasing timeline events, on a sent purchase order and its revisions, on a return's creation, refund, restock and exchange steps, and on sent replies in the inbox. Each item has a label:
+
+- **Provider read**: what Luma read from a connected system, when it read it, and when the system last changed the record. **Complete** means the read covered everything the check needs. A **Partial** read can’t confirm an outcome. **What Luma read** lists the main values, such as the status or the units on hand.
+- **Write receipt**: the system accepted the request. Acceptance alone doesn’t prove the outcome; a later read does.
+- **Luma record**: a record in Luma, such as an approval or the return case.
+- **Not retained**: this was recorded before Luma kept evidence, so the read or receipt itself isn’t available. Check the connected system if you need it.
+- **Not found**: Luma can’t find a read or receipt the record relies on. Treat the outcome as unconfirmed and check the connected system.
+
+You need permission to view the area the record belongs to, such as procurement, returns, the inbox or issues.
+
 To see how many issues were resolved and confirmed over time, open [Insights](/docs/insights).

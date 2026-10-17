@@ -100,6 +100,30 @@ cited. If the receipt cannot be stored, the attempt records the write as dispatc
 unknown outcome, cites nothing and reconciles by reading. Internal effects, such as adaptive
 fields, Luma purchase orders and supplier follow-ups, cite the Luma record they changed.
 
+### Reading cited evidence
+
+`@luma/read-models` resolves the references a record cites, so people see the evidence rather
+than IDs. A request names a subject (a purchase order, a return creation, settlement or exchange
+step, a reply, or a case) and optionally its references; without them it resolves everything the
+subject cites, up to 100. The reader needs the subject area's read permission (`procurement.read`,
+`returns.read`, `messages.read` or `issues.read`); a subject the tenant doesn't have is not found.
+
+The subject's owner reports what the subject cites and looks up stored evidence only through the
+subject: procurement's reads and receipts of that order, orders' evidence of that return case,
+messaging's send receipts and the messages of that reply's thread. App evidence tables are not
+linked to a record, so Shopify and Starshipit evidence is read only for references the case's
+execution attempts cite. Each reference resolves to a read (source, record, read and source-update
+times, revision, completeness, adapter version and an allowlisted summary of the normalized
+read), a write receipt, a Luma record, `not_retained` or `unresolved`. Provider payloads, message
+content and addresses never leave the owner.
+
+Records written before an owner stored a kind of evidence cite IDs that were never kept and
+cannot be backfilled. The migration ledger dates when each kind began (procurement reads, return
+reads, write receipts); a read or receipt cited before that date is `not_retained`. Everything
+else without stored evidence stays `unresolved`, including citations without a time and message
+reads, which were always stored: a missing read after storage began is a defect, not history.
+Busy views resolve evidence only when a person opens it.
+
 ## Observe-only
 
 Owners choose `observe_only` or `writes_enabled` for the workspace. New workspaces
