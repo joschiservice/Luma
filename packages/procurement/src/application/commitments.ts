@@ -14,7 +14,7 @@ import {
   requireTenant,
 } from '@luma/identity';
 import type { ModelGateway, ModelSchema, TraceContext } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, conflict, notFound, unavailable } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type {
@@ -453,18 +453,6 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     return fresh;
   }
 
-  function conflict(message: string): never {
-    throw new IdentityError(409, 'CONFLICT', message);
-  }
-
-  function notFound(message: string): never {
-    throw new IdentityError(404, 'NOT_FOUND', message);
-  }
-
-  function unavailable(message: string): never {
-    throw new IdentityError(503, 'SERVICE_UNAVAILABLE', message);
-  }
-
   function audit(
     context: TenantContext,
     type: string,
@@ -508,7 +496,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       const prior = await tx.command(id);
       if (prior) {
         if (prior.digest !== digest)
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
@@ -1200,7 +1188,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
   async function record(context: TenantContext, orderId: string) {
     return deps.store.transaction(context.tenantId, false, async (tx) => {
       const order = await tx.order(orderId);
-      if (!order) notFound('Purchase order not found');
+      if (!order) throw notFound('Purchase order not found');
       const supplier = await tx.supplier(order.supplierId);
       const submissions = await tx.submissions([orderId]);
       const commitments = await tx.commitments([orderId]);
@@ -1243,11 +1231,11 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     ) {
       context = await authorize(context, true);
       if (!deps.purchasing)
-        unavailable('Purchasing-system connections are unavailable.');
+        throw unavailable('Purchasing-system connections are unavailable.');
       const result = await deps.purchasing.suppliers(context, connectionId, {
         ...(cursor ? { cursor } : {}),
       });
-      if (!result.ok) unavailable(result.reason);
+      if (!result.ok) throw unavailable(result.reason);
 
       return result.ok ? result.value : { items: [], nextCursor: null };
     },
@@ -1262,7 +1250,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       let name: string | null = null;
       if (request.link) {
         if (!deps.purchasing)
-          unavailable('Purchasing-system connections are unavailable.');
+          throw unavailable('Purchasing-system connections are unavailable.');
         const result = await deps.purchasing.suppliers(
           context,
           request.link.connectionId,
@@ -1273,23 +1261,25 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             },
           },
         );
-        if (!result.ok) unavailable(result.reason);
+        if (!result.ok) throw unavailable(result.reason);
         const found = result.ok
           ? result.value.items.find(
               (s) => s.externalId === request.link!.externalId,
             )
           : undefined;
         if (!found)
-          conflict('That supplier was not found in the purchasing system.');
+          throw conflict(
+            'That supplier was not found in the purchasing system.',
+          );
         name = found.name;
       }
 
       return deps.store.transaction(context.tenantId, true, async (tx) => {
         const supplier = await tx.supplier(supplierId);
-        if (!supplier) notFound('Supplier not found');
+        if (!supplier) throw notFound('Supplier not found');
         const revision = supplier.revision ?? 1;
         if (revision !== request.expectedRevision)
-          conflict('This supplier changed. Refresh and review it again.');
+          throw conflict('This supplier changed. Refresh and review it again.');
         const now = deps.now().toISOString();
         const next: Supplier = {
           ...supplier,
@@ -1805,7 +1795,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         false,
         async (tx) => {
           const supplier = await tx.supplier(supplierId);
-          if (!supplier) notFound('Supplier not found');
+          if (!supplier) throw notFound('Supplier not found');
           const orders = (await tx.orders()).filter(
             (o) => o.supplierId === supplierId,
           );
@@ -1869,7 +1859,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       const request = deps.parse.submission(input);
       const today = deps.now().toISOString().slice(0, 10);
       if (request.requestedDeliveryDate < today)
-        conflict('Choose a delivery date that is today or later.');
+        throw conflict('Choose a delivery date that is today or later.');
       const existing = await deps.store.transaction(
         context.tenantId,
         false,
@@ -1881,26 +1871,26 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           existing.requestedBy !== context.actor.id ||
           existing.requestedDeliveryDate !== request.requestedDeliveryDate
         )
-          conflict(
+          throw conflict(
             'This request ID was already used. Refresh before trying again.',
           );
 
         return submissionView(context, existing);
       }
       if (!deps.admission)
-        unavailable('Sending orders is unavailable on this server.');
+        throw unavailable('Sending orders is unavailable on this server.');
       const prepared = await deps.store.transaction(
         context.tenantId,
         true,
         async (tx) => {
           const order = await tx.order(orderId);
-          if (!order) notFound('Purchase order not found');
+          if (!order) throw notFound('Purchase order not found');
           const supplier = await tx.supplier(order.supplierId);
           const ready = await readiness(context, tx, order, supplier);
-          if (!ready.ready) conflict(ready.blockers[0]!);
+          if (!ready.ready) throw conflict(ready.blockers[0]!);
           const live = (await tx.submissions([orderId])).find(isLiveSubmission);
           if (live && !approvalExpired(live, deps.now().getTime()))
-            conflict('This order already has a submission in progress.');
+            throw conflict('This order already has a submission in progress.');
           if (live) await saveSubmission(tx, live, { state: 'expired' });
           const link = supplier!.link!;
           const mapping = await lineMapping(tx, order, link.connectionId);
@@ -2016,20 +2006,20 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       context = await authorize(context, true);
       const request = deps.parse.decision(input);
       if (!deps.admission)
-        unavailable('Sending orders is unavailable on this server.');
+        throw unavailable('Sending orders is unavailable on this server.');
       const submission = await deps.store.transaction(
         context.tenantId,
         false,
         (tx) => tx.submission(submissionId),
       );
-      if (!submission) notFound('Submission not found');
+      if (!submission) throw notFound('Submission not found');
       if (submission.channel === 'email')
-        conflict(
+        throw conflict(
           'Review and send this supplier email in the Operations Inbox.',
         );
       const view = await submissionView(context, submission);
       if (!view.canApprove || submission.decisionId !== request.decisionId)
-        conflict(
+        throw conflict(
           'This request changed, expired or needs a different approver. Refresh it.',
         );
       await deps.admission.respond(
@@ -2090,9 +2080,9 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         false,
         (tx) => tx.submission(submissionId),
       );
-      if (!submission) notFound('Submission not found');
+      if (!submission) throw notFound('Submission not found');
       if (submission.channel === 'email')
-        conflict(
+        throw conflict(
           'Review and send this supplier email in the Operations Inbox.',
         );
       if (
@@ -2109,7 +2099,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         return submissionView(context, submission);
       const view = await submissionView(context, submission);
       if (!view.canSend)
-        conflict('Only the requester can send an approved submission.');
+        throw conflict('Only the requester can send an approved submission.');
       await dispatch(context, submission);
 
       return submissionView(
@@ -2127,11 +2117,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         false,
         (tx) => tx.submission(submissionId),
       );
-      if (!submission) notFound('Submission not found');
+      if (!submission) throw notFound('Submission not found');
       if (!deps.admission)
-        unavailable('Sending orders is unavailable on this server.');
+        throw unavailable('Sending orders is unavailable on this server.');
       if (submission.channel === 'email')
-        conflict('Check the existing supplier email in the Operations Inbox.');
+        throw conflict(
+          'Check the existing supplier email in the Operations Inbox.',
+        );
       if (!['uncertain', 'submitting'].includes(submission.state))
         return submissionView(context, submission);
       const principal = await deps
@@ -2142,7 +2134,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         )
         .catch((error: unknown) => {
           if (error instanceof MembershipSuspendedError)
-            conflict(
+            throw conflict(
               'The person who requested this order can’t access this workspace right now. Luma checks it after their access is restored.',
             );
           throw error;
@@ -2169,10 +2161,12 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           ) ?? null,
       );
       if (!submission?.externalOrder)
-        conflict('This order has not been placed in a purchasing system.');
+        throw conflict(
+          'This order has not been placed in a purchasing system.',
+        );
       const found = await locate(context, submission);
       if (!found)
-        unavailable(
+        throw unavailable(
           'The purchasing system could not be read. The details below may be out of date.',
         );
       await observe(context, submission, found);
@@ -2199,7 +2193,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         { kind: 'message', orderId, ...request },
         async (tx) => {
           const order = await tx.order(orderId);
-          if (!order) notFound('Purchase order not found');
+          if (!order) throw notFound('Purchase order not found');
           const duplicate = await tx.communicationByKey(key);
           if (duplicate)
             return { communication: duplicate, order, created: false };
@@ -2259,7 +2253,8 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         false,
         async (tx) => {
           const communication = await tx.communication(communicationId);
-          if (!communication?.purchaseOrderId) notFound('Message not found');
+          if (!communication?.purchaseOrderId)
+            throw notFound('Message not found');
 
           return {
             communication,
@@ -2269,9 +2264,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         },
       );
       if (data.attempts.some((a) => a.state === 'completed'))
-        conflict('This message was already read. Record corrections by hand.');
+        throw conflict(
+          'This message was already read. Record corrections by hand.',
+        );
       if (!data.communication.body)
-        conflict('The message text was removed and cannot be read again.');
+        throw conflict(
+          'The message text was removed and cannot be read again.',
+        );
 
       return extractInto(
         context,
@@ -2286,7 +2285,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
 
       return deps.store.transaction(context.tenantId, true, async (tx) => {
         const communication = await tx.communication(communicationId);
-        if (!communication) notFound('Message not found');
+        if (!communication) throw notFound('Message not found');
         if (communication.purgedAt) return communication;
         const purged: Communication = {
           ...communication,
@@ -2319,7 +2318,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
 
       return deps.store.transaction(context.tenantId, false, async (tx) => {
         const order = await tx.order(orderId);
-        if (!order) notFound('Purchase order not found');
+        if (!order) throw notFound('Purchase order not found');
         const commitments = await tx.commitments([orderId]);
         const { progress } = progressFor(order, {
           submissions: await tx.submissions([orderId]),
@@ -2335,7 +2334,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           !attention ||
           !['commitment_changed', 'receipt_difference'].includes(attention.kind)
         )
-          conflict(
+          throw conflict(
             'This difference no longer needs a decision. Refresh the order.',
           );
         const fact = commitments.find((c) => c.id === attention.commitmentId);
@@ -2367,7 +2366,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         !deps.parse.receipt ||
         !(await deps.reconciliationAvailable?.(context))
       )
-        unavailable(
+        throw unavailable(
           'Receipt reconciliation is not enabled for this workspace.',
         );
       const request = deps.parse.receipt(input);
@@ -2381,7 +2380,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           { command: 'receipt', orderId, ...request },
           async (tx) => {
             const order = await tx.order(orderId);
-            if (!order) notFound('Purchase order not found');
+            if (!order) throw notFound('Purchase order not found');
             const supplier = await tx.supplier(order.supplierId);
             const submissions = await tx.submissions([orderId]);
             const commitments = await tx.commitments([orderId]);
@@ -2394,7 +2393,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
                 submissions.some((s) => s.channel !== 'email'),
               commitments,
             });
-            if (error) conflict(error);
+            if (error) throw conflict(error);
             const latest = lastConfirmed(
               commitments,
               request.lineId,
@@ -2488,7 +2487,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         true,
         async (tx) => {
           const order = await tx.order(request.purchaseOrderId);
-          if (!order) notFound('Purchase order not found');
+          if (!order) throw notFound('Purchase order not found');
           const supplier = await tx.supplier(order.supplierId);
           const prior = await tx.submission(request.id);
           if (
@@ -2497,7 +2496,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
               order.authority !== 'luma' ||
               !['draft', 'open'].includes(order.status))
           )
-            conflict('This order cannot be sent through email.');
+            throw conflict('This order cannot be sent through email.');
           if (
             prior &&
             (prior.channel !== 'email' ||
@@ -2505,7 +2504,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
               prior.outgoing?.outboundId !== request.outboundId ||
               prior.requestedBy !== context.actor.id)
           )
-            conflict('This email submission ID was already used.');
+            throw conflict('This email submission ID was already used.');
           if (prior?.state === 'submitted' && request.state === 'submitted')
             return { submission: prior, order };
           if (
@@ -2514,7 +2513,9 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
               (s) => !['failed', 'rejected', 'expired'].includes(s.state),
             )
           )
-            conflict('An active submission already exists for this order.');
+            throw conflict(
+              'An active submission already exists for this order.',
+            );
           const now = deps.now().toISOString();
           const submission: Submission = {
             id: request.id,
@@ -2604,44 +2605,47 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           { command: 'commitment', orderId, ...request },
           async (tx) => {
             const order = await tx.order(orderId);
-            if (!order) notFound('Purchase order not found');
+            if (!order) throw notFound('Purchase order not found');
             const line = request.lineId
               ? order.lines.find((l) => l.id === request.lineId)
               : null;
             if (request.lineId && !line)
-              conflict('That order line does not exist.');
+              throw conflict('That order line does not exist.');
             if (
               request.kind === 'confirmed_quantity' &&
               (!line || request.quantity === null)
             )
-              conflict('A confirmed quantity needs a line and a quantity.');
+              throw conflict(
+                'A confirmed quantity needs a line and a quantity.',
+              );
             if (request.kind === 'promised_date' && !request.date)
-              conflict('A promised date needs a date.');
+              throw conflict('A promised date needs a date.');
             if (request.kind === 'condition' && !request.text?.trim())
-              conflict('Describe the condition.');
+              throw conflict('Describe the condition.');
             let source: Commitment['source'];
             if (request.supersedes) {
               const prior = await tx.commitment(request.supersedes);
               if (!prior || prior.purchaseOrderId !== orderId)
-                notFound('The commitment to correct was not found.');
+                throw notFound('The commitment to correct was not found.');
               if (prior.kind === 'received')
-                conflict(
+                throw conflict(
                   'Receipts come from the purchasing system and cannot be corrected here.',
                 );
-              if (!request.reason?.trim()) conflict('Explain the correction.');
+              if (!request.reason?.trim())
+                throw conflict('Explain the correction.');
               source = { kind: 'correction', reason: request.reason.trim() };
             } else {
               if (!request.communicationId || !request.span)
-                conflict(
+                throw conflict(
                   'Select the words in a supplier message that state this.',
                 );
               const communication = await tx.communication(
                 request.communicationId,
               );
               if (!communication || communication.purchaseOrderId !== orderId)
-                notFound('Message not found');
+                throw notFound('Message not found');
               if (!communication.body && communication.subject === null)
-                conflict('The message text was removed.');
+                throw conflict('The message text was removed.');
               const text = messageText({
                 subject: communication.subject ?? '',
                 body: communication.body ?? '',
@@ -2651,7 +2655,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
                 request.span.end > text.length ||
                 request.span.end <= request.span.start
               )
-                conflict('The selected words are not in the message.');
+                throw conflict('The selected words are not in the message.');
               source = {
                 kind: 'communication',
                 communicationId: communication.id,
@@ -2741,11 +2745,11 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         true,
         async (tx) => {
           const commitment = await tx.commitment(commitmentId);
-          if (!commitment) notFound('Commitment not found');
+          if (!commitment) throw notFound('Commitment not found');
           if (commitment.status !== 'needs_review') {
             if (commitment.review?.outcome === request.outcome)
               return commitment;
-            conflict('This commitment was already reviewed. Refresh it.');
+            throw conflict('This commitment was already reviewed. Refresh it.');
           }
           const now = deps.now().toISOString();
           const reviewed: Commitment = {
@@ -2797,7 +2801,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           { command: 'follow_up', orderId, ...request },
           async (tx) => {
             const order = await tx.order(orderId);
-            if (!order) notFound('Purchase order not found');
+            if (!order) throw notFound('Purchase order not found');
             if (
               (request.expectedOrderRevision !== undefined ||
                 request.expectedScopeFingerprint !== undefined) &&
@@ -2805,7 +2809,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
                 request.expectedScopeFingerprint !==
                   followUpScopeFingerprint(order))
             )
-              conflict(
+              throw conflict(
                 'The owned order changed after review. Refresh the proposal; the previous approval cannot authorize changed inputs.',
               );
             const current = {
@@ -2827,7 +2831,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
               request,
               now.getTime(),
             );
-            if (error) conflict(error);
+            if (error) throw conflict(error);
             const followUp: FollowUp = {
               id: request.id,
               tenantId: context.tenantId,
@@ -2844,7 +2848,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             };
 
             if (!(await tx.insertFollowUp(followUp)))
-              conflict('Someone already responded. Refresh the order.');
+              throw conflict('Someone already responded. Refresh the order.');
             await tx.audit(
               audit(context, 'purchase_order.follow_up', request.id, orderId, {
                 key: request.key,
