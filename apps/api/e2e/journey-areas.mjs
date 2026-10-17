@@ -1157,8 +1157,16 @@ export const journeyAreas = {
     ...webShell,
     ...webProcurement,
     ...webEvidence,
+    ...ordersFixture,
+    ...appHost,
     'apps/web/src/kit/identity/permission-text.ts',
     'packages/api-contract/src/**/{supplier-terms,purchasing}.ts',
+    // The native receipt journey books a receipt at a native-owned location.
+    'apps/api/e2e/native-stock-fixture.mjs',
+    'apps/api/e2e/stock-ledger-fixture.mjs',
+    'packages/application-runtime/src/composition/{native-stock,inventory-ledger,sales,read-models}.ts',
+    'packages/sales/**',
+    'packages/read-models/src/infrastructure/procurement/native-purchase-receipts.ts',
   ],
   'procurement.e2e.mjs': [...procurement, ...activity],
   'products.browser.mjs': [
