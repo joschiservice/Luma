@@ -23,10 +23,7 @@ export {
 
 export type { Configuration, Facts } from './domain/facts.js';
 
-export {
-  type WorkspaceDetectionSettings,
-  workspaceDetectionConfiguration,
-} from './domain/workspace-configuration.js';
+export { workspaceDetectionConfiguration } from './domain/workspace-configuration.js';
 
 export type {
   DiagnosisOptions,
