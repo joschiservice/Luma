@@ -28,7 +28,10 @@ export function createProcessActivities(deps: {
     id: string,
     version: string,
   ): Promise<ProcessWorkflowVersion | null>;
-  admission: Pick<ActionAdmission, 'get' | 'execute' | 'reconcile'>;
+  admission: Pick<
+    ActionAdmission,
+    'get' | 'execute' | 'reconcile' | 'approvalPending'
+  >;
   /** Persists an immutable action binding for this exact run and step before admission. */
   bindAction(
     context: TenantContext,
@@ -88,6 +91,12 @@ export function createProcessActivities(deps: {
     },
     record: async (run, output) =>
       deps.record(await authorize(run), run.id, output),
+    actionApprovalPending: async (run, _step, proposalId, decisionId) =>
+      deps.admission.approvalPending(
+        await authorize(run),
+        proposalId,
+        decisionId,
+      ),
     async action(run, version, step, outputs) {
       const context = await authorize(run);
       const published = await deps.loadVersion(

@@ -1,6 +1,6 @@
 import type { WriteAcceptance } from '@luma/connections';
 import { builtInMembership, makeTenantContext } from '@luma/identity';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
@@ -65,7 +65,13 @@ const read = (
   data: { operationId: 'effect' },
 });
 
-function fixture(kind: 'settlement' | 'exchange') {
+function fixture(
+  kind: 'settlement' | 'exchange',
+  options: {
+    reconcile?: () => Promise<{ state: 'uncertain' }>;
+    log?: (message: string, error?: unknown) => void;
+  } = {},
+) {
   const c: ReturnCase = {
     id: 'case',
     tenantId: 'tenant',
@@ -286,7 +292,8 @@ function fixture(kind: 'settlement' | 'exchange') {
 
       return execute();
     },
-    reconcile: async () => ({ state: 'uncertain' as const }),
+    reconcile:
+      options.reconcile ?? (async () => ({ state: 'uncertain' as const })),
     get: async () => ({ state: ledger }),
     writeMode: async () => 'writes_enabled' as const,
   };
@@ -301,6 +308,7 @@ function fixture(kind: 'settlement' | 'exchange') {
     refreshContext: async () => context,
     principal: async () => context,
     admission,
+    ...(options.log ? { log: options.log } : {}),
   };
   let outcome: 'passed' | 'inconclusive' = 'passed';
   let proofReads: ReturnRead[] = [read('source-proof')];
@@ -477,6 +485,23 @@ describe.each(['settlement', 'exchange'] as const)(
         state: 'not_executed',
       });
       if (kind === 'exchange') expect(f.root().processingStarted).toBe(false);
+    });
+
+    it('keeps a verified outcome and logs when admission cannot be reconciled', async () => {
+      const failure = new Error('admission store unavailable');
+      const log = vi.fn();
+      const f = fixture(kind, {
+        reconcile: async () => {
+          throw failure;
+        },
+        log,
+      });
+
+      expect(await f.send()).toMatchObject({ sent: true, state: 'verified' });
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining('admission could not be reconciled'),
+        failure,
+      );
     });
   },
 );

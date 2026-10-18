@@ -74,6 +74,9 @@ function fixture() {
     execute: vi
       .fn<ExceptionActivities['execute']>()
       .mockResolvedValue({ state: 'succeeded' }),
+    approvalPending: vi
+      .fn<ExceptionActivities['approvalPending']>()
+      .mockResolvedValue(false),
     reconcile: vi
       .fn<ExceptionActivities['reconcile']>()
       .mockResolvedValue({ state: 'succeeded' }),
@@ -300,6 +303,72 @@ it('recovers committed approval without a notification', async (t) => {
   expect(activities.execute).toHaveBeenCalledTimes(2);
 }, 40_000);
 
+it('polls a pending approval read-only and executes again once it changes', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
+  const activities = fixture();
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date((await clock.currentTimeMs()) + 600_000).toISOString(),
+  });
+  activities.execute.mockResolvedValueOnce({
+    state: 'approval_required',
+    decisionId: 'decision',
+  });
+  activities.approvalPending
+    .mockResolvedValueOnce(true)
+    .mockResolvedValueOnce(true)
+    .mockResolvedValue(false);
+  expect(await run(activities, clock)).toMatchObject({ phase: 'resolved' });
+  expect(activities.approvalPending).toHaveBeenCalledTimes(3);
+  expect(activities.approvalPending).toHaveBeenCalledWith(
+    input,
+    'incident',
+    expect.objectContaining({ id: 'proposal' }),
+    'decision',
+  );
+  expect(activities.execute).toHaveBeenCalledTimes(2);
+}, 40_000);
+
+it('ends an unanswered approval wait after one day despite proposal refreshes', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
+  const activities = {
+    ...fixture(),
+    refresh: vi.fn<Required<ExceptionActivities>['refresh']>(async () => ({
+      id: 'proposal',
+      revision: 1,
+      expiresAt: new Date(
+        (await clock.currentTimeMs()) + 3_600_000,
+      ).toISOString(),
+      refreshable: true,
+    })),
+  };
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date(
+      (await clock.currentTimeMs()) + 3_600_000,
+    ).toISOString(),
+    refreshable: true,
+  });
+  activities.execute.mockResolvedValue({
+    state: 'approval_required',
+    decisionId: 'decision',
+  });
+  activities.approvalPending.mockResolvedValue(true);
+  const started = await clock.currentTimeMs();
+  expect(await run(activities, clock)).toMatchObject({
+    phase: 'denied',
+    reason: 'proposal_expired',
+  });
+  expect(activities.refresh.mock.calls.length).toBeGreaterThan(1);
+  expect((await clock.currentTimeMs()) - started).toBeLessThan(
+    86_400_000 + 3_600_000,
+  );
+}, 120_000);
+
 it.each(['succeeded', 'reconciliation_required', 'lost_completion'] as const)(
   'waits for in-flight execution before cancellation recovery: %s',
   async (outcome) => {
@@ -448,6 +517,7 @@ it.each([
           activityType: 'refresh',
           attempt: 5,
           taskQueue: 'queue',
+          requestId: 'request',
         }),
       }),
     );
@@ -457,6 +527,7 @@ it.each([
     expect(entry.meta.error).toBe(error);
     expect(entry.meta).not.toHaveProperty('args');
     expect(captureActivityError).toHaveBeenCalledExactlyOnceWith(error, {
+      requestId: 'request',
       workflowId: 'workflow',
       workflowRunId: 'run',
       activityId: '443',
@@ -797,6 +868,12 @@ it('created AU clients and workers write encrypted history and reject foreign en
     const history = await env.client.workflow
       .getHandle(started.workflowId)
       .fetchHistory();
+    // Patch markers are Temporal metadata, not payloads, so they stay unencrypted.
+    const patches = [
+      'automatic-proposal-refresh-v1',
+      'approval-deadline-limit-v1',
+      'read-only-approval-wait-v1',
+    ];
     let payloadCount = 0;
 
     function inspect(value: unknown, path = 'history') {
@@ -813,11 +890,13 @@ it('created AU clients and workers write encrypted history and reject foreign en
             '.upsertWorkflowSearchAttributesEventAttributes.searchAttributes.indexedFields.TemporalChangeVersion',
           )
         ) {
-          expect(
-            'data' in value
-              ? JSON.parse(Buffer.from(value.data as Uint8Array).toString())
-              : null,
-          ).toEqual(['automatic-proposal-refresh-v1']);
+          expect(patches).toEqual(
+            expect.arrayContaining(
+              'data' in value
+                ? JSON.parse(Buffer.from(value.data as Uint8Array).toString())
+                : [null],
+            ),
+          );
 
           return;
         }
@@ -826,11 +905,15 @@ it('created AU clients and workers write encrypted history and reject foreign en
             '.markerRecordedEventAttributes.details.patch-data.payloads.0',
           )
         ) {
-          expect(
+          const marker =
             'data' in value
               ? JSON.parse(Buffer.from(value.data as Uint8Array).toString())
-              : null,
-          ).toEqual({ id: 'automatic-proposal-refresh-v1', deprecated: false });
+              : null;
+          expect(marker).toEqual({
+            id: expect.any(String),
+            deprecated: false,
+          });
+          expect(patches).toContain(marker.id);
 
           return;
         }

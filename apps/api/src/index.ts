@@ -7,6 +7,7 @@ import {
   readObservabilityConfig,
   readWorkflowConfig,
 } from '@luma/config';
+import { createFailureLog } from '@luma/platform';
 import {
   createObservability,
   type startLocalTelemetry,
@@ -36,6 +37,7 @@ export async function main(
       (route) => route.model,
     ),
   });
+  const log = createFailureLog(observability);
 
   const app = await buildRuntimeApp(
     identityConfig,
@@ -61,8 +63,8 @@ export async function main(
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
-      void app.close().catch(() => {
-        app.log.error('Shutdown failed');
+      void app.close().catch((error: unknown) => {
+        log('API shutdown failed', error);
         process.exitCode = 1;
       });
     });
@@ -76,8 +78,9 @@ export async function main(
     // Supervisors can discover an ephemeral listener without reserving its port.
     process.send?.({ type: 'listening', address });
     process.channel?.unref();
-  } catch {
-    app.log.error('API startup failed');
+  } catch (error) {
+    // Report before close, which shuts observability down.
+    log('API startup failed', error);
     await app.close();
     process.exitCode = 1;
   }

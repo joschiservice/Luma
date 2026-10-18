@@ -68,6 +68,7 @@ it('propagates an API span through a real Temporal client, workflow and activity
     },
     propose: async () => null,
     execute: async () => ({ state: 'succeeded' }),
+    approvalPending: async () => false,
     reconcile: async () => ({ state: 'succeeded' }),
     verify: async () => true,
   });

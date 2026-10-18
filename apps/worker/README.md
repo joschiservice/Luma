@@ -7,6 +7,10 @@ Runs Luma's two background processes. Both install instrumentation in a bootstra
 
 The default workflow worker composes execution without effect adapters, so admitted playbook actions fail their capability check and make no provider writes; effects require explicit configuration. Workflow implementation belongs to workflow-temporal and service assembly to application-runtime.
 
+## Health
+
+Set `WORKFLOW_WORKER_HEALTH_PORT` or `COMMERCE_SYNC_HEALTH_PORT` to serve `GET /health` for that process on all interfaces. It answers 200 once startup has checked the database cell, composed the services (including the Temporal connection for the workflow worker) and started the workers. It answers 503 while starting, after a shutdown signal and once the workers stop for any reason, until the process exits. The body names only the state. The variables are separate so both processes can run on one host; unset, no port is opened. Use it for readiness and draining; the process exits when its workers fail.
+
 ## Further reading
 
 - [Exception workflows](../../docs/exception-workflows.md)

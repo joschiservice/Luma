@@ -15,6 +15,8 @@ export { createObservability } from './infrastructure/observability.js';
 
 export { createTenantDatabase } from './infrastructure/database.js';
 
+export { createDatabasePool } from './infrastructure/database-pool.js';
+
 /**
  * Creates the model gateway from startup configuration. Vercel routes need `apiKey`.
  * `bedrock` routes need `bedrock` settings or an injected regional adapter. A route whose

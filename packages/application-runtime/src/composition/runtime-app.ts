@@ -17,8 +17,9 @@ import {
   createMorningBriefReader,
 } from '@luma/identity/composition';
 import { registerIdentityHttp, requestIsReadOnly } from '@luma/identity/http';
-import type { Observability } from '@luma/platform';
+import { createFailureLog, type Observability } from '@luma/platform';
 import {
+  createDatabasePool,
   createModelGateway,
   createTenantDatabase,
   createValkeyStore,
@@ -32,7 +33,6 @@ import {
   createProcessClient,
 } from '@luma/workflow-temporal';
 import type { FastifyServerOptions } from 'fastify';
-import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
 import { createMetricListener } from '../infrastructure/metric-listener.js';
@@ -82,6 +82,7 @@ export async function buildRuntimeApp(
       ? createModelGateway(modelSettings, observability)
       : undefined;
   const resources = createResourceScope();
+  const log = createFailureLog(observability);
   try {
     // Auth rate limits share counters with every API instance when a store is configured.
     const rateLimitStore =
@@ -105,10 +106,11 @@ export async function buildRuntimeApp(
         ),
     });
     resources.add(identity.close);
-    const casePool = new Pool({
+    const casePool = createDatabasePool({
       connectionString: settings.databaseUrl,
       max: 5,
-      statement_timeout: 5000,
+      workload: 'request',
+      onError: (error) => log('Case database connection failed', error),
     });
     resources.add(() => casePool.end());
     await assertCellRegion(casePool, settings.region ?? 'AU');
@@ -280,9 +282,6 @@ export async function buildRuntimeApp(
         installedConnections?.registry.ready,
       ),
     });
-    casePool.on('error', () =>
-      app.log.error('Case database connection failed'),
-    );
     registerIdentityHttp(app, identity);
     const scheduleMorningBriefs = identity.morningBriefScheduler({
       enabled: (tenantId) =>
@@ -301,54 +300,76 @@ export async function buildRuntimeApp(
           settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
       }),
     });
-    let briefPass: Promise<void> | undefined;
-    const briefTimer = setInterval(() => {
-      briefPass ??= scheduleMorningBriefs()
-        .catch(() => app.log.error('Morning brief schedule pass failed'))
-        .finally(() => {
-          briefPass = undefined;
-        });
-    }, 60000);
-    briefTimer.unref();
-    resources.add(async () => {
-      clearInterval(briefTimer);
-      await briefPass;
-    });
-    const deliveryTimer = setInterval(() => {
-      void identity.mailDelivery
-        .drain()
-        .catch(() => app.log.error('Email delivery pass failed'));
-    }, 5000);
-    deliveryTimer.unref();
+    // A tick while the same pass still runs is skipped, so passes never overlap. Close waits
+    // for running passes before the pools they use are released.
+    const running = new Set<Promise<void>>();
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const schedule = (
+      message: string,
+      pass: () => Promise<unknown>,
+      intervalMs: number,
+      firstMs = intervalMs,
+    ) => {
+      let current: Promise<void> | undefined;
+      const tick = () => {
+        if (current) return;
+        const run = pass()
+          .then(
+            () => undefined,
+            (error: unknown) => log(message, error),
+          )
+          .finally(() => {
+            running.delete(run);
+            current = undefined;
+          });
+        current = run;
+        running.add(run);
+      };
+      const start = setTimeout(() => {
+        tick();
+        const timer = setInterval(tick, intervalMs);
+        timer.unref();
+        timers.push(timer);
+      }, firstMs);
+      start.unref();
+      timers.push(start);
+    };
+    schedule(
+      'Morning brief schedule pass failed',
+      scheduleMorningBriefs,
+      60_000,
+    );
+    schedule(
+      'Email delivery pass failed',
+      () => identity.mailDelivery.drain(),
+      5000,
+    );
     // Retention runs a minute after start, so frequent restarts don't skip it, then hourly.
-    const purge = () =>
-      void identity
-        .purgeSecurityEvents()
-        .catch(() => app.log.error('Security event retention pass failed'));
-    const retentionStart = setTimeout(purge, 60_000);
-    const retentionTimer = setInterval(purge, 60 * 60_000);
-    retentionStart.unref();
-    retentionTimer.unref();
+    schedule(
+      'Security event retention pass failed',
+      () => identity.purgeSecurityEvents(),
+      60 * 60_000,
+      60_000,
+    );
     // Support views nobody uses again still need their end recorded and owners told.
-    const supportViewTimer = setInterval(() => {
-      void identity.service
-        .sweepSupportViews(`support-view-sweep:${randomUUID()}`)
-        .catch(() => app.log.error('Support view sweep failed'));
-    }, 60_000);
-    supportViewTimer.unref();
+    schedule(
+      'Support view sweep failed',
+      () =>
+        identity.service.sweepSupportViews(
+          `support-view-sweep:${randomUUID()}`,
+        ),
+      60_000,
+    );
     // Deletions become due after their restore window, or at once for an erasure request.
-    const erasureTimer = setInterval(() => {
-      void identity
-        .eraseDueAccounts()
-        .catch(() => app.log.error('Account erasure pass failed'));
-    }, 60_000);
-    erasureTimer.unref();
+    schedule(
+      'Account erasure pass failed',
+      () => identity.eraseDueAccounts(),
+      60_000,
+    );
     resources.add(async () => {
-      clearInterval(deliveryTimer);
-      clearTimeout(retentionStart);
-      clearInterval(retentionTimer);
-      clearInterval(supportViewTimer);
-      clearInterval(erasureTimer);
+      // Clearing a timeout with clearInterval, or the reverse, is valid in Node.
+      for (const timer of timers) clearInterval(timer);
+      await Promise.all(running);
       await identity.mailDelivery.drain();
     });
     app.addHook('onClose', resources.close);

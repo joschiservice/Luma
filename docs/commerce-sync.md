@@ -54,7 +54,9 @@ the next attempt re-imports idempotently.
 
 Transports first retry a transient read briefly (see
 [connectors](connectors.md#errors-retries-and-evidence)). A page failure keeps the cursor
-and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. A page the
+and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. Each stream
+waits a stable share of half to all of that delay, so streams do not retry in step after an
+outage. A page the
 adapter reports as incomplete fails the same way, because it cannot establish coverage. A
 rejected cursor restarts the scan. After five consecutive failures the stream is **failing**.
 `failing_since` marks when the current run of failures began and is cleared by a

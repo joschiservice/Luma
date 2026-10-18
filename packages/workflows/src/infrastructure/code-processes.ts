@@ -76,6 +76,7 @@ export function createCodeProcesses(
       get: unavailable,
       execute: unavailable,
       reconcile: unavailable,
+      approvalPending: unavailable,
     },
     bindAction: business?.bindAction ?? unavailable,
     read: business?.read ?? unavailable,

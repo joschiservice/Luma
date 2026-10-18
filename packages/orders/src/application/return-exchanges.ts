@@ -10,6 +10,7 @@ import {
 import {
   canonicalJson,
   conflict,
+  createFailureLog,
   forbidden,
   ServiceError,
 } from '@luma/platform';
@@ -198,6 +199,8 @@ interface Dependencies extends Pick<
     observedAt: string,
     plan: ExchangeStepPlan,
   ) => Promise<ActionDiff | null>;
+  /** Reports best-effort failures; defaults to stderr without tenant or provider data. */
+  log?: (message: string, error?: unknown) => void;
 }
 
 const facts = (value: ReturnCase) => [
@@ -258,6 +261,8 @@ function action(
 
 /** Coordinates one exchange across availability choices, native fulfillment and independent payment proof. */
 export function createReturnExchanges(deps: Dependencies) {
+  const log = deps.log ?? createFailureLog();
+
   async function authorize(context: TenantContext, write = false) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
@@ -588,7 +593,12 @@ export function createReturnExchanges(deps: Dependencies) {
       `return.exchange.${state}`,
       cited.reads,
     );
-    await deps.admission?.reconcile(context, saved).catch(() => undefined);
+    // Best effort: the outcome is already saved and must not be lost to an admission failure.
+    await deps.admission
+      ?.reconcile(context, saved)
+      .catch((error: unknown) =>
+        log('Return exchange admission could not be reconciled', error),
+      );
 
     return saved;
   }

@@ -215,16 +215,38 @@ export function nextDueAt(now: Date, supportsSince: boolean) {
 
 /**
  * Exponential retry delay for the given consecutive failure count, never shorter than the
- * source's advice and never longer than an hour.
+ * source's advice and never longer than an hour. With `jitterKey`, such as the stream id,
+ * the exponential delay is spread over its upper half by a value derived from the key and
+ * attempt, so streams that failed together do not retry together, including at the cap,
+ * while each result stays reproducible. Without a key the full exponential delay is used.
  */
-export function retryDelayMs(attempts: number, advisedMs?: number) {
-  const exponential =
-    syncPolicy.firstRetryDelayMs * 2 ** Math.max(0, attempts - 1);
-
-  return Math.min(
+export function retryDelayMs(
+  attempts: number,
+  advisedMs?: number,
+  jitterKey?: string,
+) {
+  const exponential = Math.min(
     syncPolicy.maxRetryDelayMs,
-    Math.max(exponential, advisedMs ?? 0),
+    syncPolicy.firstRetryDelayMs * 2 ** Math.max(0, attempts - 1),
   );
+  const spread =
+    jitterKey === undefined
+      ? exponential
+      : exponential / 2 +
+        Math.floor((exponential / 2) * unitHash(`${jitterKey}:${attempts}`));
+
+  return Math.min(syncPolicy.maxRetryDelayMs, Math.max(spread, advisedMs ?? 0));
+}
+
+/** Maps a string to a stable value in [0, 1) with 32-bit FNV-1a. */
+function unitHash(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0) / 2 ** 32;
 }
 
 const failureMessages: Record<string, string> & { default: string } = {

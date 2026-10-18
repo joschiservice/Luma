@@ -48,6 +48,12 @@ const refreshActivities = pauseWhileInactive(
 const execution = pauseWhileInactive(
   proxyActivities<Pick<ExceptionActivities, 'execute'>>({
     ...activityOptions,
+    // Execution can run several precondition reads, the write and verification. A retry while
+    // the first attempt still runs would reconcile too early, so allow a slow provider and
+    // detect a lost worker through heartbeats instead.
+    startToCloseTimeout: '5 minutes',
+    heartbeatTimeout: '20 seconds',
+    scheduleToCloseTimeout: '15 minutes',
     // Recovery must not race a provider write that is still running.
     cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
   }),
@@ -121,21 +127,31 @@ export async function exceptionWorkflow(
       return finish('escalated', 'manual_intervention_required');
     let proposal = initialProposal;
     progress = { ...progress, proposalId: proposal.id };
+    // Refreshed and changed proposals carry new expiries; the wait stays within one day.
+    const approvalLimit = Date.now() + 86_400_000;
+    const limitRefreshes = patched('approval-deadline-limit-v1');
+    const deadlineOf = (expiresAt: string) =>
+      limitRefreshes
+        ? Math.min(Date.parse(expiresAt), approvalLimit)
+        : Date.parse(expiresAt);
     let approvalDeadline = Math.min(
       Date.parse(proposal.expiresAt),
-      Date.now() + 86_400_000,
+      approvalLimit,
     );
     const automaticRefresh =
       patched('automatic-proposal-refresh-v1') && proposal.refreshable;
     let result;
     while (true) {
+      // Refresh failures and changed conditions retry; the limit still ends the wait.
+      if (limitRefreshes && Date.now() >= approvalLimit)
+        return finish('denied', 'proposal_expired');
       if (automaticRefresh && Date.now() >= approvalDeadline - 30_000) {
         finish('proposing', 'checking_current_conditions');
         try {
           const next = await refreshActivities.refresh(input, exceptionId);
           if (next) {
             proposal = next;
-            approvalDeadline = Date.parse(next.expiresAt);
+            approvalDeadline = deadlineOf(next.expiresAt);
             progress = {
               phase: 'awaiting_approval',
               exceptionId,
@@ -173,7 +189,7 @@ export async function exceptionWorkflow(
       if (result.state === 'proposal_changed') {
         dispatched = false;
         proposal = result.proposal;
-        approvalDeadline = Date.parse(proposal.expiresAt);
+        approvalDeadline = deadlineOf(proposal.expiresAt);
         progress = {
           phase: 'awaiting_approval',
           exceptionId,
@@ -188,11 +204,31 @@ export async function exceptionWorkflow(
         phase: 'awaiting_approval',
         decisionId: result.decisionId,
       };
-      // Polling recovers an approval committed before a lost notification.
-      await condition(
-        () => wake,
-        Math.min(30_000, Math.max(1, approvalDeadline - Date.now())),
-      );
+      const decisionId = result.decisionId;
+      const readOnlyWait = patched('read-only-approval-wait-v1');
+      while (true) {
+        // Polling recovers an approval committed before a lost notification.
+        await condition(
+          () => wake,
+          Math.min(30_000, Math.max(1, approvalDeadline - Date.now())),
+        );
+        if (
+          !readOnlyWait ||
+          wake ||
+          Date.now() >= approvalDeadline - (automaticRefresh ? 30_000 : 0)
+        )
+          break;
+        // Executing again would record a policy decision and reread the provider on every poll.
+        if (
+          !(await activities.approvalPending(
+            input,
+            exceptionId,
+            proposal,
+            decisionId,
+          ))
+        )
+          break;
+      }
       wake = false;
     }
     if (result.state === 'reconciliation_required') {

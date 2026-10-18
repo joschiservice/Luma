@@ -312,7 +312,9 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         code,
         message: options.message ?? failureMessage(code),
         dueAt: new Date(
-          +started + (options.delayMs ?? retryDelayMs(claimed.attempts + 1)),
+          +started +
+            (options.delayMs ??
+              retryDelayMs(claimed.attempts + 1, undefined, claimed.id)),
         ).toISOString(),
         restart: options.restart ?? false,
         block: options.block ?? null,
@@ -525,7 +527,11 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
             claimed.connectionId,
             new Date(
               +now() +
-                retryDelayMs(claimed.attempts + 1, result.error.retryAfterMs),
+                retryDelayMs(
+                  claimed.attempts + 1,
+                  result.error.retryAfterMs,
+                  claimed.id,
+                ),
             ).toISOString(),
           );
         const restart = result.error.code === 'invalid_input' && !!scan.cursor;
@@ -533,7 +539,11 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           restart,
           delayMs: restart
             ? 0
-            : retryDelayMs(claimed.attempts + 1, result.error.retryAfterMs),
+            : retryDelayMs(
+                claimed.attempts + 1,
+                result.error.retryAfterMs,
+                claimed.id,
+              ),
         });
 
         return true;

@@ -36,9 +36,13 @@ import {
 
 /**
  * An in-memory supplier-commitment service with inspectable records, for owner tests. Pass a
- * model gateway to extract commitments from recorded messages.
+ * model gateway to extract commitments from recorded messages; `overrides` replace
+ * dependencies.
  */
-export function commitmentFixture(gateway: ModelGateway | null = null) {
+export function commitmentFixture(
+  gateway: ModelGateway | null = null,
+  overrides: Partial<CommitmentDependencies> = {},
+) {
   const tenantId = randomUUID();
   const userId = randomUUID();
   const context = (
@@ -116,9 +120,13 @@ export function commitmentFixture(gateway: ModelGateway | null = null) {
     insertSubmission: async (value) => {
       submissions.unshift(value);
     },
-    saveSubmission: async (value) => {
-      const index = submissions.findIndex((s) => s.id === value.id);
+    saveSubmission: async (value, _settled, expected) => {
+      const index = submissions.findIndex(
+        (s) => s.id === value.id && s.state === expected,
+      );
       if (index >= 0) submissions[index] = value;
+
+      return index >= 0;
     },
     liveSubmissions: async () => submissions,
     communications: async () => [...communications.values()],
@@ -224,6 +232,7 @@ export function commitmentFixture(gateway: ModelGateway | null = null) {
       followUp: (input) => followUpInputSchema.parse(input),
       receipt: (input) => receiptInputSchema.parse(input),
     },
+    ...overrides,
   };
   const request = () => ({
     id: randomUUID(),

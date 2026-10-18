@@ -260,6 +260,28 @@ describe.skipIf(!databaseUrl)(
       }
     });
 
+    it('records a failed check before dispatch as unavailable, not as a changed precondition', async () => {
+      const f = await admitted();
+      try {
+        checkPreconditions
+          .mockResolvedValueOnce(true)
+          .mockRejectedValueOnce(new Error('provider read failed'));
+        const result = await f.service.execution.execute(alice, {
+          runId: f.step.runId,
+          stepId: f.step.stepId,
+        });
+        expect(result.state).toBe('failed');
+        expect(execute).not.toHaveBeenCalled();
+        expect(
+          (await audit(f.step.action.id)).find(
+            (entry: AuditEntry) => entry.eventType === 'execution.withheld',
+          )?.details.reason,
+        ).toBe('precondition_unavailable');
+      } finally {
+        await f.service.close();
+      }
+    });
+
     it('admits concurrent logical requests once and retains provider, artifact and audit identity', async () => {
       const f = await admitted();
       execute.mockResolvedValue({
@@ -1583,6 +1605,51 @@ describe.skipIf(!databaseUrl)(
         expect(await audit(proposal.id)).toEqual([]);
       }
       expect(resolve).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+    });
+    it('reads a pending approval without recording another policy decision', async () => {
+      const proposal = action();
+      resolve.mockResolvedValue({ ...adapter, minimumRisk: 'high' });
+      const waiting = await safety.execution.execute(alice, proposal);
+      if (waiting.state !== 'approval_required')
+        throw new Error('Missing decision');
+      const decisions = async () =>
+        (
+          await owner.query(
+            'SELECT id FROM policy_decisions WHERE tenant_id=$1 AND proposal_id=$2',
+            [tenantId, proposal.id],
+          )
+        ).rowCount;
+      const recorded = await decisions();
+      expect(
+        await safety.execution.approvalPending(
+          alice,
+          proposal.id,
+          waiting.decision.id,
+        ),
+      ).toBe(true);
+      expect(
+        await safety.execution.approvalPending(
+          alice,
+          randomUUID(),
+          waiting.decision.id,
+        ),
+      ).toBe(false);
+      expect(await decisions()).toBe(recorded);
+      await safety.policies.respond(
+        bob,
+        waiting.decision.id,
+        'approved',
+        new Date(Date.now() + 60_000).toISOString(),
+      );
+      expect(
+        await safety.execution.approvalPending(
+          alice,
+          proposal.id,
+          waiting.decision.id,
+        ),
+      ).toBe(false);
+      resolve.mockResolvedValue(adapter);
       expect(execute).not.toHaveBeenCalled();
     });
     it('keeps rejection binding when adapter risk is lowered or the response expires', async () => {

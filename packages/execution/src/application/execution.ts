@@ -7,7 +7,7 @@ import {
   requireChangesAllowed,
   requireTenant,
 } from '@luma/identity';
-import { forbidden } from '@luma/platform';
+import { forbidden, ServiceError } from '@luma/platform';
 import type {
   AutonomyAdmission,
   PolicyDecision,
@@ -115,6 +115,8 @@ export interface ExecutionDependencies {
   audit: AuditLog;
   registry: EffectRegistry;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  /** Reports a check that failed with an error rather than a negative result. */
+  logFailure?(message: string, error: unknown): void;
   parse(input: unknown): { action: ProposedAction; hash: string };
   parseVerification(input: unknown): VerificationResult;
   parseEvidence(input: unknown): string[];
@@ -339,6 +341,34 @@ export function createExecutionService(deps: ExecutionDependencies) {
 
       return result(record);
     },
+    /**
+     * States whether an approval-required decision is still waiting, without evaluating policy
+     * or reading the provider. False once a response exists, the workspace policy changed or the
+     * decision does not belong to the proposal; the caller then runs `execute` for a fresh
+     * decision.
+     */
+    async approvalPending(
+      context: TenantContext,
+      proposalId: string,
+      decisionId: string,
+    ) {
+      requireTenant(context, context.tenantId);
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      const decision = await deps.policies.decision(fresh, decisionId);
+      if (
+        !decision ||
+        decision.proposalId !== proposalId ||
+        decision.outcome !== 'approval_required' ||
+        decision.approval
+      )
+        return false;
+
+      return (
+        (await deps.policies.currentVersion(fresh.tenantId)) ===
+        decision.policyVersion
+      );
+    },
     async execute(
       context: TenantContext,
       input: unknown,
@@ -525,6 +555,18 @@ export function createExecutionService(deps: ExecutionDependencies) {
       }
       // A durable reservation is never automatically redelivered after a crash.
       await flush(context.tenantId, action.id);
+      // A check that throws withholds dispatch too, but is recorded as unavailable rather than
+      // as a changed precondition or admission.
+      let checkUnavailable = false;
+      const unavailable = (error: unknown) => {
+        // A refused identity is a real admission change, not an unavailable check.
+        if (!(error instanceof ServiceError && error.statusCode !== 503)) {
+          checkUnavailable = true;
+          deps.logFailure?.('Execution check before dispatch failed', error);
+        }
+
+        return false;
+      };
       // Audit persistence can take time; expired decisions never authorize a call, and a
       // requester who lost the permission meanwhile is withheld before dispatch.
       const admissionCurrent =
@@ -535,14 +577,14 @@ export function createExecutionService(deps: ExecutionDependencies) {
         (await deps
           .refreshContext(context)
           .then((current) => current.permissions.has(permission))
-          .catch(() => false)) &&
-        (admissionGuard ? await admissionGuard().catch(() => false) : true);
+          .catch(unavailable)) &&
+        (admissionGuard ? await admissionGuard().catch(unavailable) : true);
       // The audit flush and authorization refresh may outlive the first provider check.
       // Recheck the exact expected values immediately before dispatch; adapters still enforce
       // provider compare-and-set or an independently bound calculation at the write boundary.
       const preconditionsCurrent =
         admissionCurrent &&
-        (await adapter.checkPreconditions(action).catch(() => false));
+        (await adapter.checkPreconditions(action).catch(unavailable));
       if (
         !preconditionsCurrent ||
         (await deps.policies.currentVersion(context.tenantId)) !==
@@ -563,8 +605,9 @@ export function createExecutionService(deps: ExecutionDependencies) {
             'execution.withheld',
             deps.id(),
             {
-              reason:
-                !preconditionsCurrent && admissionCurrent
+              reason: checkUnavailable
+                ? 'precondition_unavailable'
+                : !preconditionsCurrent && admissionCurrent
                   ? 'stale_precondition'
                   : admissionCurrent
                     ? 'decision_expired'
@@ -588,10 +631,10 @@ export function createExecutionService(deps: ExecutionDependencies) {
           async (firstDispatch = true) => {
             const preconditionsStillCurrent =
               !firstDispatch ||
-              (await adapter.checkPreconditions(action).catch(() => false));
+              (await adapter.checkPreconditions(action).catch(unavailable));
             const current = await deps
               .refreshContext(context)
-              .catch(() => null);
+              .catch((error: unknown) => (unavailable(error), null));
             if (
               !current?.permissions.has(permission) ||
               (await deps.writeControl?.mode(

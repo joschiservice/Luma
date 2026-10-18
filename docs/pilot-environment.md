@@ -127,7 +127,7 @@ sequenceDiagram
   W-->>T: verified, the case resolves
 ```
 
-The scenario approves the correction automatically. When the worker prints `PILOT_EFFECT_COMMITTED`, run `kill -KILL <worker-pid>` with the PID it printed, then restart `pnpm pilot:worker` without resetting. Allow up to 90 seconds for Temporal's activity timeout and retry. The execution receipt forces read-only reconciliation, so the action is not dispatched again, and the case resolves after the independent business read. The provider file must show exactly one effect and `patchRequests: 1`. If you don't kill the worker, the simulated lost response exercises the same reconciliation after 40 seconds. Never kill the API or database for this drill.
+The scenario approves the correction automatically. When the worker prints `PILOT_EFFECT_COMMITTED`, run `kill -KILL <worker-pid>` with the PID it printed, then restart `pnpm pilot:worker` without resetting. Allow up to 90 seconds for Temporal's activity heartbeat timeout and retry. The execution receipt forces read-only reconciliation, so the action is not dispatched again, and the case resolves after the independent business read. The provider file must show exactly one effect and `patchRequests: 1`. If you don't kill the worker, the simulated lost response exercises the same reconciliation after 40 seconds. Never kill the API or database for this drill.
 
 ## Reusing the pilot in tests
 

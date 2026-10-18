@@ -559,10 +559,10 @@ export function createSubmissionRequests(
               request.state === 'submitted' ? null : (request.reason ?? null),
             updatedAt: now,
           };
-          if (prior) await tx.saveSubmission(submission, true);
+          if (prior) await tx.saveSubmission(submission, true, prior.state);
           else {
             await tx.insertSubmission(submission);
-            await tx.saveSubmission(submission, true);
+            await tx.saveSubmission(submission, true, submission.state);
           }
           await tx.audit(
             audit(

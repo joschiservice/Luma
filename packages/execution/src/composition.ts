@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { AuditLog } from '@luma/audit';
 import type { EffectRegistry } from '@luma/connections';
 import type { TenantDatabase } from '@luma/platform';
+import { createFailureLog } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
 import type { AdmissionDependencies } from './application/admission.js';
@@ -39,6 +40,7 @@ export function createExecution(
     audit,
     registry,
     refreshContext,
+    logFailure: createFailureLog(),
     parse: parseAction,
     parseVerification,
     parseEvidence,

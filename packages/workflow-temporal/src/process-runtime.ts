@@ -21,6 +21,7 @@ import {
   temporalActivities,
   type TemporalSettings,
   validateSettings,
+  workerShutdownGraceTime,
   workflowPath,
 } from './runtime.js';
 import type {
@@ -179,7 +180,13 @@ export async function createProcessWorker(
         settings.captureActivityError,
         settings.dataRegion,
       ),
-      shutdownGraceTime: '30 seconds',
+      shutdownGraceTime: workerShutdownGraceTime,
+      ...(settings.maxConcurrentActivities
+        ? {
+            maxConcurrentActivityTaskExecutions:
+              settings.maxConcurrentActivities,
+          }
+        : {}),
     });
 
     return {

@@ -17,6 +17,14 @@ import {
   purchasingWriteReceipt,
 } from './purchasing-reads.js';
 
+/** Submission states an execution outcome may still replace. */
+const unsettledSubmissionStates: Submission['state'][] = [
+  'approval_required',
+  'approved',
+  'submitting',
+  'uncertain',
+];
+
 /**
  * Executes admitted submissions exactly once and verifies them by reading the purchasing system:
  * dispatch, settlement of execution results, observed confirmations and receipts, the background
@@ -213,29 +221,25 @@ export function createSubmissionExecution({
     );
     if (!submission) return null;
     if (execution.state === 'not_started') return submission;
+    // Concurrent dispatches and reconciliations read the same submission. An unverified outcome
+    // only applies while the submission is still unsettled; otherwise the caller returns the
+    // state another caller already recorded instead of overwriting it.
+    const record = (patch: Partial<Submission>) =>
+      deps.store.transaction(context.tenantId, true, async (tx) => {
+        const current = await tx.submission(submissionId);
+        if (!current || !unsettledSubmissionStates.includes(current.state))
+          return current;
+
+        return saveSubmission(tx, current, patch);
+      });
     if (execution.state === 'not_executed')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, {
-          state: 'not_executed',
-          failure: null,
-        }),
-      );
+      return record({ state: 'not_executed', failure: null });
     if (execution.state === 'withheld' || execution.state === 'failed')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, {
-          state: 'failed',
-          failure: execution.reason,
-        }),
-      );
-    if (execution.state !== 'verified')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, { state: 'uncertain' }),
-      );
+      return record({ state: 'failed', failure: execution.reason });
+    if (execution.state !== 'verified') return record({ state: 'uncertain' });
     const found = await locate(context, submission);
     if (!found || !matchesSubmission(submission, found.data))
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, { state: 'uncertain' }),
-      );
+      return record({ state: 'uncertain' });
     submission = await deps.store.transaction(
       context.tenantId,
       true,
@@ -296,14 +300,29 @@ export function createSubmissionExecution({
     return submission;
   }
 
-  /** Moves an approved submission to submitting, executes it once and settles the result. */
+  /**
+   * Executes an approved submission once and settles the result. The caller that moves it from
+   * `approved` to `submitting` executes; concurrent callers return the stored submission without
+   * executing. Observe-only previews of unapproved submissions execute without a claim because
+   * admission records them without sending anything.
+   */
   async function dispatch(context: TenantContext, submission: Submission) {
     if (!deps.admission) return submission;
-    await deps.store.transaction(context.tenantId, true, async (tx) => {
-      const current = await tx.submission(submission.id);
-      if (current?.state === 'approved')
-        await saveSubmission(tx, current, { state: 'submitting' });
-    });
+    const claim = await deps.store.transaction(
+      context.tenantId,
+      true,
+      async (tx) => {
+        const current = await tx.submission(submission.id);
+        if (current?.state === 'approved')
+          return {
+            claimed: true,
+            current: await saveSubmission(tx, current, { state: 'submitting' }),
+          };
+
+        return { claimed: current?.state === 'approval_required', current };
+      },
+    );
+    if (!claim.claimed) return claim.current;
     let execution: SubmissionExecution;
     try {
       execution = await deps.admission.execute(context, submission);

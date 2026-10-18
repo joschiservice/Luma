@@ -101,7 +101,11 @@ export interface CommitmentContext {
   ): Promise<
     { line: PurchaseOrder['lines'][number]; sku: ExternalId | null }[]
   >;
-  /** Saves `patch` with a fresh `updatedAt`; a settled submission leaves background checks. */
+  /**
+   * Saves `patch` with a fresh `updatedAt`; a settled submission leaves background checks.
+   * Throws a conflict when another caller changed the stored state first, so a stale copy never
+   * overwrites a newer state; audit written in the same transaction rolls back with it.
+   */
   saveSubmission(
     tx: CommitmentTransaction,
     submission: Submission,
@@ -258,7 +262,8 @@ export function createCommitmentContext(
       ...patch,
       updatedAt: deps.now().toISOString(),
     };
-    await tx.saveSubmission(next, settled);
+    if (!(await tx.saveSubmission(next, settled, submission.state)))
+      throw conflict('This submission changed. Refresh it.');
 
     return next;
   }

@@ -165,7 +165,13 @@ export function createObservability(
                 ? { transaction: message }
                 : {}),
             tags: {
-              ...safeTags(context ? metadata(context) : event.tags),
+              ...safeTags(
+                context
+                  ? metadata(context)
+                  : activity?.requestId
+                    ? { request_id: activity.requestId }
+                    : event.tags,
+              ),
               ...(http
                 ? { 'http.method': http.method, 'http.route': http.route }
                 : {}),
@@ -473,6 +479,7 @@ export function createObservability(
             'temporal.activity_type': context.activityType,
             'temporal.attempt': context.attempt,
             'temporal.task_queue': context.taskQueue,
+            ...(context.requestId ? { request_id: context.requestId } : {}),
           },
         });
       const data: FailureData = { activityFailure: context };

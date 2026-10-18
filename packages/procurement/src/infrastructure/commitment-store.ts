@@ -311,12 +311,13 @@ export function createCommitmentStore(
               ],
             );
           },
-          saveSubmission: async (s, settled) => {
-            await tx.query(
-              'UPDATE procurement_submissions SET state=$3,settled=$4,document=$5 WHERE tenant_id=$1 AND id=$2',
-              [tenantId, s.id, s.state, settled, s],
-            );
-          },
+          saveSubmission: async (s, settled, expected) =>
+            !!(
+              await tx.query(
+                'UPDATE procurement_submissions SET state=$3,settled=$4,document=$5 WHERE tenant_id=$1 AND id=$2 AND state=$6',
+                [tenantId, s.id, s.state, settled, s, expected],
+              )
+            ).rowCount,
           liveSubmissions: (principalId) =>
             documents<Submission>(
               `SELECT document FROM procurement_submissions WHERE tenant_id=$1 AND principal_id=$2

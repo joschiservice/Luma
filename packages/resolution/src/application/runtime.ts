@@ -92,6 +92,16 @@ export interface ExceptionActivities {
     exceptionId: string,
     proposal: ProposalReference,
   ): Promise<WorkflowExecutionResult>;
+  /**
+   * Reads whether an execution is still waiting for the given approval decision. It records no
+   * policy decision and reads no provider; false means `execute` should run again.
+   */
+  approvalPending(
+    input: ExceptionWorkflowInput,
+    exceptionId: string,
+    proposal: ProposalReference,
+    decisionId: string,
+  ): Promise<boolean>;
   reconcile(
     input: ExceptionWorkflowInput,
     proposalId: string,
@@ -364,6 +374,15 @@ export function createExceptionActivities(deps: {
       return result.state === 'approval_required'
         ? { state: result.state, decisionId: result.decision.id }
         : { state: result.state };
+    },
+    async approvalPending(input, exceptionId, proposal, decisionId) {
+      if (input.shadow)
+        throw new WorkflowInputError('Shadow workflows cannot execute');
+      const fresh = await context(input);
+      const latest = await deps.bindings.currentProposal?.(fresh, exceptionId);
+      if (latest && latest.id !== proposal.id) return false;
+
+      return deps.execution.approvalPending(fresh, proposal.id, decisionId);
     },
     async reconcile(input, proposalId) {
       if (input.shadow)

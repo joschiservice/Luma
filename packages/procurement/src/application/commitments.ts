@@ -207,7 +207,15 @@ export interface CommitmentTransaction {
   submissions(orderIds?: string[]): Promise<Submission[]>;
   submission(id: string): Promise<Submission | null>;
   insertSubmission(submission: Submission): Promise<void>;
-  saveSubmission(submission: Submission, settled: boolean): Promise<void>;
+  /**
+   * Replaces the stored submission only while its state is still `expected`. Returns false and
+   * writes nothing when another caller changed the state first.
+   */
+  saveSubmission(
+    submission: Submission,
+    settled: boolean,
+    expected: Submission['state'],
+  ): Promise<boolean>;
   /** Unsettled submissions in active states, oldest first. */
   liveSubmissions(principalId: string): Promise<Submission[]>;
   /** Newest first; reads at most `limit` messages when given. */

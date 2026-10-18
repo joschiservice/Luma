@@ -83,6 +83,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
     get: deps.execution.get,
     writeMode: deps.execution.writeMode,
     reconcile: deps.execution.reconcile,
+    approvalPending: deps.execution.approvalPending,
     async execute(context: TenantContext, input: unknown) {
       const reference = deps.parseReference(input);
       // Execution checks the capability's permission, or actions.execute, against a fresh
