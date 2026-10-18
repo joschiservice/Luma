@@ -88,6 +88,31 @@ describe('retryDelayMs', () => {
     expect(retryDelayMs(20)).toBe(syncPolicy.maxRetryDelayMs);
     expect(retryDelayMs(1, 90_000)).toBe(90_000);
   });
+
+  it('spreads keyed delays over the upper half of the backoff, reproducibly', () => {
+    const delays = Array.from({ length: 50 }, (_, index) =>
+      retryDelayMs(3, undefined, `stream-${index}`),
+    );
+
+    for (const delay of delays) {
+      expect(delay).toBeGreaterThanOrEqual(60_000);
+      expect(delay).toBeLessThan(120_000);
+    }
+    expect(new Set(delays).size).toBeGreaterThan(40);
+    expect(retryDelayMs(3, undefined, 'stream-1')).toBe(
+      retryDelayMs(3, undefined, 'stream-1'),
+    );
+  });
+
+  it('keeps source advice and the hour cap when jittered', () => {
+    expect(retryDelayMs(1, 90_000, 'stream-1')).toBe(90_000);
+    expect(retryDelayMs(1, 5 * 60 * 60_000, 'stream-1')).toBe(
+      syncPolicy.maxRetryDelayMs,
+    );
+    const capped = retryDelayMs(30, undefined, 'stream-1');
+    expect(capped).toBeGreaterThanOrEqual(syncPolicy.maxRetryDelayMs / 2);
+    expect(capped).toBeLessThanOrEqual(syncPolicy.maxRetryDelayMs);
+  });
 });
 
 describe('streamStatus', () => {

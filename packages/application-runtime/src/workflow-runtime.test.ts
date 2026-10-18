@@ -127,6 +127,7 @@ function fixture() {
       get: vi.fn().mockResolvedValue(null),
       execute: vi.fn().mockResolvedValue({ state: 'succeeded' }),
       reconcile: vi.fn().mockResolvedValue({ state: 'succeeded' }),
+      approvalPending: vi.fn().mockResolvedValue(true),
     },
     bindings: {
       recordWorkflow: vi.fn(),
@@ -217,6 +218,18 @@ describe('durable activity boundaries', () => {
     });
     expect(deps.execution.execute).not.toHaveBeenCalled();
     expect(deps.bindings.proposals.get).not.toHaveBeenCalled();
+  });
+  it('reads a pending approval without evaluating policy again', async () => {
+    const { deps, activities } = fixture();
+    expect(
+      await activities.approvalPending(input, 'incident', proposal, 'decision'),
+    ).toBe(true);
+    expect(deps.execution.approvalPending).toHaveBeenCalledWith(
+      context,
+      proposal.id,
+      'decision',
+    );
+    expect(deps.execution.execute).not.toHaveBeenCalled();
   });
   it('rejects a proposal bound to a different case', async () => {
     const { deps, activities } = fixture();

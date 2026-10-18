@@ -8,7 +8,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, createFailureLog } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type { ReturnAction } from '../domain/return-actions.js';
@@ -152,6 +152,8 @@ interface Dependencies extends Pick<
     observedAt: string,
     plan: ExchangeStepPlan,
   ) => Promise<ActionDiff | null>;
+  /** Reports best-effort failures; defaults to stderr without tenant or provider data. */
+  log?: (message: string, error?: unknown) => void;
 }
 
 const facts = (value: ReturnCase) => [
@@ -212,6 +214,8 @@ function action(
 
 /** Coordinates one exchange across availability choices, native fulfillment and independent payment proof. */
 export function createReturnExchanges(deps: Dependencies) {
+  const log = deps.log ?? createFailureLog();
+
   async function authorize(context: TenantContext, write = false) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
@@ -396,7 +400,12 @@ export function createReturnExchanges(deps: Dependencies) {
       { proof, state, failure: state === 'failed' ? 'provider_failed' : null },
       `return.exchange.${state}`,
     );
-    await deps.admission?.reconcile(context, saved).catch(() => undefined);
+    // Best effort: the outcome is already saved and must not be lost to an admission failure.
+    await deps.admission
+      ?.reconcile(context, saved)
+      .catch((error: unknown) =>
+        log('Return exchange admission could not be reconciled', error),
+      );
 
     return saved;
   }

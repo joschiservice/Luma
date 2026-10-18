@@ -8,7 +8,7 @@ import {
   requirePermission,
   requireTenant,
 } from '@luma/identity';
-import { canonicalJson } from '@luma/platform';
+import { canonicalJson, createFailureLog } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
 import type {
@@ -136,6 +136,8 @@ interface Dependencies extends Pick<
     observedAt: string,
     plan: ReturnActionPlan,
   ) => Promise<ActionDiff | null>;
+  /** Reports best-effort failures; defaults to stderr without tenant or provider data. */
+  log?: (message: string, error?: unknown) => void;
 }
 
 function fail(status: 404 | 409 | 503, message: string): never {
@@ -191,6 +193,8 @@ function returnSettlementAction(
 
 /** Composes separately governed physical and financial steps. Checking uncertain writes never sends again. */
 export function createReturnActions(deps: Dependencies) {
+  const log = deps.log ?? createFailureLog();
+
   async function authorize(context: TenantContext, write = false) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
@@ -417,7 +421,12 @@ export function createReturnActions(deps: Dependencies) {
       },
       state === 'verified' ? 'return.settlement.verified' : undefined,
     );
-    await deps.admission?.reconcile(context, result).catch(() => undefined);
+    // Best effort: the outcome is already saved and must not be lost to an admission failure.
+    await deps.admission
+      ?.reconcile(context, result)
+      .catch((error: unknown) =>
+        log('Return settlement admission could not be reconciled', error),
+      );
 
     return result;
   }

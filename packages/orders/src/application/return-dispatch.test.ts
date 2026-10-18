@@ -1,5 +1,5 @@
 import { builtInMembership, makeTenantContext } from '@luma/identity';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
@@ -42,7 +42,13 @@ const decided = {
   evidence: { note: 'Counted', link: null },
 };
 
-function fixture(kind: 'settlement' | 'exchange') {
+function fixture(
+  kind: 'settlement' | 'exchange',
+  options: {
+    reconcile?: () => Promise<{ state: 'uncertain' }>;
+    log?: (message: string, error?: unknown) => void;
+  } = {},
+) {
   const c: ReturnCase = {
     id: 'case',
     tenantId: 'tenant',
@@ -214,7 +220,8 @@ function fixture(kind: 'settlement' | 'exchange') {
     decision: async () => null,
     respond: async () => {},
     execute: () => execute(),
-    reconcile: async () => ({ state: 'uncertain' as const }),
+    reconcile:
+      options.reconcile ?? (async () => ({ state: 'uncertain' as const })),
     writeMode: async () => 'writes_enabled' as const,
   };
   const common = {
@@ -228,6 +235,7 @@ function fixture(kind: 'settlement' | 'exchange') {
     refreshContext: async () => context,
     principal: async () => context,
     admission,
+    ...(options.log ? { log: options.log } : {}),
   };
   let outcome: 'passed' | 'inconclusive' = 'passed';
   const service =
@@ -368,6 +376,23 @@ describe.each(['settlement', 'exchange'] as const)(
         state: 'not_executed',
       });
       if (kind === 'exchange') expect(f.root().processingStarted).toBe(false);
+    });
+
+    it('keeps a verified outcome and logs when admission cannot be reconciled', async () => {
+      const failure = new Error('admission store unavailable');
+      const log = vi.fn();
+      const f = fixture(kind, {
+        reconcile: async () => {
+          throw failure;
+        },
+        log,
+      });
+
+      expect(await f.send()).toMatchObject({ sent: true, state: 'verified' });
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining('admission could not be reconciled'),
+        failure,
+      );
     });
   },
 );

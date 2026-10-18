@@ -116,7 +116,11 @@ it('admits each consequential step independently under the exact run and version
       reconcile: async () => {
         throw new Error('Unexpected reconciliation');
       },
-    } as unknown as Pick<ActionAdmission, 'get' | 'execute' | 'reconcile'>,
+      approvalPending: async () => false,
+    } as unknown as Pick<
+      ActionAdmission,
+      'get' | 'execute' | 'reconcile' | 'approvalPending'
+    >,
     bindAction: async (_context, _run, _version, step) => ({
       proposalId: step.id,
     }),
@@ -154,7 +158,12 @@ it('stops a run whose stored principal can no longer propose actions', async () 
     resolveContext: async () => operator('member'),
     loadRun: async () => triggerRun(processVersion),
     loadVersion: async () => processVersion,
-    admission: { get: vi.fn(), execute: vi.fn(), reconcile: vi.fn() },
+    admission: {
+      get: vi.fn(),
+      execute: vi.fn(),
+      reconcile: vi.fn(),
+      approvalPending: vi.fn(),
+    },
     bindAction: vi.fn(),
     read,
     decision: vi.fn(),

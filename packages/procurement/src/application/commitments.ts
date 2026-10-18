@@ -234,7 +234,15 @@ export interface CommitmentTransaction {
   submissions(orderIds?: string[]): Promise<Submission[]>;
   submission(id: string): Promise<Submission | null>;
   insertSubmission(submission: Submission): Promise<void>;
-  saveSubmission(submission: Submission, settled: boolean): Promise<void>;
+  /**
+   * Replaces the stored submission only while its state is still `expected`. Returns false and
+   * writes nothing when another caller changed the state first.
+   */
+  saveSubmission(
+    submission: Submission,
+    settled: boolean,
+    expected: Submission['state'],
+  ): Promise<boolean>;
   /** Unsettled submissions in active states, oldest first. */
   liveSubmissions(principalId: string): Promise<Submission[]>;
   communications(filter: {
@@ -405,6 +413,14 @@ export interface SubmissionView extends Submission {
 }
 
 const hour = 3_600_000;
+
+/** Submission states an execution outcome may still replace. */
+const unsettledSubmissionStates: Submission['state'][] = [
+  'approval_required',
+  'approved',
+  'submitting',
+  'uncertain',
+];
 
 // Activity shows `reason` as the event summary.
 const auditSummaries: Record<string, string> = {
@@ -802,6 +818,11 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     };
   }
 
+  /**
+   * Applies `patch` to `submission` while the stored state still matches `submission.state`.
+   * Throws a conflict when another caller changed the submission first, so a stale copy never
+   * overwrites a newer state; audit written in the same transaction rolls back with it.
+   */
   async function saveSubmission(
     tx: CommitmentTransaction,
     submission: Submission,
@@ -813,7 +834,8 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       ...patch,
       updatedAt: deps.now().toISOString(),
     };
-    await tx.saveSubmission(next, settled);
+    if (!(await tx.saveSubmission(next, settled, submission.state)))
+      conflict('This submission changed. Refresh it.');
 
     return next;
   }
@@ -1030,29 +1052,25 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     );
     if (!submission) return null;
     if (execution.state === 'not_started') return submission;
+    // Concurrent dispatches and reconciliations read the same submission. An unverified outcome
+    // only applies while the submission is still unsettled; otherwise the caller returns the
+    // state another caller already recorded instead of overwriting it.
+    const record = (patch: Partial<Submission>) =>
+      deps.store.transaction(context.tenantId, true, async (tx) => {
+        const current = await tx.submission(submissionId);
+        if (!current || !unsettledSubmissionStates.includes(current.state))
+          return current;
+
+        return saveSubmission(tx, current, patch);
+      });
     if (execution.state === 'not_executed')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, {
-          state: 'not_executed',
-          failure: null,
-        }),
-      );
+      return record({ state: 'not_executed', failure: null });
     if (execution.state === 'withheld' || execution.state === 'failed')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, {
-          state: 'failed',
-          failure: execution.reason,
-        }),
-      );
-    if (execution.state !== 'verified')
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, { state: 'uncertain' }),
-      );
+      return record({ state: 'failed', failure: execution.reason });
+    if (execution.state !== 'verified') return record({ state: 'uncertain' });
     const found = await locate(context, submission);
     if (!found || !matchesSubmission(submission, found))
-      return deps.store.transaction(context.tenantId, true, async (tx) =>
-        saveSubmission(tx, submission!, { state: 'uncertain' }),
-      );
+      return record({ state: 'uncertain' });
     submission = await deps.store.transaction(
       context.tenantId,
       true,
@@ -1104,13 +1122,29 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     return submission;
   }
 
+  /**
+   * Executes an approved submission once. The caller that moves it from `approved` to
+   * `submitting` executes; concurrent callers return the stored submission without executing.
+   * Observe-only previews of unapproved submissions execute without a claim because admission
+   * records them without sending anything.
+   */
   async function dispatch(context: TenantContext, submission: Submission) {
     if (!deps.admission) return submission;
-    await deps.store.transaction(context.tenantId, true, async (tx) => {
-      const current = await tx.submission(submission.id);
-      if (current?.state === 'approved')
-        await saveSubmission(tx, current, { state: 'submitting' });
-    });
+    const claim = await deps.store.transaction(
+      context.tenantId,
+      true,
+      async (tx) => {
+        const current = await tx.submission(submission.id);
+        if (current?.state === 'approved')
+          return {
+            claimed: true,
+            current: await saveSubmission(tx, current, { state: 'submitting' }),
+          };
+
+        return { claimed: current?.state === 'approval_required', current };
+      },
+    );
+    if (!claim.claimed) return claim.current;
     let execution: SubmissionExecution;
     try {
       execution = await deps.admission.execute(context, submission);
@@ -2674,10 +2708,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
             failure: request.reason ?? null,
             updatedAt: now,
           };
-          if (prior) await tx.saveSubmission(submission, true);
+          if (prior) await tx.saveSubmission(submission, true, prior.state);
           else {
             await tx.insertSubmission(submission);
-            await tx.saveSubmission(submission, true);
+            await tx.saveSubmission(submission, true, submission.state);
           }
           await tx.audit(
             audit(

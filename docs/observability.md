@@ -123,7 +123,7 @@ Request bodies, users, breadcrumbs, extras and custom error properties, such as 
 
 Process logs on stderr carry the same details as `error` with `type`, `message`, `code`, `stack` and `cause`. The API logs `Request failed` with trace ID, method and route; workers log the operation message. Logs contain no URLs, headers or bodies.
 
-Temporal history receives only sanitized activity failures. The worker additionally logs `Workflow activity failed before sanitization` with the original error, stack and cause, and the workflow ID, run ID, activity ID, activity type and attempt; use those fields to match an `Activity failed` warning. With `SENTRY_DSN` set, the regular and pilot workers also capture the original exception with a `temporal` context, independent of trace sampling, and flush pending events on shutdown. Activity arguments, custom error properties and ambient user or request data are never attached. These logs and events can contain provider details and need restricted access.
+Temporal history receives only sanitized activity failures. The worker additionally logs `Workflow activity failed before sanitization` with the original error, stack and cause, and the workflow ID, run ID, activity ID, activity type and attempt; use those fields to match an `Activity failed` warning. When the workflow input carries the starting request's ID, the log and the Sentry event's `request_id` tag include it, which links an activity failure to the API request that started the workflow. Traces continue through Temporal only with local diagnostics; hosted exports do not propagate trace context into workflows, so use `request_id` there. With `SENTRY_DSN` set, the regular and pilot workers also capture the original exception with a `temporal` context, independent of trace sampling, and flush pending events on shutdown. Activity arguments, custom error properties and ambient user or request data are never attached. These logs and events can contain provider details and need restricted access.
 
 ## Local diagnostics
 
@@ -166,7 +166,7 @@ Client spans include network and driver overhead; PostgreSQL statistics describe
 
 ## Instrumenting an operation
 
-Wrap an algorithm with `measureSync` or `measure` from `@luma/platform` and add its fixed name to `PerformanceOperation`. Without the local adapter the work runs directly. CPU profiles already capture functions, so add a measured boundary only where an operation-level duration helps. Temporal's tracing plugin covers workflow, client and activity boundaries.
+Wrap an algorithm with `measureSync` or `measure` from `@luma/platform` and add its fixed name to `PerformanceOperation`. Without the local adapter the work runs directly. CPU profiles already capture functions, so add a measured boundary only where an operation-level duration helps. With local diagnostics, Temporal's tracing plugin covers workflow, client and activity boundaries.
 
 ## Local data policy and lifecycle
 

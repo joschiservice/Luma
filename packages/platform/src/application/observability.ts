@@ -77,6 +77,8 @@ export interface ActivityFailureContext {
   attempt: number;
   taskQueue: string;
   namespace: string;
+  /** Server request ID that started the workflow, when its input carries one. */
+  requestId?: string;
 }
 
 /** Request facts for an unexpected HTTP failure; the adapter redacts them before export. */

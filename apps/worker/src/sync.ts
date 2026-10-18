@@ -10,10 +10,15 @@ import {
   type startLocalTelemetry,
 } from '@luma/platform/composition';
 
+import { createHealth, readHealthPort } from './health.js';
+
 /** Runs commerce history import and sync until SIGINT or SIGTERM. */
 export async function main(
   localTelemetry?: Awaited<ReturnType<typeof startLocalTelemetry>>,
 ) {
+  const health = createHealth(
+    readHealthPort(process.env, 'COMMERCE_SYNC_HEALTH_PORT'),
+  );
   // Mailbox reading sends documents and supplier messages to the configured EU model routes.
   const modelSettings = readModelGatewayConfig(process.env);
   const observability = createObservability({
@@ -23,6 +28,7 @@ export async function main(
     ),
   });
   try {
+    await health.listen();
     const worker = await createDefaultCommerceSyncWorker(
       readIdentityConfig(process.env),
       readCommerceSyncConfig(process.env),
@@ -30,17 +36,23 @@ export async function main(
       observability,
       modelSettings,
     );
-    const shutdown = () => worker.shutdown();
+    const shutdown = () => {
+      health.set('stopping');
+      worker.shutdown();
+    };
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, shutdown);
     try {
+      health.set('running');
       await worker.run();
     } finally {
+      health.set('stopping');
       for (const signal of ['SIGINT', 'SIGTERM'] as const)
         process.removeListener(signal, shutdown);
       await worker.close();
     }
   } finally {
+    await health.close();
     await observability.shutdown();
     await localTelemetry?.shutdown();
   }

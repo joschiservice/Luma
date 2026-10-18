@@ -28,7 +28,7 @@ import {
   supplierLinkInputSchema,
 } from './validation.js';
 
-function fixture() {
+function fixture(overrides: Partial<CommitmentDependencies> = {}) {
   const tenantId = randomUUID();
   const userId = randomUUID();
   const context = (
@@ -101,9 +101,13 @@ function fixture() {
     insertSubmission: async (value) => {
       submissions.unshift(value);
     },
-    saveSubmission: async (value) => {
-      const index = submissions.findIndex((s) => s.id === value.id);
+    saveSubmission: async (value, _settled, expected) => {
+      const index = submissions.findIndex(
+        (s) => s.id === value.id && s.state === expected,
+      );
       if (index >= 0) submissions[index] = value;
+
+      return index >= 0;
     },
     liveSubmissions: async () => submissions,
     communications: async () => [],
@@ -195,6 +199,7 @@ function fixture() {
       followUp: (input) => followUpInputSchema.parse(input),
       receipt: (input) => receiptInputSchema.parse(input),
     },
+    ...overrides,
   };
   const request = () => ({
     id: randomUUID(),
@@ -336,5 +341,124 @@ describe('receipt reconciliation commands', () => {
         key: `${body.key}:${body.nextCheckAt}`,
       }),
     );
+  });
+});
+
+describe('purchase-order submission dispatch', () => {
+  it('executes a concurrently dispatched submission once and keeps the verified result', async () => {
+    let executions = 0;
+    let firstSettled = () => {};
+    const settled = new Promise<void>((resolve) => {
+      firstSettled = resolve;
+    });
+    const connectionId = randomUUID();
+    const f = fixture({
+      admission: {
+        prepare: async () => {
+          throw new Error('Not used');
+        },
+        decision: async () => null,
+        respond: async () => {},
+        execute: async () => {
+          executions += 1;
+          if (executions === 1) return { state: 'verified' };
+          // A second execution would only settle after the first; it must not replace it.
+          await settled;
+
+          return { state: 'uncertain' };
+        },
+        reconcile: async () => ({ state: 'uncertain' }),
+        get: async () => ({ state: 'uncertain' }),
+      },
+      purchasing: {
+        connections: async () => [],
+        suppliers: async () => ({
+          ok: true,
+          value: { items: [], nextCursor: null },
+        }),
+        orders: async (_context, _connection, query) => ({
+          ok: true,
+          value: [
+            {
+              observationId: randomUUID(),
+              observedAt: '2026-10-02T12:00:00.000Z',
+              externalId: 'jtl-order-1',
+              scopeKey: '',
+              data: {
+                supplier: { externalId: 'supplier', scopeKey: '' },
+                orderNumber: 'B-1',
+                lumaOrderId: query.created?.lumaOrderId ?? null,
+                status: 'open',
+                requestedDeliveryDate: '2026-10-10',
+                confirmed: null,
+                createdAt: '2026-10-02T11:00:00.000Z',
+                lines: [
+                  {
+                    id: { externalId: 'line-1', scopeKey: '' },
+                    sku: { externalId: 'sku-1', scopeKey: '' },
+                    itemNumber: 'SKU-1',
+                    quantity: { amount: '100', unit: 'each' },
+                    deliveredQuantity: null,
+                    confirmedQuantity: null,
+                    confirmedDeliveryDate: null,
+                    confirmed: null,
+                    requestedDeliveryDate: null,
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      },
+    });
+    const { order } = f;
+    const requester = f.context();
+    f.submissions.push({
+      id: randomUUID(),
+      tenantId: order.tenantId,
+      purchaseOrderId: order.id,
+      connectionId,
+      supplier: { externalId: 'supplier', scopeKey: '' },
+      requestedDeliveryDate: '2026-10-10',
+      lines: [
+        {
+          lineId: order.lines[0]!.id,
+          sku: { externalId: 'sku-1', scopeKey: '' },
+          quantity: 100,
+          unit: 'each',
+        },
+      ],
+      actionId: randomUUID(),
+      decisionId: randomUUID(),
+      requestedBy: requester.actor.id,
+      requestedAt: '2026-10-02T11:00:00.000Z',
+      expiresAt: '2026-10-03T11:00:00.000Z',
+      state: 'approved',
+      externalOrder: null,
+      submittedAt: null,
+      decidedBy: randomUUID(),
+      decidedAt: '2026-10-02T11:30:00.000Z',
+      failure: null,
+      updatedAt: '2026-10-02T11:30:00.000Z',
+    });
+    const audit = f.audits.push.bind(f.audits);
+    f.audits.push = (...entries) => {
+      const length = audit(...entries);
+      if (entries.some((e) => e.eventType === 'purchase_order.submitted'))
+        firstSettled();
+
+      return length;
+    };
+
+    await Promise.all([f.service.tick(requester), f.service.tick(requester)]);
+
+    expect(executions).toBe(1);
+    expect(f.submissions[0]).toMatchObject({
+      state: 'submitted',
+      externalOrder: { externalId: 'jtl-order-1', orderNumber: 'B-1' },
+    });
+    expect(
+      f.audits.filter((e) => e.eventType === 'purchase_order.submitted'),
+    ).toHaveLength(1);
   });
 });

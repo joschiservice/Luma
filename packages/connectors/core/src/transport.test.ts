@@ -7,7 +7,14 @@ import {
   withDispatchGuard,
 } from './dispatch.js';
 import { ConnectorError } from './index.js';
-import { fail, parse, retryAfterMs, retryRead } from './transport.js';
+import {
+  abortableSleep,
+  fail,
+  jitteredDelayMs,
+  parse,
+  retryAfterMs,
+  retryRead,
+} from './transport.js';
 
 describe('connector transport helpers', () => {
   it('preserves uncertain effects from transports that do not participate in dispatch tracking', async () => {
@@ -139,9 +146,59 @@ describe('connector transport helpers', () => {
       .mockResolvedValue('page');
 
     await expect(
-      retryRead(read, { attempts: 3, maxDelayMs: 2000, sleep }),
+      retryRead(read, {
+        attempts: 3,
+        maxDelayMs: 2000,
+        sleep,
+        random: () => 0,
+      }),
     ).resolves.toBe('page');
-    expect(sleep.mock.calls).toEqual([[1000], [2000]]);
+    expect(sleep.mock.calls).toEqual([
+      [1000, undefined],
+      [2000, undefined],
+    ]);
+  });
+
+  it('spreads waits above the advised delay without exceeding the in-place limit', () => {
+    expect(jitteredDelayMs(1000, 2000, () => 0)).toBe(1000);
+    expect(jitteredDelayMs(1000, 2000, () => 0.5)).toBe(1250);
+    expect(jitteredDelayMs(1000, 2000, () => 0.999)).toBe(1499);
+    expect(jitteredDelayMs(1800, 2000, () => 0.999)).toBe(2000);
+    expect(jitteredDelayMs(0, 2000, () => 0.999)).toBe(0);
+  });
+
+  it('stops waiting and clears the timer when the request is aborted', async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const read = vi.fn(async () => fail('transient', 1000));
+      const result = retryRead(
+        read,
+        { attempts: 3, maxDelayMs: 2000, sleep: abortableSleep },
+        controller.signal,
+      );
+      const settled = expect(result).rejects.toMatchObject({
+        failure: { code: 'transient' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.getTimerCount()).toBe(1);
+
+      controller.abort(new Error('stopped'));
+      await settled;
+      expect(vi.getTimerCount()).toBe(0);
+      expect(read).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not wait or read again once the request is already aborted', async () => {
+    const read = vi.fn(async () => fail('transient', 1000));
+
+    await expect(
+      retryRead(read, undefined, AbortSignal.abort(new Error('stopped'))),
+    ).rejects.toMatchObject({ failure: { code: 'transient' } });
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
   it.each([

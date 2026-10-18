@@ -6,8 +6,11 @@ import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
-import type { Observability } from '@luma/platform';
-import { createTenantDatabase } from '@luma/platform/composition';
+import { createFailureLog, type Observability } from '@luma/platform';
+import {
+  createDatabasePool,
+  createTenantDatabase,
+} from '@luma/platform/composition';
 import type { ProposedAction } from '@luma/policies';
 import {
   createShipmentDispatchOptionsReader,
@@ -27,7 +30,6 @@ import {
   createExceptionWorker,
   createProcessClient,
 } from '@luma/workflow-temporal';
-import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
 import {
@@ -211,6 +213,13 @@ export function createExceptionWorkflowRuntime(
 }
 
 /**
+ * Connections shared by the exception and procurement workers' activities, schedule advancing
+ * and owner rereads. Activities wait for a connection beyond this, up to the pool's acquire
+ * timeout, so their combined concurrency should stay below it.
+ */
+const workerPoolMax = 10;
+
+/**
  * Start a worker for persisted incidents, diagnoses and process workflows. With `connections`,
  * installed apps contribute their case workflows; without it, only Luma's own run.
  * `observability` evaluates workspace releases, such as Luma-owned order records.
@@ -224,7 +233,11 @@ export async function createDefaultExceptionWorker(
 ) {
   settings = {
     ...settings,
-    temporal: createRegionalTemporalSettings(settings.temporal),
+    temporal: {
+      ...createRegionalTemporalSettings(settings.temporal),
+      // The exception and procurement workers each run up to half of the shared pool.
+      maxConcurrentActivities: workerPoolMax / 2,
+    },
   };
   if ((identitySettings.region ?? 'AU') !== settings.temporal.dataRegion)
     throw new Error('Workflow placement differs from the identity cell');
@@ -232,7 +245,16 @@ export async function createDefaultExceptionWorker(
   try {
     const identity = createIdentity(identitySettings);
     resources.add(identity.close);
-    const pool = new Pool({ connectionString: settings.databaseUrl, max: 10 });
+    const pool = createDatabasePool({
+      connectionString: settings.databaseUrl,
+      max: workerPoolMax,
+      workload: 'background',
+      onError: (error) =>
+        createFailureLog(observability)(
+          'Workflow database connection failed',
+          error,
+        ),
+    });
     resources.add(() => pool.end());
     await assertCellRegion(pool, identitySettings.region ?? 'AU');
     const processClient = await createProcessClient(
@@ -388,21 +410,42 @@ export async function createDefaultExceptionWorker(
       }
     }
 
+    const workers = [worker, procurementWorker];
+    const shutdown = () => {
+      stopSchedules.abort();
+      for (const each of workers) {
+        try {
+          each.shutdown();
+        } catch {
+          // A worker that has already stopped or failed has nothing left to drain.
+        }
+      }
+    };
+
     return {
       run: async () => {
         const schedules = advanceSchedules();
         try {
-          await Promise.all([worker.run(), procurementWorker.run()]);
+          // A failing worker stops the other. Both must finish their activities before close
+          // releases the pool and connections they use; the first failure is then rethrown.
+          const results = await Promise.allSettled(
+            workers.map((each) =>
+              each.run().catch((error: unknown) => {
+                shutdown();
+                throw error;
+              }),
+            ),
+          );
+          const failure = results.find(
+            (result) => result.status === 'rejected',
+          );
+          if (failure) throw failure.reason;
         } finally {
           stopSchedules.abort();
           await schedules;
         }
       },
-      shutdown: () => {
-        stopSchedules.abort();
-        worker.shutdown();
-        procurementWorker.shutdown();
-      },
+      shutdown,
       close: resources.close,
     };
   } catch (error) {

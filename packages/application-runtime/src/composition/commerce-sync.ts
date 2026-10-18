@@ -33,11 +33,11 @@ import { createIdentity } from '@luma/identity/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import {
+  createDatabasePool,
   createModelGateway,
   createTenantDatabase,
 } from '@luma/platform/composition';
 import { createSupplierTerms } from '@luma/procurement/composition';
-import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
 import { createDetectionWorker } from './detection-worker.js';
@@ -230,9 +230,11 @@ export async function createDefaultCommerceSyncWorker(
         : undefined;
     const identity = createIdentity(identitySettings);
     resources.add(identity.close);
-    const pool = new Pool({
+    const pool = createDatabasePool({
       connectionString: settings.databaseUrl,
       max: settings.concurrency * settings.workspaceConcurrency * 2 + 2,
+      workload: 'background',
+      onError: (error) => log('Sync database connection failed', error),
     });
     resources.add(() => pool.end());
     await assertCellRegion(pool, identitySettings.region ?? 'AU');

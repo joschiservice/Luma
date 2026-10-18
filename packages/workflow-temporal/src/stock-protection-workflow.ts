@@ -1,4 +1,31 @@
-import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
+import { ActivityFailure, ApplicationFailure } from '@temporalio/common';
+import {
+  continueAsNew,
+  patched,
+  proxyActivities,
+  sleep,
+} from '@temporalio/workflow';
+
+import {
+  membershipSuspendedFailure,
+  workspaceInactiveFailure,
+} from './workspace-pause.js';
+
+const firstBackoffMs = 60_000;
+const longestBackoffMs = 3_600_000;
+
+/** Failures that repeat until a person restores the workspace, membership or permission. */
+function persistent(error: unknown) {
+  return (
+    error instanceof ActivityFailure &&
+    error.cause instanceof ApplicationFailure &&
+    [
+      'WorkflowRejected',
+      workspaceInactiveFailure,
+      membershipSuspendedFailure,
+    ].includes(error.cause.type ?? '')
+  );
+}
 
 /** One durable run per tenant and stall case; activities reload all ownership before every effect. */
 export interface StockProtectionWorkflowInput {
@@ -30,17 +57,25 @@ export async function stockProtectionWorkflow(
       maximumAttempts: 5,
     },
   });
+  let backoff = firstBackoffMs;
   for (let pass = 0; pass < 500; pass++) {
     let moreWork = false;
+    let rejected = false;
     try {
       const result = await activities.stockProtectionTick(input);
       if (result.done) return;
       moreWork = result.moreWork ?? false;
-    } catch {
+      backoff = firstBackoffMs;
+    } catch (error) {
       // A removed permission or unavailable workspace pauses the lifecycle. The next activity
       // refreshes authority before reconciling; holds are never silently released on failure.
+      // Ending the run would leave live holds unmanaged, so repeated rejections back off.
+      rejected = persistent(error);
     }
-    await sleep(moreWork ? '1 second' : '1 minute');
+    if (rejected && patched('stock-protection-rejection-backoff-v1')) {
+      await sleep(backoff);
+      backoff = Math.min(backoff * 2, longestBackoffMs);
+    } else await sleep(moreWork ? '1 second' : '1 minute');
   }
   await continueAsNew<typeof stockProtectionWorkflow>(input);
 }

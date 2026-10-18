@@ -89,9 +89,13 @@ Policy evaluation and the initial dispatch share execution's preflight boundary;
 separate policy result authorizes a later write. While awaiting approval, the command
 layer records the response through policies with the approver's authenticated context and,
 after commit, sends a notification signal. The signal is only a wake-up hint with no
-approval or actor claims. A 30-second durable poll covers lost notifications.
+approval or actor claims. A 30-second durable poll covers lost notifications. The poll only
+reads whether the decision is still pending: it records no policy decision and reads no
+provider. Execution runs again after a signal, a recorded response, a workspace policy
+change or a replaced proposal. Process capability steps wait the same way.
 
-Approval waits end at the proposal or evidence expiry, at most 24 hours. When the
+Approval waits end at the proposal or evidence expiry, at most 24 hours after the first
+proposal, including renewals. When the
 composition installs a proposal refresher (the shipping-method correction), the workflow
 rereads current conditions 30 seconds before that deadline and renews an unexecuted
 proposal. Renewal records a policy evaluation but never approves; a rejection or a
@@ -99,6 +103,12 @@ still-valid approval prevents it, and an expired approval needs a new decision. 
 expiry and changed membership never authorize execution.
 
 ## Authority, retries and recovery
+
+The execute activity may run for five minutes, because preflight reads, the write and
+verification can each be slow. It heartbeats while it runs, so Temporal retries after a
+lost worker within 20 seconds instead of retrying an attempt that is still running. Worker
+shutdown waits six minutes for running activities; give deploys at least that much
+termination grace.
 
 Every activity rebuilds the initiating user's context through identity and checks current
 membership, role, organization status and cell placement. Serialized contexts, sessions,

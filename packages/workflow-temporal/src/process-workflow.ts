@@ -12,6 +12,7 @@ import {
   continueAsNew,
   defineQuery,
   defineSignal,
+  patched,
   proxyActivities,
   setHandler,
   sleep,
@@ -38,8 +39,11 @@ const activities = pauseWhileInactive(
 );
 const action = pauseWhileInactive(
   proxyActivities<Pick<ProcessActivities, 'action'>>({
-    startToCloseTimeout: '1 minute',
-    scheduleToCloseTimeout: '5 minutes',
+    // Admission can run precondition reads, the write and verification; heartbeats detect a
+    // lost worker without retrying a slow attempt that is still running.
+    startToCloseTimeout: '5 minutes',
+    heartbeatTimeout: '20 seconds',
+    scheduleToCloseTimeout: '15 minutes',
     retry: {
       initialInterval: '1 second',
       maximumInterval: '30 seconds',
@@ -83,6 +87,7 @@ export async function processWorkflow(
       read: activities.read,
       coordinate: activities.coordinate,
       decision: activities.decision,
+      actionApprovalPending: activities.actionApprovalPending,
       action: action.action,
       verify: activities.verify,
       record: activities.record,
@@ -90,6 +95,7 @@ export async function processWorkflow(
     {
       now: () => new Date().toISOString(),
       wait: sleep,
+      patched,
       checkpoint: async (next) => {
         if (workflowInfo().continueAsNewSuggested)
           await continueAsNew<typeof processWorkflow>(run, version, next);

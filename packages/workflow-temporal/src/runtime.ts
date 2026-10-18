@@ -61,7 +61,15 @@ export interface TemporalSettings {
   payloadKeyService?: TemporalKeyService;
   tls?: NativeConnectionOptions['tls'];
   apiKey?: string;
+  /** Caps concurrent activities per worker; keep it within the database pool shared by them. */
+  maxConcurrentActivities?: number;
 }
+
+/**
+ * Worker shutdown waits this long for running activities. It exceeds the longest activity
+ * timeout, so a deploy does not cancel a provider write that is still running.
+ */
+export const workerShutdownGraceTime = '6 minutes';
 
 /** Checks Temporal connection settings before opening a client or worker. */
 export function validateSettings(settings: TemporalSettings) {
@@ -99,12 +107,47 @@ export function workflowPath() {
     : fileURLToPath(new URL('./workflows.ts', import.meta.url));
 }
 
+/** Reads the server request ID that workflow inputs carry, for correlating failures. */
+function requestIdOf(input: unknown) {
+  const value =
+    input && typeof input === 'object' && 'requestId' in input
+      ? input.requestId
+      : undefined;
+
+  return typeof value === 'string' && /^[\x21-\x7e]{1,200}$/.test(value)
+    ? value
+    : undefined;
+}
+
+/**
+ * Heartbeats while an activity with a heartbeat timeout runs, so a lost worker is detected
+ * within that timeout instead of the full start-to-close timeout. Returns the stop function,
+ * or undefined when the activity has no heartbeat timeout.
+ */
+function heartbeatWhileRunning() {
+  let context: Context;
+  try {
+    context = Context.current();
+  } catch {
+    // Direct calls outside a Temporal activity, as in unit tests, have nothing to heartbeat.
+    return undefined;
+  }
+  const timeout = context.info.heartbeatTimeoutMs;
+  if (!timeout) return undefined;
+  const timer = setInterval(
+    () => context.heartbeat(),
+    Math.max(1000, timeout / 4),
+  );
+
+  return () => clearInterval(timer);
+}
+
 /**
  * Logs and reports original failures before sanitizing errors for Temporal history.
  * Reporting failures do not change activity retry behavior. A suspended or closed workspace,
  * or a suspended acting member, is not a failure: it is reported to the workflow, which
- * pauses, without logging.
- * Wrapped activities must run within a Temporal activity context.
+ * pauses, without logging. Activities scheduled with a heartbeat timeout heartbeat until
+ * they finish. Wrapped activities must run within a Temporal activity context.
  */
 export function temporalActivities<T extends object>(
   activities: T,
@@ -115,6 +158,7 @@ export function temporalActivities<T extends object>(
     Object.entries(activities).map(([name, fn]) => [
       name,
       async (...args: unknown[]) => {
+        const stopHeartbeat = heartbeatWhileRunning();
         try {
           if (
             dataRegion &&
@@ -148,11 +192,16 @@ export function temporalActivities<T extends object>(
               'Acting member is suspended',
               membershipSuspendedFailure,
             );
-          log.error('Workflow activity failed before sanitization', { error });
+          const requestId = requestIdOf(args[0]);
+          log.error('Workflow activity failed before sanitization', {
+            error,
+            ...(requestId ? { requestId } : {}),
+          });
           try {
             const info = Context.current().info;
             if (info.workflowExecution)
               captureActivityError?.(error, {
+                ...(requestId ? { requestId } : {}),
                 workflowId: info.workflowExecution.workflowId,
                 workflowRunId: info.workflowExecution.runId,
                 activityId: info.activityId,
@@ -176,6 +225,8 @@ export function temporalActivities<T extends object>(
             'Workflow activity unavailable',
             'WorkflowActivityUnavailable',
           );
+        } finally {
+          stopHeartbeat?.();
         }
       },
     ]),
@@ -249,7 +300,13 @@ export async function createExceptionWorker(
             },
           }
         : {}),
-      shutdownGraceTime: '30 seconds',
+      shutdownGraceTime: workerShutdownGraceTime,
+      ...(settings.maxConcurrentActivities
+        ? {
+            maxConcurrentActivityTaskExecutions:
+              settings.maxConcurrentActivities,
+          }
+        : {}),
     });
 
     return {

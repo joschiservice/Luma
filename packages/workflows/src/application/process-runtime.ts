@@ -59,6 +59,16 @@ export interface ProcessActivities {
   ): Promise<
     { state: 'approved' | 'denied'; decisionId: string } | { state: 'pending' }
   >;
+  /**
+   * Reads whether an action step still waits for its approval decision, without evaluating
+   * policy or reading the provider. False means `action` should run again.
+   */
+  actionApprovalPending?(
+    run: ProcessRun,
+    step: Extract<ProcessStep, { kind: 'capability' }>,
+    proposalId: string,
+    decisionId: string,
+  ): Promise<boolean>;
   /** Binds the exact run and step, then calls Action Admission for this action alone. */
   action(
     run: ProcessRun,
@@ -83,6 +93,8 @@ export interface ProcessClock {
   now(): string;
   wait(milliseconds: number): Promise<void>;
   decisionChanged(milliseconds: number): Promise<boolean>;
+  /** Temporal patch marker for a changed command sequence; absent means the change applies. */
+  patched?(id: string): boolean;
   /** Rolls over durable history at an open coordination boundary without replaying earlier effects. */
   checkpoint?(checkpoint: ProcessCheckpoint): Promise<void>;
 }
@@ -380,7 +392,21 @@ export async function runProcess(
               reason: 'policy_decision_expired',
             });
           }
-          await clock.decisionChanged(30_000);
+          const changed = await clock.decisionChanged(30_000);
+          // Running the action again would record a policy decision on every poll.
+          if (
+            !changed &&
+            activities.actionApprovalPending &&
+            (clock.patched?.('read-only-process-approval-wait-v1') ?? true) &&
+            Date.parse(clock.now()) < deadline &&
+            (await activities.actionApprovalPending(
+              run,
+              step,
+              result.proposalId,
+              result.decisionId,
+            ))
+          )
+            continue;
           result = await activities.action(run, version, step, outputs);
         }
         if (result.state === 'not_executed') {

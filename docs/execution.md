@@ -115,7 +115,10 @@ Each attempt records dispatch separately from business outcome:
 
 A prepared reservation starts as uncertain and pending, because a crash can happen on
 either side of the provider call. A withheld call records `not_dispatched`, an accepted
-response `dispatched`. Thrown calls stay uncertain unless the adapter reports dispatch
+response `dispatched`. The withheld audit reason distinguishes a changed precondition
+(`stale_precondition`), changed authority (`admission_changed`), an expired decision
+(`decision_expired`) and a recheck that failed with an error (`precondition_unavailable`);
+the last is also logged. Thrown calls stay uncertain unless the adapter reports dispatch
 certainty explicitly. Provider request IDs are kept in the attempt and completion audit
 when supplied.
 

@@ -265,7 +265,7 @@ export function createClient(options: ShopifyTransportOptions): {
       };
 
       return queryDocument.test(query)
-        ? retryRead(attempt, readRetry)
+        ? retryRead(attempt, readRetry, options.signal)
         : attempt();
     },
     { nextReadDelay: () => budget.nextDelay() },

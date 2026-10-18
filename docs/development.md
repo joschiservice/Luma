@@ -140,8 +140,8 @@ suites cannot run. Report that limitation when relying on it.
 - Browser failures keep traces and screenshots in `.luma/playwright`; open the report with
   `pnpm test:browser:report`.
 - The pilot recovery test kills a worker after a provider write and waits out the
-  one-minute activity timeout. Keep that real crash coverage; do not shorten the production
-  timeout to speed up tests.
+  20-second activity heartbeat timeout. Keep that real crash coverage; do not shorten the
+  production timeout to speed up tests.
 - Use `pnpm run test --filter=<package>` (with `run`) so pnpm forwards the filter to the
   database runner.
 
