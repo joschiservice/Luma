@@ -39,6 +39,7 @@ import { appHostHttp } from './features/app-host.js';
 import { assistantHttp } from './features/assistant.js';
 import { commerceSyncHttp } from './features/commerce-sync.js';
 import { connectionsHttp } from './features/connections.js';
+import { customersHttp } from './features/customers.js';
 import { exceptionsHttp } from './features/exceptions.js';
 import { identityHttp } from './features/identity.js';
 import { inventoryHttp } from './features/inventory.js';
@@ -284,6 +285,7 @@ export function buildApp(
       ...assistantHttp(dependencies),
       ...commerceSyncHttp(dependencies),
       ...connectionsHttp(dependencies),
+      ...customersHttp(dependencies),
       ...exceptionsHttp(dependencies),
       ...identityHttp(dependencies),
       ...inventoryHttp(dependencies),

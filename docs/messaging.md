@@ -292,9 +292,21 @@ body, attachment and citation copies in the same transaction. Unsent drafts and 
 are withheld; uncertain sends stay uncertain and are never dispatched again. Erasure also
 visits source messages already removed by retention. Removing a document's content also removes its representation and its facts'
 quotes, which are copies of the document text; values, locators and reviews stay. Text can
-also be removed on request from the thread. A Shopify customer
-redaction removes the text of messages to or from that customer's email, their attachment
-content and thread snippets, and removes customer links. Erased members keep their opaque ID
+also be removed on request from the thread.
+
+Customer erasure, from a Shopify redaction or a member with `customers.erase`, removes the
+customer's identity as well as content. For messages to, from, copied to or replying to their
+addresses it removes text and attachment content, replaces their address with an empty address
+without a name on messages, replies, threads and the thread correspondent, clears the subjects
+of those messages, threads and replies, removes the addresses from receipt events and link
+evidence, and blanks the name and email of party facts naming their address and of customer
+party facts read from their attachments. Supplier parties read from those attachments stay:
+they are the merchant's business data. Sender and recipient rules for their address are removed
+and keep no copy of it; the erasure counts them, because removed rules have no history view.
+The empty address has no `@`, so it is never a reply recipient, and threads keep one empty
+participant in its place. Customer links are removed. Messages read again from the
+mailbox are not restored, because stored messages are never replaced; new mail from the
+address is read as usual. Erased members keep their opaque ID
 on owners, notes and timeline entries, as elsewhere.
 
 ## Live updates

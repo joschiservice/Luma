@@ -12,7 +12,9 @@ proposal and expands up to 100 earlier steps that passed the same visibility and
 Routine step records and approval-rule checks cannot create a business event by themselves;
 they remain in the event history. Approval, accepted writes, uncertain outcomes and verified
 results keep their distinct labels. The API's event view retains individual immutable records.
-Grouping precedes pagination, so a group is not repeated on older pages.
+Grouping precedes pagination, so a group is not repeated on older pages. Customer erasures are
+`privacy` events whose summary is their counts only (profiles, messages, threads, replies,
+rules); the audit entry holds no customer identifier to show.
 
 ## Reads and ordering
 

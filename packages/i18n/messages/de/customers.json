@@ -101,5 +101,21 @@
   "customers_preview_label": "Kundenvorschau",
   "customers_preview_open": "Ganzen Kunden öffnen",
   "customers_preview_filter": "Nach {value} filtern",
-  "customers_preview_unavailable": "Die Details des Kunden konnten nicht geladen werden."
+  "customers_preview_unavailable": "Die Details des Kunden konnten nicht geladen werden.",
+  "customers_erase_action": "Kunden löschen",
+  "customers_erase_title": "{name} löschen?",
+  "customers_erase_description": "Luma entfernt das Profil dieses Kunden, seine Bestelladressen und die Postfachnachrichten von oder an ihn. Das lässt sich nicht rückgängig machen.",
+  "customers_erase_scope": "Nachrichtentext, Anhänge, Adressen, Namen und Betreffzeilen werden entfernt, ebenso Postfachregeln für seine Adresse; nicht gesendete Antworten an ihn werden zurückgehalten. Spätere Importe überspringen diesen Kunden. Daten im verbundenen System bleiben unverändert.",
+  "customers_erase_confirm": "Kunden löschen",
+  "customers_erase_pending": "Wird gelöscht…",
+  "customers_erase_failed": "Der Kunde konnte nicht gelöscht werden. Versuche es erneut.",
+  "customers_erase_forbidden": "Du darfst keine Kunden mehr löschen.",
+  "customers_erase_preview_title": "Was gelöscht wird",
+  "customers_erase_preview_loading": "Luma prüft, was gelöscht wird…",
+  "customers_erase_preview_failed": "Luma konnte nicht prüfen, was gelöscht wird.",
+  "customers_erase_preview_profiles": "Kundenprofile",
+  "customers_erase_preview_messages": "Postfachnachrichten",
+  "customers_erase_preview_threads": "Geänderte Threads",
+  "customers_erase_preview_replies": "Antworten an ihn",
+  "customers_erase_preview_rules": "Postfachregeln für seine Adresse"
 }

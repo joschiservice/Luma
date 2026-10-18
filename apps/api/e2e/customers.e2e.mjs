@@ -303,6 +303,70 @@ it('lists imported customers per store with search, filters, sorting and their s
   ).toBeNull();
 });
 
+it('erases a customer only for members allowed to, once per command and never for other tenants', async (t) => {
+  const f = await settingsFixture(t);
+  const c = await customersFixture(f);
+  const body = {
+    id: randomUUID(),
+    connectionId: c.tokyo,
+    externalId: 'gid://shopify/Customer/71',
+  };
+  const counts = { profiles: 1, messages: 0, threads: 0, replies: 0, rules: 0 };
+  const target = {
+    connectionId: body.connectionId,
+    externalId: body.externalId,
+  };
+  await f.request(
+    f.member,
+    `${f.base}/customer-erasures/preview`,
+    'POST',
+    target,
+    403,
+  );
+  // The preview reports what erasing removes and leaves the customer in place.
+  expect(
+    await f.request(
+      f.owner,
+      `${f.base}/customer-erasures/preview`,
+      'POST',
+      target,
+    ),
+  ).toEqual(counts);
+  expect(
+    (await f.request(f.member, `${f.base}/customers?limit=50`)).items.map(
+      (item) => item.externalId,
+    ),
+  ).toContain('gid://shopify/Customer/71');
+  await f.request(f.member, `${f.base}/customer-erasures`, 'POST', body, 403);
+  await f.request(f.outsider, `${f.base}/customer-erasures`, 'POST', body, 404);
+  expect(
+    await f.request(f.owner, `${f.base}/customer-erasures`, 'POST', body),
+  ).toEqual(counts);
+  // A retry returns the original result; the ID can't name another customer.
+  expect(
+    await f.request(f.owner, `${f.base}/customer-erasures`, 'POST', body),
+  ).toEqual(counts);
+  await f.request(
+    f.owner,
+    `${f.base}/customer-erasures`,
+    'POST',
+    { ...body, externalId: 'gid://shopify/Customer/73' },
+    409,
+  );
+  await f.request(
+    f.owner,
+    `${f.base}/customer-erasures`,
+    'POST',
+    { ...body, id: randomUUID(), connectionId: randomUUID() },
+    404,
+  );
+  expect(
+    (await f.request(f.member, `${f.base}/customers?limit=50`)).items.map(
+      (item) => item.externalId,
+    ),
+  ).not.toContain('gid://shopify/Customer/71');
+});
+
 it('pages with a cursor bound to its filters and keeps other tenants and roles out', async (t) => {
   const f = await settingsFixture(t);
   const c = await customersFixture(f);

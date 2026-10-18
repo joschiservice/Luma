@@ -156,6 +156,18 @@ it('names access changes by what happened, with the role as context', () => {
   expect(activitySubject(added)).toEqual(['Admin']);
 });
 
+it('names erasures by what happened, with their counts and no customer details', () => {
+  const erased = event({
+    type: 'privacy',
+    action: 'customers.erased',
+    summary: '1,14,6,2,1',
+  });
+  expect(activityTitle(erased)).toBe('Customer erased');
+  expect(activitySubject(erased)).toEqual([
+    'Profiles: 1 · Messages: 14 · Threads: 6 · Replies: 2 · Mailbox rules: 1',
+  ]);
+});
+
 it('says what an event concerns without storage IDs', () => {
   expect(
     activitySubject(

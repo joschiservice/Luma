@@ -125,8 +125,8 @@ const uniqueOrders = <T extends { order: z.infer<typeof orderReference> }>(
 
 const iso = (value: Date | null) => value?.toISOString() ?? null;
 
-// Erasure and imports of one connection's customers serialize, so a read that started before
-// an erasure cannot store data the erasure already removed.
+// Erasure (`erase_customer_records`, which takes the same lock) and imports of one connection's
+// customers serialize, so a read that started before an erasure cannot store data it removed.
 const lockConnection = (
   tx: SqlTransaction,
   tenantId: string,
@@ -136,53 +136,21 @@ const lockConnection = (
     `customers:${tenantId}:${connectionId}`,
   ]);
 
-// Deletes the addresses of one connection's orders, or of the orders linked to the listed
-// source customers. Erased orders are remembered so later reads cannot store them again.
-async function eraseOrderAddresses(
-  tx: SqlTransaction,
-  tenantId: string,
-  connectionId: string,
-  externalIds: string[] | null,
-) {
-  if (externalIds === null) {
-    await tx.query(
-      'DELETE FROM customer_order_addresses WHERE tenant_id=$1 AND connection_id=$2',
-      [tenantId, connectionId],
-    );
-
-    return;
-  }
-  await tx.query(
-    `INSERT INTO customer_erasures(tenant_id,connection_id,external_digest)
-    SELECT DISTINCT $1::uuid,$2::uuid,sha256(convert_to(o.order_external_id,'UTF8')) FROM customer_orders o
-    WHERE o.tenant_id=$1 AND o.connection_id=$2 AND o.customer_external_id=ANY($3)
-    ON CONFLICT DO NOTHING`,
-    [tenantId, connectionId, externalIds],
-  );
-  await tx.query(
-    `DELETE FROM customer_order_addresses a USING customer_orders o
-    WHERE a.tenant_id=$1 AND a.connection_id=$2 AND o.tenant_id=$1 AND o.connection_id=$2
-    AND o.customer_external_id=ANY($3) AND a.order_scope_key=o.order_scope_key
-    AND a.order_external_id=o.order_external_id`,
-    [tenantId, connectionId, externalIds],
-  );
-}
-
-// Deletes profiles and order links of one connection, or only of the listed source customers.
+// Deletes profiles and order links of the listed source customers of one connection.
 async function deleteCustomers(
   tx: SqlTransaction,
   tenantId: string,
   connectionId: string,
-  externalIds: string[] | null,
+  externalIds: string[],
 ) {
   await tx.query(
     `DELETE FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2
-    AND ($3::text[] IS NULL OR customer_external_id=ANY($3))`,
+    AND customer_external_id=ANY($3)`,
     [tenantId, connectionId, externalIds],
   );
   const removed = await tx.query(
     `DELETE FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2
-    AND ($3::text[] IS NULL OR external_id=ANY($3))`,
+    AND external_id=ANY($3)`,
     [tenantId, connectionId, externalIds],
   );
 
@@ -405,36 +373,6 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
             observed_at=EXCLUDED.observed_at
           WHERE customer_order_addresses.observed_at<=EXCLUDED.observed_at`,
           [context.tenantId, connectionId, ...columns],
-        );
-      });
-    },
-    async erase(context, connectionId, externalIds) {
-      requirePermission(context, 'sync.manage');
-      z.string().uuid().parse(connectionId);
-      if (externalIds)
-        z.array(z.string().min(1).max(1024)).max(10000).parse(externalIds);
-
-      return db.transaction(context.tenantId, async (tx) => {
-        await lockConnection(tx, context.tenantId, connectionId);
-        if (externalIds?.length)
-          await tx.query(
-            `INSERT INTO customer_erasures(tenant_id,connection_id,external_digest)
-            SELECT $1,$2,sha256(convert_to(id,'UTF8')) FROM unnest($3::text[]) id ON CONFLICT DO NOTHING`,
-            [context.tenantId, connectionId, externalIds],
-          );
-        // Linked orders are read before their links are deleted.
-        await eraseOrderAddresses(
-          tx,
-          context.tenantId,
-          connectionId,
-          externalIds ?? null,
-        );
-
-        return deleteCustomers(
-          tx,
-          context.tenantId,
-          connectionId,
-          externalIds ?? null,
         );
       });
     },

@@ -127,12 +127,20 @@ observation and stores the latest report per source order in `@luma/customers`; 
 never replaces a newer one. Order detail shows them only to people who can read customers.
 
 A `customers/redact` or `shop/redact` request erases the affected imported profiles, their
-order links, order addresses and ledger rows in its intake transaction. A customer redaction
+order links, order addresses, ledger rows and inbox data in its intake transaction. The
+request's signed email joins the profile emails, so the inbox is erased even when no profile
+holds the address. A customer redaction
 erases the addresses of the customer's linked orders and of the orders it lists, even when it
 names no Shopify customer ID; a shop redaction erases every address of the shop. Erased
 customer and order IDs are remembered by digest, so later reads skip them, their orders get
-no new links and those orders' addresses are not stored again. Erasing customers through
-`@luma/customers` does the same for their linked orders. Erasure and customer imports of one
+no new links and those orders' addresses are not stored again. A member with `customers.erase` erases one
+source customer of any connection the same way through `@luma/customers`, by connection and
+source ID, whether or not a profile was imported. A preview runs the same erasure in a
+savepoint and rolls it back, so its counts match what erasing would do at that moment; it holds
+the connection's customer lock while it runs. Each erasure, from a member or a Shopify request,
+appends a `customers.erased` audit entry per workspace with its counts, shown in Activity as a
+privacy event; it names neither the customer ID nor their addresses. Shopify entries are keyed by
+the request digest, so a redelivery records one. Erasure and customer imports of one
 connection take the same lock, so a read that started earlier cannot restore erased data. Other retained data still follows the
 [privacy operations](shopify-production.md#privacy-operations) procedure.
 

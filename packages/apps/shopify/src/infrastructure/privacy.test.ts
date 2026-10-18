@@ -70,7 +70,7 @@ it.each([
     expect(inserts()[0]![0]).toContain('ON CONFLICT DO NOTHING');
   },
 );
-it('erases imported customer profiles and order addresses with redaction intake', async () => {
+it('erases imported customer profiles, order addresses and inbox data with redaction intake', async () => {
   const f = fixture();
   const erasures = () =>
     f.query.mock.calls
@@ -96,19 +96,26 @@ it('erases imported customer profiles and order addresses with redaction intake'
   });
   await f.send('customers/redact', {
     ...base,
-    customer: { email: 'customer@example.test' },
+    customer: { email: ' Customer@Example.test ' },
     orders_to_redact: [],
   });
-  expect(erasures()).toEqual([
-    ['development:client', shop, ['gid://shopify/Customer/456'], []],
-    ['development:client', shop, null, null],
+  // The signed email reaches the inbox even when no stored profile holds it.
+  expect(erasures().map((values) => values.slice(0, 5))).toEqual([
+    ['development:client', shop, ['gid://shopify/Customer/456'], [], []],
+    ['development:client', shop, null, null, null],
     [
       'development:client',
       shop,
       [],
       ['gid://shopify/Order/7', 'gid://shopify/Order/8'],
+      ['customer@example.test'],
     ],
+    ['development:client', shop, [], [], ['customer@example.test']],
   ]);
+  // Activity is keyed by the signed request's digest, never by the customer.
+  expect(erasures().map((values) => values[5])).toEqual(
+    erasures().map(() => expect.stringMatching(/^[0-9a-f]{64}$/)),
+  );
 });
 it('rejects bad signatures before parsing or persistence', async () => {
   const f = fixture();

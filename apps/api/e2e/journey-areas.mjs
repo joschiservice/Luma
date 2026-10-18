@@ -231,6 +231,8 @@ const customers = [
   ...rmCustomers,
   'packages/customers/**',
   'packages/api-contract/src/**/customers.ts',
+  'packages/api-contract/src/contracts/customer-erasures.ts',
+  'packages/application-runtime/src/composition/features/customers.ts',
 ];
 const records = [...rmRecords, 'packages/api-contract/src/**/records.ts'];
 const insights = [...rmInsights, 'packages/api-contract/src/**/insights.ts'];

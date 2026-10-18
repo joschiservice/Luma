@@ -24,6 +24,7 @@ import {
   type InstalledPurchaseOrderRuntime,
   type InstalledReturnRuntime,
 } from '@luma/connections/composition';
+import { createCustomerErasure } from '@luma/customers/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import type { BoundActionStep } from '@luma/execution';
 import {
@@ -223,6 +224,7 @@ export interface ApplicationServices {
     cases: ReturnType<typeof createDetectionServices>['cases'];
     commitments: SupplierCommitments;
     connectionCoverage: import('@luma/connections').CoverageReader;
+    customerErasure: ReturnType<typeof createCustomerErasure>;
     customers: ReadModelServices['customers'];
     decisionAssignments: ReturnType<
       typeof createDecisionServices
@@ -1258,6 +1260,11 @@ export function createApplicationServices(
       cases: detection.cases,
       commitments,
       connectionCoverage: createConnectionCoverage(database),
+      customerErasure: createCustomerErasure({
+        db: database,
+        audit: createAuditLog,
+        refreshContext: identity.refreshContext,
+      }),
       customers,
       decisionAssignments,
       decisions,

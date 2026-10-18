@@ -19,7 +19,9 @@ type ActivityType =
   | 'connection'
   | 'procurement'
   /** Restricted changes to members, invitations, roles and workspace settings. */
-  | 'access';
+  | 'access'
+  /** Data-subject erasures, recorded with counts and never the customer's identifiers. */
+  | 'privacy';
 
 export interface ActivityQuery {
   /** Business groups hide routine checks and retain up to 100 authorized steps. */

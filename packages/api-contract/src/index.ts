@@ -4,6 +4,7 @@ import { appHostContracts } from './domains/app-host.js';
 import { assistantContracts } from './domains/assistant.js';
 import { commerceSyncContracts } from './domains/commerce-sync.js';
 import { connectionsContracts } from './domains/connections.js';
+import { customersContracts } from './domains/customers.js';
 import { exceptionsContracts } from './domains/exceptions.js';
 import { identityContracts } from './domains/identity.js';
 import { inventoryContracts } from './domains/inventory.js';
@@ -26,6 +27,7 @@ type ApiContract = typeof adaptiveContracts &
   typeof assistantContracts &
   typeof commerceSyncContracts &
   typeof connectionsContracts &
+  typeof customersContracts &
   typeof exceptionsContracts &
   typeof identityContracts &
   typeof inventoryContracts &
@@ -50,6 +52,7 @@ export const apiContract: ApiContract = {
   ...assistantContracts,
   ...commerceSyncContracts,
   ...connectionsContracts,
+  ...customersContracts,
   ...exceptionsContracts,
   ...identityContracts,
   ...inventoryContracts,

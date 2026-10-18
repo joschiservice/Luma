@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import { createAuditLog } from '@luma/audit/composition';
+import { createCustomerErasure } from '@luma/customers/composition';
 import type { TenantContext } from '@luma/identity';
 import {
   builtInMembership,
@@ -1101,18 +1102,249 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
       `UPDATE messaging_threads SET document=jsonb_set(document,'{snippet}','"legacy copy"'::jsonb) WHERE tenant_id=$1 AND id=$2`,
       [tenant, before.thread.id],
     );
+    const requestKey = 'a'.repeat(64);
     await owner.query(
-      "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'])",
+      "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'],NULL,NULL,$1)",
+      [requestKey],
     );
     const customer = await threadByProvider('t2');
-    expect(customer.messages[0]).toMatchObject({ text: null });
-    expect(customer.thread.snippet).toBe('');
+    expect(customer.messages[0]).toMatchObject({
+      text: null,
+      from: { address: '', name: null },
+      subject: '',
+    });
+    expect(customer.thread).toMatchObject({
+      snippet: '',
+      subject: '',
+      correspondent: { address: '', name: null },
+    });
+    expect(
+      customer.outbound.find((item) => item.id === draft.id),
+    ).toMatchObject({ to: [{ address: '', name: null }], subject: '' });
     expect(customer.links).toEqual([]);
+    // No copy of the address or name survives in stored thread data, events or link evidence.
+    const stored = await owner.query(
+      `SELECT t.subject,t.document,
+        (SELECT json_agg(json_build_array(m.from_address,m.document)) FROM messaging_messages m WHERE m.tenant_id=t.tenant_id AND m.thread_id=t.id) AS messages,
+        (SELECT json_agg(e.details) FROM messaging_events e WHERE e.tenant_id=t.tenant_id AND e.thread_id=t.id) AS events,
+        (SELECT json_agg(l.evidence) FROM messaging_links l WHERE l.tenant_id=t.tenant_id AND l.thread_id=t.id) AS links,
+        (SELECT json_agg(o.document) FROM messaging_outbound o WHERE o.tenant_id=t.tenant_id AND o.thread_id=t.id) AS outbound
+      FROM messaging_threads t WHERE t.tenant_id=$1 AND t.id=$2`,
+      [tenant, before.thread.id],
+    );
+    expect(JSON.stringify(stored.rows[0])).not.toMatch(/kim/i);
+    expect(stored.rows[0].document.participants).toEqual([
+      { address: '', name: null },
+      { address: 'orders@shop.example', name: null },
+    ]);
+    // A redelivery erases again but records the request in Activity once, with counts only.
     await owner.query(
-      "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'])",
+      "SELECT erase_shopify_customer_data('shopify','shop.myshopify.com',ARRAY['c-1'],NULL,NULL,$1)",
+      [requestKey],
     );
     expect((await threadByProvider('t2')).thread.snippet).toBe('');
+    const recorded = await owner.query<{
+      document: { actor: unknown; details: Record<string, string> };
+    }>(
+      "SELECT document FROM audit_entries WHERE tenant_id=$1 AND document->>'eventType'='customers.erased' AND document->>'correlationId'=$2",
+      [tenant, requestKey],
+    );
+    expect(recorded.rows).toHaveLength(1);
+    expect(recorded.rows[0]!.document).toMatchObject({
+      actor: { kind: 'connector', id: 'Shopify' },
+      details: {
+        source: 'shopify',
+        scope: 'customer',
+        profiles: '1',
+        messages: '1',
+      },
+    });
+    expect(JSON.stringify(recorded.rows)).not.toMatch(/kim|c-1/i);
     expect((await threadByProvider('t1')).messages[0]!.text).not.toBeNull();
+  });
+  it('erases a customer of any connection by address, audited and only for permitted members', async () => {
+    mailbox.push(
+      message('m-erp', 't-erp', {
+        from: address('pat@erp-customer.example', 'Pat Doe'),
+        to: [address('orders@shop.example')],
+        subject: 'Invoice for Pat Doe',
+        text: 'Please send my invoice.',
+        receivedAt: new Date().toISOString(),
+        attachments: [
+          {
+            attachment: { externalId: 'pat-invoice', scopeKey: '' },
+            filename: 'invoice.pdf',
+            mimeType: 'application/pdf',
+            size: 100,
+          },
+        ],
+      }),
+    );
+    await messaging.service.syncMailbox(adminContext(), connectionId);
+    await drain();
+    // A rule for the address, and facts read from the customer's attachment.
+    await owner.query(
+      `INSERT INTO messaging_rules(tenant_id,id,connection_id,kind,value,party,created_by,created_at)
+       VALUES($1,$2,$3,'sender_address','pat@erp-customer.example','{"kind":"customer"}',$4,now())`,
+      [tenant, randomUUID(), connectionId, adminId],
+    );
+    const documentId = (
+      await owner.query<{ id: string }>(
+        `SELECT d.id FROM messaging_documents d JOIN messaging_threads t ON t.tenant_id=d.tenant_id AND t.id=d.thread_id
+         WHERE d.tenant_id=$1 AND t.provider_thread_id='t-erp'`,
+        [tenant],
+      )
+    ).rows[0]!.id;
+    const fact = (role: string, name: string, email: string | null) => ({
+      value: { kind: 'party', role, name, email },
+      locator: { kind: 'text', page: null, start: 0, end: 4 },
+      quote: name,
+      confidence: 'high',
+      match: { state: 'unmatched', record: null, candidates: [] },
+      origin: 'model',
+      change: null,
+      review: null,
+    });
+    for (const [key, document] of [
+      [
+        'party:customer',
+        fact('customer', 'Pat Doe', 'pat@erp-customer.example'),
+      ],
+      ['party:supplier', fact('supplier', 'Northstar Supply', null)],
+    ] as const)
+      await owner.query(
+        `INSERT INTO messaging_facts(tenant_id,id,document_id,fact_key,document,status,created_at,updated_at)
+         VALUES($1,$2,$3,$4,$5,'proposed',now(),now())`,
+        [tenant, randomUUID(), documentId, key, document],
+      );
+    const erasure = createCustomerErasure({
+      db: createTenantDatabase(runtime),
+      audit: createAuditLog,
+      refreshContext: async (c) => c,
+    });
+    const request = {
+      id: randomUUID(),
+      connectionId,
+      // No profile holds this customer; the merchant supplies the address.
+      externalId: 'erp-customer-9',
+      emails: ['Pat@ERP-Customer.example'],
+    };
+    await expect(
+      erasure.erase(context(memberId, 'member'), request),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    // Another workspace cannot erase through this workspace's connection.
+    expect(
+      await erasure.erase(context(adminId, 'admin', otherTenant), {
+        ...request,
+        id: randomUUID(),
+      }),
+    ).toBeNull();
+    expect((await threadByProvider('t-erp')).messages[0]!.text).not.toBeNull();
+
+    // The preview counts exactly what erasing removes and changes nothing.
+    const counts = {
+      profiles: 0,
+      messages: 1,
+      threads: 1,
+      replies: 0,
+      rules: 1,
+    };
+    const target = {
+      connectionId: request.connectionId,
+      externalId: request.externalId,
+      emails: request.emails,
+    };
+    expect(await erasure.preview(adminContext(), target)).toEqual(counts);
+    await expect(
+      erasure.preview(context(memberId, 'member'), target),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect((await threadByProvider('t-erp')).messages[0]!.text).not.toBeNull();
+    expect(
+      (
+        await owner.query(
+          "SELECT 1 FROM customer_erasures WHERE tenant_id=$1 AND connection_id=$2 AND external_digest=sha256(convert_to('erp-customer-9','UTF8'))",
+          [tenant, connectionId],
+        )
+      ).rowCount,
+    ).toBe(0);
+
+    expect(await erasure.erase(adminContext(), request)).toEqual(counts);
+    const erased = await threadByProvider('t-erp');
+    expect(erased.messages[0]).toMatchObject({
+      text: null,
+      from: { address: '', name: null },
+    });
+    expect(erased.thread).toMatchObject({
+      subject: '',
+      correspondent: { address: '', name: null },
+    });
+    // The customer's party fact loses their identity; the supplier named in it stays.
+    const facts = await owner.query<{
+      fact_key: string;
+      document: { value: { name: string; email: string | null } };
+    }>(
+      'SELECT fact_key,document FROM messaging_facts WHERE tenant_id=$1 AND document_id=$2 ORDER BY fact_key',
+      [tenant, documentId],
+    );
+    expect(facts.rows.map((row) => [row.fact_key, row.document.value])).toEqual(
+      [
+        [
+          'party:customer',
+          { kind: 'party', role: 'customer', name: '', email: null },
+        ],
+        [
+          'party:supplier',
+          {
+            kind: 'party',
+            role: 'supplier',
+            name: 'Northstar Supply',
+            email: null,
+          },
+        ],
+      ],
+    );
+    // The rule for their address is removed without keeping the address.
+    expect(
+      (
+        await owner.query(
+          "SELECT value,removed_by FROM messaging_rules WHERE tenant_id=$1 AND removed_by='erasure'",
+          [tenant],
+        )
+      ).rows,
+    ).toEqual([{ value: 'erased', removed_by: 'erasure' }]);
+    // A retry returns the original result; the ID cannot be reused for another customer.
+    expect(await erasure.erase(adminContext(), request)).toEqual(counts);
+    await expect(
+      erasure.erase(adminContext(), { ...request, externalId: 'other' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    const audit = await createAuditLog(createTenantDatabase(runtime)).list(
+      tenant,
+      request.id,
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({
+      eventType: 'customers.erased',
+      connectionId,
+      details: {
+        source: 'member',
+        profiles: '0',
+        messages: '1',
+        threads: '1',
+        replies: '0',
+        rules: '1',
+        addresses: '1',
+      },
+    });
+    expect(JSON.stringify(audit)).not.toMatch(/pat|erp-customer-9/i);
+    // The source customer stays erased: later imports are suppressed.
+    expect(
+      (
+        await owner.query(
+          "SELECT 1 FROM customer_erasures WHERE tenant_id=$1 AND connection_id=$2 AND external_digest=sha256(convert_to('erp-customer-9','UTF8'))",
+          [tenant, connectionId],
+        )
+      ).rowCount,
+    ).toBe(1);
   });
   it('keeps truncated supplier messages visible without handing incomplete commitments to procurement', async () => {
     const before = handedOff.length;

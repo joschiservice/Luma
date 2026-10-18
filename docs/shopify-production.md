@@ -93,8 +93,11 @@ that export or deletion is complete. Retries of the same signed body and topic a
 deduplicated, including after completion. No body, shop or customer identifier is logged.
 The runtime role can insert requests but cannot read or complete them.
 
-Imported customer profiles are erased automatically on intake (see
-[commerce sync](commerce-sync.md#customers)). Everything else is an operator procedure;
+Imported customer profiles, order addresses and the customer's inbox data are erased
+automatically on intake, including messages to or from the request's signed email when no
+profile holds it (see [commerce sync](commerce-sync.md#customers) and
+[messaging](messaging.md#retention-and-erasure)), and each bound workspace's Activity records
+the erasure with its counts. Everything else is an operator procedure;
 the endpoint alone does not make a deployment compliant.
 
 Assign an operator before production onboarding. Check the queue daily and alert on
@@ -124,8 +127,8 @@ For each request:
    evidence, logs and exports. Live customer-context reads are not persisted. Deliver the
    retained data, or a documented no-data result, to the verified merchant through a
    secure channel.
-3. `customers/redact`: remove or anonymize the corresponding retained data across those
-   stores. Pause ingestion while doing so, and make sure replay and backups cannot restore
+3. `customers/redact`: profiles, order addresses and inbox data are already erased; remove
+   or anonymize the corresponding retained data across the other stores. Pause ingestion while doing so, and make sure replay and backups cannot restore
    erased data. Keep only documented legal retention.
 4. `shop/redact`: stop the installation's ingestion and erase its secrets and all
    retained shop data, including derived evidence and exports. Check current installation

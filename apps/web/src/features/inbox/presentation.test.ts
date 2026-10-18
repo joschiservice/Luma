@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { cellText, onPage, pickLocator } from './document';
 import { documentFixture } from './fixtures';
 import {
+  addressLabel,
   cellRange,
   confirmBlock,
+  correspondentLabel,
   dueState,
   eventText,
   factText,
@@ -50,6 +52,17 @@ describe('inbox presentation', () => {
     expect(
       factText({ kind: 'date', role: 'delivery', date: '2026-10-21' }),
     ).toBe('21 Oct 2026');
+  });
+
+  it('names erased contacts instead of showing an empty address', () => {
+    const erased = { address: '', name: null };
+    expect(addressLabel(erased)).toBe('Erased contact');
+    expect(correspondentLabel({ correspondent: erased })).toBe(
+      'Erased contact',
+    );
+    expect(
+      factText({ kind: 'party', role: 'customer', name: '', email: null }),
+    ).toBe('Erased contact');
   });
 
   it('groups facts by kind in a fixed order and blocks unchanged confirmation of uncertain facts', () => {
