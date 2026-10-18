@@ -408,11 +408,18 @@ export const OverviewChecks: Story = {
       within(canvasElement).getByRole('region', { name: 'Overview' }),
     );
     await expect(overview.getByText('10 units')).toBeVisible();
+    // A conclusion that matches the title appears only in the heading.
     await expect(
-      overview.getByText(
+      within(canvasElement).getByRole('heading', {
+        level: 1,
+        name: 'Available to sell is 10 units above the stock in the leading system',
+      }),
+    ).toBeVisible();
+    await expect(
+      overview.queryByText(
         'Available to sell is 10 units above the stock in the leading system.',
       ),
-    ).toBeVisible();
+    ).toBeNull();
     await expect(
       overview.getByText('Check current stock in both systems.', {
         selector: 'p',

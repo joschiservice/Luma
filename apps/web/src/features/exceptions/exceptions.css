@@ -6,12 +6,51 @@
   font-size: 12px;
 }
 
-.case-owner-controls {
-  display: flex;
+.case-owner {
+  display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 4px 8px;
+  min-width: 0;
 }
-.case-owner-controls > p {
-  margin: 0;
+
+.case-owner-trigger,
+.case-owner-value {
+  max-width: 220px;
+  gap: 6px;
+}
+
+.case-owner-trigger {
+  margin-left: -6px;
+  padding-inline: 6px;
+}
+
+.case-owner-value {
+  display: inline-flex;
+  align-items: center;
+  color: var(--foreground-muted);
+  font-size: 13px;
+}
+
+.case-owner svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.case-owner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Without an owner the property reads as a quiet placeholder. */
+.case-owner:not([data-assigned]) .case-owner-name {
+  color: var(--foreground-subtle);
+}
+
+.case-owner-error {
+  flex-basis: 100%;
+  color: var(--destructive);
+  font-size: 12px;
 }

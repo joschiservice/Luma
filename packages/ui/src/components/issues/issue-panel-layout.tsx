@@ -57,7 +57,7 @@ export function IssuePanelLayout({
               ) : null}
               {item ? (
                 <IssueSection section="details">
-                  <IssueRecordDetails item={item} expanded />
+                  <IssueRecordDetails item={item} embedded />
                 </IssueSection>
               ) : null}
             </div>

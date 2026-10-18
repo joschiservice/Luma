@@ -5,7 +5,6 @@ import { type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Button } from '../primitives/button';
 import { SectionNavigation } from '../primitives/section-navigation';
 import { WorkspaceHeaderSlot } from '../workspace/workspace-header-slot';
-import { CaseStatus } from './case-investigation';
 import {
   caseSummaryText,
   freshnessLabel,
@@ -13,17 +12,22 @@ import {
   sourceLabel,
 } from './case-presentation';
 import { IssueDetailViews } from './issue-collection';
+import { IssueStatusBadges } from './issue-inspector-header';
 import { IssueRecordDetails } from './issue-record-details';
 import { IssuePageNavigation, IssueSection } from './issue-section';
 import { IssueSectionSelect } from './issue-section-select';
 import { useIssueNavigation } from './use-issue-navigation';
 
-/** Provides a compact workspace header, persistent section navigation, and one issue column. */
+/**
+ * Provides a compact workspace header, persistent section navigation, and one issue column.
+ * `owner` sits beside the issue status in the header.
+ */
 export function IssuePageLayout({
   item,
   back,
   links,
   refresh,
+  owner,
   children,
   actions,
   canReview = false,
@@ -33,6 +37,7 @@ export function IssuePageLayout({
   /** Contextual destinations below the workspace breadcrumb. */
   links?: ReactNode;
   refresh?: ReactNode;
+  owner?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
   canReview?: boolean;
@@ -73,7 +78,12 @@ export function IssuePageLayout({
                     {title}
                   </span>
                 </div>
-                {item ? <CaseStatus item={item} /> : null}
+                {item ? (
+                  <div className="issue-page-status">
+                    <IssueStatusBadges item={item} />
+                    {owner}
+                  </div>
+                ) : null}
               </div>
               <div className="issue-page-actions">
                 {refresh}
@@ -148,7 +158,7 @@ export function IssuePageLayout({
                       <dd>{freshnessLabel(item.freshness)}</dd>
                     </div>
                   </dl>
-                  <IssueRecordDetails item={item} expanded />
+                  <IssueRecordDetails item={item} embedded />
                 </IssueSection>
               ) : null}
             </div>

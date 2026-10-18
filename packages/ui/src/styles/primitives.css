@@ -967,6 +967,17 @@
   font-size: 12px;
 }
 
+.person-picker-clear {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.person-picker-clear [data-slot='button'] {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .person-picker-more {
   padding: 8px 8px 2px;
   color: var(--foreground-subtle);

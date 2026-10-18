@@ -6,7 +6,27 @@ import { issueStatus, severityFullLabel } from './case-presentation';
 import { IssuePanelClose } from './issue-panel-close';
 import { IssuePanelHeading } from './issue-panel-heading';
 
-/** Keeps issue identity and navigation in a compact row, with dismissal at the end of the controls. */
+/**
+ * Shows the issue's operational status, including why it needs attention, and its severity.
+ * The inspector and the full issue page share it so both headers report the same state.
+ */
+export function IssueStatusBadges({ item }: { item: CaseSummary }) {
+  const status = issueStatus(item);
+
+  return (
+    <>
+      <StatePill state={status.state}>{status.label}</StatePill>
+      <span className="issue-severity" data-severity={item.severity}>
+        {severityFullLabel(item.severity)}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Keeps issue identity and navigation in a compact row, with dismissal at the end of the
+ * controls. `owner` sits beside the status and severity as the issue's responsible person.
+ */
 export function IssueInspectorHeader({
   item,
   fallback,
@@ -14,6 +34,7 @@ export function IssueInspectorHeader({
   next,
   openPage,
   refresh,
+  owner,
   className = '',
 }: {
   item?: CaseSummary | undefined;
@@ -22,6 +43,7 @@ export function IssueInspectorHeader({
   next?: ReactNode;
   openPage?: ReactNode;
   refresh?: ReactNode;
+  owner?: ReactNode;
   className?: string;
 }) {
   return (
@@ -30,12 +52,8 @@ export function IssueInspectorHeader({
         <IssuePanelHeading item={item} {...(fallback ? { fallback } : {})} />
         {item ? (
           <div className="issue-panel-status">
-            <StatePill state={issueStatus(item).state}>
-              {issueStatus(item).label}
-            </StatePill>
-            <span className="issue-severity" data-severity={item.severity}>
-              {severityFullLabel(item.severity)}
-            </span>
+            <IssueStatusBadges item={item} />
+            {owner}
           </div>
         ) : null}
       </div>

@@ -658,22 +658,7 @@ function InvestigationReport({
         </>
       ) : (
         <>
-          <IssueSection
-            section="overview"
-            enabled={expanded}
-            status={
-              !unconfirmed &&
-              item.freshness !== 'stale' &&
-              !diagnosis?.superseded &&
-              item.state !== 'resolved' &&
-              diagnosis &&
-              !['pending', 'failed'].includes(item.diagnosisStatus) &&
-              !['pending', 'failed'].includes(diagnosis.status) &&
-              item.attention.required ? (
-                <Badge tone="warning">{m.issues_manual_review_needed()}</Badge>
-              ) : null
-            }
-          >
+          <IssueSection section="overview" enabled={expanded}>
             {expanded ? (
               <IssueOverview
                 item={item}

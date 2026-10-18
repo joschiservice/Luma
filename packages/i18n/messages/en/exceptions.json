@@ -123,5 +123,10 @@
   "exceptions_owner_none": "No owner",
   "exceptions_source_none": "No source reported",
   "exceptions_waiting_none": "Not waiting",
-  "exceptions_open_sync": "Open sync"
+  "exceptions_open_sync": "Open sync",
+  "exceptions_owner_label": "Owner",
+  "exceptions_owner_change": "Owner: {owner}. Change owner",
+  "exceptions_owner_picker_title": "Issue owner",
+  "exceptions_owner_clear": "Remove owner",
+  "exceptions_owner_members_failed": "Team members couldn't be loaded, so the owner can't be changed right now."
 }

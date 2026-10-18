@@ -89,6 +89,7 @@ import {
   segmentLabels,
 } from './issue-list';
 import { useCaseObservation } from './observation';
+import { CaseOwnerControl } from './owner';
 import { LiveCaseDetail } from './progress';
 import { issueGroups, IssueResults } from './results';
 
@@ -686,6 +687,15 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                     }
                     className="inbox-case-nav"
                     item={item}
+                    owner={
+                      item ? (
+                        <CaseOwnerControl
+                          organizationId={organizationId}
+                          item={item}
+                          onChange={observation.refresh}
+                        />
+                      ) : null
+                    }
                     fallback={
                       detail.isError || denied
                         ? m.exceptions_issue_unavailable()

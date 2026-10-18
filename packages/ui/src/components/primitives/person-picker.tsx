@@ -2,7 +2,7 @@ import { Combobox } from '@base-ui/react/combobox';
 import { m } from '@luma/i18n/messages';
 import { cn } from '@luma/ui/lib/utils';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { useSmallScreen } from '../../lib/use-small-screen';
 import { Button, buttonVariants } from './button';
@@ -26,6 +26,9 @@ const searchText = (person: PersonOption) =>
  * typing when more match, so long lists stay quick. `people` keeps its order, so callers put
  * likely choices such as the reader first. Choosing a person calls `onSelect` and closes the
  * popup; the picker does not keep a selected value. Small screens get a modal bottom sheet.
+ * `children` replaces the trigger's visible text, such as the current owner's name, while
+ * `label` stays its accessible name. `clear` adds an action below the list that removes the
+ * current choice and closes the popup.
  */
 export function PersonPicker({
   people,
@@ -34,6 +37,9 @@ export function PersonPicker({
   onSelect,
   disabled = false,
   limit = 50,
+  variant = 'outline',
+  clear,
+  children,
   className,
 }: {
   people: readonly PersonOption[];
@@ -42,6 +48,9 @@ export function PersonPicker({
   onSelect: (id: string) => void;
   disabled?: boolean;
   limit?: number;
+  variant?: 'outline' | 'ghost';
+  clear?: { label: string; onClear: () => void } | undefined;
+  children?: ReactNode;
   className?: string | undefined;
 }) {
   const mobile = useSmallScreen();
@@ -75,12 +84,12 @@ export function PersonPicker({
       <Combobox.Trigger
         aria-label={label}
         className={cn(
-          buttonVariants({ variant: 'outline', size: 'sm' }),
+          buttonVariants({ variant, size: 'sm' }),
           'person-picker-trigger',
           className,
         )}
       >
-        {label}
+        {children ?? label}
         <ChevronDown size={14} aria-hidden="true" />
       </Combobox.Trigger>
       <Combobox.Portal>
@@ -135,6 +144,20 @@ export function PersonPicker({
                   total: matches.length,
                 })}
               </p>
+            ) : null}
+            {clear ? (
+              <div className="person-picker-clear">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false);
+                    clear.onClear();
+                  }}
+                >
+                  {clear.label}
+                </Button>
+              </div>
             ) : null}
           </Combobox.Popup>
         </Combobox.Positioner>
