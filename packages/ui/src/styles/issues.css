@@ -1951,11 +1951,13 @@
   padding: 12px;
 }
 
-.issue-panel .issue-record-details {
+.issue-record-details[data-embedded] {
+  overflow: visible;
+  border-radius: 0;
   background: transparent;
 }
 
-.issue-panel .issue-record-content {
+.issue-record-details[data-embedded] .issue-record-content {
   padding: 0;
 }
 
@@ -2030,6 +2032,10 @@
 .issue-record-details [role='status']:not(:empty) {
   display: block;
   padding: 0 12px 12px;
+}
+
+.issue-record-details[data-embedded] [role='status']:not(:empty) {
+  padding: 8px 0 0;
   color: var(--foreground-subtle);
   font-size: 12px;
 }
@@ -2117,6 +2123,13 @@
   display: block;
 }
 
+.issue-page-status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px 12px;
+}
+
 .issue-page-identity .case-badges {
   flex-shrink: 0;
   flex-wrap: nowrap;
@@ -2173,6 +2186,12 @@
 
 .issue-page-facts dd {
   margin: 2px 0 0;
+}
+
+.issue-page-facts + .issue-record-details {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 /* Issue collections (all evidence, full audit) */

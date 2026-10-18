@@ -270,14 +270,21 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await issueTypeFilter.waitFor();
   expect(await row.isVisible()).toBe(true);
   await expandSection('Change and outcome check');
-  await detailPane
-    .getByRole('combobox', { name: 'Assignee', exact: true })
+  const ownerControl = detailPane.locator(
+    '.issue-inspector-header .case-owner',
+  );
+  await ownerControl
+    .getByRole('combobox', {
+      name: 'Owner: No owner. Change owner',
+      exact: true,
+    })
     .click();
   await page.getByRole('option').filter({ hasText: 'Ada' }).first().click();
   await expect(
-    detailPane
-      .getByRole('region', { name: 'Case owner', exact: true })
-      .getByText('Ada', { exact: true }),
+    ownerControl.getByRole('combobox', {
+      name: 'Owner: Ada. Change owner',
+      exact: true,
+    }),
   ).toBeVisible();
   const ownerApi = `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}/owner`;
   const owned = await (
@@ -291,13 +298,15 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     data: { userId: null, revision: 0 },
   });
   expect(staleOwner.status()).toBe(409);
-  await detailPane
-    .getByRole('button', { name: 'Clear owner', exact: true })
+  await ownerControl
+    .getByRole('combobox', { name: 'Owner: Ada. Change owner', exact: true })
     .click();
+  await page.getByRole('button', { name: 'Remove owner', exact: true }).click();
   await expect(
-    detailPane
-      .getByRole('region', { name: 'Case owner', exact: true })
-      .getByText('Unassigned', { exact: true }),
+    ownerControl.getByRole('combobox', {
+      name: 'Owner: No owner. Change owner',
+      exact: true,
+    }),
   ).toBeVisible();
 
   await page.getByText('Live updates', { exact: true }).waitFor();

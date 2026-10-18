@@ -16,26 +16,24 @@ import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
 import { WorkspaceDate } from '../primitives/workspace-date';
 
-/** Displays issue metadata and lets users copy its identifier. */
+/**
+ * Displays issue metadata and lets users copy its identifier. On its own it is a collapsed
+ * disclosure; `embedded` shows the metadata directly inside a section that already names it.
+ */
 export function IssueRecordDetails({
   item,
-  expanded = false,
+  embedded = false,
 }: {
   item: CaseDetail;
-  expanded?: boolean;
+  embedded?: boolean;
 }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   );
   const timestamp = (value: string) => <WorkspaceDate value={value} />;
 
-  return (
-    <Disclosure className="issue-record-details" open={expanded}>
-      <summary>
-        <FileText size={16} aria-hidden="true" />
-        {m.issues_section_details()}
-        <ChevronRight size={16} aria-hidden="true" />
-      </summary>
+  const content = (
+    <>
       <div className="issue-record-content">
         <dl className="issue-record-subject">
           <div>
@@ -126,6 +124,21 @@ export function IssueRecordDetails({
             ? m.issues_details_copy_failed()
             : ''}
       </span>
+    </>
+  );
+
+  return embedded ? (
+    <div className="issue-record-details" data-embedded="">
+      {content}
+    </div>
+  ) : (
+    <Disclosure className="issue-record-details">
+      <summary>
+        <FileText size={16} aria-hidden="true" />
+        {m.issues_section_details()}
+        <ChevronRight size={16} aria-hidden="true" />
+      </summary>
+      {content}
     </Disclosure>
   );
 }

@@ -300,7 +300,6 @@
   "issues_findings_configuration": "Konfiguration",
   "issues_findings_rules": "Regeln",
   "issues_findings_configuration_value": "Konfiguration: {configuration} · Regeln: {rules}",
-  "issues_manual_review_needed": "Manuelle Prüfung nötig",
   "issues_notice_unconfirmed_title": "Untersuchung nicht bestätigt",
   "issues_notice_unconfirmed_body": "Das sind die zuletzt bestätigten Befunde. Stelle die Verbindung wieder her oder aktualisiere die Seite, bevor du eine Behebung wählst.",
   "issues_notice_stale_title": "Nachweise sind veraltet",

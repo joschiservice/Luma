@@ -19,6 +19,7 @@ import { CaseOrderChangePlan } from '../orders/change-plan';
 import { capabilityRecordType } from '../sync/presentation';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
+import { CaseOwnerControl } from './owner';
 import { LiveCaseDetail } from './progress';
 
 /** Opens a shareable issue workspace and preserves inbox filters on return. */
@@ -181,6 +182,15 @@ function IssueWorkspace({
         </>
       }
       refresh={<RefreshButton onClick={observation.restart} />}
+      owner={
+        item ? (
+          <CaseOwnerControl
+            organizationId={organizationId}
+            item={item}
+            onChange={observation.refresh}
+          />
+        ) : null
+      }
       canReview={Boolean(
         item &&
         observation.snapshot.data?.review.proposal &&

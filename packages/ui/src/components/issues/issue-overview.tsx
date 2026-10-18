@@ -79,6 +79,10 @@ export function IssueOverview({
       ? item.summary
       : (diagnosis?.summary ?? item.summary),
   );
+  // The issue title already sits above the overview; repeat the conclusion only when it adds to it.
+  const sameAsTitle =
+    summary.replace(/\.+$/, '') ===
+    caseSummaryText(item.summary).replace(/\.+$/, '');
   const limitations = [
     ...new Set(
       steps
@@ -110,7 +114,9 @@ export function IssueOverview({
   return (
     <div className="issue-overview">
       <div className="issue-overview-summary">
-        <p className="issue-overview-conclusion">{summary}</p>
+        {sameAsTitle ? null : (
+          <p className="issue-overview-conclusion">{summary}</p>
+        )}
         <div className="issue-overview-product case-caption">
           {products.size ? (
             [...products.entries()].map(([key, product]) => (

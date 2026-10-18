@@ -300,7 +300,6 @@
   "issues_findings_configuration": "Configuration",
   "issues_findings_rules": "Rules",
   "issues_findings_configuration_value": "Configuration: {configuration} · Rules: {rules}",
-  "issues_manual_review_needed": "Manual review needed",
   "issues_notice_unconfirmed_title": "Investigation not confirmed",
   "issues_notice_unconfirmed_body": "These are the last confirmed findings. Reconnect or refresh before you choose a fix.",
   "issues_notice_stale_title": "Evidence is out of date",

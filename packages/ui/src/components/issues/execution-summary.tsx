@@ -149,7 +149,10 @@ export function ExecutionSummary({
   );
 }
 
-/** Keeps workflow state and version identifiers available as secondary change metadata. */
+/**
+ * Keeps workflow state and the issue version available as secondary change metadata. The
+ * investigation version is shown once, in the issue's technical details.
+ */
 export function ExecutionMetadata({ progress }: { progress: CaseProgress }) {
   return (
     <dl>
@@ -157,8 +160,6 @@ export function ExecutionMetadata({ progress }: { progress: CaseProgress }) {
       <dd>{caseStateLabel(progress.state)}</dd>
       <dt>{m.issues_meta_issue_version()}</dt>
       <dd>{progress.caseRevision}</dd>
-      <dt>{m.issues_meta_investigation_version()}</dt>
-      <dd>{progress.diagnosisRevision}</dd>
       <dt>{m.issues_meta_workflow()}</dt>
       <dd>
         {progress.workflowRuns?.length

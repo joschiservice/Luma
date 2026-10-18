@@ -10,7 +10,6 @@ import { Link } from '@tanstack/react-router';
 
 import { EvidenceDisclosure } from '../../shared/evidence/evidence';
 import type { CaseObservation } from './observation';
-import { CaseOwnerControl } from './owner';
 
 /**
  * Keeps a selected case investigation and history current through progress events and query
@@ -51,73 +50,66 @@ export function LiveCaseDetail({
     );
 
   return (
-    <>
-      <CaseOwnerControl
-        organizationId={observation.organizationId}
-        item={data.detail}
-        onChange={observation.refresh}
-      />
-      <CaseInvestigation
-        item={data.detail}
-        review={data.review}
-        lifecycle={data.progress}
-        embedded
-        expanded={expanded}
-        unconfirmed={!confirmed}
-        onRefresh={refresh}
-        refreshing={snapshot.isFetching}
-        progress={
-          <>
-            <CaseTimeline
-              expanded={expanded}
-              {...data}
-              timeline={history.data?.timeline ?? []}
-              evidence={history.data?.evidence ?? []}
-              historyUnavailable={history.isError || history.isPending}
-              hasMoreTimeline={history.data?.hasMoreTimeline ?? false}
-              hasMoreEvidence={history.data?.hasMoreEvidence ?? false}
-              loadingHistory={history.isFetching}
-              onLoadMore={observation.loadMore}
-              connection={connection}
-              confirmed={confirmed}
-              onRefresh={refresh}
-              renderEvidence={(refs) => (
-                <EvidenceDisclosure
-                  organizationId={observation.organizationId}
-                  subject={{ kind: 'case', id: data.detail.id }}
-                  refs={refs}
-                  count={new Set(refs).size}
-                />
-              )}
-              workflowLink={(run) => (
-                <Link
-                  to="/app/$organizationId/workflows/$definitionId"
-                  params={{
-                    organizationId: observation.organizationId,
-                    definitionId: run.definitionId,
-                  }}
-                  hash={`run-${run.id}`}
-                >
-                  {run.name}
-                </Link>
-              )}
-            >
-              {history.isError ? (
-                <CaseNotice error title={m.exceptions_history_failed_title()}>
-                  {history.data
-                    ? m.exceptions_history_failed_stale()
-                    : m.exceptions_history_failed_text()}
-                  <Button variant="outline" onClick={observation.retryHistory}>
-                    {m.exceptions_history_retry()}
-                  </Button>
-                </CaseNotice>
-              ) : history.isPending ? (
-                <CaseLoading />
-              ) : null}
-            </CaseTimeline>
-          </>
-        }
-      />
-    </>
+    <CaseInvestigation
+      item={data.detail}
+      review={data.review}
+      lifecycle={data.progress}
+      embedded
+      expanded={expanded}
+      unconfirmed={!confirmed}
+      onRefresh={refresh}
+      refreshing={snapshot.isFetching}
+      progress={
+        <>
+          <CaseTimeline
+            expanded={expanded}
+            {...data}
+            timeline={history.data?.timeline ?? []}
+            evidence={history.data?.evidence ?? []}
+            historyUnavailable={history.isError || history.isPending}
+            hasMoreTimeline={history.data?.hasMoreTimeline ?? false}
+            hasMoreEvidence={history.data?.hasMoreEvidence ?? false}
+            loadingHistory={history.isFetching}
+            onLoadMore={observation.loadMore}
+            connection={connection}
+            confirmed={confirmed}
+            onRefresh={refresh}
+            renderEvidence={(refs) => (
+              <EvidenceDisclosure
+                organizationId={observation.organizationId}
+                subject={{ kind: 'case', id: data.detail.id }}
+                refs={refs}
+                count={new Set(refs).size}
+              />
+            )}
+            workflowLink={(run) => (
+              <Link
+                to="/app/$organizationId/workflows/$definitionId"
+                params={{
+                  organizationId: observation.organizationId,
+                  definitionId: run.definitionId,
+                }}
+                hash={`run-${run.id}`}
+              >
+                {run.name}
+              </Link>
+            )}
+          >
+            {history.isError ? (
+              <CaseNotice error title={m.exceptions_history_failed_title()}>
+                {history.data
+                  ? m.exceptions_history_failed_stale()
+                  : m.exceptions_history_failed_text()}
+                <Button variant="outline" onClick={observation.retryHistory}>
+                  {m.exceptions_history_retry()}
+                </Button>
+              </CaseNotice>
+            ) : history.isPending ? (
+              <CaseLoading />
+            ) : null}
+          </CaseTimeline>
+        </>
+      }
+    />
   );
 }

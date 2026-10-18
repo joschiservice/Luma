@@ -35,6 +35,7 @@ import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
 import { StoryShell } from '../../shell/storybook-shell';
 import { issuePresentation, issueProperties } from './issue-list';
+import { CaseOwnerProperty } from './owner';
 import { IssueResults } from './results';
 
 // Fixtures share one ID; the list keys rows by ID, so each gets its own.
@@ -235,6 +236,19 @@ function IssuesExample({
                         }
                         className="inbox-case-nav"
                         item={issues[selected]!}
+                        owner={
+                          <CaseOwnerProperty
+                            name={selected === 0 ? 'Alex Morgan' : undefined}
+                            people={[
+                              {
+                                id: 'sam',
+                                name: 'Sam Lee',
+                                detail: 'sam@northstar.example',
+                              },
+                            ]}
+                            onClear={selected === 0 ? () => {} : undefined}
+                          />
+                        }
                         openPage={
                           <a
                             href="#full-issue"
