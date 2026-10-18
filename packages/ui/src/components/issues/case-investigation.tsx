@@ -81,7 +81,7 @@ const diagnosisStatuses = {
 } satisfies Record<Diagnosis['status'], () => string>;
 
 /** Displays the recorded issue state and severity. */
-export function CaseStatus({ item }: { item: CaseSummary }) {
+function CaseStatus({ item }: { item: CaseSummary }) {
   return (
     <div className="case-badges">
       <Badge tone={item.severity === 'high' ? 'warning' : 'neutral'}>
