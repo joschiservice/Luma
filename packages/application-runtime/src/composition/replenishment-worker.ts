@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { AppDefinition } from '@luma/app-host';
 import type { IdentityService } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
+import { createFailureLog } from '@luma/platform';
 import {
   createProcessWorker,
   type StockProtectionWorkflowInput,
@@ -24,6 +25,7 @@ import type { createReplenishmentRuntime } from './replenishment.js';
 /**
  * Runs durable process activities for replenishment, case workflows and computation workflows,
  * starts case runs for new cases, and recovers committed starts after API or worker restarts.
+ * Monitor failures go to `log`, which defaults to stderr with sanitized error details.
  */
 export async function createReplenishmentWorker(
   settings: TemporalSettings,
@@ -40,6 +42,7 @@ export async function createReplenishmentWorker(
       incidentId: string,
     ): Promise<void>;
   },
+  log: (message: string, error?: unknown) => void = createFailureLog(),
 ) {
   const select = (run: ProcessRun) =>
     run.definitionId === 'inventory-replenishment'
@@ -108,10 +111,7 @@ export async function createReplenishmentWorker(
             );
           } catch (error) {
             if (pausesBackgroundWork(error)) continue;
-            console.error(
-              'Replenishment check could not complete; retrying.',
-              error,
-            );
+            log('Replenishment check could not complete; retrying.', error);
           }
         }
         if (stockProtection) {
@@ -137,7 +137,7 @@ export async function createReplenishmentWorker(
                 }
             } catch (error) {
               if (!pausesBackgroundWork(error))
-                console.error(
+                log(
                   'Stock protection discovery is unavailable; retrying.',
                   error,
                 );
@@ -161,10 +161,7 @@ export async function createReplenishmentWorker(
               );
             } catch (error) {
               if (pausesBackgroundWork(error)) continue;
-              console.error(
-                'Case workflow starts could not complete; retrying.',
-                error,
-              );
+              log('Case workflow starts could not complete; retrying.', error);
             }
           }
         }
@@ -187,14 +184,12 @@ export async function createReplenishmentWorker(
               );
             } catch (error) {
               if (pausesBackgroundWork(error)) continue;
-              console.error(
-                'Code workflow start could not complete; retrying.',
-              );
+              log('Code workflow start could not complete; retrying.', error);
             }
           }
         }
       } catch (error) {
-        console.error('Replenishment monitor is unavailable; retrying.', error);
+        log('Replenishment monitor is unavailable; retrying.', error);
       }
       await delay(5000, undefined, { signal: stop.signal }).catch(
         () => undefined,

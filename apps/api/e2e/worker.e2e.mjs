@@ -25,7 +25,8 @@ test('the standalone worker starts and drains on SIGTERM', async (t) => {
   await until(() => {
     if (worker.result) throw new Error(worker.output);
 
-    return worker.output.includes("state: 'RUNNING'");
+    // Temporal logs one JSON line per entry.
+    return worker.output.includes('"state":"RUNNING"');
   }, 'standalone worker running');
   worker.child.kill('SIGTERM');
   expect(await worker.wait()).toEqual({ code: 0, signal: null });

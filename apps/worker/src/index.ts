@@ -1,4 +1,7 @@
-import { createDefaultExceptionWorker } from '@luma/application-runtime/worker';
+import {
+  createDefaultExceptionWorker,
+  installRuntimeLogger,
+} from '@luma/application-runtime/worker';
 import {
   readConnectionsConfig,
   readIdentityConfig,
@@ -25,6 +28,8 @@ export async function main(
       },
     };
   };
+  // Temporal logs as JSON with sanitized errors; installed before any worker connects.
+  installRuntimeLogger();
   const observability = createObservability(
     readObservabilityConfig(process.env),
   );

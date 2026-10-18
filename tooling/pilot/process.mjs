@@ -44,6 +44,9 @@ setInterval(() => {
 }, 1_000).unref();
 
 try {
+  const { installRuntimeLogger } = await import('@luma/workflow-temporal');
+  // Temporal logs as JSON with sanitized errors; installed before any worker connects.
+  installRuntimeLogger();
   const { createPilot } = await import('./runtime.mjs');
   const { createObservability } = await import('@luma/platform/composition');
   observability = createObservability({ ...settings, approvedModels: [] });
