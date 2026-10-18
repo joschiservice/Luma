@@ -113,7 +113,10 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 For a member, a suspended or closed organization raises `WorkspaceInactiveError`, a 404
 `IdentityError` subclass. Callers see the same response; background work uses the subclass
 to pause instead of failing or blocking. Cross-tenant worker discovery returns active
-organizations only.
+organizations only. A closed organization's data is removed after its announced
+[deletion date](commerce-sync.md#closed-workspace-retention); from then on it can't be
+reopened. The workspace list includes closed workspaces with `dataDeletionAt` and
+`dataDeletedAt`, and their owners get notices through the mail queue.
 
 A suspended membership raises `MembershipSuspendedError`, a 403 with the `ACCESS_SUSPENDED`
 code; the member already knows the workspace exists. The workspace list still includes the

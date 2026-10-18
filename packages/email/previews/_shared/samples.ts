@@ -108,4 +108,14 @@ export const samples = {
     signInLink: `${origin}/sign-in`,
   },
   account_erased: { kind: 'account_erased' },
+  workspace_closure_scheduled: {
+    kind: 'workspace_closure_scheduled',
+    workspace: 'Northwind Goods',
+    deletionAt: new Date('2027-01-16T00:00:00Z'),
+  },
+  workspace_closure_reminder: {
+    kind: 'workspace_closure_reminder',
+    workspace: 'Northwind Goods',
+    deletionAt: new Date('2027-01-16T00:00:00Z'),
+  },
 } satisfies { [K in Email['kind']]: Email & { kind: K } };

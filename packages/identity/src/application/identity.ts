@@ -101,9 +101,14 @@ export interface IdentityTransaction {
   removeMember(organizationId: string, memberId: string): Promise<void>;
 }
 
-/** A workspace with the signed-in person's membership status in it. */
+/**
+ * A workspace with the signed-in person's membership status in it. A closed workspace carries
+ * the announced deletion date of its data, once scheduled, and when the deletion completed.
+ */
 type OrganizationAccess = Organization & {
   membershipStatus: MembershipStatus;
+  dataDeletionAt: string | null;
+  dataDeletedAt: string | null;
 };
 
 /** A membership as returned to API callers, without its permission set. */

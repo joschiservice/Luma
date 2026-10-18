@@ -99,5 +99,12 @@
   "email_protection_partial": "Some stock holds for {store} could not be confirmed. Luma keeps uncertain writes for reconciliation and does not resend them.",
   "email_protection_escalated": "Stock holds for {store} reached their time limit. Review the incident to release them or keep them longer.",
   "email_protection_released": "Stock protection for {store} has ended. Review the verified releases, outside changes and incident summary.",
-  "email_protection_action": "Review stock protection"
+  "email_protection_action": "Review stock protection",
+  "email_workspace_closure_scheduled_subject": "{workspace} will be deleted on {date}",
+  "email_workspace_closure_reminder_subject": "{workspace} will be deleted in a week",
+  "email_workspace_closure_preview": "Contact Luma support before {date} to keep it.",
+  "email_workspace_closure_scheduled_body": "{workspace} is closed. On {date} Luma deletes its data.",
+  "email_workspace_closure_reminder_body": "{workspace} is closed, and Luma deletes its data on {date}.",
+  "email_workspace_closure_scope": "This removes orders, stock, customers, messages, issues, workflows and every other record in the workspace. Luma keeps its log of actions taken in the workspace for a limited time afterwards. Deleted data can’t be restored.",
+  "email_workspace_closure_keep": "To keep {workspace}, ask Luma support to reopen it before {date}."
 }

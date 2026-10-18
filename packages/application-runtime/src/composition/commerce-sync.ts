@@ -40,6 +40,7 @@ import { createSupplierTerms } from '@luma/procurement/composition';
 import { Pool } from 'pg';
 
 import { assertCellRegion } from '../cell-region.js';
+import { createDataRetentionWorker } from './data-retention.js';
 import { createDetectionWorker } from './detection-worker.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createMailboxSyncWorker } from './mailbox-sync.js';
@@ -205,8 +206,8 @@ export function createCommerceSyncService(
 
 /**
  * Starts the commerce sync process: identity for resolving who each sync runs as, the
- * worker database pool, the runner loop, supplier follow-up, mailbox reading and scheduled
- * detection. Failures
+ * worker database pool, the runner loop, supplier follow-up, mailbox reading, scheduled
+ * detection and data retention. Failures
  * are written to stderr and reported through `observability` when supplied. Close it after
  * `run` resolves. With `modelSettings` and `observability`, mailbox reading extracts facts from
  * documents and supplier messages through the configured regional routes.
@@ -283,6 +284,12 @@ export async function createDefaultCommerceSyncWorker(
       log,
     });
     resources.add(detection.close);
+    const retention = createDataRetentionWorker({
+      pool,
+      closureRetentionDays: settings.closureRetentionDays,
+      auditRetentionDays: settings.auditRetentionDays,
+      log,
+    });
 
     return {
       run: async () => {
@@ -291,6 +298,7 @@ export async function createDefaultCommerceSyncWorker(
           followUp.run(),
           mailboxes.run(),
           detection.run(),
+          retention.run(),
         ]);
       },
       shutdown: () => {
@@ -298,6 +306,7 @@ export async function createDefaultCommerceSyncWorker(
         followUp.shutdown();
         mailboxes.shutdown();
         detection.shutdown();
+        retention.shutdown();
       },
       close: resources.close,
     };

@@ -143,3 +143,18 @@ it('does not acknowledge failed persistence', async () => {
     'Database unavailable',
   );
 });
+it('queues the shop for data removal only on shop/redact', async () => {
+  const f = fixture();
+  const queued = () =>
+    f.query.mock.calls
+      .filter(([sql]) => String(sql).includes('erase_shopify_shop_data'))
+      .map(([, values]) => values);
+  await f.send('customers/redact', {
+    ...base,
+    customer: { id: 456 },
+    orders_to_redact: [],
+  });
+  expect(queued()).toEqual([]);
+  await f.send('shop/redact', base);
+  expect(queued()).toEqual([['development:client', shop]]);
+});

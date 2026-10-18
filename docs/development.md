@@ -75,7 +75,14 @@ superuser, database creation, role creation or RLS bypass privileges.
   `luma_commerce_sync` and `luma_customers`.
 
 A migration that adds a table grants it to the owning role and, where needed, to reader
-roles. See [ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
+roles. A table with a `tenant_id` column also needs a row in `data_retention_classes`:
+`purge_on_closure` for workspace data, `keep_with_organization` for records that follow the
+organization or account lifecycle, or `legal_retention`. Workspace apps classify their tables in their own
+migrations, which run after the core ones. Closed-workspace removal stops while
+any tenant table is unclassified; see
+[closed workspace retention](commerce-sync.md#closed-workspace-retention). An immutable
+table attaches the shared `refuse_delete_outside_purge()` trigger `BEFORE DELETE` instead of
+refusing deletes in its own guard. See [ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
 
 ### API source imports
 

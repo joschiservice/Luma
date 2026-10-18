@@ -35415,6 +35415,28 @@
                           "membershipStatus": {
                             "enum": ["active", "suspended"],
                             "type": "string"
+                          },
+                          "dataDeletionAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "dataDeletedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -35423,7 +35445,9 @@
                           "slug",
                           "dataRegion",
                           "status",
-                          "membershipStatus"
+                          "membershipStatus",
+                          "dataDeletionAt",
+                          "dataDeletedAt"
                         ]
                       }
                     }

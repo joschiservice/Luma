@@ -16,6 +16,10 @@ export interface CommerceSyncConfig {
     /** Time between reads of a current mailbox. */
     pollMs: number;
   };
+  /** Days a closed workspace's data is kept before the sync process removes it. */
+  closureRetentionDays: number;
+  /** Days a closed workspace's audit entries are kept after closure; at least the closure window. */
+  auditRetentionDays: number;
 }
 
 /**
@@ -75,6 +79,30 @@ export function readCommerceSyncConfig(
       'MESSAGING_POLL_SECONDS must be an integer from 30 to 3600',
     );
 
+  const closureRetentionDays = Number(
+    env.WORKSPACE_CLOSURE_RETENTION_DAYS ?? '90',
+  );
+  if (
+    !Number.isInteger(closureRetentionDays) ||
+    closureRetentionDays < 30 ||
+    closureRetentionDays > 3650
+  )
+    throw new Error(
+      'WORKSPACE_CLOSURE_RETENTION_DAYS must be an integer from 30 to 3650',
+    );
+
+  // One year after closure covers disputes about actions taken for the merchant; longer legal
+  // retention is the operator's decision.
+  const auditRetentionDays = Number(env.AUDIT_RETENTION_DAYS ?? '365');
+  if (
+    !Number.isInteger(auditRetentionDays) ||
+    auditRetentionDays < closureRetentionDays ||
+    auditRetentionDays > 3650
+  )
+    throw new Error(
+      'AUDIT_RETENTION_DAYS must be an integer from WORKSPACE_CLOSURE_RETENTION_DAYS to 3650',
+    );
+
   return {
     databaseUrl,
     connections,
@@ -82,5 +110,7 @@ export function readCommerceSyncConfig(
     workspaceConcurrency,
     connectionConcurrency,
     messaging: { retentionDays, pollMs: pollSeconds * 1000 },
+    closureRetentionDays,
+    auditRetentionDays,
   };
 }

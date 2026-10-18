@@ -125,6 +125,12 @@ export function createPrivacyIntake(
                 eventKey,
               ],
         );
+      // Uninstalled connections of the shop are queued for removal by the sync process.
+      if (topic === 'shop/redact')
+        await tx.query('SELECT erase_shopify_shop_data($1::text,$2::text)', [
+          app,
+          shop,
+        ]);
     });
   };
 }

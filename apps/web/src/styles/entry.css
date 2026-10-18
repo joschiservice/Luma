@@ -623,6 +623,24 @@
   text-decoration: none;
 }
 
+.workspace-list-closed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.workspace-list-note {
+  display: block;
+  color: var(--foreground-muted);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: normal;
+}
+
 .workspace-list a:hover {
   background: var(--surface-hover);
 }
