@@ -17,9 +17,69 @@ import {
   workspaceName,
 } from '../../kit/identity/data';
 import { regionLabel } from '../../kit/identity/region';
+import { closureNotice } from './closure';
+
+/** One workspace row as the list needs it. */
+type WorkspaceRow = Parameters<typeof closureNotice>[0] & {
+  id: string;
+  name: string;
+  membershipStatus: 'active' | 'suspended';
+};
 
 /**
- * Lists the person's workspaces, marking those where their access is suspended. Entry mode
+ * The workspace rows: open workspaces link to Home and mark suspended access; closed ones
+ * can't be opened and say what happens to their data.
+ */
+export function WorkspaceRows({
+  workspaces,
+}: {
+  workspaces: readonly WorkspaceRow[];
+}) {
+  return (
+    <ul className="workspace-list">
+      {workspaces.map((org) => {
+        const closure = closureNotice(org);
+
+        return closure ? (
+          <li key={org.id}>
+            <div className="workspace-list-closed">
+              <span className="workspace-avatar" aria-hidden="true">
+                {org.name.trim().slice(0, 1).toUpperCase()}
+              </span>
+              <span className="workspace-list-name">
+                {org.name}
+                <span className="workspace-list-note">{closure}</span>
+              </span>
+              <Badge>{m.identity_workspaces_closed()}</Badge>
+            </div>
+          </li>
+        ) : (
+          <li key={org.id}>
+            <Link
+              to="/app/$organizationId/home"
+              params={{ organizationId: org.id }}
+            >
+              <span className="workspace-avatar" aria-hidden="true">
+                {org.name.trim().slice(0, 1).toUpperCase()}
+              </span>
+              <span className="workspace-list-name">{org.name}</span>
+              {org.membershipStatus === 'suspended' ? (
+                <Badge tone="warning">
+                  {m.identity_workspaces_suspended()}
+                </Badge>
+              ) : null}
+              <ChevronRight size={16} aria-hidden="true" />
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Lists the person's workspaces, marking those where their access is suspended. A closed
+ * workspace can't be opened; its row says when its data is deleted. Entry mode
  * opens the sole workspace when it's accessible, or routes an empty list to creation.
  */
 export function WorkspaceList({ entry = false }: { entry?: boolean }) {
@@ -32,7 +92,8 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
   if (
     entry &&
     query.data.length === 1 &&
-    query.data[0]!.membershipStatus === 'active'
+    query.data[0]!.membershipStatus === 'active' &&
+    query.data[0]!.status !== 'closed'
   )
     return (
       <Navigate
@@ -48,27 +109,7 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
         <h1 id="workspaces-title">{m.identity_workspaces_title()}</h1>
         <p>{m.identity_workspaces_lead()}</p>
         {query.data.length ? (
-          <ul className="workspace-list">
-            {query.data.map((org) => (
-              <li key={org.id}>
-                <Link
-                  to="/app/$organizationId/home"
-                  params={{ organizationId: org.id }}
-                >
-                  <span className="workspace-avatar" aria-hidden="true">
-                    {org.name.trim().slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="workspace-list-name">{org.name}</span>
-                  {org.membershipStatus === 'suspended' ? (
-                    <Badge tone="warning">
-                      {m.identity_workspaces_suspended()}
-                    </Badge>
-                  ) : null}
-                  <ChevronRight size={16} aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <WorkspaceRows workspaces={query.data} />
         ) : (
           <p className="entry-empty">{m.identity_workspaces_empty()}</p>
         )}

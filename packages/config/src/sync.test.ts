@@ -55,4 +55,33 @@ describe('commerce sync configuration', () => {
         key!,
       );
   });
+
+  it('bounds how long a closed workspace keeps its data', () => {
+    expect(readCommerceSyncConfig(env).closureRetentionDays).toBe(90);
+    expect(
+      readCommerceSyncConfig({
+        ...env,
+        WORKSPACE_CLOSURE_RETENTION_DAYS: '365',
+      }).closureRetentionDays,
+    ).toBe(365);
+    for (const invalid of ['29', '3651', '90.5'])
+      expect(() =>
+        readCommerceSyncConfig({
+          ...env,
+          WORKSPACE_CLOSURE_RETENTION_DAYS: invalid,
+        }),
+      ).toThrow('WORKSPACE_CLOSURE_RETENTION_DAYS');
+  });
+
+  it('keeps audit entries at least as long as the closure window', () => {
+    expect(readCommerceSyncConfig(env).auditRetentionDays).toBe(365);
+    expect(
+      readCommerceSyncConfig({ ...env, AUDIT_RETENTION_DAYS: '2190' })
+        .auditRetentionDays,
+    ).toBe(2190);
+    for (const invalid of ['89', '3651', '365.5'])
+      expect(() =>
+        readCommerceSyncConfig({ ...env, AUDIT_RETENTION_DAYS: invalid }),
+      ).toThrow('AUDIT_RETENTION_DAYS');
+  });
 });

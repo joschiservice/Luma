@@ -82,8 +82,16 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
   assert.deepStrictEqual(
     (await api.request('/v1/organizations', { cookie: alice.cookie })).body
       .items,
-    // The list adds the caller's membership status to each workspace.
-    [{ ...organization, membershipStatus: 'active' }],
+    // The list adds the caller's membership status to each workspace; an open workspace has
+    // no deletion date.
+    [
+      {
+        ...organization,
+        membershipStatus: 'active',
+        dataDeletionAt: null,
+        dataDeletedAt: null,
+      },
+    ],
   );
   await api.request(contextPath, { cookie: alice.cookie });
   await api.request('/auth/sign-out', {

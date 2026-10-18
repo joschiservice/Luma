@@ -93,12 +93,26 @@ that export or deletion is complete. Retries of the same signed body and topic a
 deduplicated, including after completion. No body, shop or customer identifier is logged.
 The runtime role can insert requests but cannot read or complete them.
 
-Imported customer profiles are erased automatically on intake (see
-[commerce sync](commerce-sync.md#customers)). Everything else is an operator procedure;
+Imported customer profiles, order addresses and the customer's inbox data are erased
+automatically on intake, including messages to or from the request's signed email when no
+profile holds it (see [commerce sync](commerce-sync.md#customers) and
+[messaging](messaging.md#retention-and-erasure)), and each bound workspace's Activity records
+the erasure with its counts. Everything else is an operator procedure;
 the endpoint alone does not make a deployment compliant.
 
-Assign an operator before production onboarding. Check the queue daily and alert on
-requests approaching their 30-day deadline. Use a restricted operator session with
+A `shop/redact` also queues every uninstalled connection of the shop. The commerce sync
+process then deletes that connection's retained rows in batches: observations, mappings,
+snapshots and projections, sync state, customer records and connection-scoped evidence,
+with the rows that reference them. Uninstall has already erased the credentials. The
+connection record, its lifecycle events, the shop binding and customer erasure markers
+remain. A connection that is reconnected before removal finishes is a newer installation:
+removal stops and the request stays with the operator. Canonical records shared with other
+connections, issue evidence and audit entries are not connection-scoped and remain until
+the workspace is closed or the operator removes them.
+
+Assign an operator before production onboarding. Check the queue daily. The sync process
+reports open requests due within seven days, and overdue ones, to Sentry hourly with counts
+only; route that issue to the operator. Use a restricted operator session with
 database-owner or BYPASSRLS access, never the API runtime credentials. Supply
 `SHOPIFY_PRIVACY_DATABASE_URL` and the encryption key settings through the secret manager,
 and build `@luma/connections` first.
@@ -124,13 +138,14 @@ For each request:
    evidence, logs and exports. Live customer-context reads are not persisted. Deliver the
    retained data, or a documented no-data result, to the verified merchant through a
    secure channel.
-3. `customers/redact`: remove or anonymize the corresponding retained data across those
-   stores. Pause ingestion while doing so, and make sure replay and backups cannot restore
+3. `customers/redact`: profiles, order addresses and inbox data are already erased; remove
+   or anonymize the corresponding retained data across the other stores. Pause ingestion while doing so, and make sure replay and backups cannot restore
    erased data. Keep only documented legal retention.
-4. `shop/redact`: stop the installation's ingestion and erase its secrets and all
-   retained shop data, including derived evidence and exports. Check current installation
-   status before acting on a delayed request after reinstall; never delete another
-   tenant's data or a newer installation's data.
+4. `shop/redact`: confirm in `connection_data_purges` that each bound connection was
+   `purged`, then erase the remaining shop data, including derived evidence and exports.
+   For a `superseded` connection, or one never queued because it was active, check current
+   installation status before acting on a delayed request after reinstall; never delete
+   another tenant's data or a newer installation's data.
 5. Record affected stores, actions, backup expiry or legal retention, verification,
    merchant delivery and the operator in restricted evidence. Remove the temporary files,
    then record completion.

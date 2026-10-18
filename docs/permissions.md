@@ -43,6 +43,7 @@ Imported orders, stock, products, customers, and returns.
 | Review native stock changes | `inventory.approve` | Approve or reject another member’s exact stock opening or correction. | Yes | Yes | Yes |  |
 | View products | `products.read` | See the product catalog and SKU comparisons. |  | Yes | Yes | Yes |
 | View customers | `customers.read` | See customer profiles, including names, email addresses, and postal addresses. | Yes | Yes | Yes | Yes |
+| Erase customers | `customers.erase` | Erase a customer’s profile, order addresses and inbox messages for a data-subject request. | Yes | Yes | Yes |  |
 | View returns | `returns.read` | See returns, refunds, and money returned. |  | Yes | Yes | Yes |
 | Manage returns | `returns.manage` | Open return cases, record receipt and inspection, propose resolutions, and request returns in connected systems. | Yes | Yes | Yes |  |
 | View insights | `insights.read` | See operational metrics, rule charts, and import coverage. |  | Yes | Yes | Yes |

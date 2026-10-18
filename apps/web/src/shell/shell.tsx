@@ -262,9 +262,11 @@ function TenantShell({ organizationId }: { organizationId: string }) {
           workspaces={organizations.data.map((org) => ({
             id: org.id,
             name: org.name,
-            ...(org.membershipStatus === 'suspended'
-              ? { status: m.identity_workspaces_suspended() }
-              : {}),
+            ...(org.status === 'closed'
+              ? { status: m.identity_workspaces_closed() }
+              : org.membershipStatus === 'suspended'
+                ? { status: m.identity_workspaces_suspended() }
+                : {}),
             link: (
               <Link
                 to="/app/$organizationId/home"

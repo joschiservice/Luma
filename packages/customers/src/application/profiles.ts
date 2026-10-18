@@ -52,19 +52,9 @@ export interface CustomerProfiles {
     orders: OrderAddresses[],
   ): Promise<void>;
   /**
-   * Deletes stored profiles, their order links and the addresses of their orders for one
-   * connection, or only those of the listed source customers, and prevents listed customers and
-   * their linked orders' addresses from being imported again. Requires `sync.manage`.
-   */
-  erase(
-    context: TenantContext,
-    connectionId: string,
-    externalIds?: string[],
-  ): Promise<number>;
-  /**
    * Deletes the listed source customers' profiles and order links, for customers the source no
-   * longer has. Order addresses stay: they belong to orders the source still reports. Unlike
-   * `erase`, a later read that reports the customers again imports them again. Accepts up to
+   * longer has. Order addresses stay: they belong to orders the source still reports. Unlike an
+   * erasure, a later read that reports the customers again imports them again. Accepts up to
    * 1000 IDs. Requires `sync.manage`.
    */
   remove(

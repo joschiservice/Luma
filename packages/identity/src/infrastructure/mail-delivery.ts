@@ -17,6 +17,7 @@ import {
 import { briefAuthority } from './morning-brief.js';
 import { drainPasswordMail } from './password-mail.js';
 import { workspaceTransaction } from './settings.js';
+import { drainWorkspaceClosureMail } from './workspace-closure.js';
 
 interface Delivery {
   stock_protection_document?: {
@@ -377,6 +378,7 @@ export function createMailDelivery(
     );
     if (!(await drainPasswordMail(pool, provider, origin, secret))) return;
     if (!(await drainAccountMail(pool, provider, origin))) return;
+    if (!(await drainWorkspaceClosureMail(pool, provider))) return;
     const tenants = await pool.query<{ tenant_id: string }>(
       'SELECT tenant_id FROM workspace_mail_tenants()',
     );

@@ -102,3 +102,34 @@
   align-items: center;
   gap: 2px;
 }
+.customers-erase-preview {
+  display: grid;
+  gap: 8px;
+}
+.customers-erase-preview h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.customers-erase-counts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.customers-erase-counts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.customers-erase-counts dt {
+  color: var(--muted-foreground);
+}
+.customers-erase-counts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}

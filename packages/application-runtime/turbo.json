@@ -7,6 +7,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/api/src/**",
         "$TURBO_ROOT$/packages/apps/*/package.json",
+        "$TURBO_ROOT$/packages/apps/*/migrations/**",
         "$TURBO_ROOT$/tooling/shopify/**",
         "$TURBO_ROOT$/packages/apps/shopify/src/infrastructure/fixtures/admin-2026-07.graphql",
         "$TURBO_ROOT$/packages/application-runtime/migrations/**",

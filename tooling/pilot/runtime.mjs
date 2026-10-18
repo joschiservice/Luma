@@ -840,6 +840,7 @@ export async function createPilot(
               services: installations.registry.stockProtection(),
               start: processClient.startStockProtection,
             },
+            failureLog,
           )
         : undefined;
     if (replenishmentWorker) resources.add(replenishmentWorker.close);
@@ -910,13 +911,13 @@ export async function createPilot(
     if (role === 'worker' && simulation) {
       const timer = setInterval(() => {
         followUp().catch((error) =>
-          console.error('Supplier follow-up failed; retrying.', error),
+          failureLog('Supplier follow-up failed; retrying.', error),
         );
       }, 10_000);
       resources.add(() => clearInterval(timer));
       const mailboxTimer = setInterval(() => {
         readMailboxes({ passes: 1 }).catch((error) =>
-          console.error('Reading mailboxes failed; retrying.', error),
+          failureLog('Reading mailboxes failed; retrying.', error),
         );
       }, 10_000);
       resources.add(() => clearInterval(mailboxTimer));

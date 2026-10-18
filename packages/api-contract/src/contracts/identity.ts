@@ -35,6 +35,10 @@ const membershipSchema = z.object({
 /** A workspace in the signed-in person's list, with their membership status in it. */
 const organizationAccessSchema = organizationSchema.extend({
   membershipStatus: membershipStatusSchema,
+  /** For a closed workspace, the announced date its data is deleted; null until scheduled. */
+  dataDeletionAt: z.string().datetime().nullable(),
+  /** For a closed workspace, when its data was deleted; null until then. */
+  dataDeletedAt: z.string().datetime().nullable(),
 });
 
 const tenantContextSchema = z.object({

@@ -67,6 +67,13 @@ Each domain owns writes to its tables. For a table that holds tenant data:
   (`ALTER POLICY tenant_scope ON <table> TO <owner>, <reader>`) or give them their own
   `FOR SELECT` policy. Column-level `GRANT SELECT(...)` keeps a reader to the columns it
   needs. Cross-domain reads go through deliberate query adapters, not shared write access.
+- Classify the table for closed-workspace retention in the same migration:
+  `INSERT INTO data_retention_classes(table_name,class) VALUES('supplier_lead_times','purge_on_closure');`
+  Use `purge_on_closure` for workspace data, `keep_with_organization` for records that follow
+  the organization or account lifecycle, and `legal_retention` only with a documented reason.
+  Closed-workspace removal stops while any tenant table is unclassified, and the retention
+  test fails first. Immutable tables attach the shared `refuse_delete_outside_purge()`
+  trigger `BEFORE DELETE` rather than refusing deletes in their own guard.
 
 A new group role must also be granted to the logins that need it: local logins in
 `tooling/dev/database.mjs`, and journey fixtures that grant roles to their runtime login.

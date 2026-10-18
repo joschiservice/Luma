@@ -82,6 +82,35 @@ Change notifications are still acknowledged and stored as hints, and Shopify pri
 requests are always processed. After reactivation the stored hints and due streams run
 like any other, and scheduled scans cover what changed meanwhile.
 
+## Closed workspace retention
+
+A closed workspace keeps its data for `WORKSPACE_CLOSURE_RETENTION_DAYS` (90 by default,
+30 to 3650) after closure. The sync process announces the deletion date once, as
+`organizations.data_deletion_at`, at least seven days after announcing it. A longer window
+moves an announced date later; a shorter one never moves it earlier, so data is never deleted
+before the date owners were given. Active owners get an email when the date is announced and
+a reminder about a week before, unless the first notice already arrived within eight days of
+deletion. Each notice is sent once per owner and date; reopening the workspace, a changed
+date or the start of removal cancels queued notices. The workspace list shows closed
+workspaces with their date and can't open them.
+
+After the date, the sync process deletes every row of tables classified `purge_on_closure`
+in batches. Tables classified `keep_with_organization` (organization identity, memberships,
+roles, settings, mail and staff or support records) remain and follow
+[account deletion](identity.md#account-deletion) and their own retention. Audit entries are
+`legal_retention`: they are deleted only once the workspace has been closed for
+`AUDIT_RETENTION_DAYS` (365 by default, from the closure window to 3650) and its other data is
+gone. Set that window to the longest legal retention that applies to Luma's records of
+actions; the default covers disputes about actions taken for a merchant. Active workspaces
+never lose audit entries. Once removal starts, the workspace can't be reopened.
+
+Every public table with a `tenant_id` column needs a class in `data_retention_classes`. While
+one is unclassified, removal deletes nothing and reports the table to Sentry; the retention
+integration test fails first. Immutable ledger evidence attaches the shared
+`refuse_delete_outside_purge` delete guard, so only removal of its own tenant can delete it.
+A removal that a foreign key blocks is reported with the table name and retried every minute.
+No workspace export is offered before deletion.
+
 ## Ledger and coverage
 
 ```mermaid
@@ -170,12 +199,20 @@ observation and stores the latest report per source order in `@luma/customers`; 
 never replaces a newer one. Order detail shows them only to people who can read customers.
 
 A `customers/redact` or `shop/redact` request erases the affected imported profiles, their
-order links, order addresses and ledger rows in its intake transaction. A customer redaction
+order links, order addresses, ledger rows and inbox data in its intake transaction. The
+request's signed email joins the profile emails, so the inbox is erased even when no profile
+holds the address. A customer redaction
 erases the addresses of the customer's linked orders and of the orders it lists, even when it
 names no Shopify customer ID; a shop redaction erases every address of the shop. Erased
 customer and order IDs are remembered by digest, so later reads skip them, their orders get
-no new links and those orders' addresses are not stored again. Erasing customers through
-`@luma/customers` does the same for their linked orders. Erasure and customer imports of one
+no new links and those orders' addresses are not stored again. A member with `customers.erase` erases one
+source customer of any connection the same way through `@luma/customers`, by connection and
+source ID, whether or not a profile was imported. A preview runs the same erasure in a
+savepoint and rolls it back, so its counts match what erasing would do at that moment; it holds
+the connection's customer lock while it runs. Each erasure, from a member or a Shopify request,
+appends a `customers.erased` audit entry per workspace with its counts, shown in Activity as a
+privacy event; it names neither the customer ID nor their addresses. Shopify entries are keyed by
+the request digest, so a redelivery records one. Erasure and customer imports of one
 connection take the same lock, so a read that started earlier cannot restore erased data. Other retained data still follows the
 [privacy operations](shopify-production.md#privacy-operations) procedure.
 

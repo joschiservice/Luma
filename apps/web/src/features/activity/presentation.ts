@@ -4,7 +4,7 @@ import {
   activityOutcomes,
   activityTypes,
 } from '@luma/api-contract';
-import { formatCalendarDate } from '@luma/i18n/format';
+import { formatCalendarDate, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import {
   issueKind,
@@ -54,6 +54,7 @@ const activityLabels: Record<string, Label> = {
   connection: m.activity_type_connection,
   procurement: m.activity_type_procurement,
   access: m.activity_type_access,
+  privacy: m.activity_type_privacy,
 
   simulation: m.activity_mode_simulation,
   shadow: m.activity_mode_shadow,
@@ -162,6 +163,7 @@ const activityLabels: Record<string, Label> = {
   'invitation.revoked': m.activity_action_invitation_revoked,
   'workspace.updated': m.activity_action_workspace_changed,
   'collections.exported': m.activity_action_list_exported,
+  'customers.erased': m.activity_action_customer_erased,
 };
 
 /** Readable names for the changes Luma can propose, keyed by their recorded change code. */
@@ -315,14 +317,18 @@ export function activityHref(
 }
 
 /**
- * Names the business change without exposing storage identifiers. Procurement and access events
- * are named by their action, because their summary is a reason or the role that changed.
+ * Names the business change without exposing storage identifiers. Procurement, access and privacy
+ * events are named by their action, because their summary is a reason, a role or counts.
  */
 export function activityTitle(
   item: Pick<ActivityEvent, 'type' | 'summary' | 'action'> &
     Partial<Pick<ActivityEvent, 'actor'>>,
 ): string {
-  if (item.type === 'procurement' || item.type === 'access')
+  if (
+    item.type === 'procurement' ||
+    item.type === 'access' ||
+    item.type === 'privacy'
+  )
     return activityLabel(item.action);
 
   if (!item.summary)
@@ -444,8 +450,8 @@ export function activityResourceLabel(
 }
 
 /**
- * Says what an event is about in a few words: the kind of issue, the record, or for access and
- * procurement events the role, setting or reason that was recorded.
+ * Says what an event is about in a few words: the kind of issue, the record, for access and
+ * procurement events the role, setting or reason that was recorded, and for erasures the counts.
  */
 export function activitySubject(
   item: Pick<
@@ -461,6 +467,17 @@ export function activitySubject(
       operatorCodeMessages[item.summary]
         ? operatorCodeLabel(item.summary)
         : item.summary,
+    );
+  const erased = /^(\d+),(\d+),(\d+),(\d+),(\d+)$/.exec(item.summary ?? '');
+  if (item.type === 'privacy' && erased)
+    parts.push(
+      m.activity_customer_erased_counts({
+        profiles: formatNumber(Number(erased[1])),
+        messages: formatNumber(Number(erased[2])),
+        threads: formatNumber(Number(erased[3])),
+        replies: formatNumber(Number(erased[4])),
+        rules: formatNumber(Number(erased[5])),
+      }),
     );
   // A record named only by its kind adds little beside the kind of issue.
   const resource = activityResourceLabel(item);

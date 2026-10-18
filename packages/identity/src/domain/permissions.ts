@@ -261,6 +261,15 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'customers.erase',
+    group: 'records',
+    label: 'Erase customers',
+    description:
+      'Erase a customer’s profile, order addresses and inbox messages for a data-subject request.',
+    consequential: true,
+    introduced: '2026-10-18',
+  },
+  {
     key: 'returns.read',
     group: 'records',
     label: 'View returns',

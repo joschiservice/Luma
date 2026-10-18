@@ -186,6 +186,14 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
 
               return rows.map((row) => ({
                 ...organizationDto(row.organization),
+                dataDeletionAt:
+                  row.organization.status === 'closed'
+                    ? (row.organization.dataDeletionAt?.toISOString() ?? null)
+                    : null,
+                dataDeletedAt:
+                  row.organization.status === 'closed'
+                    ? (row.organization.dataPurgedAt?.toISOString() ?? null)
+                    : null,
                 membershipStatus:
                   row.status === 'active'
                     ? ('active' as const)

@@ -70,6 +70,7 @@
   "messaging_row_attachments": "{count, plural, one {{count, number} attachment} other {{count, number} attachments}}",
   "messaging_subject_none": "(no subject)",
   "messaging_correspondent_unknown": "Unknown sender",
+  "messaging_address_erased": "Erased contact",
   "messaging_address_named": "{name} <{address}>",
   "messaging_due_overdue": "Reply overdue",
   "messaging_due_in": "Reply due {time}",

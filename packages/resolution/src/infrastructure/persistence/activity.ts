@@ -222,7 +222,9 @@ async function readActivity<Row extends Record<string, unknown>>(
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
         COALESCE(s.doc->'details'->>'purchaseOrderId',CASE WHEN a.subject_kind='order' THEN a.subject_id END,p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
         COALESCE(CASE WHEN s.doc->'details'->>'purchaseOrderId' IS NOT NULL THEN 'purchase_order' END,CASE WHEN a.subject_kind='order' THEN 'order' END,p.document->'target'->>'kind',r.document->'action'->'target'->>'kind',a.document->'action'->'target'->>'kind',e.document->'subject'->>'subjectKind') AS resource_kind,
-        COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability',a.document->'action'->>'capability') AS summary,
+        COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason'
+          -- Erasure counts only; the entry never holds the customer's identifiers.
+          WHEN s.doc->>'eventType'='customers.erased' THEN concat_ws(',',s.doc->'details'->>'profiles',s.doc->'details'->>'messages',s.doc->'details'->>'threads',s.doc->'details'->>'replies',s.doc->'details'->>'rules') END,p.document->>'capability',r.document->'action'->>'capability',a.document->'action'->>'capability') AS summary,
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
         COALESCE(r.definition_id,w.definition_id,s.doc->'details'->>'definitionId') AS playbook_id,COALESCE(v.document->'provenance'->>'kind',wv.document->'provenance'->>'kind') AS mode,
         COALESCE(s.doc->>'eventType','case.updated') AS action,
@@ -248,6 +250,7 @@ async function readActivity<Row extends Record<string, unknown>>(
         person.actor_name,person.actor_email,person.actor_member,
         connections.items->0->>'system' AS system,
         CASE WHEN action LIKE 'purchase_order.%' THEN 'procurement'
+          WHEN action LIKE 'customers.%' THEN 'privacy'
           WHEN action LIKE 'connection.%' THEN 'connection'
           WHEN details->>'resolution' IS NOT NULL THEN 'resolution'
           WHEN action LIKE '%verification%' OR details->>'verification' IS NOT NULL THEN 'verification'

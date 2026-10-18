@@ -259,3 +259,25 @@ export function customerOrdersOptions(
       api.orders.list({ params: { organizationId }, query }, { signal }),
   });
 }
+
+/** Counts what erasing one source customer would remove now, without changing anything. */
+export function previewCustomerErasure(
+  organizationId: string,
+  body: { connectionId: string; externalId: string },
+) {
+  return api.customerErasures.preview({
+    params: { organizationId },
+    body: { ...body, emails: [] },
+  });
+}
+
+/** Erases one source customer and their inbox data; retry with the same command ID. */
+export function eraseCustomer(
+  organizationId: string,
+  body: { id: string; connectionId: string; externalId: string },
+) {
+  return api.customerErasures.create({
+    params: { organizationId },
+    body: { ...body, emails: [] },
+  });
+}

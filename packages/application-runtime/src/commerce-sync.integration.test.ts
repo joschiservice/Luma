@@ -4,6 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { createShopifyConnector } from '@luma/app-shopify';
 import { createCommerceServices } from '@luma/application-runtime';
 import { createAutomaticLinkStore } from '@luma/application-runtime/sync';
+import { createAuditLog } from '@luma/audit/composition';
 import {
   createAutoLinkRunner,
   createAutoLinkService,
@@ -27,7 +28,10 @@ import {
   createReadChecks,
   createSourceAuthority,
 } from '@luma/connections/composition';
-import { createCustomerProfiles } from '@luma/customers/composition';
+import {
+  createCustomerErasure,
+  createCustomerProfiles,
+} from '@luma/customers/composition';
 import {
   orderAttentionForOrders,
   orderAttentionQuery,
@@ -1945,7 +1949,16 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       ).rowCount,
     ).toBe(0);
     // Erasing a customer erases the addresses of the orders they placed.
-    await profiles.erase(context(), shop, [ada]);
+    await createCustomerErasure({
+      db,
+      audit: createAuditLog,
+      refreshContext: async (value) => value,
+    }).erase(context(), {
+      id: randomUUID(),
+      connectionId: shop,
+      externalId: ada,
+      emails: [],
+    });
     expect(await stored()).toEqual(['gid://shopify/Order/3']);
 
     // Newer reads of erased orders do not store their addresses again.

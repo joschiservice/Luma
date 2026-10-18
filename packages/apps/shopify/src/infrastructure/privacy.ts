@@ -33,8 +33,9 @@ const payloads = {
 
 /**
  * Verifies compliance deliveries and durably queues encrypted requests for operator
- * fulfillment. Redaction requests also erase imported customer profiles and order addresses
- * in the same transaction.
+ * fulfillment. Redaction requests also erase imported customer profiles, order addresses and
+ * the customer's inbox data, including messages to or from the signed email address, in the
+ * same transaction.
  */
 export function createPrivacyIntake(
   db: TenantDatabase,
@@ -90,24 +91,27 @@ export function createPrivacyIntake(
         'INSERT INTO shopify_privacy_requests(tenant_id,app,event_key,topic,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
         [intakeTenant, app, eventKey, topic, encrypted],
       );
-      // Imported customer profiles and order addresses are erased with the intake; other
-      // retained data still follows the operator workflow.
+      // Imported customer profiles, order addresses and the customer's inbox data are erased
+      // with the intake and recorded in each workspace's Activity; other retained data still
+      // follows the operator workflow.
       const request = parsed.data as {
-        customer?: { id?: number };
+        customer?: { id?: number; email?: string };
         orders_to_redact?: number[];
       };
       const orders = (request.orders_to_redact ?? []).map(
         (id) => `gid://shopify/Order/${id}`,
       );
+      const email = request.customer?.email?.trim().toLowerCase();
       if (
         topic === 'shop/redact' ||
         (topic === 'customers/redact' &&
-          (request.customer?.id || orders.length))
+          (request.customer?.id || email || orders.length))
       )
         await tx.query(
-          'SELECT erase_shopify_customer_data($1::text,$2::text,$3::text[],$4::text[])',
+          // The request digest keys each workspace's Activity entry, so a redelivery records one.
+          'SELECT erase_shopify_customer_data($1::text,$2::text,$3::text[],$4::text[],$5::text[],$6::text)',
           topic === 'shop/redact'
-            ? [app, shop, null, null]
+            ? [app, shop, null, null, null, eventKey]
             : [
                 app,
                 shop,
@@ -116,8 +120,17 @@ export function createPrivacyIntake(
                   ? [`gid://shopify/Customer/${request.customer.id}`]
                   : [],
                 orders,
+                // The signed email also reaches inbox data no stored profile links to.
+                email ? [email] : [],
+                eventKey,
               ],
         );
+      // Uninstalled connections of the shop are queued for removal by the sync process.
+      if (topic === 'shop/redact')
+        await tx.query('SELECT erase_shopify_shop_data($1::text,$2::text)', [
+          app,
+          shop,
+        ]);
     });
   };
 }

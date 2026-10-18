@@ -41,6 +41,8 @@
   "permissions_products_read_description": "Produktkatalog und SKU-Vergleiche ansehen.",
   "permissions_customers_read_label": "Kunden ansehen",
   "permissions_customers_read_description": "Kundenprofile ansehen, einschließlich Namen, E-Mail-Adressen und Postanschriften.",
+  "permissions_customers_erase_label": "Kunden löschen",
+  "permissions_customers_erase_description": "Profil, Bestelladressen und Postfachnachrichten eines Kunden für eine Betroffenenanfrage löschen.",
   "permissions_returns_read_label": "Retouren ansehen",
   "permissions_returns_read_description": "Retouren, Erstattungen und erstattete Beträge ansehen.",
   "permissions_returns_manage_label": "Retouren bearbeiten",

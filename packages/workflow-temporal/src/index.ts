@@ -7,6 +7,8 @@ export {
 
 export type { TemporalSettings } from './runtime.js';
 
+export { installRuntimeLogger } from './logger.js';
+
 export {
   createProcessClient,
   createProcessWorker,

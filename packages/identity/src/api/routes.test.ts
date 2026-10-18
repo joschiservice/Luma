@@ -24,6 +24,8 @@ const organization: Organization = {
   status: 'active',
   dataRegion: 'AU',
 };
+// An open workspace has no announced deletion.
+const open = { dataDeletionAt: null, dataDeletedAt: null };
 
 const withRole = (membership: Membership, key: BuiltInRoleKey): Membership => {
   const role = builtInReference(key);
@@ -266,9 +268,10 @@ it('rejects an ended support view without falling back to the customer session',
 it('refuses personal account routes and lists only the viewed workspace in a support view', async () => {
   const { app, tx } = fixture();
   tx.listOrganizations.mockResolvedValue([
-    { ...organization, membershipStatus: 'active' },
+    { ...organization, ...open, membershipStatus: 'active' },
     {
       ...organization,
+      ...open,
       id: '88888888-8888-4888-8888-888888888888',
       membershipStatus: 'active',
     },
@@ -416,14 +419,14 @@ it('rejects a suspended member on the next request and lists the workspace as su
   const { app, tx } = fixture();
   tx.findMembership.mockResolvedValue({ ...owner, status: 'suspended' });
   tx.listOrganizations.mockResolvedValue([
-    { ...organization, membershipStatus: 'suspended' },
+    { ...organization, ...open, membershipStatus: 'suspended' },
   ]);
   const response = await app.inject({ url: `${base}/context`, headers });
   expect(response.statusCode).toBe(403);
   expect(response.json()).toEqual({ code: 'ACCESS_SUSPENDED' });
   const list = await app.inject({ url: '/v1/organizations', headers });
   expect(list.json().items).toEqual([
-    { ...organization, membershipStatus: 'suspended' },
+    { ...organization, ...open, membershipStatus: 'suspended' },
   ]);
 });
 

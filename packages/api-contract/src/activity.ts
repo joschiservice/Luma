@@ -22,6 +22,7 @@ export const activityTypes = [
   'connection',
   'procurement',
   'access',
+  'privacy',
 ] as const;
 
 /**

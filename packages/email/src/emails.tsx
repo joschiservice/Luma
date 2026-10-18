@@ -110,6 +110,11 @@ export type Email =
       resetLink: string;
     }
   | { kind: 'account_deletion_scheduled'; eraseAfter: Date }
+  | {
+      kind: 'workspace_closure_scheduled' | 'workspace_closure_reminder';
+      workspace: string;
+      deletionAt: Date;
+    }
   | { kind: 'account_restored'; signInLink: string }
   | { kind: 'account_erased' }
   | { kind: 'account_inspection_requested'; reason: string; link: string }
@@ -652,6 +657,40 @@ export function emailContent(
               {m.email_account_scheduled_erase({ date }, o)}
             </Paragraph>
             <Paragraph>{m.email_account_scheduled_keep({}, o)}</Paragraph>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'workspace_closure_scheduled':
+    case 'workspace_closure_reminder': {
+      const values = {
+        workspace: email.workspace,
+        date: formatEmailDate(email.deletionAt, locale, 'UTC'),
+      };
+      const reminder = email.kind === 'workspace_closure_reminder';
+
+      return {
+        subject: reminder
+          ? m.email_workspace_closure_reminder_subject(values, o)
+          : m.email_workspace_closure_scheduled_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_workspace_closure_preview(values, o)}
+            heading={
+              reminder
+                ? m.email_workspace_closure_reminder_subject(values, o)
+                : m.email_workspace_closure_scheduled_subject(values, o)
+            }
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>
+              {reminder
+                ? m.email_workspace_closure_reminder_body(values, o)
+                : m.email_workspace_closure_scheduled_body(values, o)}
+            </Paragraph>
+            <Paragraph>{m.email_workspace_closure_scope({}, o)}</Paragraph>
+            <Paragraph>{m.email_workspace_closure_keep(values, o)}</Paragraph>
           </EmailLayout>
         ),
       };

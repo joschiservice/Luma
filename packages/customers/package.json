@@ -13,6 +13,11 @@
       "luma-source": "./src/composition.ts",
       "types": "./dist/composition.d.ts",
       "default": "./dist/composition.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
     }
   },
   "scripts": {
@@ -21,8 +26,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/audit": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
+    "@orpc/server": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

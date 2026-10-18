@@ -356,8 +356,11 @@ export const freshnessStates: Record<Citation['freshness'], OperationalState> =
     missing: 'error',
   };
 
-/** Names an address as "Name <address>", or just the address. */
+/** Names an address as "Name <address>", just the address, or an erased contact. */
 export function addressLabel(address: MessageAddress) {
+  // Customer erasure leaves an empty address in place of the person.
+  if (!address.address) return m.messaging_address_erased();
+
   return address.name
     ? m.messaging_address_named({
         name: address.name,
@@ -370,9 +373,13 @@ export function addressLabel(address: MessageAddress) {
 export function correspondentLabel(
   thread: Pick<ThreadSummary, 'correspondent'>,
 ) {
-  return thread.correspondent
-    ? thread.correspondent.name || thread.correspondent.address
-    : m.messaging_correspondent_unknown();
+  if (!thread.correspondent) return m.messaging_correspondent_unknown();
+
+  return (
+    thread.correspondent.name ||
+    thread.correspondent.address ||
+    m.messaging_address_erased()
+  );
 }
 
 /**
@@ -400,6 +407,8 @@ function money(value: FactMoney) {
 export function factText(value: FactValue): string {
   switch (value.kind) {
     case 'party':
+      if (!value.name && !value.email) return m.messaging_address_erased();
+
       return value.email
         ? m.messaging_address_named({ name: value.name, address: value.email })
         : value.name;

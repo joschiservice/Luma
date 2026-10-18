@@ -151,3 +151,32 @@ export type CustomerSource = z.infer<typeof customerSourceSchema>;
 export type CustomerList = z.infer<typeof customerListSchema>;
 
 export type CustomerDetail = z.infer<typeof customerDetailSchema>;
+
+/** The customer a data-subject erasure applies to. */
+export const customerErasureTargetSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    externalId: z.string().trim().min(1).max(1024),
+    emails: z
+      .array(z.string().trim().toLowerCase().email().max(320))
+      .max(20)
+      .default([]),
+  })
+  .strict();
+
+/** A data-subject erasure of one source customer. */
+export const customerErasureInputSchema = customerErasureTargetSchema
+  .extend({
+    /** Command ID; retry with the same ID and customer to get the original result. */
+    id: z.string().uuid(),
+  })
+  .strict();
+
+/** What an erasure removes or changes, or would when previewed. */
+export const customerErasureSchema = z.object({
+  profiles: z.number().int().min(0),
+  messages: z.number().int().min(0),
+  threads: z.number().int().min(0),
+  replies: z.number().int().min(0),
+  rules: z.number().int().min(0),
+});

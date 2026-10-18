@@ -62,6 +62,10 @@ const permissionText: Record<
     m.permissions_customers_read_label,
     m.permissions_customers_read_description,
   ],
+  'customers.erase': [
+    m.permissions_customers_erase_label,
+    m.permissions_customers_erase_description,
+  ],
   'returns.read': [
     m.permissions_returns_read_label,
     m.permissions_returns_read_description,

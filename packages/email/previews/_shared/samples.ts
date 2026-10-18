@@ -146,4 +146,14 @@ export const samples = {
     until: new Date('2026-10-11T23:10:00Z'),
     link: `${origin}/app/${tenant}/settings/security`,
   },
+  workspace_closure_scheduled: {
+    kind: 'workspace_closure_scheduled',
+    workspace: 'Northwind Goods',
+    deletionAt: new Date('2027-01-16T00:00:00Z'),
+  },
+  workspace_closure_reminder: {
+    kind: 'workspace_closure_reminder',
+    workspace: 'Northwind Goods',
+    deletionAt: new Date('2027-01-16T00:00:00Z'),
+  },
 } satisfies { [K in Email['kind']]: Email & { kind: K } };

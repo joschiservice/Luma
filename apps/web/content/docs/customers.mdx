@@ -74,6 +74,12 @@ The history includes only orders Luma has imported. Shopify shares orders from t
 
 Someone whose role includes **Manage connections** can reconnect a store in **Manage apps**. See [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
 
+## Erase a customer
+
+When a customer asks you to delete their data, open the customer and choose **Erase customer**. Before you confirm, Luma shows what it will erase: the customer profile, inbox messages, threads and replies to them, and mailbox rules for their address. It removes their profile, the addresses on their orders, and the messages to or from them in the inbox: message text, attachments, their email address and name, and the subjects. Unsent replies to them are withheld. Suppliers named in their attachments stay. Later imports skip this customer, so they don’t come back.
+
+Erasing in Luma doesn’t delete the customer in your store or ERP; do that there as well. Shopify’s customer data requests are erased automatically. Erasing a customer needs **Erase customers**, which Owners and Admins have. It can’t be undone. Each erasure, including Shopify’s, appears in Activity as a **Privacy** event with what was erased, without the customer’s details.
+
 ## Who can see customers
 
 Customer profiles include names, email addresses and postal addresses, so they need **View customers**. The built-in roles include it; a custom role might not. Without it, Customers is hidden from the sidebar and search, and a link to a customer says you don’t have access to customers in this workspace. Ask a workspace admin for access. See [Roles and permissions](/docs/roles-and-permissions).

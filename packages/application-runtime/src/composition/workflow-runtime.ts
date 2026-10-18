@@ -224,7 +224,8 @@ const workerPoolMax = 10;
 /**
  * Start a worker for persisted incidents, diagnoses and process workflows. With `connections`,
  * installed apps contribute their case workflows; without it, only Luma's own run.
- * `observability` evaluates workspace releases, such as Luma-owned order records.
+ * `observability` evaluates workspace releases, such as Luma-owned order records, and receives
+ * background monitor failures.
  */
 export async function createDefaultExceptionWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
@@ -243,6 +244,7 @@ export async function createDefaultExceptionWorker(
   };
   if ((identitySettings.region ?? 'AU') !== settings.temporal.dataRegion)
     throw new Error('Workflow placement differs from the identity cell');
+  const log = createFailureLog(observability);
   const resources = createResourceScope();
   try {
     const identity = createIdentity(identitySettings);
@@ -251,11 +253,7 @@ export async function createDefaultExceptionWorker(
       connectionString: settings.databaseUrl,
       max: workerPoolMax,
       workload: 'background',
-      onError: (error) =>
-        createFailureLog(observability)(
-          'Workflow database connection failed',
-          error,
-        ),
+      onError: (error) => log('Workflow database connection failed', error),
     });
     resources.add(() => pool.end());
     await assertCellRegion(pool, identitySettings.region ?? 'AU');
@@ -391,6 +389,7 @@ export async function createDefaultExceptionWorker(
             start: processClient.startStockProtection,
           }
         : undefined,
+      log,
     );
     resources.add(procurementWorker.close);
 
@@ -401,7 +400,7 @@ export async function createDefaultExceptionWorker(
         try {
           await advanceWorkflowSchedules(pool);
         } catch (error) {
-          console.error(
+          log(
             'Scheduled workflow starts could not be advanced; retrying.',
             error,
           );
@@ -457,3 +456,5 @@ export async function createDefaultExceptionWorker(
 }
 
 export { createAdmissionEligibility } from './admission.js';
+
+export { installRuntimeLogger } from '@luma/workflow-temporal';

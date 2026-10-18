@@ -41,6 +41,8 @@
   "permissions_products_read_description": "See the product catalog and SKU comparisons.",
   "permissions_customers_read_label": "View customers",
   "permissions_customers_read_description": "See customer profiles, including names, email addresses, and postal addresses.",
+  "permissions_customers_erase_label": "Erase customers",
+  "permissions_customers_erase_description": "Erase a customer’s profile, order addresses and inbox messages for a data-subject request.",
   "permissions_returns_read_label": "View returns",
   "permissions_returns_read_description": "See returns, refunds, and money returned.",
   "permissions_returns_manage_label": "Manage returns",

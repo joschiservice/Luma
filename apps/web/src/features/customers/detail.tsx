@@ -31,6 +31,7 @@ import { RecordFields } from '../adaptive/record-fields';
 import { systemName } from '../products/presentation';
 import { CustomerReturnCases } from '../returns/case-list';
 import { customerFilters, customerOptions, type CustomersSearch } from './data';
+import { EraseCustomer } from './erase';
 import { CustomerOrders } from './orders';
 import {
   addressLines,
@@ -83,6 +84,11 @@ export function CustomerPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      erase={
+        detail ? (
+          <EraseCustomer organizationId={organizationId} item={detail.item} />
+        ) : null
+      }
       messages={
         detail ? (
           <RecordMessages
@@ -176,6 +182,7 @@ export function CustomerDetailView({
   refresh,
   history,
   messages,
+  erase,
 }: {
   organizationId: string;
   /** The list state the customer was opened from; the breadcrumb returns to it. */
@@ -192,6 +199,8 @@ export function CustomerDetailView({
   history?: ReactNode;
   /** Message threads linked to the customer. */
   messages?: ReactNode;
+  /** The data-subject erasure action, for members allowed to erase customers. */
+  erase?: ReactNode;
 }) {
   const item = detail?.item;
   const store = detail?.source ? systemName(detail.source.system) : null;
@@ -237,6 +246,7 @@ export function CustomerDetailView({
                 />
               ) : null
             ) : null}
+            {item && error !== 'missing' ? erase : null}
             <RefreshButton
               refreshing={refreshing}
               onClick={refresh}

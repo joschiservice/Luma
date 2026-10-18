@@ -74,6 +74,9 @@ export const organization = pgTable('organizations', {
   createdAt: time('created_at').notNull(),
   dataRegion: text('data_region').notNull(),
   status: text('status').notNull().default('active'),
+  /** Announced by the retention pass for a closed workspace; never moves earlier. */
+  dataDeletionAt: time('data_deletion_at'),
+  dataPurgedAt: time('data_purged_at'),
 });
 
 export const member = pgTable('memberships', {
