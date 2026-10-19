@@ -11,7 +11,8 @@ export interface WorkflowConfig {
     namespace: string;
     taskQueue: string;
     dataRegion: DataRegion;
-    tls: boolean;
+    /** A private CA replaces the system roots when the server certificate is self-issued. */
+    tls: boolean | { serverRootCACertificate: Uint8Array };
     apiKey?: string;
     payloadEncryption?: {
       keyArn: string;
@@ -82,6 +83,7 @@ export function readWorkflowConfig(
     throw new Error('Temporal address must contain only host and port');
   if (!local)
     assertRegionalServiceEndpoint(env, 'temporal', endpoint.toString());
+  const serverRootCACertificate = readServerCertificateAuthority(env, tls);
   const payloadEncryption = readEncryption(env, region);
 
   return {
@@ -91,11 +93,37 @@ export function readWorkflowConfig(
       namespace,
       taskQueue,
       dataRegion: region,
-      tls: tls === 'true',
+      tls: serverRootCACertificate
+        ? { serverRootCACertificate }
+        : tls === 'true',
       ...(env.TEMPORAL_API_KEY ? { apiKey: env.TEMPORAL_API_KEY } : {}),
       ...(payloadEncryption ? { payloadEncryption } : {}),
     },
   };
+}
+
+/**
+ * Reads `TEMPORAL_TLS_SERVER_CA`, a base64-encoded PEM bundle that the client trusts instead
+ * of the system roots. It requires TLS, so a self-hosted server can use a private CA.
+ */
+function readServerCertificateAuthority(
+  env: Readonly<Record<string, string | undefined>>,
+  tls: string,
+) {
+  const encoded = env.TEMPORAL_TLS_SERVER_CA;
+  if (!encoded) return undefined;
+  if (tls !== 'true')
+    throw new Error('TEMPORAL_TLS_SERVER_CA requires TEMPORAL_TLS=true');
+  const pem = Buffer.from(encoded, 'base64');
+  if (
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) ||
+    !pem.toString('utf8').includes('-----BEGIN CERTIFICATE-----')
+  )
+    throw new Error(
+      'TEMPORAL_TLS_SERVER_CA must be a base64-encoded PEM certificate bundle',
+    );
+
+  return new Uint8Array(pem);
 }
 
 function readEncryption(

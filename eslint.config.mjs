@@ -47,6 +47,7 @@ export default defineConfig(
       '**/.turbo/**',
       '**/coverage/**',
       '**/routeTree.gen.ts',
+      '**/cdk.out/**',
     ],
   },
   js.configs.recommended,

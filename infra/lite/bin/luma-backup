@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Uploads logical PostgreSQL backups (roles without passwords, and each database in custom
+# format) to the stage's backup bucket, which expires them after 35 days. The luma-backup
+# timer runs it daily; it skips hosts without a deployment.
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+[[ -s $LUMA_STATE_DIR/state/image ]] || {
+  log 'nothing deployed; skipping backup'
+  exit 0
+}
+load_parameters
+bucket=$(parameter host/BACKUP_BUCKET)
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+work=$(mktemp -d -p "$LUMA_STATE_DIR")
+trap 'rm -rf "$work"' EXIT
+
+compose exec -T postgres pg_dumpall -U postgres --globals-only --no-role-passwords \
+  >"$work/globals.sql"
+for database in luma temporal temporal_visibility; do
+  compose exec -T postgres pg_dump -U postgres --format=custom "$database" \
+    >"$work/$database.dump"
+done
+aws s3 cp --only-show-errors --recursive "$work" "s3://$bucket/lite/$LUMA_STAGE/$stamp/"
+log "backup $stamp uploaded"

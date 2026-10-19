@@ -5,6 +5,7 @@ packages:
   - packages/connectors/*
   - packages/simulator/*
   - tooling
+  - infra
 
 minimumReleaseAge: 0
 saveExact: true

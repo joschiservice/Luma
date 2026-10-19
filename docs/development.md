@@ -70,8 +70,10 @@ once, then restart `pnpm db:studio`.
 The migration administrator is used only during initialization. Runtime logins never have
 superuser, database creation, role creation or RLS bypass privileges.
 
-The local logins `luma_api`, `luma_worker` and `luma_staff` inherit domain group roles such as
-`luma_identity`, `luma_desk` and `luma_connectors`; `tooling/dev/database.mjs` defines which.
+The runtime logins `luma_api`, `luma_worker` and `luma_staff` inherit domain group roles such
+as `luma_identity`, `luma_desk` and `luma_connectors`;
+`packages/application-runtime/scripts/runtime-logins.mjs` defines which. Local setup applies
+it, and deployments run `db:provision-logins` after migrating.
 A migration that adds a table grants it to the owning role and, where needed, to reader
 roles; follow the [add-migration](../.agents/skills/add-migration/SKILL.md) skill. A table with a
 `tenant_id` column also needs a row in `data_retention_classes`: `purge_on_closure` for

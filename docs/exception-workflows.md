@@ -52,7 +52,9 @@ persistent Temporal deployment for durable operation. Settings are documented in
   the server, namespace, backups and workers in the approved cell region; the setting cannot verify
   physical placement.
 - `TEMPORAL_TLS=true` is required in production and whenever `TEMPORAL_API_KEY` is set.
-  Inject the key as a deployment secret.
+  Inject the key as a deployment secret. A self-hosted server may present a certificate from a
+  private CA: set `TEMPORAL_TLS_SERVER_CA` to the base64-encoded PEM bundle, which then
+  replaces the system roots for that connection.
 
 The default worker runs persisted diagnosis for incident references and returns manual
 intervention when no published proposal exists. It resolves no connector effect adapters

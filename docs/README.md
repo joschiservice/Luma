@@ -18,6 +18,7 @@ are [agent skills](../.agents/skills) that people can read as well.
 - [Local development](development.md): commands, worktrees, roles, tests and troubleshooting.
 - [Performance measurement](benchmarking.md): budgets, benchmarks and fair comparisons.
 - [Observability](observability.md): hosted telemetry, data policy and local Grafana.
+- [Deployment](deployment.md): AWS accounts, the Lite cell, settings, deploys and restores.
 - [Synthetic pilot](pilot-environment.md) and [commerce simulator](simulator.md).
 
 **Platform**

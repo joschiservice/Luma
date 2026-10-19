@@ -62,6 +62,7 @@ Use the [codebase map](docs/codebase-map.md) to find the owning package, then se
 - `packages/i18n` — interface languages: English and German message catalogs, language runtime and formatting helpers.
 - `apps/simulator`, `apps/simulator-web`, `packages/simulator/*` and `tooling/pilot` — synthetic provider behavior and operational scenarios.
 - `tooling` — development, validation, evaluation and observability commands.
+- `infra` and `Dockerfile` — AWS CDK stacks, the Lite cell host files and the server image; see the [deployment guide](docs/deployment.md).
 
 ## Architecture and code quality
 

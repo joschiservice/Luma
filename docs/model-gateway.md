@@ -193,7 +193,9 @@ Grant the IAM principal `bedrock:InvokeModel` on the regional profile in the con
 and on the foundation model in every approved destination region, plus
 `bedrock:GetAccountDataRetention`, `bedrock:GetModelInvocationLoggingConfiguration` and
 `bedrock:GetInferenceProfile`, and nothing else. The adapter does not refresh temporary
-credentials; restart with new values before a session token expires.
+credentials; restart with new values before a session token expires. Deployed cells create
+this principal per stage and give its key to the application; see
+[deployment](deployment.md#settings).
 
 Structured output uses a forced tool named after the output schema, so output schemas must
 describe a JSON object and the model must support forced tool choice. When tools are also

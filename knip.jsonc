@@ -57,6 +57,8 @@
         "@luma/app-starshipit",
       ],
     },
+    // cdk.json runs the CDK app with tsx; the aws-cdk CLI is used only as a binary.
+    "infra": { "entry": ["src/app.ts"], "ignoreDependencies": ["tsx"] },
     "apps/simulator": { "entry": ["src/server.ts"] },
     "apps/simulator-web": { "entry": ["src/main.tsx"] },
     "apps/staff": { "entry": ["src/main.tsx"] },

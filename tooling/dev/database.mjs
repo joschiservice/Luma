@@ -11,6 +11,9 @@ export async function provision(
   await run('pnpm', ['--filter', '@luma/api', 'db:migrate'], {
     env: { ...process.env, MIGRATION_DATABASE_URL: migrationUrl },
   });
+  // Loaded here so commands that import this module never load workspace packages first.
+  const { provisionRuntimeLogins } =
+    await import('@luma/application-runtime/runtime-logins');
   const pool = new Pool({
     connectionString: migrationUrl,
     max: 1,
@@ -20,45 +23,11 @@ export async function provision(
   try {
     await client.query('SELECT luma_provision_cell_region($1)', [region]);
     await client.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
-    await client.query('BEGIN');
-    await client.query(
-      "SELECT pg_advisory_xact_lock(hashtext('luma_local_roles'))",
-    );
-    for (const [name, password, grants] of [
-      [
-        'luma_api',
-        saved.apiPassword,
-        'luma_identity,luma_connectors,luma_case_reader,luma_desk,luma_commerce_sync,luma_sales,luma_adaptive',
-      ],
-      [
-        'luma_worker',
-        saved.workerPassword,
-        'luma_exceptions,luma_policies,luma_execution,luma_audit,luma_connectors,luma_orders,luma_inventory,luma_desk,luma_commerce_sync,luma_customers,luma_sales,luma_adaptive',
-      ],
-      ['luma_staff', saved.staffPassword, 'luma_staff_runtime'],
-    ]) {
-      const exists = await client.query(
-        'SELECT 1 FROM pg_roles WHERE rolname = $1',
-        [name],
-      );
-      if (!exists.rowCount)
-        await client.query(
-          `CREATE ROLE ${name} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
-        );
-      // PostgreSQL utility statements do not accept password parameters; quote on the server.
-      const quoted = await client.query(
-        'SELECT quote_literal($1) AS password',
-        [password],
-      );
-      await client.query(
-        `ALTER ROLE ${name} PASSWORD ${quoted.rows[0].password}`,
-      );
-      await client.query(`GRANT ${grants} TO ${name}`);
-    }
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
+    await provisionRuntimeLogins(client, {
+      luma_api: saved.apiPassword,
+      luma_worker: saved.workerPassword,
+      luma_staff: saved.staffPassword,
+    });
   } finally {
     client.release();
     await pool.end();

@@ -1,0 +1,20 @@
+# The server image builds from a clean checkout; local state, credentials and outputs stay out.
+**/node_modules
+**/dist
+**/.turbo
+**/.tanstack
+**/.output
+**/coverage
+**/storybook-static
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+**/cdk.out
+.git
+.luma
+.claude
+.agents
+reports
+research_notes
+apps/api/.e2e-*

@@ -50,6 +50,30 @@ it('requires TLS for production and API keys', () => {
   ).toBe('fixture');
 });
 
+it('trusts a private Temporal CA only over TLS', () => {
+  const pem =
+    '-----BEGIN CERTIFICATE-----\nZml4dHVyZQ==\n-----END CERTIFICATE-----\n';
+  const encoded = Buffer.from(pem).toString('base64');
+  expect(
+    readWorkflowConfig({
+      ...env,
+      TEMPORAL_TLS: 'true',
+      TEMPORAL_TLS_SERVER_CA: encoded,
+    }).temporal.tls,
+  ).toEqual({ serverRootCACertificate: new Uint8Array(Buffer.from(pem)) });
+  expect(() =>
+    readWorkflowConfig({ ...env, TEMPORAL_TLS_SERVER_CA: encoded }),
+  ).toThrow('requires TEMPORAL_TLS=true');
+  expect(() =>
+    readWorkflowConfig({
+      ...env,
+      TEMPORAL_TLS: 'true',
+      TEMPORAL_TLS_SERVER_CA:
+        Buffer.from('not a certificate').toString('base64'),
+    }),
+  ).toThrow('PEM certificate bundle');
+});
+
 it('requires inspected remote endpoints and encrypted production payloads', () => {
   const production = {
     ...env,

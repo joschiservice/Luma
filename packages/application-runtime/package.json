@@ -18,6 +18,9 @@
       "luma-source": "./src/composition/commerce-sync.ts",
       "types": "./dist/composition/commerce-sync.d.ts",
       "default": "./dist/composition/commerce-sync.js"
+    },
+    "./runtime-logins": {
+      "default": "./scripts/runtime-logins.mjs"
     }
   },
   "scripts": {
@@ -25,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:provision-region": "node scripts/provision-region.mjs"
+    "db:provision-region": "node scripts/provision-region.mjs",
+    "db:provision-logins": "node scripts/provision-logins.mjs"
   },
   "dependencies": {
     "@luma/api-contract": "workspace:*",
@@ -56,7 +60,8 @@
     "pg": "catalog:pg-8-20-0",
     "zod": "catalog:",
     "@luma/sales": "workspace:*",
-    "@luma/adaptive": "workspace:*"
+    "@luma/adaptive": "workspace:*",
+    "@luma/app-shopify": "workspace:*"
   },
   "devDependencies": {
     "@luma/connector-shopify": "workspace:*",
@@ -75,7 +80,6 @@
     "@luma/simulator-core": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",
     "@luma/app-cin7": "workspace:*",
-    "@luma/app-jtl": "workspace:*",
-    "@luma/app-shopify": "workspace:*"
+    "@luma/app-jtl": "workspace:*"
   }
 }
