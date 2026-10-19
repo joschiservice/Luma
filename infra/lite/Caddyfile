@@ -1,0 +1,60 @@
+# The cell's only ingress. The customer site gets a public certificate for its regional host;
+# the staff listeners are plain HTTP on the private Docker network, reached only through the
+# Tailscale nodes that terminate TLS for them.
+{
+	servers {
+		# Only the Tailscale nodes may forward a client address; no public client connects from
+		# their private addresses.
+		trusted_proxies static 172.30.0.21/32 172.30.0.22/32
+	}
+}
+
+{$LUMA_APP_HOST} {
+	encode zstd gzip
+
+	# The API sees the browser's address and the original Host, Origin and cookies, without
+	# the /api prefix.
+	handle_path /api/* {
+		header >Cache-Control "no-store"
+		reverse_proxy api:3001 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	# Fingerprinted build assets never change under the same URL.
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy web:3000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+# Staff console: static files, with /api/ forwarded only to the staff API.
+:8081 {
+	handle_path /api/* {
+		header >Cache-Control "no-store"
+		reverse_proxy staff-api:3002
+	}
+
+	handle {
+		root * /srv/staff
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' {$LUMA_STAFF_API_ORIGIN}; form-action 'self' {$LUMA_STAFF_API_ORIGIN}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+		@html not path /assets/*
+		header @html Cache-Control "no-store"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Regional staff API, which the console calls directly and Google redirects to after sign-in.
+:8082 {
+	header >Cache-Control "no-store"
+	reverse_proxy staff-api:3002
+}

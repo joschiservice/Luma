@@ -1,0 +1,22 @@
+{
+  "name": "@luma/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS CDK app describing Luma's regional cells. Synthesizing is offline; deploying is an explicit operator step.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "synth": "cdk synth --quiet",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "aws-cdk": "2.1145.0",
+    "aws-cdk-lib": "2.273.0",
+    "cdk-nag": "3.0.2",
+    "constructs": "10.8.1",
+    "tsx": "catalog:"
+  }
+}

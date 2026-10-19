@@ -1,0 +1,11 @@
+{
+  "extends": "@luma/typescript-config/node.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // aws-cdk-lib's declarations do not compile with this flag.
+    "exactOptionalPropertyTypes": false,
+    "noEmit": true,
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

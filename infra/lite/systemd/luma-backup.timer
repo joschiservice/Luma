@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Luma logical database backup
+
+[Timer]
+# 03:30 in Sydney standard time.
+OnCalendar=*-*-* 17:30:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

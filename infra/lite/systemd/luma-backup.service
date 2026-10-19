@@ -1,0 +1,8 @@
+[Unit]
+Description=Luma logical database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/luma/bin/luma-backup

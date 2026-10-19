@@ -394,7 +394,8 @@ Protect both the staff website and API ingress with the workforce access gateway
 private network. The upstream must not be independently reachable through a public
 listener, alternate hostname or the customer API. The API still authenticates and authorizes
 each request. If a gateway forwards identity headers, strip client-supplied values and
-validate the gateway's assertion before treating them as identity evidence.
+validate the gateway's assertion before treating them as identity evidence. The Lite cell
+uses a private tailnet for both; see [deployment](deployment.md#hosts-and-staff-access).
 
 Set `STAFF_TRUSTED_PROXY` to the reviewed ingress IP addresses or narrow CIDR ranges,
 separated by commas. Production Google authentication requires this setting; other modes

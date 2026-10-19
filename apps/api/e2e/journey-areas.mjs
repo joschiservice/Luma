@@ -29,6 +29,11 @@ export const ignoredPaths = [
   'apps/web/src/features/marketing/**',
   'tooling/{apps,architecture,benchmarks,orders,shopify,simulator,style}/**',
   'tooling/evaluation/*.mjs',
+  // Deployment: journeys run the application from source, not the image or the cloud stacks.
+  'infra/**',
+  'Dockerfile',
+  '.dockerignore',
+  '.github/workflows/deploy-lite.yml',
   // Generated from mapped sources.
   'apps/web/src/routeTree.gen.ts',
   'packages/api-contract/openapi.json',

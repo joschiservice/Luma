@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Prepares the Lite cell host: attaches and mounts the data volume, installs Docker and
+# Compose, adds swap and the daily backup timer, then restores the last deployment when the
+# volume has one. The instance user data runs it on first boot; rerunning it is safe.
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+COMPOSE_VERSION=v5.6.0
+declare -A COMPOSE_SHA256=(
+  [aarch64]=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
+  [x86_64]=40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a
+)
+
+# A replacement instance waits until the previous one releases the volume, which happens when
+# CloudFormation terminates it at the end of the stack update.
+attach_data_volume() {
+  local instance device state
+  instance=$(imds instance-id)
+  device="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${LUMA_DATA_VOLUME_ID//-/}"
+  for _ in $(seq 120); do
+    [[ -e $device ]] && break
+    state=$(aws ec2 describe-volumes --volume-ids "$LUMA_DATA_VOLUME_ID" \
+      --query 'Volumes[0].State' --output text)
+    if [[ $state == available ]]; then
+      aws ec2 attach-volume --volume-id "$LUMA_DATA_VOLUME_ID" --instance-id "$instance" \
+        --device /dev/sdf >/dev/null || true
+    else
+      log "waiting for data volume $LUMA_DATA_VOLUME_ID ($state)"
+    fi
+    sleep 10
+  done
+  [[ -e $device ]] || die "data volume $LUMA_DATA_VOLUME_ID did not attach"
+  DATA_DEVICE=$(readlink -f "$device")
+}
+
+mount_data_volume() {
+  local uuid
+  blkid "$DATA_DEVICE" >/dev/null 2>&1 || mkfs.xfs -q -L luma-data "$DATA_DEVICE"
+  uuid=$(blkid -s UUID -o value "$DATA_DEVICE")
+  mkdir -p "$LUMA_STATE_DIR"
+  grep -q "UUID=$uuid " /etc/fstab ||
+    echo "UUID=$uuid $LUMA_STATE_DIR xfs defaults,nofail 0 2" >>/etc/fstab
+  mountpoint -q "$LUMA_STATE_DIR" || mount "$LUMA_STATE_DIR"
+  install -d -m 0700 "$LUMA_STATE_DIR/state" "$LUMA_STATE_DIR/env"
+}
+
+install_docker() {
+  local arch plugin
+  dnf install -y -q docker jq
+  arch=$(uname -m)
+  plugin=/usr/local/lib/docker/cli-plugins/docker-compose
+  install -d "$(dirname "$plugin")"
+  if ! echo "${COMPOSE_SHA256[$arch]}  $plugin" | sha256sum -c --status 2>/dev/null; then
+    curl -fsSL -o "$plugin.download" \
+      "https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-linux-$arch"
+    echo "${COMPOSE_SHA256[$arch]}  $plugin.download" | sha256sum -c --quiet
+    chmod 0755 "$plugin.download"
+    mv "$plugin.download" "$plugin"
+  fi
+  # Images, volumes and container state live on the data volume.
+  install -d /etc/docker /etc/systemd/system/docker.service.d
+  printf '{ "data-root": "%s/docker", "live-restore": true, "log-driver": "local" }\n' \
+    "$LUMA_STATE_DIR" >/etc/docker/daemon.json
+  printf '[Unit]\nRequiresMountsFor=%s\n' "$LUMA_STATE_DIR" \
+    >/etc/systemd/system/docker.service.d/luma-data.conf
+  systemctl daemon-reload
+  systemctl enable --now docker
+}
+
+configure_swap() {
+  [[ -f /swapfile ]] && return
+  fallocate -l 2G /swapfile
+  chmod 0600 /swapfile
+  mkswap -q /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap defaults 0 0' >>/etc/fstab
+}
+
+install_backup_timer() {
+  install -m 0644 "$LUMA_HOME"/systemd/luma-backup.* /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now luma-backup.timer
+}
+
+attach_data_volume
+mount_data_volume
+install_docker
+configure_swap
+install_backup_timer
+if [[ -s $LUMA_STATE_DIR/state/image ]]; then
+  log "restoring deployment $(cat "$LUMA_STATE_DIR/state/image")"
+  LUMA_HOST_FILES_FRESH=1 bash "$LUMA_HOME/bin/luma-deploy" "$(cat "$LUMA_STATE_DIR/state/image")"
+fi
+log 'host ready'

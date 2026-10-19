@@ -16,3 +16,6 @@ apps/api/.e2e-*/
 
 # Worktree-local development state and credentials
 .luma/
+
+# AWS CDK synthesis output
+cdk.out/

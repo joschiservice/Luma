@@ -1,0 +1,351 @@
+# The Lite cell: every Luma process and its infrastructure on one host. luma-deploy renders the
+# environment files under ${LUMA_STATE_DIR}/env and runs the setup services in order; do not
+# start this file by hand without them.
+name: luma
+
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION:?}
+    awslogs-group: ${LUMA_LOG_GROUP:?}
+    tag: '{{.Name}}'
+    mode: non-blocking
+    max-buffer-size: 4m
+
+x-server: &server
+  image: ${LUMA_IMAGE:?}
+  init: true
+  restart: unless-stopped
+  logging: *logging
+  networks: [luma]
+  env_file:
+    - path: ${LUMA_STATE_DIR:?}/env/app.env
+      format: raw
+
+x-depends-on-data: &depends-on-data
+  postgres: { condition: service_healthy }
+  valkey: { condition: service_healthy }
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    command:
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'track_io_timing=on',
+      ]
+    environment:
+      POSTGRES_DB: luma
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    shm_size: 256mb
+    restart: unless-stopped
+    logging: *logging
+    networks: [luma]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d luma']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:9.1.2-alpine
+    command:
+      [
+        'valkey-server',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '128mb',
+        '--maxmemory-policy',
+        'noeviction',
+        '--requirepass',
+        '${VALKEY_PASSWORD:?}',
+      ]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?}
+    restart: unless-stopped
+    logging: *logging
+    networks: [luma]
+    volumes:
+      - valkey:/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'valkey-cli --no-auth-warning -a "$$VALKEY_PASSWORD" ping',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Self-hosted Temporal on the cell's PostgreSQL. Clients connect over TLS with a private CA,
+  # as production configuration requires.
+  temporal:
+    image: temporalio/server:1.32.1
+    environment: &temporal-database
+      DB: postgres12
+      DB_PORT: '5432'
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: luma_temporal
+      POSTGRES_PWD: ${TEMPORAL_DATABASE_PASSWORD:?}
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig.yaml
+      TEMPORAL_TLS_FRONTEND_CERT: /etc/temporal/tls/server.pem
+      TEMPORAL_TLS_FRONTEND_KEY: /etc/temporal/tls/server.key
+      TEMPORAL_TLS_SERVER_CA_CERT: /etc/temporal/tls/ca.pem
+      TEMPORAL_TLS_FRONTEND_SERVER_NAME: temporal
+    restart: unless-stopped
+    logging: *logging
+    networks: [luma]
+    volumes:
+      - ./temporal/dynamicconfig.yaml:/etc/temporal/dynamicconfig.yaml:ro
+      - ${LUMA_STATE_DIR:?}/temporal-tls:/etc/temporal/tls:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 7233']
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  temporal-schema:
+    image: temporalio/admin-tools:1.32.1
+    profiles: [setup]
+    entrypoint: ['sh', '/setup/setup-schema.sh']
+    environment:
+      POSTGRES_PWD: ${TEMPORAL_DATABASE_PASSWORD:?}
+    logging: *logging
+    networks: [luma]
+    volumes:
+      - ./temporal:/setup:ro
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.32.1
+    profiles: [setup]
+    entrypoint: ['sh', '/setup/setup-namespace.sh']
+    environment:
+      TEMPORAL_NAMESPACE: luma
+    logging: *logging
+    networks: [luma]
+    volumes:
+      - ./temporal:/setup:ro
+      - ${LUMA_STATE_DIR:?}/temporal-tls/ca.pem:/etc/temporal/tls/ca.pem:ro
+
+  # Applies migrations with the administrator login, records the cell region and provisions the
+  # restricted runtime logins. Runtime containers never receive these credentials.
+  migrate:
+    image: ${LUMA_IMAGE:?}
+    profiles: [setup]
+    command:
+      [
+        'sh',
+        '-c',
+        'node packages/application-runtime/scripts/migrate.mjs && node packages/application-runtime/scripts/provision-region.mjs && node packages/application-runtime/scripts/provision-logins.mjs',
+      ]
+    env_file:
+      - path: ${LUMA_STATE_DIR:?}/env/migrate.env
+        format: raw
+    logging: *logging
+    networks: [luma]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Copies the staff console's static files into the volume Caddy serves them from.
+  staff-console:
+    image: ${LUMA_IMAGE:?}
+    profiles: [setup]
+    user: root
+    command:
+      ['sh', '-c', 'rm -rf /srv/staff/* && cp -R apps/staff/dist/. /srv/staff/']
+    logging: *logging
+    volumes:
+      - staff-console:/srv/staff
+
+  api:
+    <<: *server
+    command: ['node', 'apps/api/dist/composition/bootstrap.js']
+    environment:
+      HOST: 0.0.0.0
+      PORT: '3001'
+    depends_on:
+      <<: *depends-on-data
+      temporal: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 5s
+
+  worker:
+    <<: *server
+    command: ['node', 'apps/worker/dist/bootstrap.js']
+    environment:
+      WORKFLOW_WORKER_HEALTH_PORT: '9470'
+    # Shutdown waits up to six minutes for running activities, such as provider writes.
+    stop_grace_period: 7m
+    depends_on:
+      <<: *depends-on-data
+      temporal: { condition: service_healthy }
+    healthcheck: &worker-health
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:9470/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 5s
+
+  sync:
+    <<: *server
+    command: ['node', 'apps/worker/dist/sync-bootstrap.js']
+    environment:
+      COMMERCE_SYNC_HEALTH_PORT: '9470'
+    depends_on: *depends-on-data
+    healthcheck: *worker-health
+
+  web:
+    <<: *server
+    working_dir: /app/apps/web
+    command: [
+        'node_modules/.bin/srvx',
+        'serve',
+        '--prod',
+        '--entry',
+        'dist/server/server.js',
+        '--static',
+        # Relative to the entry file's directory.
+        '../client',
+        '--port',
+        '3000',
+      ]
+    env_file:
+      - path: ${LUMA_STATE_DIR:?}/env/web.env
+        format: raw
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/favicon.svg').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 5s
+
+  staff-api:
+    <<: *server
+    profiles: [staff]
+    command: ['node', 'apps/staff-api/dist/index.js']
+    env_file:
+      - path: ${LUMA_STATE_DIR:?}/env/staff.env
+        format: raw
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3002/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 5s
+
+  # The only public listener. Staff sites listen on internal ports that only the Tailscale
+  # nodes below reach; they are never published on the host.
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      LUMA_APP_HOST: ${LUMA_APP_HOST:?}
+      LUMA_STAFF_API_ORIGIN: ${LUMA_STAFF_API_ORIGIN:?}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    networks:
+      luma:
+        ipv4_address: 172.30.0.10
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - staff-console:/srv/staff:ro
+    depends_on: [web, api]
+
+  # Private staff access: each Tailscale node gets its own tailnet HTTPS name and forwards to a
+  # Caddy staff listener. Nothing about the staff console is reachable from the internet.
+  tailscale-staff:
+    image: tailscale/tailscale:v1.104.1
+    profiles: [staff]
+    restart: unless-stopped
+    logging: *logging
+    environment: &tailscale
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_AUTH_ONCE: 'true'
+      TS_HOSTNAME: ${LUMA_STAFF_NODE:?}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: 'true'
+    networks:
+      luma:
+        ipv4_address: 172.30.0.21
+    volumes:
+      - tailscale-staff:/var/lib/tailscale
+      - ./tailscale/staff.json:/config/serve.json:ro
+
+  tailscale-staff-api:
+    image: tailscale/tailscale:v1.104.1
+    profiles: [staff]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *tailscale
+      TS_HOSTNAME: ${LUMA_STAFF_API_NODE:?}
+    networks:
+      luma:
+        ipv4_address: 172.30.0.22
+    volumes:
+      - tailscale-staff-api:/var/lib/tailscale
+      - ./tailscale/staff-api.json:/config/serve.json:ro
+
+networks:
+  luma:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  postgres:
+  valkey:
+  caddy-data:
+  caddy-config:
+  staff-console:
+  tailscale-staff:
+  tailscale-staff-api:

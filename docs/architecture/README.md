@@ -26,18 +26,21 @@ decisions.
 | [014](014-adaptive-workspaces.md) | Adaptive workspaces and operational packages | Accepted |
 
 | [015](015-shared-provider-admission.md) | Shared Shopify request admission | Accepted |
+| [016](016-aws-deployment.md) | AWS deployment and the single-host Lite cell | Accepted |
 
 ## Baseline
 
 - TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through oRPC.
 - PostgreSQL with Drizzle; Better Auth; modular monolith first.
-- TanStack Start for the web app; Vercel primarily for frontend delivery.
+- TanStack Start for the web app, served from the cell; Vercel only for session-free entry and
+  public pages ([ADR-016](016-aws-deployment.md)).
 - A canonical commerce model kept separate from provider payloads.
 - EU data residency by default; regional data planes later.
 - Sentry, Langfuse and PostHog.
 - Execution preference: provider API, deterministic browser automation, agentic browser or
   computer use, then human escalation.
-- Open: V0 PostgreSQL hosting, Neon Frankfurt or an AWS-managed alternative.
+- AWS in Sydney for the AU cell: PostgreSQL on the Lite cell host first, RDS in the production
+  cell ([ADR-016](016-aws-deployment.md)).
 
 ## Writing an ADR
 

@@ -36,6 +36,7 @@ conventions only; it does not list files.
 | HTTP schemas, typed client, OpenAPI                                                             | `@luma/api-contract`                                                                     |
 | Shared technical infrastructure, model gateway                                                  | `@luma/platform`; validated settings in `@luma/config`                                   |
 | Shared components and design tokens                                                             | `@luma/ui`                                                                               |
+| AWS stacks, the server image and the Lite cell host                                             | `infra` (`@luma/infra`), image in the root `Dockerfile`                                  |
 | Interface languages, message catalogs, formatting                                               | `@luma/i18n`                                                                             |
 | Email templates, shared email layout and previews                                               | `@luma/email`; sending and queues in `@luma/identity`                                    |
 

@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# Deploys one server image to the Lite cell: refreshes the host files, creates missing secrets
+# and keys, renders the environment, migrates, and starts every service. The GitHub deploy
+# workflow runs it as root through SSM Run Command; rerunning it with the same tag is safe.
+# Migrations only move forward, so redeploying an older tag needs a compatible schema.
+#
+#   luma-deploy <image-tag>
+set -euo pipefail
+
+tag=${1:?usage: luma-deploy <image-tag>}
+[[ $tag =~ ^[A-Za-z0-9._-]{1,128}$ ]] || {
+  echo 'luma: invalid image tag' >&2
+  exit 1
+}
+# Continue with the newest copy of this script and the files it uses.
+if [[ -z ${LUMA_HOST_FILES_FRESH:-} ]]; then
+  # shellcheck source=luma-lib.sh
+  source /opt/luma/bin/luma-lib.sh
+  refresh_host_files
+  LUMA_HOST_FILES_FRESH=1 exec bash /opt/luma/bin/luma-deploy "$@"
+fi
+# shellcheck source=luma-lib.sh
+source /opt/luma/bin/luma-lib.sh
+exec 9>/run/luma-deploy.lock
+flock -n 9 || die 'another deploy is running'
+
+connection_key() { openssl rand -base64 32; }
+
+# Creates an access key for an application principal on first deploy. The ID is written last,
+# so an interrupted run creates a fresh key next time.
+ensure_access_key() {
+  local prefix=$1 user=$2 key
+  [[ -n $(parameter "generated/${prefix}_ACCESS_KEY_ID") ]] && return
+  log "creating an access key for $user"
+  key=$(aws iam create-access-key --user-name "$user" \
+    --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text)
+  aws ssm put-parameter --name "$PARAMETER_PATH/generated/${prefix}_SECRET_ACCESS_KEY" \
+    --type SecureString --value "${key#*$'\t'}" --overwrite >/dev/null
+  aws ssm put-parameter --name "$PARAMETER_PATH/generated/${prefix}_ACCESS_KEY_ID" \
+    --type SecureString --value "${key%%$'\t'*}" --no-overwrite >/dev/null
+}
+
+generate_secrets() {
+  local name
+  for name in POSTGRES_PASSWORD VALKEY_PASSWORD BETTER_AUTH_SECRET STAFF_AUTH_SECRET \
+    API_DATABASE_PASSWORD WORKER_DATABASE_PASSWORD STAFF_DATABASE_PASSWORD \
+    TEMPORAL_DATABASE_PASSWORD; do
+    ensure_generated "$name" random_secret
+  done
+  ensure_generated CONNECTION_KEY connection_key
+  ensure_access_key TEMPORAL_KMS "$(parameter host/TEMPORAL_KMS_USER)"
+  ensure_access_key BEDROCK "$(parameter host/BEDROCK_USER)"
+  load_parameters
+}
+
+# Temporal's frontend presents a certificate for the name `temporal` from a private CA. The CA
+# key never leaves the host; the server certificate is renewed 30 days before it expires.
+ensure_temporal_certificates() {
+  local ca=$LUMA_STATE_DIR/temporal-ca tls=$LUMA_STATE_DIR/temporal-tls
+  install -d -m 0700 "$ca"
+  install -d -m 0755 "$tls"
+  if [[ ! -s $ca/ca.key ]]; then
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 3650 \
+      -subj '/CN=Luma Temporal CA' -keyout "$ca/ca.key" -out "$ca/ca.pem" 2>/dev/null
+  fi
+  install -m 0644 "$ca/ca.pem" "$tls/ca.pem"
+  TEMPORAL_CERTIFICATE_RENEWED=
+  if ! openssl x509 -checkend 2592000 -noout -in "$tls/server.pem" >/dev/null 2>&1; then
+    log 'issuing the Temporal server certificate'
+    # A running server keeps a replaced certificate until it restarts.
+    [[ -f $tls/server.pem ]] && TEMPORAL_CERTIFICATE_RENEWED=1
+    openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj '/CN=temporal' \
+      -keyout "$tls/server.key" -out "$ca/server.csr" 2>/dev/null
+    openssl x509 -req -in "$ca/server.csr" -CA "$ca/ca.pem" -CAkey "$ca/ca.key" \
+      -CAcreateserial -days 825 -out "$tls/server.pem" \
+      -extfile <(printf 'subjectAltName=DNS:temporal\nextendedKeyUsage=serverAuth\n') 2>/dev/null
+    rm -f "$ca/server.csr"
+  fi
+  # The Temporal image runs as uid 1000.
+  chown 1000:1000 "$tls/server.key"
+  chmod 0400 "$tls/server.key"
+  chmod 0644 "$tls/server.pem"
+}
+
+render_environment() {
+  local env=$LUMA_STATE_DIR/env domain app_host tailnet staff_node staff_api_node valkey
+  domain=$(parameter host/DOMAIN)
+  # Without a domain, sslip.io resolves names that embed the Elastic IP, such as
+  # au.app.203-0-113-10.sslip.io, so Caddy can still obtain a public certificate.
+  [[ -n $domain ]] || domain="$(imds public-ipv4 | tr . -).sslip.io"
+  app_host="au.app.$domain"
+  tailnet=$(parameter host/TAILNET)
+  staff_node="luma-$LUMA_STAGE-staff"
+  staff_api_node="luma-$LUMA_STAGE-au-staff-api"
+  valkey="redis://:$(parameter generated/VALKEY_PASSWORD)@valkey:6379"
+
+  umask 077
+  cat >"$env/compose.env" <<EOF
+AWS_REGION=$AWS_REGION
+LUMA_STATE_DIR=$LUMA_STATE_DIR
+LUMA_LOG_GROUP=$(parameter host/LOG_GROUP)
+LUMA_IMAGE=$(parameter host/IMAGE_REPOSITORY):$tag
+LUMA_APP_HOST=$app_host
+LUMA_STAFF_NODE=$staff_node
+LUMA_STAFF_API_NODE=$staff_api_node
+LUMA_STAFF_API_ORIGIN=https://$staff_api_node.${tailnet:-tailnet.invalid}
+POSTGRES_PASSWORD=$(parameter generated/POSTGRES_PASSWORD)
+VALKEY_PASSWORD=$(parameter generated/VALKEY_PASSWORD)
+TEMPORAL_DATABASE_PASSWORD=$(parameter generated/TEMPORAL_DATABASE_PASSWORD)
+TS_AUTHKEY=$(parameter host/TS_AUTHKEY)
+EOF
+
+  cat >"$env/migrate.env" <<EOF
+MIGRATION_DATABASE_URL=postgresql://postgres:$(parameter generated/POSTGRES_PASSWORD)@postgres:5432/luma
+LUMA_REGION=AU
+LUMA_ENABLED_REGIONS=AU
+LUMA_API_DATABASE_PASSWORD=$(parameter generated/API_DATABASE_PASSWORD)
+LUMA_WORKER_DATABASE_PASSWORD=$(parameter generated/WORKER_DATABASE_PASSWORD)
+LUMA_STAFF_DATABASE_PASSWORD=$(parameter generated/STAFF_DATABASE_PASSWORD)
+EOF
+
+  # Settings under /luma/<stage>/app/ come last and may add provider, mail or model settings.
+  {
+    cat <<EOF
+LUMA_REGION=AU
+LUMA_ENABLED_REGIONS=AU
+OBSERVABILITY_ENVIRONMENT=$LUMA_STAGE
+IDENTITY_DATABASE_URL=postgresql://luma_api:$(parameter generated/API_DATABASE_PASSWORD)@postgres:5432/luma
+WORKFLOW_DATABASE_URL=postgresql://luma_worker:$(parameter generated/WORKER_DATABASE_PASSWORD)@postgres:5432/luma
+BETTER_AUTH_SECRET=$(parameter generated/BETTER_AUTH_SECRET)
+BETTER_AUTH_URL=https://$app_host
+AUTH_TRUSTED_ORIGINS=https://$app_host
+AUTH_CLIENT_IP_HEADER=x-forwarded-for
+AUTH_RATE_LIMIT_URL=$valkey
+SHOPIFY_ADMISSION_URL=$valkey
+CONNECTIONS_ACTIVE_KEY_ID=k1
+CONNECTIONS_KEYS={"k1":"$(parameter generated/CONNECTION_KEY)"}
+TEMPORAL_ADDRESS=temporal:7233
+TEMPORAL_NAMESPACE=luma
+TEMPORAL_TASK_QUEUE=luma-exceptions-v1
+TEMPORAL_DATA_REGION=AU
+TEMPORAL_TLS=true
+TEMPORAL_TLS_SERVER_CA=$(base64 -w0 "$LUMA_STATE_DIR/temporal-tls/ca.pem")
+LUMA_REGIONAL_SERVICE_ENDPOINTS={"AU":{"temporal":["https://temporal:7233"]}}
+TEMPORAL_KMS_KEY_ARN=$(parameter host/TEMPORAL_KMS_KEY_ARN)
+TEMPORAL_KMS_REGION=$AWS_REGION
+TEMPORAL_KMS_ACCESS_KEY_ID=$(parameter generated/TEMPORAL_KMS_ACCESS_KEY_ID)
+TEMPORAL_KMS_SECRET_ACCESS_KEY=$(parameter generated/TEMPORAL_KMS_SECRET_ACCESS_KEY)
+EOF
+    # Bedrock credentials only accompany a configured Bedrock region.
+    if [[ -n $(parameter app/MODEL_GATEWAY_BEDROCK_REGION) ]]; then
+      echo "MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID=$(parameter generated/BEDROCK_ACCESS_KEY_ID)"
+      echo "MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY=$(parameter generated/BEDROCK_SECRET_ACCESS_KEY)"
+    fi
+    section app
+  } >"$env/app.env"
+
+  {
+    echo 'LUMA_REGION=AU'
+    section web
+  } >"$env/web.env"
+
+  {
+    cat <<EOF
+LUMA_REGION=AU
+LUMA_ENABLED_REGIONS=AU
+OBSERVABILITY_ENVIRONMENT=$LUMA_STAGE
+STAFF_DATABASE_URL=postgresql://luma_staff:$(parameter generated/STAFF_DATABASE_PASSWORD)@postgres:5432/luma
+STAFF_AUTH_SECRET=$(parameter generated/STAFF_AUTH_SECRET)
+STAFF_AUTH_MODE=google
+STAFF_PUBLIC_ORIGIN=https://$staff_node.$tailnet
+STAFF_REGIONAL_API_ORIGINS={"AU":"https://$staff_api_node.$tailnet"}
+STAFF_CUSTOMER_ORIGIN=https://$app_host
+STAFF_API_HOST=0.0.0.0
+STAFF_API_PORT=3002
+STAFF_COOKIE_PREFIX=luma-staff
+STAFF_TRUSTED_PROXY=172.30.0.10,172.30.0.21,172.30.0.22
+EOF
+    section staff
+  } >"$env/staff.env"
+  umask 022
+
+  # The staff console runs only once its private network and Google sign-in are configured.
+  if [[ -n $tailnet && -n $(parameter host/TS_AUTHKEY) &&
+    -n $(parameter staff/STAFF_GOOGLE_CLIENT_ID) ]]; then
+    touch "$env/staff-enabled"
+  else
+    rm -f "$env/staff-enabled"
+    log 'staff console disabled: set host/TAILNET, host/TS_AUTHKEY and the staff/STAFF_GOOGLE_* settings'
+  fi
+}
+
+# Creates the Temporal login and databases. Statements go through stdin so the password never
+# appears in a process list.
+setup_temporal_database() {
+  compose exec -T postgres psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres <<SQL
+\set password '$(parameter generated/TEMPORAL_DATABASE_PASSWORD)'
+SELECT 'CREATE ROLE luma_temporal LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS'
+  WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'luma_temporal') \gexec
+ALTER ROLE luma_temporal PASSWORD :'password';
+SELECT 'CREATE DATABASE temporal OWNER luma_temporal'
+  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'temporal') \gexec
+SELECT 'CREATE DATABASE temporal_visibility OWNER luma_temporal'
+  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'temporal_visibility') \gexec
+REVOKE CONNECT ON DATABASE temporal, temporal_visibility FROM PUBLIC;
+SQL
+}
+
+log "deploying $tag"
+load_parameters
+generate_secrets
+ensure_temporal_certificates
+render_environment
+
+repository=$(parameter host/IMAGE_REPOSITORY)
+aws ecr get-login-password | docker login --username AWS --password-stdin "${repository%%/*}" >/dev/null
+compose --profile setup pull --quiet
+compose up -d --wait postgres valkey
+setup_temporal_database
+compose run --rm temporal-schema
+compose run --rm migrate
+compose up -d --wait temporal
+[[ $TEMPORAL_CERTIFICATE_RENEWED == 1 ]] && compose restart temporal
+compose run --rm temporal-namespace
+compose run --rm staff-console
+compose up -d --wait --wait-timeout 600 --remove-orphans
+echo "$tag" >"$LUMA_STATE_DIR/state/image"
+docker image prune -af --filter 'until=168h' >/dev/null
+log "deployed $tag"
