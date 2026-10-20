@@ -2,7 +2,7 @@
   "info": {
     "title": "Luma public API",
     "version": "1.0.0",
-    "description": "Read your workspace’s orders, fulfillment, stock, products, customers, returns, issues, workflows and activity with a personal API app token. Send it as `Authorization: Bearer <token>`. A token works in one workspace, with the permissions it was granted that its creator still holds. Requests are limited per token and per workspace: responses report the tighter limit in `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`, and a 429 response says when to retry in `Retry-After`. Reads of operations marked `x-luma-personal-data` by a token that can read customers are counted and recorded in the workspace’s activity."
+    "description": "Read your workspace’s orders, fulfillment, stock, products, customers, returns, issues, workflows and activity with a personal API app token. Send it as `Authorization: Bearer <token>`. A token works in one workspace, with the permissions it was granted that its creator still holds. Requests are limited per token and per workspace: responses report the tighter limit in `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`, and a 429 response says when to retry in `Retry-After`. Reads of operations marked `x-luma-personal-data` by a token that can read customers are counted and recorded in the workspace’s activity. `/changes` reports which records changed, so a copy stays current without reading everything again."
   },
   "openapi": "3.1.1",
   "components": {
@@ -20,6 +20,7 @@
               "READ_ONLY",
               "NOT_FOUND",
               "CONFLICT",
+              "GONE",
               "REGION_UNAVAILABLE",
               "SERVICE_UNAVAILABLE",
               "NOT_READY",
@@ -3903,6 +3904,221 @@
           },
           "404": {
             "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-luma-public-api": true,
+        "security": [
+          {
+            "apiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/changes": {
+      "get": {
+        "operationId": "changes.list",
+        "summary": "Follow changed records",
+        "description": "Lists which orders, fulfillment, returns, stock positions, products, customers, return cases and issues changed, in the order their changes were committed. Each change names the record type, ID and whether it was `upserted` or `deleted`, never its content: read the record through its own route. Several changes to one record in one transaction appear once, and a record can appear again without a visible difference, so treat each change as a reason to reread. A reread that returns 404 means the record is gone. To keep a copy current, request without `after` to get the current position, read every record through the list routes, then follow from that position with `after` set to each response’s `cursor`. A change appears once every transaction that started before it has finished, so a very long transaction delays the feed but never skips a change. Changes are kept for 30 days: a cursor older than that returns 410, and you need to read every record again. Only record types you can read are returned; naming one you can’t returns 403. Workflows and activity are not included.",
+        "tags": ["changes"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The `cursor` of the previous page. Without it, the response holds no changes and returns the current position."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Comma-separated record types, such as `order,customer`. Defaults to every type you can read. Types: `order`, `fulfillment`, `return`, `inventory`, `product`, `customer`, `returnCase`, `issue`."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "enum": [
+                              "order",
+                              "fulfillment",
+                              "return",
+                              "inventory",
+                              "product",
+                              "customer",
+                              "returnCase",
+                              "issue"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "operation": {
+                            "enum": ["upserted", "deleted"],
+                            "type": "string"
+                          },
+                          "recordedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["type", "id", "operation", "recordedAt"]
+                      }
+                    },
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["items", "cursor", "hasMore"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "410",
             "content": {
               "application/json": {
                 "schema": {

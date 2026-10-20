@@ -31,6 +31,18 @@ Die Workspace-ID steht in der Adresse jeder Seite im Workspace, nach `/app/`. Di
 - Ein Token sendet höchstens 600 Anfragen pro Minute, alle API-Apps eines Workspace zusammen 1.800. Jede Antwort nennt in `RateLimit-Remaining`, wie viele Anfragen übrig sind, und in `RateLimit-Reset`, in wie vielen Sekunden die Zählung neu beginnt. Anfragen über dem Limit enden mit `429`; warte die Sekunden aus dem Header `Retry-After` ab, bevor du es erneut versuchst.
 - Sende mit einem Token keine Browser-Cookies. Anfragen mit beidem werden abgelehnt.
 
+## Eine Kopie aktuell halten
+
+Damit deine eigene Kopie des Workspace aktuell bleibt, ohne alles neu zu lesen, folge den Änderungen:
+
+1. Rufe `/changes` ohne Parameter auf. Die Antwort enthält die aktuelle Position in `cursor`.
+2. Lies alle Datensätze, die du brauchst, über die Listen-Anfragen, etwa `/orders` und `/customers`.
+3. Rufe `/changes?after=<cursor>` mit der gespeicherten Position auf. Jede Änderung nennt die Art des Datensatzes, seine ID und ob er `upserted` (angelegt oder geändert) oder `deleted` (gelöscht) wurde. Lies geänderte Datensätze über ihre eigene Anfrage neu, entferne gelöschte und speichere den neuen `cursor`. Wiederhole das, solange `hasMore` `true` ist, und schau später wieder nach.
+
+Die Änderungen umfassen Bestellungen, Fulfillment, Retouren, Lagerpositionen, Produkte, Kunden, Retourenfälle und Probleme, soweit die App sie lesen darf. Mit `types` folgst du nur einem Teil davon, etwa `?types=order,customer`. Ein Datensatz kann auch erscheinen, wenn sich an dem, was du liest, nichts geändert hat. Liefert das erneute Lesen `404`, wurde er inzwischen entfernt; behandle ihn als gelöscht.
+
+Änderungen bleiben 30 Tage erhalten. Fragt dein Tool in dieser Zeit nicht nach, liefert die Anfrage `410`, und du beginnst wieder bei Schritt 1.
+
 ## Token ersetzen oder widerrufen
 
 **Einstellungen → API-Apps** listet deine Apps mit dem, was sie lesen dürfen, den letzten vier Zeichen des Tokens, dem Ablaufdatum und der letzten Nutzung. Luma schickt dir eine E-Mail eine Woche bevor ein Token abläuft.

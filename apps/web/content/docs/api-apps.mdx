@@ -31,6 +31,18 @@ The workspace ID is in the address of every page in the workspace, after `/app/`
 - A token sends at most 600 requests a minute, and all API apps of a workspace together 1,800. Each response says how many requests are left in `RateLimit-Remaining` and in how many seconds the count resets in `RateLimit-Reset`. Requests above the limit return `429`; wait the number of seconds in the `Retry-After` header before you try again.
 - Don't send your browser cookies with a token. Requests that send both are refused.
 
+## Keep a copy current
+
+To keep your own copy of the workspace without reading everything again, follow the changes:
+
+1. Request `/changes` without parameters. The response holds the current position in `cursor`.
+2. Read every record you need through the list requests, such as `/orders` and `/customers`.
+3. Request `/changes?after=<cursor>` with the saved position. Each change names a record type, its ID and whether it was `upserted` or `deleted`. Read changed records again through their own request, remove deleted ones and save the new `cursor`. Repeat while `hasMore` is `true`, then check again later.
+
+The changes cover orders, fulfillment, returns, stock positions, products, customers, return cases and issues, as far as the app can read them. Use `types` to follow only some of them, such as `?types=order,customer`. A record can appear even though nothing you read differs, and reading it again can return `404` when it was removed in the meantime; treat that as deleted.
+
+Changes are kept for 30 days. If your tool doesn't check in that time, the request returns `410` and you start again from step 1.
+
 ## Replace or revoke a token
 
 **Settings → API apps** lists your apps with what they can read, the last four characters of the token, when it expires and when it was last used. Luma emails you a week before a token expires.

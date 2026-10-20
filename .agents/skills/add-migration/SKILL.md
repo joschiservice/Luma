@@ -91,6 +91,9 @@ bypasses RLS and shows a plan the API never gets.
 - If the table feeds a metric, Home, Insights or Needs you, attach the `metric_change` trigger
   with the right topics; tables that feed Needs you also carry `decisions`. See
   [live delivery](../../../docs/operational-metrics.md#live-delivery).
+- If the table backs a record served by a `publicApi` route, attach the `workspace_change`
+  triggers and give `luma_change_feed` its ID columns, as `0167_workspace_changes.sql` does. See
+  the [change feed](../../../docs/api.md#change-feed).
 - `SECURITY DEFINER` functions set `search_path`, `REVOKE ALL ... FROM PUBLIC`, and check that
   the row's `tenant_id` matches `app.tenant_id` before acting.
 

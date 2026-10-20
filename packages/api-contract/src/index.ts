@@ -134,6 +134,8 @@ export type {
   TenantContextResponse,
 } from './contracts/identity.js';
 
+export * from './changes.js';
+
 export * from './customers.js';
 
 export * from './decisions.js';

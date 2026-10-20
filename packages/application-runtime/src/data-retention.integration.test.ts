@@ -327,6 +327,15 @@ describe.skipIf(!databaseUrl)(
       ])
         expect(await count(table, active, shop)).toBe(0);
       expect(await count('customer_erasures', active, shop)).toBe(1);
+      // Copies that follow the change feed learn that the shop's customer is gone.
+      expect(
+        (
+          await owner.query(
+            'SELECT record_type,operation FROM workspace_changes WHERE tenant_id=$1',
+            [active],
+          )
+        ).rows,
+      ).toEqual([{ record_type: 'customer', operation: 'deleted' }]);
       expect(await count('shopify_installation_bindings', active, shop)).toBe(
         1,
       );

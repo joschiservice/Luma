@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createFailureLog } from '@luma/platform';
+import { changeRetentionDays } from '@luma/read-models';
 import type { Pool } from 'pg';
 
 interface PurgeBatch {
@@ -18,7 +19,7 @@ const batchesPerPass = 20;
  * Applies retention in bounded batches. Each pass announces deletion dates for closed workspaces
  * and queues owner notices, removes connections queued by a Shopify shop/redact, removes closed
  * workspaces whose announced date has passed, then deletes audit entries of workspaces closed
- * longer than `auditRetentionDays`. Hourly, it also reports open Shopify privacy requests due
+ * longer than `auditRetentionDays` and change feed entries past their retention. Hourly, it also reports open Shopify privacy requests due
  * within seven days through `log`, with counts only. Use a login that inherits
  * `luma_commerce_sync`. A removal blocked by a foreign key or an unclassified table is reported
  * and retried on the next pass; other failures are logged and retried.
@@ -97,6 +98,19 @@ export function createDataRetentionWorker(options: {
     }
   }
 
+  /** Deletes change feed entries past their retention in batches, up to the pass limit. */
+  async function pruneChanges() {
+    for (let i = 0; i < batchesPerPass && !stop.signal.aborted; i++) {
+      const row = (
+        await options.pool.query<{ removed: number }>(
+          'SELECT prune_workspace_changes($1,$2) AS removed',
+          [changeRetentionDays, batch],
+        )
+      ).rows[0];
+      if (!row || row.removed < batch) return;
+    }
+  }
+
   /** Runs one pass of every retention step; each step's failure is logged independently. */
   async function pass() {
     await options.pool
@@ -130,6 +144,9 @@ export function createDataRetentionWorker(options: {
         'Closed workspace audit entries could not be removed; retrying.',
         error,
       ),
+    );
+    await pruneChanges().catch((error: unknown) =>
+      log('Old change feed entries could not be removed; retrying.', error),
     );
     await checkPrivacyRequests().catch((error: unknown) =>
       log('Shopify privacy deadlines could not be checked; retrying.', error),

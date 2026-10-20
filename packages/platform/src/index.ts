@@ -3,6 +3,7 @@ export { canonicalJson } from './domain/canonical-json.js';
 export {
   conflict,
   forbidden,
+  gone,
   invalid,
   notFound,
   RateLimitedError,

@@ -59,6 +59,7 @@ import type {
 } from '@luma/read-models';
 import {
   capabilityReadPermission,
+  createChangeFeed,
   createCustomerWorkspace,
   createEvidenceReader,
   createFulfillmentWorkspace,
@@ -83,6 +84,7 @@ import type { createTenantFeatureRelease } from './feature-release.js';
 
 /** The read-only workspace views, by the HTTP area that serves them. */
 export interface ReadModelServices {
+  changes: ReturnType<typeof createChangeFeed>;
   customers: ReturnType<typeof createCustomerWorkspace>;
   evidence: ReturnType<typeof createEvidenceReader>;
   fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
@@ -409,6 +411,7 @@ export function createReadModelServices(options: {
   });
 
   return {
+    changes: createChangeFeed(database),
     customers: createCustomerWorkspace(database),
     evidence: createEvidenceReader(
       database,

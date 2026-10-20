@@ -72,6 +72,20 @@ Use API apps over the existing contract, starting with personal apps.
     the request when it fails.
   - The person an app acts for is emailed a week before its token expires and when someone else
     revokes it.
+- **Change feed.** `/changes` lists which public records changed, by type and ID, never their
+  content; clients reread the record through its own route. Triggers on the tables behind each
+  record write one row per record and transaction, in the writing transaction.
+  - Rows are ordered by transaction ID and served only once every older transaction has
+    finished. A sequence or timestamp is taken before commit, so a reader could pass a value
+    whose transaction commits later and skip that change for good. The cost is that one long
+    transaction anywhere in the cluster delays the feed.
+  - Rows are kept for 30 days. A cursor before the pruned position gets `410`, and the client
+    rereads everything; an unbounded log would grow with every sync.
+  - Purging a closed workspace records nothing. Removing one connection's data, such as a Shopify
+    shop redaction, and customer erasure record deletions, so copies kept outside Luma learn of
+    them.
+  - Payloads in the feed were rejected: they would duplicate each route's permission and
+    personal-data handling, and every record shape change would become a feed change too.
 - **Later kinds of app.** Workspace-owned apps and public apps installable by any workspace act
   as themselves, not as a person. They need a non-user principal, which is the groundwork in
   [LUMA-56](https://linear.app/auren-labs/issue/LUMA-56). They use the same credentials,
@@ -85,6 +99,8 @@ Use API apps over the existing contract, starting with personal apps.
   callers, not just the web app.
 - Adding a scope means marking its read routes public. The scope test fails until both lists
   match.
+- A table that backs a public record needs the `workspace_change` triggers, or copies kept
+  through the feed silently go stale.
 - Writes through API apps aren't possible yet. They need action admission and approval rules in
   which an app is its own requester, so that an app can't satisfy the approval of the person who
   created it.

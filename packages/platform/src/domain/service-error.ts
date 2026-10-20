@@ -1,5 +1,5 @@
 /** HTTP status a service error is reported with. */
-export type ServiceErrorStatus = 401 | 403 | 404 | 409 | 422 | 429 | 503;
+export type ServiceErrorStatus = 401 | 403 | 404 | 409 | 410 | 422 | 429 | 503;
 
 /** Stable error code clients receive in the error body. */
 export type ServiceErrorCode =
@@ -11,6 +11,7 @@ export type ServiceErrorCode =
   | 'READ_ONLY'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'GONE'
   | 'REGION_UNAVAILABLE'
   | 'TOO_MANY_REQUESTS'
   | 'SERVICE_UNAVAILABLE'
@@ -52,6 +53,14 @@ export function notFound(message: string): ServiceError {
 /** Creates a 409 `CONFLICT` error for a request that contradicts current state; use with `throw`. */
 export function conflict(message: string): ServiceError {
   return new ServiceError(409, 'CONFLICT', message);
+}
+
+/**
+ * Creates a 410 `GONE` error for a position or resource that no longer exists and won't return,
+ * such as an expired cursor; use with `throw`.
+ */
+export function gone(message: string): ServiceError {
+  return new ServiceError(410, 'GONE', message);
 }
 
 /** Creates a 422 `VALIDATION_ERROR` error for input the use case rejects; use with `throw`. */
