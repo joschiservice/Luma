@@ -45,8 +45,14 @@ export function createMailEvents(
           'Invalid webhook signature',
         );
       }
-      if (!(event.type in statuses) || !('email_id' in event.data)) return;
-      const status = statuses[event.type as keyof typeof statuses];
+      if (
+        event.type !== 'email.delivered' &&
+        event.type !== 'email.delivery_delayed' &&
+        event.type !== 'email.bounced' &&
+        event.type !== 'email.complained'
+      )
+        return;
+      const status = statuses[event.type];
       const receipt = await pool.query(
         'UPDATE mail_receipts SET status=$2,updated_at=now() WHERE provider_id=$1',
         [event.data.email_id, status],

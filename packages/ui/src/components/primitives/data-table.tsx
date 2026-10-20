@@ -3,8 +3,13 @@ import { useRender } from '@base-ui/react/use-render';
 import { m } from '@luma/i18n/messages';
 import {
   type ColumnDef,
-  getCoreRowModel,
-  useReactTable,
+  columnOrderingFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  rowSelectionFeature,
+  tableFeatures,
+  useTable,
 } from '@tanstack/react-table';
 import {
   ArrowDown,
@@ -103,6 +108,13 @@ const rowLinkProps = {
 };
 
 const selectColumn = '__select';
+const features = tableFeatures({
+  columnOrderingFeature,
+  columnVisibilityFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  rowSelectionFeature,
+});
 /** Keyboard resizing steps in pixels; Shift takes the larger step. */
 const resizeStep = { small: 16, large: 64 };
 
@@ -264,7 +276,7 @@ export function DataTable<Row, SortKey extends string = string>({
     onChange: (next) => selection?.onChange(next),
   });
 
-  const definitions: ColumnDef<Row>[] = [
+  const definitions: ColumnDef<typeof features, { value: Row }>[] = [
     ...(selection ? [{ id: selectColumn, size: 44 }] : []),
     ...columns.map((column) => ({
       id: column.key,
@@ -282,20 +294,15 @@ export function DataTable<Row, SortKey extends string = string>({
         ? resizing.width
         : (column.width ?? defaultWidth(definition));
   }
-  // The table model takes a mutable array; copying keeps the caller's rows untouched.
-  const data = useMemo(() => [...rows], [rows]);
-  // The model is rebuilt from controlled props on every render and its functions are never
-  // memoized or passed to memoized children, so skipping compiler memoization is safe.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  // Table 9 requires object records; Luma tables also accept primitive rows.
+  const data = useMemo(() => rows.map((value) => ({ value })), [rows]);
+  const table = useTable({
+    features,
     data,
     columns: definitions,
-    getRowId: (row) => rowKey(row),
-    getCoreRowModel: getCoreRowModel(),
-    manualSorting: true,
-    manualFiltering: true,
-    manualPagination: true,
+    getRowId: (row) => rowKey(row.value),
     enableRowSelection: !!selection,
+    enableRowRangeSelection: false,
     state: {
       columnOrder: [
         selectColumn,
@@ -306,7 +313,8 @@ export function DataTable<Row, SortKey extends string = string>({
         keys.map((key) => [key, shownKeys.includes(key)]),
       ),
       columnPinning: {
-        left: [
+        end: [],
+        start: [
           ...(selection && configurable ? [selectColumn] : []),
           ...(configurable && columnState.pinned ? [columnState.pinned] : []),
         ],
@@ -636,7 +644,8 @@ export function DataTable<Row, SortKey extends string = string>({
                       <label className="ui-data-table-select">
                         <Checkbox
                           aria-label={m.ui_table_select_row({
-                            row: selection?.rowLabel(row.original) ?? row.id,
+                            row:
+                              selection?.rowLabel(row.original.value) ?? row.id,
                           })}
                           checked={row.getIsSelected()}
                           // The change comes from a click, which carries Shift for a range.
@@ -664,7 +673,7 @@ export function DataTable<Row, SortKey extends string = string>({
                     data-pinned={stickyLeft(column.key) ? '' : undefined}
                     style={stickyLeft(column.key)}
                   >
-                    {column.cell(row.original)}
+                    {column.cell(row.original.value)}
                   </Cell>
                 );
               })}

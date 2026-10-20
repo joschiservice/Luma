@@ -2,12 +2,12 @@
 # One server image runs the API, the workflow worker, commerce sync, the web server, the staff
 # API and the deploy steps; each container chooses its command. JavaScript builds on the build
 # platform, so a cross-architecture build emulates only the Code Steps runtime installation.
-ARG NODE_IMAGE=node:24.21.0-trixie-slim
+ARG NODE_IMAGE=node:24.22.0-trixie-slim
 
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS build
 ARG TARGETARCH
 ENV CI=true npm_config_store_dir=/pnpm/store
-RUN npm install --global pnpm@12.4.2
+RUN npm install --global pnpm@12.14.0
 WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,id=luma-pnpm-store,target=/pnpm/store \

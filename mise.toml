@@ -1,6 +1,6 @@
 [tools]
-node = "24.21.0"
-pnpm = "12.4.2"
+node = "24.22.0"
+pnpm = "12.14.0"
 
 [tasks.setup]
 description = "Install dependencies and prepare the local database and demo workspace"

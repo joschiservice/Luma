@@ -176,6 +176,44 @@ export const Default: Story = {
   },
 };
 
+export const PrimitiveRows: Story = {
+  render: function PrimitiveRowsPreview() {
+    const [selected, setSelected] = useState<string[]>([]);
+
+    return (
+      <DataTable
+        caption="Orders"
+        rows={orders.map((order) => order.number)}
+        rowKey={(number) => number}
+        columns={[{ key: 'number', header: 'Order', cell: (number) => number }]}
+        selection={{
+          selected,
+          onChange: setSelected,
+          rowLabel: (number) => number,
+        }}
+      />
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('rowheader', { name: 'SO-10' }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('checkbox', { name: 'Select SO-10' }),
+    );
+    await expect(
+      canvas.getByRole('checkbox', { name: 'Select SO-10' }),
+    ).toBeChecked();
+    await expect(
+      canvas.getByRole('rowheader', { name: 'SO-10' }).closest('tr'),
+    ).toHaveAttribute('data-selected');
+    await expect(
+      canvas.getByRole('checkbox', { name: 'Select #1002' }),
+    ).not.toBeChecked();
+  },
+};
+
 /** Plain tables sit inside a surface that already has a boundary, such as a card. */
 export const Compact: Story = {
   args: { density: 'compact', variant: 'plain' },

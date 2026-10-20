@@ -22,57 +22,56 @@ allowBuilds:
 # Shared versions; named catalogs preserve intentional version differences.
 catalog:
   '@opentelemetry/api': '1.9.1'
-  '@opentelemetry/instrumentation': '0.222.0'
-  '@opentelemetry/resources': '2.11.0'
-  '@opentelemetry/sdk-trace-node': '2.11.0'
-  '@orpc/client': '1.15.5'
-  '@orpc/contract': '1.15.5'
-  '@orpc/openapi': '1.15.5'
-  '@orpc/openapi-client': '1.15.5'
-  '@orpc/server': '1.15.5'
-  '@orpc/standard-server-fastify': '1.15.5'
-  '@orpc/zod': '1.15.5'
-  '@storybook/react-vite': '10.6.0'
+  '@opentelemetry/instrumentation': '0.223.0'
+  '@opentelemetry/resources': '2.12.0'
+  '@opentelemetry/sdk-trace-node': '2.12.0'
+  '@orpc/client': '1.15.7'
+  '@orpc/contract': '1.15.7'
+  '@orpc/openapi': '1.15.7'
+  '@orpc/openapi-client': '1.15.7'
+  '@orpc/server': '1.15.7'
+  '@orpc/standard-server-fastify': '1.15.7'
+  '@orpc/zod': '1.15.7'
+  '@storybook/react-vite': '10.6.2'
   '@tailwindcss/vite': '4.3.3'
   '@tanstack/react-form': '1.33.5'
-  '@tanstack/react-query': '5.103.0'
+  '@tanstack/react-query': '5.104.5'
   '@tanstack/react-router': '1.170.45'
   '@tanstack/react-router-ssr-query': '1.167.3'
   '@tanstack/react-start': '1.169.3'
   '@tanstack/router-cli': '1.167.45'
   '@temporalio/testing': '1.24.0'
-  '@types/node': '^24.0.0'
-  '@types/pg': '8.20.0'
+  '@types/node': '24.19.2'
+  '@types/pg': '8.23.1'
   '@types/react': '^19.2.0'
   '@types/react-dom': '^19.2.0'
-  'better-auth': '1.7.5'
-  '@better-auth/passkey': '1.7.5'
-  'fastify': '5.12.5'
+  'better-auth': '1.7.11'
+  '@better-auth/passkey': '1.7.11'
+  'fastify': '5.12.7'
   'fflate': '0.8.3'
-  'graphql': '^16.14.2'
-  'lucide-react': '1.46.0'
-  'playwright': '1.63.0'
-  'react': '^19.2.0'
-  'react-dom': '^19.2.0'
-  'storybook': '10.6.0'
-  'ts-pattern': '5.9.0'
-  'tsx': '^4.20.0'
-  'unpdf': '1.8.1'
-  'vite': '8.3.0'
-  'vitest': '4.1.11'
-  'zod': '4.6.5'
+  'graphql': '17.0.2'
+  'lucide-react': '1.59.0'
+  'pg': '8.23.1'
+  'playwright': '1.64.1'
+  'react': '19.3.1'
+  'react-dom': '19.3.1'
+  'storybook': '10.6.2'
+  'ts-pattern': '5.9.2'
+  'tsx': '4.23.15'
+  'unpdf': '1.9.1'
+  'vite': '8.3.4'
+  'vitest': '5.0.5'
+  'zod': '4.6.7'
 
 catalogs:
-  pg-8-23-0:
-    'pg': '8.23.0'
-  pg-8-20-0:
-    'pg': '8.20.0'
-  typescript-compatible-5-9-3:
-    'typescript': '~5.9.3'
+  # ESLint's TypeScript parser supports the compiler API through TypeScript 6.0.
+  typescript-compatible-6-0-3:
+    'typescript': '~6.0.3'
+  # Persisted Code Step versions include this compiler version.
   typescript-5-9-3:
     'typescript': '5.9.3'
 
-# Keep auto-installed optional framework peers on the reviewed patch release.
+# Keep auto-installed optional framework peers on the reviewed release.
 overrides:
-  next: 16.3.8
+  next: 16.4.2
   '@tanstack/react-start': 'catalog:'

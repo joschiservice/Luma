@@ -11,6 +11,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import {
   APIError,
+  type AuthMiddleware,
   createAuthEndpoint,
   createAuthMiddleware,
   getAuthoritativeSessionFromCtx,
@@ -67,7 +68,7 @@ export interface AuthSettings {
 function accountSecurityMiddleware(
   db: NodePgDatabase<typeof schema>,
   settings: AuthSettings,
-) {
+): AuthMiddleware {
   return createAuthMiddleware(async (ctx) => {
     if (ctx.path === '/sign-up/email') {
       const region = settings.region ?? 'AU';

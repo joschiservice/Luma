@@ -19,15 +19,15 @@
     "@luma/i18n": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-email": "6.11.1"
+    "react-email": "6.11.3"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@react-email/ui": "6.11.1",
+    "@react-email/ui": "6.11.3",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:typescript-compatible-5-9-3",
+    "typescript": "catalog:typescript-compatible-6-0-3",
     "vitest": "catalog:"
   }
 }

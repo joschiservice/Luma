@@ -165,6 +165,25 @@ it('pauses optional email to an address that bounced until a message to it is de
   ).toBe(204);
   expect((await request(member, `${base}/settings`)).emailPaused).toBeNull();
 
+  // Inbox events also carry email IDs, but are not outbound delivery receipts.
+  expect(
+    (
+      await postEvent(f, {
+        type: 'inbox.email.received',
+        created_at: new Date().toISOString(),
+        data: { email_id: `provider-${sent.id}` },
+      })
+    ).statusCode,
+  ).toBe(204);
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT status FROM mail_receipts WHERE provider_id=$1',
+        [`provider-${sent.id}`],
+      )
+    ).rows[0].status,
+  ).toBe('accepted');
+
   expect((await postEvent(f, bounce)).statusCode).toBe(204);
   expect((await request(member, `${base}/settings`)).emailPaused).toBe(
     'bounced',

@@ -2,6 +2,10 @@
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
   // Exports read by tools that knip does not follow.
   "ignoreIssues": {
+    // Storybook reads each story's metadata and named exports at runtime.
+    "**/*.stories.{ts,tsx}": ["exports"],
+    // Storybook loads these default configuration exports itself.
+    "packages/ui/.storybook/{main,preview}.ts": ["exports"],
     // tooling/dev/studio.mjs passes this file to drizzle-kit studio.
     "apps/api/drizzle.studio.config.ts": ["exports"],
     // Better Auth reads the tables from this module namespace by model name.
@@ -10,6 +14,8 @@
     "packages/i18n/vite.d.mts": ["exports"],
     // Consumers import the built package, since its JSX needs the package's own compiler settings.
     "packages/email/src/index.ts": ["exports"],
+    // React Email discovers and renders the preview modules' default exports.
+    "packages/email/previews/**/*.tsx": ["exports"],
   },
   "ignoreBinaries": ["docker", "mise", "hyperfine"],
   "workspaces": {

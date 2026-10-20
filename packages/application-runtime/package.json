@@ -57,7 +57,7 @@
     "@luma/workflows": "workspace:*",
     "@orpc/server": "catalog:",
     "fastify": "catalog:",
-    "pg": "catalog:pg-8-20-0",
+    "pg": "catalog:",
     "zod": "catalog:",
     "@luma/sales": "workspace:*",
     "@luma/adaptive": "workspace:*",
@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@luma/connector-shopify": "workspace:*",
-    "testcontainers": "12.1.0",
+    "testcontainers": "12.2.1",
     "@luma/typescript-config": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/resources": "catalog:",
