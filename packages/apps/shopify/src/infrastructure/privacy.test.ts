@@ -158,3 +158,24 @@ it('queues the shop for data removal only on shop/redact', async () => {
   await f.send('shop/redact', base);
   expect(queued()).toEqual([['development:client', shop]]);
 });
+it('rejects a signed customers/data_request body relabelled as shop/redact', async () => {
+  const f = fixture();
+  const body = Buffer.from(
+    JSON.stringify({
+      ...base,
+      customer: { id: 456, email: 'customer@example.test' },
+      orders_requested: [1],
+      data_request: { id: 12 },
+    }),
+  );
+  const signature = createHmac('sha256', config.clientSecret)
+    .update(body)
+    .digest('base64');
+  await expect(
+    f.intake(body, signature, shop, 'shop/redact'),
+  ).rejects.toMatchObject({ statusCode: 422 });
+  await expect(
+    f.intake(body, signature, shop, 'customers/redact'),
+  ).rejects.toMatchObject({ statusCode: 422 });
+  expect(f.transaction).not.toHaveBeenCalled();
+});

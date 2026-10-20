@@ -97,7 +97,9 @@ Imported customer profiles, order addresses and the customer's inbox data are er
 automatically on intake, including messages to or from the request's signed email when no
 profile holds it (see [commerce sync](commerce-sync.md#customers) and
 [messaging](messaging.md#retention-and-erasure)), and each bound workspace's Activity records
-the erasure with its counts. Everything else is an operator procedure;
+the erasure with its counts. A `shop/redact` erases only connections that are already
+revoked or disconnected; a body that does not match its topic's exact shape is rejected with
+422, because the topic header is not covered by the HMAC. Everything else is an operator procedure;
 the endpoint alone does not make a deployment compliant.
 
 A `shop/redact` also queues every uninstalled connection of the shop. The commerce sync

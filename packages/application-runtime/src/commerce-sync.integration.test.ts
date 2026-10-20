@@ -1968,12 +1968,22 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     expect(await stored()).toEqual(['gid://shopify/Order/3']);
     expect(await addresses(await id('1'))).toEqual({ state: 'not_imported' });
 
-    // Shop redaction erases every address of the shop.
-    await runtime.query('SELECT erase_shopify_customer_data($1,$2,$3)', [
-      'test:app',
-      'fixture.myshopify.com',
-      null,
-    ]);
+    // shop/redact does not erase customers of an active installation.
+    const redactShop = () =>
+      runtime.query('SELECT erase_shopify_customer_data($1,$2,$3)', [
+        'test:app',
+        'fixture.myshopify.com',
+        null,
+      ]);
+    await redactShop();
+    expect(await stored()).toEqual(['gid://shopify/Order/3']);
+
+    // After uninstall, shop redaction erases every address of the shop.
+    await owner.query(
+      `UPDATE connector_installations SET secret=NULL,document=jsonb_set(document,'{status}','"disconnected"') WHERE tenant_id=$1 AND id=$2`,
+      [tenant, shop],
+    );
+    await redactShop();
     expect(await stored()).toEqual([]);
   });
 

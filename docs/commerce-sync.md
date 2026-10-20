@@ -203,7 +203,10 @@ order links, order addresses, ledger rows and inbox data in its intake transacti
 request's signed email joins the profile emails, so the inbox is erased even when no profile
 holds the address. A customer redaction
 erases the addresses of the customer's linked orders and of the orders it lists, even when it
-names no Shopify customer ID; a shop redaction erases every address of the shop. Erased
+names no Shopify customer ID; a shop redaction erases every customer and address of the
+shop's revoked or disconnected connections only. The topic comes from an unsigned header, so
+each topic's body must match its exact shape, and an active installation is never erased
+shop-wide. Erased
 customer and order IDs are remembered by digest, so later reads skip them, their orders get
 no new links and those orders' addresses are not stored again. A member with `customers.erase` erases one
 source customer of any connection the same way through `@luma/customers`, by connection and
