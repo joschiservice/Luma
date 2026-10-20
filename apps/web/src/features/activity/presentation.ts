@@ -164,6 +164,7 @@ const activityLabels: Record<string, Label> = {
   'workspace.updated': m.activity_action_workspace_changed,
   'collections.exported': m.activity_action_list_exported,
   'customers.erased': m.activity_action_customer_erased,
+  'customers.erasure_skipped': m.activity_action_customer_erasure_skipped,
 };
 
 /** Readable names for the changes Luma can propose, keyed by their recorded change code. */

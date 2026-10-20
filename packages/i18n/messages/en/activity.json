@@ -253,5 +253,6 @@
   "activity_export_failed": "Activity couldn’t be exported. Try again.",
   "activity_action_list_exported": "List exported",
   "activity_action_customer_erased": "Customer erased",
+  "activity_action_customer_erasure_skipped": "Shop deletion request not applied: the store is still connected",
   "activity_customer_erased_counts": "Profiles: {profiles} · Messages: {messages} · Threads: {threads} · Replies: {replies} · Mailbox rules: {rules}"
 }

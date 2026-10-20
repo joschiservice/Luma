@@ -253,5 +253,6 @@
   "activity_export_failed": "Die Aktivität konnte nicht exportiert werden. Versuche es erneut.",
   "activity_action_list_exported": "Liste exportiert",
   "activity_action_customer_erased": "Kunde gelöscht",
+  "activity_action_customer_erasure_skipped": "Shop-Löschanfrage nicht ausgeführt: Der Shop ist noch verbunden",
   "activity_customer_erased_counts": "Profile: {profiles} · Nachrichten: {messages} · Threads: {threads} · Antworten: {replies} · Postfachregeln: {rules}"
 }
