@@ -895,6 +895,26 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     expect(f.transport.mock.calls).toHaveLength(calls);
     expect((await f.connection()).status).toBe('revoked');
   });
+  it('applies an uninstall after the refresh token expired without sending it to Shopify', async () => {
+    const f = fixture();
+    await f.oauth.callback(f.ctx, await f.query());
+    const c = await f.connection();
+    const body = Buffer.from(JSON.stringify({ myshopify_domain: f.shop }));
+    const calls = f.transport.mock.calls.length;
+    f.advance(91 * 24 * 3600000);
+    await f.oauth.uninstall(
+      f.ctx.tenantId,
+      c.id,
+      body,
+      createHmac('sha256', config.clientSecret).update(body).digest('base64'),
+      f.shop,
+      'app/uninstalled',
+    );
+    // Revoked without credentials, so a later shop/redact erases this connection.
+    expect(f.transport.mock.calls).toHaveLength(calls);
+    expect((await f.connection()).status).toBe('revoked');
+    await expect(f.oauth.credential(f.ctx, c.id)).rejects.toThrow();
+  });
   it('reconnects the same connection when moving from a pilot to the production app', async () => {
     const f = fixture();
     await f.oauth.callback(f.ctx, await f.query());
