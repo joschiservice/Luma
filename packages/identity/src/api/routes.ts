@@ -2,7 +2,7 @@ import type { RouteAccess } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
 import { forbidden, notFound, ServiceError } from '@luma/platform';
 import { implement } from '@orpc/server';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { IdentityService } from '../application/identity.js';
 import type { TenantContext } from '../domain/context.js';
@@ -10,9 +10,25 @@ import { ReadOnlyAccessError } from '../domain/context.js';
 import type { HttpContext } from './contract-routes.js';
 import { restrictRequestToReads, runInRequestScope } from './request-scope.js';
 
-/** Extracts the cookie and authorization headers used to resolve a request's session. */
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Extracts the cookie header used to resolve a request's session. */
 export function credentials(request: FastifyRequest) {
   return request.headers.cookie ? { cookie: request.headers.cookie } : {};
+}
+
+/**
+ * Reads a Luma API token from `Authorization: Bearer luma_…`, or null. Other authorization
+ * headers, such as credentials for a proxy in front of the API, are ignored as before; a token
+ * proves nothing until the identity service finds its hash.
+ */
+function bearerToken(request: FastifyRequest): string | null {
+  const match = /^Bearer\s+(luma_[\x21-\x7e]{1,200})\s*$/i.exec(
+    request.headers.authorization ?? '',
+  );
+
+  return match ? match[1]! : null;
 }
 
 function tenantContext(request: FastifyRequest) {
@@ -121,6 +137,9 @@ export function identityRoutes(service?: IdentityService) {
         permissions: [...context.permissions],
         allAppPermissions: context.permissions.allAppPermissions,
         supportView: context.supportView ?? null,
+        apiApp: context.apiApp
+          ? { id: context.apiApp.id, scopes: [...context.apiApp.scopes] }
+          : null,
       };
     }),
     listMembers: os.listMembers.handler(async ({ context: { request } }) => ({
@@ -156,6 +175,7 @@ const publicRoutes = new Set([
   'GET /health',
   'GET /ready',
   'GET /openapi.json',
+  'GET /openapi.public.json',
   'GET /v1/connector-providers',
   'GET /v1/connector-providers/:providerId',
   'GET /auth/region-config',
@@ -195,7 +215,7 @@ export function registerIdentityGuards(
   app.decorateRequest('tenantContext', null);
   // Every request gets a scope that a support view can restrict to reads.
   app.addHook('onRequest', (_request, _reply, done) => runInRequestScope(done));
-  app.addHook('preHandler', async (request) => {
+  app.addHook('preHandler', async (request, reply) => {
     const route = request.routeOptions.url;
     const key = `${request.method === 'HEAD' ? 'GET' : request.method} ${route}`;
     if (
@@ -210,6 +230,12 @@ export function registerIdentityGuards(
         'REGION_UNAVAILABLE',
         'Identity service is unavailable',
       );
+    const bearer = bearerToken(request);
+    if (bearer !== null) {
+      await authorizeApiApp(request, reply, service, bearer);
+
+      return;
+    }
     if (
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       (!request.headers.origin ||
@@ -232,12 +258,7 @@ export function registerIdentityGuards(
       return;
     }
     const params = request.params as { organizationId?: string };
-    if (
-      !params.organizationId ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        params.organizationId,
-      )
-    )
+    if (!params.organizationId || !uuidPattern.test(params.organizationId))
       throw notFound('Organization not found');
     if (supportView && !readsOnly(request)) throw new ReadOnlyAccessError();
     const context = await service.resolveTenant(
@@ -258,6 +279,47 @@ export function registerIdentityGuards(
         { supportView: { read: request.url.split('?')[0] ?? route } },
       );
   });
+}
+
+/**
+ * Authorizes a personal API app's bearer request. Only tenant routes marked `publicApi` accept
+ * tokens; a request may not also send cookies, so a browser session never mixes with a token.
+ * Browsers don't attach bearer tokens by themselves, so the Origin check doesn't apply.
+ */
+async function authorizeApiApp(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  service: IdentityService,
+  token: string,
+) {
+  if (request.headers.cookie)
+    throw new ServiceError(
+      401,
+      'UNAUTHENTICATED',
+      'Send either an API token or a session cookie, not both.',
+    );
+  const params = request.params as { organizationId?: string };
+  if (
+    !request.routeOptions.config.publicApi ||
+    !params.organizationId ||
+    !uuidPattern.test(params.organizationId)
+  )
+    throw forbidden(
+      'API apps can’t use this operation. Sign in to Luma to use it.',
+    );
+  const { context, rateLimit } = await service.resolveApiApp(
+    token,
+    params.organizationId,
+    request.id,
+  );
+  if (rateLimit)
+    reply.headers({
+      'ratelimit-limit': rateLimit.limit,
+      'ratelimit-remaining': rateLimit.remaining,
+      'ratelimit-reset': rateLimit.reset,
+    });
+  request.tenantContext = context;
+  authorizeRoute(context, routeAccess(request));
 }
 
 /** Reports whether a route only reads: `GET`, `HEAD`, or declared `readOnly`. */
@@ -291,9 +353,11 @@ function authorizeRoute(
       : [];
   if (!permissions.some((permission) => context.permissions.has(permission)))
     throw forbidden(
-      permissions.length
-        ? 'Your role does not allow this. Ask a workspace admin for access.'
-        : 'This route does not declare who may use it.',
+      !permissions.length
+        ? 'This route does not declare who may use it.'
+        : context.apiApp
+          ? 'This API app doesn’t have the permission this operation needs, or your role no longer grants it.'
+          : 'Your role does not allow this. Ask a workspace admin for access.',
     );
 }
 
@@ -305,6 +369,8 @@ declare module 'fastify' {
     access?: import('@luma/api-contract').RouteAccess;
     /** A route with a request body that only reads; support views may call it. */
     readOnly?: true;
+    /** Part of the public API: personal API apps may call it with a bearer token. */
+    publicApi?: true;
   }
 
   interface FastifyRequest {

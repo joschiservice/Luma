@@ -27,6 +27,7 @@ export const helpTopics = [
   'workspace-settings',
   'roles-and-permissions',
   'account-security',
+  'api-apps',
 ] as const;
 
 export type HelpTopic = (typeof helpTopics)[number];

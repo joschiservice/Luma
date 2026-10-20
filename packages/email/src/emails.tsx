@@ -101,6 +101,21 @@ export type Email =
       timeZone: string;
       activityLink: string;
     }
+  | {
+      kind: 'api_app_expiring';
+      workspace: string;
+      app: string;
+      expiresAt: Date;
+      timeZone: string;
+      link: string;
+    }
+  | {
+      kind: 'api_app_revoked';
+      workspace: string;
+      app: string;
+      revokedBy: string | null;
+      link: string;
+    }
   | { kind: 'password_reset'; link: string }
   | { kind: 'password_changed'; resetLink: string }
   | { kind: 'email_verification'; link: string }
@@ -462,6 +477,55 @@ export function emailContent(
             />
             <Action locale={locale} href={email.activityLink}>
               {m.email_support_emergency_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'api_app_expiring': {
+      const values = {
+        workspace: email.workspace,
+        app: email.app,
+        date: formatEmailDateTime(email.expiresAt, locale, email.timeZone),
+      };
+
+      return {
+        subject: m.email_api_app_expiring_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_api_app_expiring_preview(values, o)}
+            heading={m.email_api_app_expiring_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_api_app_expiring_body(values, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_api_app_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'api_app_revoked': {
+      const values = {
+        workspace: email.workspace,
+        app: email.app,
+        person:
+          email.revokedBy ?? m.email_api_app_revoked_person_unknown({}, o),
+      };
+
+      return {
+        subject: m.email_api_app_revoked_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_api_app_revoked_preview({}, o)}
+            heading={m.email_api_app_revoked_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_api_app_revoked_body(values, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_api_app_action({}, o)}
             </Action>
           </EmailLayout>
         ),

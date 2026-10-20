@@ -13,12 +13,15 @@ Browsers reach the API only through the same-origin `/api` proxy, which removes 
 
 `@luma/api-contract/openapi` is a separate server and tooling entry point, so schema generation stays out of browser bundles. The server serves the document at `/openapi.json`; the committed copy in `packages/api-contract` must be regenerated with `pnpm --filter @luma/api-contract generate:openapi` after contract changes, and a test rejects a stale copy.
 
+Personal API apps call the API directly with `Authorization: Bearer <token>`, either through the same `/api` proxy or at the API origin. Only routes marked `publicApi` accept tokens; `/openapi.public.json` describes them, with the bearer scheme and their 401, 403 and 429 responses. Routes whose responses can include customer personal data also declare `personalData`, published as `x-luma-personal-data`; API app reads of them are counted. See [API apps](identity.md#api-apps).
+
 `/v1/connector-providers` is a public, static catalog of provider names and categories. It describes no installed connections and exposes no tenant data.
 
 ## Contract rules
 
 - Business endpoints use `/v1`. Additive changes may stay in v1. Removing or renaming fields, changing types or narrowing accepted inputs needs a new major path and an explicit migration. Health and readiness stay unversioned.
 - Route keys form OpenAPI operation IDs; keep them stable.
+- Routes marked `publicApi` are called by tools outside Luma that can't be updated with the web app. Treat every change to them as a published API change, and mark a route public only when it reads with a permission API apps can be granted ([ADR-017](architecture/017-api-apps.md)).
 - Start routes from `endpoint` in the contract package. Declare a non-200 success status with `successStatus`, and every intended error status in the route's `errors` metadata; the OpenAPI document adds the shared error schema for them. Use strict mutation objects so unexpected tenant or region fields are rejected.
 - Contract paths use `{param}`. Each route is registered with Fastify as `:param`, which is the form hooks, the guard and route allowlists see.
 - Handlers and use cases report expected failures by throwing `ServiceError` from `@luma/platform`, which the Fastify error handler turns into the error body with its status, code and message. Use its helpers in the `throw notFound(message)` form (also `conflict`, `invalid`, `forbidden` and `unavailable`) so TypeScript narrows after the throw; do not declare local helpers that return `never`. Do not throw oRPC errors from handlers: only input validation failures are mapped to 400, and any other oRPC error becomes a 500.
@@ -35,6 +38,8 @@ Errors have `{ code, message, requestId }`, and `requestId` matches the `x-reque
 | Body parser failure                               | normalized 400, 413 or 415                      |
 | No session                                        | `401 UNAUTHENTICATED`                           |
 | Member lacks the declared permission              | `403 FORBIDDEN`                                 |
+| API app token on a route that isn't public        | `403 FORBIDDEN`                                 |
+| API app over its token or workspace limit         | `429 TOO_MANY_REQUESTS` with `Retry-After`      |
 | Unknown route or resource, or inaccessible tenant | `404 NOT_FOUND`                                 |
 | Provisioning in an inactive region                | `422 REGION_UNAVAILABLE`                        |
 | Request served by the wrong regional cell         | `503 REGION_UNAVAILABLE`                        |

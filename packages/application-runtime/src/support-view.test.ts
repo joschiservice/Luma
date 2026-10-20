@@ -64,6 +64,7 @@ function supportApp() {
     resolveWorkflowContext: vi.fn(),
     refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(fail),
+    resolveApiApp: vi.fn(fail),
     listSecurityEvents: vi.fn(fail),
     supportInspections: vi.fn(fail),
     decideSupportInspection: vi.fn(fail),

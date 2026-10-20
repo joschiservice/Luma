@@ -66,6 +66,14 @@ const tenantContextSchema = z.object({
     })
     .nullable()
     .optional(),
+  /**
+   * Present when a personal API app made the request: `permissions` are then the app's scopes
+   * that the member's role still grants, and `actor.sessionId` is the token's credential ID.
+   */
+  apiApp: z
+    .object({ id: z.string().uuid(), scopes: z.array(z.string()) })
+    .nullable()
+    .optional(),
 });
 
 const supportViewEndReasonSchema = z.enum([
@@ -306,7 +314,7 @@ export const identityContract = {
       description:
         'Returns your membership, role and effective permissions. Changes to your role apply on the next request.',
     })
-    .meta({ access: anyMember, errors })
+    .meta({ publicApi: true, access: anyMember, errors })
     .input(z.object({ params: organizationParamsSchema }))
     .output(tenantContextSchema),
   listMembers: endpoint

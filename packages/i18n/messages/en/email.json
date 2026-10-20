@@ -139,5 +139,15 @@
   "email_workspace_closure_scheduled_body": "{workspace} is closed. On {date} Luma deletes its data.",
   "email_workspace_closure_reminder_body": "{workspace} is closed, and Luma deletes its data on {date}.",
   "email_workspace_closure_scope": "This removes orders, stock, customers, messages, issues, workflows and every other record in the workspace. Luma keeps its log of actions taken in the workspace for a limited time afterwards. Deleted data can’t be restored.",
-  "email_workspace_closure_keep": "To keep {workspace}, ask Luma support to reopen it before {date}."
+  "email_workspace_closure_keep": "To keep {workspace}, ask Luma support to reopen it before {date}.",
+  "email_api_app_expiring_subject": "Your API app token expires on {date}",
+  "email_api_app_expiring_preview": "Replace the token of {app} before it stops working.",
+  "email_api_app_expiring_heading": "Your API app token expires soon",
+  "email_api_app_expiring_body": "The token of your API app {app} in {workspace} stops working on {date}. Replace the token before then, and update the tools that use it.",
+  "email_api_app_revoked_subject": "Your API app {app} was revoked",
+  "email_api_app_revoked_preview": "Its token no longer works.",
+  "email_api_app_revoked_heading": "Your API app was revoked",
+  "email_api_app_revoked_body": "{person} revoked your API app {app} in {workspace}. Its token no longer works. If you still need access, create a new API app.",
+  "email_api_app_revoked_person_unknown": "A workspace admin",
+  "email_api_app_action": "Open API apps"
 }

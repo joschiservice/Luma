@@ -44,6 +44,7 @@ const memberPermissions = [
   'messages.read',
   'assistant.use',
   'activity.read',
+  'api_apps.create',
 ] as const satisfies readonly Permission[];
 
 /**

@@ -418,6 +418,7 @@ export const workflowsContract = {
         'Requires `workflows.read`. People can inspect published versions and activation status. Viewing a workflow never activates it.',
     })
     .meta({
+      publicApi: true,
       access: requires('workflows.read'),
       errors: [401, 403, 404, 409, 503],
     })
@@ -432,6 +433,7 @@ export const workflowsContract = {
         'Read published steps, versions, prerequisites and historical grants. Process versions show the exact order of decisions, actions, waits and verification.',
     })
     .meta({
+      publicApi: true,
       access: requires('workflows.read'),
       errors: [401, 403, 404, 409, 503],
     })
@@ -446,6 +448,7 @@ export const workflowsContract = {
         'Returns the 50 most recent runs with subject, actor, trigger and step evidence, and the names of the people who started them. Process runs show their current state and recorded outputs. Execution and verification results are separate.',
     })
     .meta({
+      publicApi: true,
       access: requires('workflows.read'),
       errors: [401, 403, 404, 409, 503],
     })

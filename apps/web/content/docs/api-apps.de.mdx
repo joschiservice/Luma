@@ -1,0 +1,49 @@
+---
+title: Daten mit API-Apps lesen
+description: Erstelle eine persönliche API-App, sende ihr Token mit deinen Anfragen und ersetze oder widerrufe es, wenn du es nicht mehr brauchst.
+---
+
+Die Daten deines Workspace gehören dir. Mit einer API-App können deine Skripte, Tabellen und anderen Tools sie lesen, ohne sich bei Luma anzumelden. Die App handelt mit einem Token für dich und kann nur lesen, was du auswählst und was deine Rolle erlaubt.
+
+## API-App erstellen
+
+1. Öffne **Einstellungen → API-Apps** und wähle **API-App erstellen**.
+2. Gib einen Namen ein, der sagt, was das Token nutzt, zum Beispiel _Wöchentlicher Umsatzbericht_.
+3. Wähle unter **Was die App lesen darf** nur, was das Tool braucht. Zur Auswahl stehen Bestellungen, Fulfillment, Bestand, Produkte, Kunden, Retouren, Probleme, Workflows und Aktivität. Berechtigungen, die deine Rolle nicht enthält, sind nicht verfügbar. **Personenbezogene Daten** kennzeichnet Angaben zu Kunden.
+4. Wähle, wie lange das Token gültig ist, von 7 Tagen bis zu einem Jahr, und wähle **API-App erstellen**.
+5. Kopiere das Token und bewahre es sicher auf, zum Beispiel in einem Passwort-Manager. Luma zeigt es nur einmal.
+
+Wenn deine Rolle nicht erlaubt, API-Apps zu erstellen, frag eine Workspace-Admin-Person. Jede Person kann in einem Workspace bis zu 25 API-Apps haben.
+
+## Token verwenden
+
+Sende Anfragen an die API-Adresse unter **Deine Workspace-API** mit dem Header `Authorization: Bearer <token>`. So liest du zum Beispiel Bestellungen:
+
+```bash
+curl -H "Authorization: Bearer $LUMA_TOKEN" \
+  https://<deine Luma-Adresse>/api/v1/organizations/<Workspace-ID>/orders
+```
+
+Die Workspace-ID steht in der Adresse jeder Seite im Workspace, nach `/app/`. Die **API-Referenz** beschreibt jede Anfrage, die ein Token stellen kann, mit ihren Parametern und Antworten.
+
+- Ein Token gilt nur in dem Workspace, in dem du es erstellt hast, und kann nur lesen.
+- Verliert deine Rolle eine Berechtigung, verliert die App sie auch. Anfragen, die sie nicht mehr stellen darf, enden mit `403`.
+- Ein Token sendet höchstens 600 Anfragen pro Minute, alle API-Apps eines Workspace zusammen 1.800. Jede Antwort nennt in `RateLimit-Remaining`, wie viele Anfragen übrig sind, und in `RateLimit-Reset`, in wie vielen Sekunden die Zählung neu beginnt. Anfragen über dem Limit enden mit `429`; warte die Sekunden aus dem Header `Retry-After` ab, bevor du es erneut versuchst.
+- Sende mit einem Token keine Browser-Cookies. Anfragen mit beidem werden abgelehnt.
+
+## Token ersetzen oder widerrufen
+
+**Einstellungen → API-Apps** listet deine Apps mit dem, was sie lesen dürfen, den letzten vier Zeichen des Tokens, dem Ablaufdatum und der letzten Nutzung. Luma schickt dir eine E-Mail eine Woche bevor ein Token abläuft.
+
+- **Token ersetzen** gibt dir ein neues Token. Das aktuelle funktioniert sofort nicht mehr, also aktualisiere die Tools, die es nutzen. Ersetze ein Token vor dem Ablauf und immer dann, wenn es jemand anderes haben könnte.
+- **Widerrufen** beendet die App endgültig. Das lässt sich nicht rückgängig machen; erstelle eine neue App, wenn du wieder Zugriff brauchst.
+
+Wer Apps verwaltet, sieht alle API-Apps im Workspace und kann jede widerrufen, aber dein Token weder sehen noch ersetzen. Widerruft jemand anderes deine App, schickt dir Luma eine E-Mail. Erstellen, Ersetzen und Widerrufen von API-Apps steht in der [Aktivität](/docs/activity) für alle, die eingeschränkte Aktivität sehen dürfen.
+
+## Kundendaten
+
+Bestellungen, Kunden und Retouren enthalten Namen, Adressen und Kontaktdaten von Kunden nur, wenn die App Kunden lesen darf. Dann zählt Luma die Anfragen, die diese Daten lesen, und die Datensätze, die sie zurückgeben, aber nie die Datensätze selbst. **Einstellungen → API-Apps** zeigt die Anzahl jeder App für die letzten 30 Tage, und die [Aktivität](/docs/activity) zeigt, wann eine App in einer Stunde zum ersten Mal Kundendaten über eine Adresse liest.
+
+## Wenn ein Token nicht mehr funktioniert
+
+Ein Token funktioniert nicht mehr, wenn es abläuft oder widerrufen wird, wenn du den Workspace verlässt oder wenn dein Konto deaktiviert wird. Solange dein Zugriff auf den Workspace gesperrt ist, werden deine Tokens ebenfalls abgelehnt. Sie funktionieren wieder, sobald dein Zugriff wiederhergestellt ist, außer sie sind inzwischen abgelaufen.

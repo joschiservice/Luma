@@ -280,7 +280,11 @@ export const returnCasesContract = {
       description:
         'Searches persisted return cases by case, order, source identity or item. Customer filtering also requires customers.read and follows source order mappings. No provider is called. The cursor is bound to the tenant and filters.',
     })
-    .meta({ access: requires('returns.read'), errors: [401, 403, 422, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('returns.read'),
+      errors: [401, 403, 422, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema,
@@ -329,7 +333,11 @@ export const returnCasesContract = {
       description:
         'Requires `returns.read`. Reads a return case with its lines, the receipt, inspection and proposed resolution with who decided them and on which evidence, the case history, and the latest request to create the return in the order’s system.',
     })
-    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('returns.read'),
+      errors: [401, 403, 404, 503],
+    })
     .input(z.object({ params: caseParams }))
     .output(returnCaseDetailSchema),
   assign: caseCommand(

@@ -3,6 +3,7 @@ import {
   forbidden,
   invalid,
   notFound,
+  RateLimitedError,
   ServiceError,
 } from '@luma/platform';
 
@@ -17,6 +18,7 @@ import type {
 } from '../domain/context.js';
 import {
   AccountErasedError,
+  apiAppContext,
   isOwner,
   makeTenantContext,
   requirePermission,
@@ -33,6 +35,11 @@ import {
 } from '../domain/security-events.js';
 import { describeUserAgent } from '../domain/sessions.js';
 import type { AccountInspections } from './account-inspections.js';
+import type {
+  ApiCredential,
+  ApiCredentials,
+  ApiRateLimit,
+} from './api-apps.js';
 import type { SupportViewCredentials } from './support-view.js';
 
 export type Credentials = Readonly<Record<string, string>>;
@@ -164,6 +171,8 @@ export interface IdentityRepository {
   supportViews: SupportViewCredentials;
   /** Luma support requests to inspect one account, answered by its owner. */
   accountInspections: AccountInspections;
+  /** Bearer credentials of personal API apps; without it, every bearer token is refused. */
+  apiCredentials?: ApiCredentials;
   /** Reads one account's security events, newest first, after an optional position. */
   listSecurityEvents(
     userId: string,
@@ -254,6 +263,42 @@ export function createIdentityService(
     if (view.state !== 'active') throw supportViewEnded();
 
     return view;
+  }
+
+  const apiTokenRefused = () =>
+    new ServiceError(
+      401,
+      'UNAUTHENTICATED',
+      'This API token is invalid, expired or revoked.',
+    );
+
+  /** Resolves the app's member and narrows the context to the app's scopes. */
+  async function resolveApiCredential(
+    credential: ApiCredential,
+    organizationId: string,
+    requestId: string,
+  ) {
+    if (credential.status !== 'active') throw apiTokenRefused();
+    if (credential.tenantId !== organizationId)
+      throw notFound('Organization not found');
+    await requirePlacement(organizationId);
+    const context = await repository.withUser(credential.userId, (tx) =>
+      resolve(
+        tx,
+        {
+          userId: credential.userId,
+          sessionId: credential.id,
+        },
+        organizationId,
+        requestId,
+      ),
+    );
+
+    return apiAppContext(context, {
+      id: credential.appId,
+      credentialId: credential.id,
+      scopes: credential.scopes,
+    });
   }
 
   async function withTenant<T>(
@@ -413,9 +458,27 @@ export function createIdentityService(
         ),
       );
     },
-    /** Resolves the actor's current membership again; a support view stays a support view. */
+    /**
+     * Resolves the actor's current membership again; a support view stays a support view. An API
+     * app context rereads its credential and stays narrowed to the app's scopes; a revoked or
+     * expired credential is refused.
+     */
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
+      if (context.apiApp) {
+        const credential = await repository.apiCredentials?.find(
+          context.tenantId,
+          context.apiApp.credentialId,
+        );
+        if (!credential || credential.userId !== context.actor.id)
+          throw apiTokenRefused();
+
+        return resolveApiCredential(
+          credential,
+          context.tenantId,
+          context.requestId,
+        );
+      }
       await requirePlacement(context.tenantId);
 
       return repository.withUser(context.actor.id, (tx) =>
@@ -684,6 +747,46 @@ export function createIdentityService(
       return repository.withUser(session.userId, (tx) =>
         resolve(tx, session, organizationId, requestId),
       );
+    },
+    /**
+     * Resolves a personal API app's access to a workspace from a bearer token: the credential
+     * must be active and belong to the workspace, and the member it acts for must still have an
+     * active membership. The context carries the member's permissions narrowed to the app's
+     * scopes. Unknown, expired and revoked tokens get 401; a token from another cell gets 503.
+     * Each request counts against the app's rate limits, which come back with the context;
+     * an exhausted limit throws `RateLimitedError`.
+     */
+    async resolveApiApp(
+      token: string,
+      organizationId: string,
+      requestId: string,
+    ): Promise<{ context: TenantContext; rateLimit: ApiRateLimit | null }> {
+      const credentials = repository.apiCredentials;
+      if (!credentials) throw apiTokenRefused();
+      const found = await credentials.resolve(token);
+      if (found.state === 'other_cell')
+        throw new ServiceError(
+          503,
+          'REGION_UNAVAILABLE',
+          'This API token belongs to another Luma region. Use that region’s API address.',
+        );
+      if (found.state !== 'found') throw apiTokenRefused();
+      const context = await resolveApiCredential(
+        found.credential,
+        organizationId,
+        requestId,
+      );
+      const rateLimit = await credentials.admit(
+        context.tenantId,
+        found.credential.id,
+      );
+      if (rateLimit && rateLimit.remaining < 0)
+        throw new RateLimitedError(
+          'Too many requests from API apps. Wait before trying again.',
+          rateLimit.reset,
+        );
+
+      return { context, rateLimit };
     },
     /**
      * Returns which of the given users can't act in the context's workspace: their membership is

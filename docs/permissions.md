@@ -109,6 +109,7 @@ Connected systems, imports, and installed apps.
 | Manage connections | `connections.manage` | Connect, reconnect, and disconnect systems. | Yes | Yes | Yes |  |
 | Manage imports | `sync.manage` | Start, pause, and fix imports, and review links between imported records. |  | Yes | Yes |  |
 | Manage apps | `apps.manage` | Install, update, and uninstall apps, and grant the access they request. | Yes | Yes | Yes |  |
+| Create personal API apps | `api_apps.create` | Create API apps that read workspace data for you with a token, limited to permissions you hold. People who manage apps can see and revoke them. | Yes | Yes | Yes | Yes |
 
 ## Ask Luma
 

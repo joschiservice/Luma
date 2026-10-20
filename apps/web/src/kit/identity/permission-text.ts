@@ -154,6 +154,10 @@ const permissionText: Record<
     m.permissions_sync_manage_label,
     m.permissions_sync_manage_description,
   ],
+  'api_apps.create': [
+    m.permissions_api_apps_create_label,
+    m.permissions_api_apps_create_description,
+  ],
   'apps.manage': [
     m.permissions_apps_manage_label,
     m.permissions_apps_manage_description,

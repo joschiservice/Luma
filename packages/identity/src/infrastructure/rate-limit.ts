@@ -17,11 +17,17 @@ return {count, ttl}`;
 
 const maxMemoryEntries = 10_000;
 
+/** The requests counted in a key's current window and the seconds until it resets. */
+export interface WindowCount {
+  count: number;
+  resetIn: number;
+}
+
 /** Counts requests in this process only, in fixed windows. */
 function memoryCounter() {
   const entries = new Map<string, { count: number; resetAt: number }>();
 
-  return (key: string, rule: Rule) => {
+  return (key: string, rule: Rule): WindowCount => {
     const now = Date.now();
     if (entries.size >= maxMemoryEntries)
       for (const [stored, entry] of entries)
@@ -37,43 +43,54 @@ function memoryCounter() {
     entry.count++;
 
     return {
-      allowed: entry.count <= rule.max,
-      retryAfter:
-        entry.count <= rule.max
-          ? null
-          : Math.max(1, Math.ceil((entry.resetAt - now) / 1000)),
+      count: entry.count,
+      resetIn: Math.max(1, Math.ceil((entry.resetAt - now) / 1000)),
     };
   };
 }
 
 /**
- * Stores auth rate-limit counters in Valkey so every API instance shares them, and in process
- * memory when no store is configured. Keys hold a hash of the client address and path, never
- * the address itself. When Valkey is unreachable a request is counted in memory instead, so an
- * outage weakens limits to per-instance ones rather than refusing every sign-in.
+ * Counts one request per call in fixed windows kept in Valkey, so every API instance shares
+ * them, and in process memory when no store is configured. Keys hold a hash of the given key,
+ * never the key itself. When Valkey is unreachable a request is counted in memory instead, so
+ * an outage weakens limits to per-instance ones rather than refusing every request.
+ */
+export function createRequestCounter(store?: AtomicStore) {
+  const memory = memoryCounter();
+
+  return async (key: string, rule: Rule): Promise<WindowCount> => {
+    if (!store) return memory(key, rule);
+    const hashed = `luma:auth-rate:${createHash('sha256').update(key).digest('hex')}`;
+    try {
+      const result = await store.run(consumeScript, hashed, [
+        String(rule.window),
+      ]);
+      if (!Array.isArray(result)) throw new Error('Unexpected result');
+      const [count, ttl] = result.map(Number);
+      if (!Number.isFinite(count) || !Number.isFinite(ttl))
+        throw new Error('Unexpected result');
+
+      return { count: count!, resetIn: Math.max(1, ttl!) };
+    } catch {
+      return memory(key, rule);
+    }
+  };
+}
+
+/**
+ * Stores auth rate-limit counters through `createRequestCounter`. Keys hold a hash of the
+ * client address and path, never the address itself.
  */
 export function createRateLimitStorage(store?: AtomicStore): RateLimitStorage {
-  const memory = memoryCounter();
+  const count = createRequestCounter(store);
 
   return {
     async consume(key, rule) {
-      if (!store) return memory(key, rule);
-      const hashed = `luma:auth-rate:${createHash('sha256').update(key).digest('hex')}`;
-      try {
-        const result = await store.run(consumeScript, hashed, [
-          String(rule.window),
-        ]);
-        if (!Array.isArray(result)) throw new Error('Unexpected result');
-        const [count, ttl] = result.map(Number);
-        if (!Number.isFinite(count) || !Number.isFinite(ttl))
-          throw new Error('Unexpected result');
+      const window = await count(key, rule);
 
-        return count! <= rule.max
-          ? { allowed: true, retryAfter: null }
-          : { allowed: false, retryAfter: Math.max(1, ttl!) };
-      } catch {
-        return memory(key, rule);
-      }
+      return window.count <= rule.max
+        ? { allowed: true, retryAfter: null }
+        : { allowed: false, retryAfter: window.resetIn };
     },
   };
 }

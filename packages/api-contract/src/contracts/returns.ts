@@ -16,7 +16,12 @@ export const returnsContract = {
       description:
         'List returns imported from connected stores, and refunds that no return settles, with their stage and refund state. `action` returns need a person: a request to review, units to refund, a failed refund payment or a return to close. `waiting` returns wait for items or a processing refund payment; `done` returns are closed, declined, cancelled or refunded. `refund.refunded` sums successful refund payments only; pending and failed payments are reported separately and never count as money returned. `sources` lists each commerce connection and whether it shares returns with Luma. Search matches the return name, order number, return reason and source IDs, and for readers with customer access the name and email address of the order’s customer when the source shares them. Conditions (`where`) and grouping (`group`) use the Returns catalog fields and also narrow the counts; receipt a source does not report is unknown and matches no comparison, and amounts compare only within one currency. Results contain up to `limit` records (at most 50) with counts per view and stage; nextCursor continues the same filters, conditions, grouping and sorting.',
     })
-    .meta({ access: requires('returns.read'), errors: [400, 401, 404, 503] })
+    .meta({
+      publicApi: true,
+      personalData: true,
+      access: requires('returns.read'),
+      errors: [400, 401, 404, 503],
+    })
     .input(
       z.object({ params: organizationParamsSchema, query: returnQuerySchema }),
     )
@@ -29,7 +34,12 @@ export const returnsContract = {
       description:
         'Read one return with its items, reasons, receipt and refund quantities, refunds with every payment attempt, the order it belongs to, other returns of that order and up to 50 observed snapshots. The ID of a refund that settles a return resolves to that return. Store returns are read-only here; work them in a return case, and approve, receive and refund them in the source store.',
     })
-    .meta({ access: requires('returns.read'), errors: [401, 404, 503] })
+    .meta({
+      publicApi: true,
+      personalData: true,
+      access: requires('returns.read'),
+      errors: [401, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema.extend({

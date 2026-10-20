@@ -83,6 +83,8 @@
   "permissions_sync_manage_description": "Importe starten, pausieren und reparieren sowie Verknüpfungen zwischen importierten Datensätzen prüfen.",
   "permissions_apps_manage_label": "Apps verwalten",
   "permissions_apps_manage_description": "Apps installieren, aktualisieren und deinstallieren und den angefragten Zugriff gewähren.",
+  "permissions_api_apps_create_label": "Persönliche API-Apps erstellen",
+  "permissions_api_apps_create_description": "API-Apps erstellen, die mit einem Token Workspace-Daten für dich lesen, beschränkt auf Berechtigungen, die du selbst hast. Wer Apps verwaltet, kann sie sehen und widerrufen.",
   "permissions_assistant_use_label": "„Luma fragen“ nutzen",
   "permissions_assistant_use_description": "Fragen zu Workspace-Daten stellen. Antworten enthalten nur Daten, die diese Rolle sehen darf.",
   "permissions_activity_read_label": "Aktivität ansehen",

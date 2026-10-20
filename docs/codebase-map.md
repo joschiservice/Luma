@@ -9,7 +9,7 @@ conventions only; it does not list files.
 
 | Area                                                                                            | Owner                                                                                    |
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Sign-in, workspaces, memberships, roles, settings                                               | `@luma/identity`                                                                         |
+| Sign-in, workspaces, memberships, roles, settings, personal API apps                            | `@luma/identity`                                                                         |
 | Reviewed Google Workspace/OIDC federation adapters                                              | `@luma/identity-provider`                                                                |
 | Staff identities, support access, inspection and account actions                                | `@luma/staff`                                                                            |
 | Action policy and approval requirements                                                         | `@luma/policies`                                                                         |

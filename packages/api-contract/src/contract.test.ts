@@ -8,13 +8,48 @@ import {
   subscribeToMetrics,
 } from './client.js';
 import { dataRegionSchema, organizationParamsSchema } from './index.js';
-import { openApiDocument } from './openapi.js';
+import { openApiDocument, publicOpenApiDocument } from './openapi.js';
 
-it('keeps the committed SDK document synchronized with the contract', async () => {
-  const committed = JSON.parse(
-    await readFile(new URL('../openapi.json', import.meta.url), 'utf8'),
+it('keeps the committed SDK documents synchronized with the contract', async () => {
+  for (const [file, document] of [
+    ['../openapi.json', openApiDocument],
+    ['../openapi.public.json', publicOpenApiDocument],
+  ] as const)
+    expect(
+      JSON.parse(await readFile(new URL(file, import.meta.url), 'utf8')),
+    ).toEqual(JSON.parse(JSON.stringify(document)));
+});
+
+it('publishes only token-authenticated reads in the public API document', () => {
+  const document: {
+    paths: Record<
+      string,
+      Record<
+        string,
+        { security?: unknown; responses?: Record<string, unknown> }
+      >
+    >;
+  } = JSON.parse(JSON.stringify(publicOpenApiDocument));
+  const operations = Object.entries(document.paths).flatMap(([path, methods]) =>
+    Object.entries(methods).map(([method, operation]) => ({
+      path,
+      method,
+      operation,
+    })),
   );
-  expect(committed).toEqual(openApiDocument);
+
+  expect(operations.length).toBeGreaterThan(0);
+  for (const { path, method, operation } of operations) {
+    expect(method).toBe('get');
+    expect(path).toMatch(/^\/v1\/organizations\/\{organizationId\}\//);
+    expect(operation.security).toEqual([{ apiToken: [] }]);
+    expect(Object.keys(operation.responses ?? {})).toEqual(
+      expect.arrayContaining(['401', '403', '429']),
+    );
+  }
+  expect(document.paths).not.toHaveProperty(
+    '/v1/organizations/{organizationId}/api-apps',
+  );
 });
 
 it('generates concrete response, parameter and error schemas with unique operation IDs', () => {

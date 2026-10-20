@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { AtomicStore } from '@luma/platform';
 import { Pool } from 'pg';
 
+import { createApiAppsService } from './application/api-apps.js';
 import { createIdentityService } from './application/identity.js';
 import type { MailProvider } from './application/mail.js';
 import type { MorningBriefSource } from './application/morning-brief.js';
@@ -10,6 +11,13 @@ import type { AppPermissionSource } from './application/roles.js';
 import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
 import { eraseDueAccounts } from './infrastructure/account-deletion.js';
+import {
+  createApiAppReads,
+  createApiAppsRepository,
+  createApiCredentials,
+  queueApiAppExpiryNotices,
+} from './infrastructure/api-apps.js';
+import { createApiToken } from './infrastructure/api-tokens.js';
 import type { AuthSettings } from './infrastructure/auth.js';
 import {
   createInvitationToken,
@@ -77,9 +85,22 @@ export function createIdentity(
     passwordMail: !!provider,
   });
   const region = settings.region ?? 'AU';
-  const service = createIdentityService(repository, {
-    region,
-    enabledRegions: settings.enabledRegions ?? [region],
+  const service = createIdentityService(
+    {
+      ...repository,
+      apiCredentials: createApiCredentials(pool, region, {
+        enabled: settings.rateLimit?.enabled ?? true,
+        ...(rateLimitStore ? { store: rateLimitStore } : {}),
+      }),
+    },
+    { region, enabledRegions: settings.enabledRegions ?? [region] },
+  );
+  const apiApps = createApiAppsService({
+    repository: createApiAppsRepository(pool, settings.readOnly),
+    reads: createApiAppReads(pool),
+    issue: () => createApiToken(region),
+    id: randomUUID,
+    now: () => new Date(),
   });
   const invitationToken = createInvitationToken(settings.secret);
   const workspaceSettings = createSettingsService({
@@ -108,6 +129,8 @@ export function createIdentity(
   return {
     service,
     settings: workspaceSettings,
+    /** Personal API apps: tokens that act for one member within the permissions they chose. */
+    apiApps,
     /** Creates the roles service; app permissions come from the workspace app host. */
     roles: (appPermissions: AppPermissionSource = async () => []) =>
       createRolesService({
@@ -141,6 +164,11 @@ export function createIdentity(
      * configured. Safe to run repeatedly and concurrently; an interrupted erasure is repeated.
      */
     eraseDueAccounts: () => eraseDueAccounts(pool, !!provider),
+    /**
+     * Queues a notice for each API app token that expires within a week and hasn't had one.
+     * Safe to run repeatedly and concurrently.
+     */
+    queueApiAppExpiryNotices: () => queueApiAppExpiryNotices(pool),
     trustedOrigins: settings.trustedOrigins,
     regionConfig: {
       region,

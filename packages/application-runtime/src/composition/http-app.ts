@@ -3,7 +3,10 @@ import type { Socket } from 'node:net';
 
 import type { ApiError } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
-import { openApiDocument } from '@luma/api-contract/openapi';
+import {
+  openApiDocument,
+  publicOpenApiDocument,
+} from '@luma/api-contract/openapi';
 import type { AppRegistry, AppService } from '@luma/app-host';
 import type { SyncService } from '@luma/commerce-sync';
 import type {
@@ -12,6 +15,7 @@ import type {
   SourceEnvironments,
 } from '@luma/connections';
 import type {
+  ApiAppsService,
   IdentityService,
   RolesService,
   SettingsService,
@@ -22,7 +26,7 @@ import {
   registerIdentityGuards,
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
-import { describeError, ServiceError } from '@luma/platform';
+import { describeError, RateLimitedError, ServiceError } from '@luma/platform';
 import type { MetricEvents } from '@luma/resolution';
 import {
   registerDeskEvents,
@@ -64,6 +68,7 @@ declare module 'fastify' {
 
 /** Services and settings the runtime composes outside `createApplicationServices`. */
 interface RuntimeDependencies {
+  apiApps?: ApiAppsService;
   appRegistry?: AppRegistry;
   apps?: AppService;
   /** Returns whether the services required to handle requests are available. */
@@ -210,6 +215,9 @@ export function buildApp(
   });
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ServiceError) {
+      if (error instanceof RateLimitedError)
+        reply.header('retry-after', String(error.retryAfterSeconds));
+
       return reply.status(error.statusCode).send({
         code: error.code,
         message:
@@ -340,6 +348,14 @@ export function buildApp(
         }),
       },
     }),
+    {
+      recordPersonalRead: async (context, route, body) => {
+        // Without the API apps service no token resolves, so no API app read reaches here.
+        if (!dependencies.apiApps)
+          throw new Error('API app reads cannot be recorded');
+        await dependencies.apiApps.recordPersonalRead(context, route, body);
+      },
+    },
   );
   const apps = dependencies.apps;
   dependencies.appRegistry?.registerHttp(
@@ -363,6 +379,7 @@ export function buildApp(
   );
   registerMetricEvents(app, dependencies.metricEvents, dependencies.identity);
   app.get('/openapi.json', async () => openApiDocument);
+  app.get('/openapi.public.json', async () => publicOpenApiDocument);
 
   return app;
 }

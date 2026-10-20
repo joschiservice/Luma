@@ -108,7 +108,7 @@ Luma staff delete accounts on request ([staff access](staff.md#account-deletion)
 
 ## Context and isolation
 
-Every Fastify route is protected by default. Only health, readiness, OpenAPI, the static connector-provider catalog and the restricted auth bridge are public. Organization listing and creation need a session. Tenant routes use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`, which handlers pass explicitly into application use cases.
+Every Fastify route is protected by default. Only health, readiness, the OpenAPI documents, the static connector-provider catalog and the restricted auth bridge are public. Organization listing and creation need a session. Tenant routes use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`, which handlers pass explicitly into application use cases.
 
 Every tenant route declares who may call it: contract routes through `access` in their metadata (`requires(...)` or `anyMember` from `@luma/api-contract`), other routes through `config.access`. The guard denies routes without a declaration, and callers without the declared permission receive 403. No database handles or auth instances leave the identity package.
 
@@ -192,6 +192,84 @@ permissions, and `context.supportView` is set; `refreshContext` keeps it.
   the workspace list returns only the viewed workspace. Personal security settings and
   credential setup aren't reachable.
 - A view that ended returns 401; `GET /v1/support-view` then reports why and clears the cookie.
+
+### API apps
+
+A personal API app reads one workspace for the member who created it, through a bearer token
+([ADR-017](architecture/017-api-apps.md)). The context's actor is the member, with the app's
+scopes that the member's role still grants. `context.apiApp` is set, and `actor.sessionId` is
+the credential ID. `refreshContext` rereads the credential and keeps the narrowing.
+
+```mermaid
+flowchart TD
+  request["Request with Authorization: Bearer luma_…"] --> cookie{"Also sends cookies?"}
+  cookie -->|yes| both["401"]
+  cookie -->|no| public{"Tenant route marked publicApi?"}
+  public -->|no| refused["403"]
+  public -->|yes| token{"Format, checksum and cell match?"}
+  token -->|other cell| region["503 REGION_UNAVAILABLE"]
+  token -->|no| invalid["401"]
+  token -->|yes| credential{"Active credential of this workspace?"}
+  credential -->|other workspace| notFound["404"]
+  credential -->|expired, revoked or unknown| invalid
+  credential -->|yes| member{"Member active?"}
+  member -->|no| suspended["403 ACCESS_SUSPENDED"]
+  member -->|yes| limit{"Within token and workspace limits?"}
+  limit -->|no| limited["429 with Retry-After"]
+  limit -->|yes| narrowed["Context narrowed to the app's scopes"]
+  narrowed --> handler["Route handler"]
+  handler --> personal{"Route marked personalData and app holds customers.read?"}
+  personal -->|yes| recorded["Count the read, then respond"]
+  personal -->|no| respond["Respond"]
+```
+
+- **Admission.** The guard only takes `Bearer` tokens that start with `luma_`; other
+  authorization headers, such as a proxy's credentials, are ignored as before. Only tenant
+  routes whose contract declares `publicApi` accept tokens. Account
+  routes, support view routes and API app management refuse them before the token is resolved.
+  Bearer requests skip the Origin check, because browsers never attach bearer tokens by
+  themselves; a request that also sends cookies is refused, so a session never mixes with a
+  token.
+- **Scopes.** API apps can be granted the read permissions of public routes, and a person
+  grants only scopes they hold. Losing a permission removes it from the app on the next
+  request, and regaining it restores it. App permissions are never included.
+- **Management.** Members with `api_apps.create` create and rotate their own apps. People with
+  `apps.manage` see every app and can revoke any of them, but only the person an app acts for
+  can rotate it; nobody can mint a token that acts for someone else. Commands use
+  `workspace_commands` receipts. A repeated command returns the app with `token: null`, because
+  the token is never stored. Creating, rotating and revoking are access events.
+- **Storage.** Identity manages `api_apps` and `api_app_credentials` under tenant RLS and can't
+  read token hashes. Tokens resolve through `api_credential_resolve` and `api_credential_find`,
+  owned by `luma_api_credentials`. Use is recorded at most once a minute.
+- **Lifecycle.**
+  - Apps reference their membership: removing the member or erasing the account deletes them,
+    so a later invitation never revives a token.
+  - A suspended membership blocks its tokens until reactivation.
+  - An account disablement revokes the account's apps in every workspace, and enabling the
+    account doesn't restore them.
+  - Each member keeps at most 25 apps that aren't revoked.
+- **Limits.** Each token is limited to 600 requests a minute and each workspace to 1,800 across
+  its tokens. The counters share the store and the `AUTH_RATE_LIMIT` switch of the
+  [sign-in limits](#sign-in-protection). Admitted responses carry `RateLimit-Limit`,
+  `RateLimit-Remaining` and `RateLimit-Reset` for whichever limit has fewer requests left;
+  refused requests still count.
+- **Personal data reads.** Orders, customers and returns include customer details only for
+  callers holding `customers.read`; their routes declare `personalData`, and a test keeps every
+  public `customers.read` route marked. A successful read of such a route by an app holding
+  `customers.read` adds to an hourly row in `api_app_personal_reads` (requests, and records
+  counted from `items`), and the first read of a route in an hour adds an
+  `api_app.personal_data_read` access event. Recording runs before the response is sent, in a
+  short transaction outside the workspace lock; if it fails, the request fails and no data
+  leaves. Counts are kept with the organization even after the app is gone, and the app list
+  sums the last 30 days.
+- **Notices.** The member an app acts for is emailed through `workspace_mail` a week before a
+  token expires, unless they issued it for at most a week, and when someone else revokes the
+  app. `api_apps_queue_expiry_notices` queues expiry notices hourly, once per credential;
+  delivery rechecks that the member is active and the token is still current and unrevoked, and
+  cancels the notice otherwise.
+- **Writes.** No public route changes data yet. Before one does, action admission must treat an
+  app as its own requester, and durable work started by an app must not continue with the
+  member's full permissions.
 
 ## Browser sessions
 

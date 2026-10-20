@@ -253,6 +253,7 @@ function fixture() {
     resolveWorkflowContext: vi.fn(),
     refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(),
+    resolveApiApp: vi.fn(),
     listSecurityEvents: vi.fn(),
     supportInspections: vi.fn(),
     decideSupportInspection: vi.fn(),

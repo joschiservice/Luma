@@ -36,6 +36,7 @@
     "---Verwaltung---",
     "workspace-settings",
     "roles-and-permissions",
-    "account-security"
+    "account-security",
+    "api-apps"
   ]
 }

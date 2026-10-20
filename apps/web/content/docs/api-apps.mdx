@@ -1,0 +1,49 @@
+---
+title: Read your data with API apps
+description: Create a personal API app, send its token with your requests, and replace or revoke it when you no longer need it.
+---
+
+Your workspace data belongs to you. An API app lets your scripts, spreadsheets and other tools read it without signing in to Luma. The app acts for you with a token, and it can only read what you choose and what your role allows.
+
+## Create an API app
+
+1. Open **Settings → API apps** and select **Create API app**.
+2. Enter a name that says what uses the token, such as _Weekly sales report_.
+3. Under **What the app can read**, select only what the tool needs. You can choose orders, fulfillment, stock, products, customers, returns, issues, workflows and activity. Permissions your role doesn't include are unavailable. **Personal data** marks customer details.
+4. Choose how long the token stays valid, from 7 days to a year, and select **Create API app**.
+5. Copy the token and store it somewhere safe, such as a password manager. Luma shows it only once.
+
+If your role doesn't allow creating API apps, ask a workspace admin. Each person can have up to 25 API apps in a workspace.
+
+## Use the token
+
+Send requests to the API address shown under **Your workspace API**, with the header `Authorization: Bearer <token>`. For example, to read orders:
+
+```bash
+curl -H "Authorization: Bearer $LUMA_TOKEN" \
+  https://<your Luma address>/api/v1/organizations/<workspace ID>/orders
+```
+
+The workspace ID is in the address of every page in the workspace, after `/app/`. **API reference** describes every request a token can make, with its parameters and responses.
+
+- A token works only in the workspace where you created it, and it can only read.
+- If your role loses a permission, the app loses it too. Requests it can no longer make return `403`.
+- A token sends at most 600 requests a minute, and all API apps of a workspace together 1,800. Each response says how many requests are left in `RateLimit-Remaining` and in how many seconds the count resets in `RateLimit-Reset`. Requests above the limit return `429`; wait the number of seconds in the `Retry-After` header before you try again.
+- Don't send your browser cookies with a token. Requests that send both are refused.
+
+## Replace or revoke a token
+
+**Settings → API apps** lists your apps with what they can read, the last four characters of the token, when it expires and when it was last used. Luma emails you a week before a token expires.
+
+- **Replace token** gives you a new token. The current one stops working immediately, so update the tools that use it. Replace a token before it expires, and whenever you think someone else might have it.
+- **Revoke** stops the app for good. You can't undo it; create a new app if you need access again.
+
+People who manage apps see every API app in the workspace and can revoke any of them, but they can't see or replace your token. If someone else revokes your app, Luma emails you. Creating, replacing and revoking API apps are recorded in [Activity](/docs/activity) for people who can view restricted activity.
+
+## Customer data
+
+Orders, customers and returns include customer names, addresses and contact details only when the app can read customers. When it can, Luma counts the requests that read this data and the records they returned, never the records themselves. **Settings → API apps** shows each app's count for the last 30 days, and [Activity](/docs/activity) records when an app first reads customer data through an address in each hour.
+
+## When a token stops working
+
+A token stops working when it expires or is revoked, when you leave the workspace, or when your account is disabled. While your access to the workspace is suspended, your tokens are refused too. They work again once your access is restored, unless they expired in the meantime.

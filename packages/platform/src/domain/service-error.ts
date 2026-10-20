@@ -1,5 +1,5 @@
 /** HTTP status a service error is reported with. */
-export type ServiceErrorStatus = 401 | 403 | 404 | 409 | 422 | 503;
+export type ServiceErrorStatus = 401 | 403 | 404 | 409 | 422 | 429 | 503;
 
 /** Stable error code clients receive in the error body. */
 export type ServiceErrorCode =
@@ -12,6 +12,7 @@ export type ServiceErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'REGION_UNAVAILABLE'
+  | 'TOO_MANY_REQUESTS'
   | 'SERVICE_UNAVAILABLE'
   | 'NOT_READY';
 
@@ -27,6 +28,19 @@ export class ServiceError extends Error {
     message: string,
   ) {
     super(message);
+  }
+}
+
+/**
+ * A 429 `TOO_MANY_REQUESTS` error for a caller that sent too many requests. The HTTP error handler
+ * sends `Retry-After` with the whole seconds to wait.
+ */
+export class RateLimitedError extends ServiceError {
+  constructor(
+    message: string,
+    readonly retryAfterSeconds: number,
+  ) {
+    super(429, 'TOO_MANY_REQUESTS', message);
   }
 }
 

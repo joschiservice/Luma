@@ -1,8 +1,12 @@
 import { writeFile } from 'node:fs/promises';
 
-import { openApiDocument } from './openapi.js';
+import { openApiDocument, publicOpenApiDocument } from './openapi.js';
 
-await writeFile(
-  new URL('../openapi.json', import.meta.url),
-  `${JSON.stringify(openApiDocument, null, 2)}\n`,
-);
+for (const [file, document] of [
+  ['../openapi.json', openApiDocument],
+  ['../openapi.public.json', publicOpenApiDocument],
+] as const)
+  await writeFile(
+    new URL(file, import.meta.url),
+    `${JSON.stringify(document, null, 2)}\n`,
+  );

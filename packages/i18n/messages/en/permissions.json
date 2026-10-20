@@ -83,6 +83,8 @@
   "permissions_sync_manage_description": "Start, pause, and fix imports, and review links between imported records.",
   "permissions_apps_manage_label": "Manage apps",
   "permissions_apps_manage_description": "Install, update, and uninstall apps, and grant the access they request.",
+  "permissions_api_apps_create_label": "Create personal API apps",
+  "permissions_api_apps_create_description": "Create API apps that read workspace data for you with a token, limited to permissions you hold. People who manage apps can see and revoke them.",
   "permissions_assistant_use_label": "Use Ask Luma",
   "permissions_assistant_use_description": "Ask questions about workspace data. Answers only include data this role can see.",
   "permissions_activity_read_label": "View activity",

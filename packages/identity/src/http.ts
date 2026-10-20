@@ -40,6 +40,8 @@ export function registerIdentityHttp(
     );
 }
 
+export { apiAppsRoutes } from './api/api-apps.js';
+
 export { rolesRoutes } from './api/roles.js';
 
 export { settingsRoutes } from './api/settings.js';
