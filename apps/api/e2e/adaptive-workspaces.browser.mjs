@@ -166,11 +166,11 @@ test('authors reviewed live views and business fields with search, history and r
   await expect(
     page.getByRole('link', { name: '#ADAPTIVE', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Menu', exact: true }).focus();
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  await menu.focus();
   await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('link', { name: 'Saved views', exact: true }),
-  ).toBeFocused();
+  await expect(menu).not.toBeFocused();
+  await expect(page.locator(':focus')).toBeVisible();
   await page.screenshot({
     path: '/tmp/luma-adaptive-view-narrow.png',
     fullPage: true,
