@@ -9,6 +9,15 @@ const statuses = {
   'email.complained': 'complained',
 } as const;
 
+type MailEvent = ReturnType<Resend['webhooks']['verify']>;
+
+/** Outbound delivery events; inbox events also carry email IDs but are not receipts. */
+function isDeliveryEvent(
+  event: MailEvent,
+): event is Extract<MailEvent, { type: keyof typeof statuses }> {
+  return Object.hasOwn(statuses, event.type);
+}
+
 /** The signature headers Resend sends with each webhook request. */
 export interface MailEventSignature {
   id: string;
@@ -31,7 +40,7 @@ export function createMailEvents(
 
   return {
     async receive(payload: string, headers: MailEventSignature) {
-      let event: ReturnType<typeof webhooks.verify>;
+      let event: MailEvent;
       try {
         event = webhooks.verify({
           payload,
@@ -45,8 +54,8 @@ export function createMailEvents(
           'Invalid webhook signature',
         );
       }
-      if (!(event.type in statuses) || !('email_id' in event.data)) return;
-      const status = statuses[event.type as keyof typeof statuses];
+      if (!isDeliveryEvent(event)) return;
+      const status = statuses[event.type];
       const receipt = await pool.query(
         'UPDATE mail_receipts SET status=$2,updated_at=now() WHERE provider_id=$1',
         [event.data.email_id, status],

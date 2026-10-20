@@ -31,9 +31,9 @@
     "@luma/identity-provider": "workspace:*",
     "@orpc/server": "catalog:",
     "better-auth": "catalog:",
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "0.45.4",
     "fastify": "catalog:",
-    "pg": "catalog:pg-8-20-0",
+    "pg": "catalog:",
     "zod": "catalog:",
     "@luma/platform": "workspace:*"
   },

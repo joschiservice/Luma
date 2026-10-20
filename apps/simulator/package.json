@@ -23,7 +23,7 @@
     "@luma/simulator-jtl": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",
     "fastify": "catalog:",
-    "pg": "catalog:pg-8-20-0",
+    "pg": "catalog:",
     "zod": "catalog:",
     "@luma/simulator-starshipit": "workspace:*"
   }
