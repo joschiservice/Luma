@@ -1661,6 +1661,53 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       checks.rows.every((row) => row.document.value.items.length === 0),
     ).toBe(true);
     await expectLedgerCounts();
+
+    // shop/redact keeps an active installation's customers and tells its workspace why.
+    const redactShop = (request: string) =>
+      runtime.query(
+        'SELECT erase_shopify_customer_data($1,$2,$3,NULL,NULL,$4)',
+        ['test:app', 'fixture.myshopify.com', null, request],
+      );
+    const recorded = async (request: string) =>
+      (
+        await owner.query<{ type: string; details: Record<string, string> }>(
+          "SELECT document->>'eventType' AS type,document->'details' AS details FROM audit_entries WHERE tenant_id=$1 AND document->>'correlationId'=$2",
+          [tenant, request],
+        )
+      ).rows;
+    await redactShop('early');
+    await redactShop('early');
+    const profileIds = async () =>
+      (
+        await owner.query<{ external_id: string }>(
+          'SELECT external_id FROM customer_profiles WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows;
+    expect(await profileIds()).toEqual([
+      { external_id: 'gid://shopify/Customer/2' },
+    ]);
+    expect(await recorded('early')).toEqual([
+      {
+        type: 'customers.erasure_skipped',
+        details: {
+          source: 'shopify',
+          scope: 'shop',
+          reason: 'installation_active',
+        },
+      },
+    ]);
+
+    // After uninstall, the same request erases them.
+    await owner.query(
+      `UPDATE connector_installations SET secret=NULL,document=jsonb_set(document,'{status}','"revoked"') WHERE tenant_id=$1 AND id=$2`,
+      [tenant, shop],
+    );
+    await redactShop('after-uninstall');
+    expect(await profileIds()).toEqual([]);
+    expect(await recorded('after-uninstall')).toMatchObject([
+      { type: 'customers.erased', details: { scope: 'shop', profiles: '1' } },
+    ]);
   });
 
   it('lists a customer’s orders from every source once and erases the order links with the profile', async () => {
@@ -1978,7 +2025,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     await redactShop();
     expect(await stored()).toEqual(['gid://shopify/Order/3']);
 
-    // After uninstall, shop redaction erases every address of the shop.
+    // After uninstall, shop redaction erases every address of the shop's connection.
     await owner.query(
       `UPDATE connector_installations SET secret=NULL,document=jsonb_set(document,'{status}','"disconnected"') WHERE tenant_id=$1 AND id=$2`,
       [tenant, shop],

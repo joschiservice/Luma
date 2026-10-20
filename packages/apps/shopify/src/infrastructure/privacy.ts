@@ -18,23 +18,30 @@ const customer = z
   })
   .refine((value) => value.id || value.email || value.phone);
 const base = z.object({ shop_id: identifier, shop_domain: shopHostname });
-// The topic header is unsigned, so each body must match exactly one topic: strict shapes stop a
-// signed customer request from being replayed as a shop-wide redaction.
+const absent = z.never().optional();
+// The topic header is unsigned, so each body must match exactly one topic: a body carrying
+// another topic's keys is rejected, which stops a signed customer request from being replayed
+// as a shop-wide redaction. Other unknown keys are tolerated, so fields Shopify adds later do not
+// fail these mandatory deliveries.
 const payloads = {
-  'customers/data_request': base
-    .extend({
-      customer,
-      orders_requested: z.array(identifier),
-      data_request: z.object({ id: identifier }),
-    })
-    .strict(),
-  'customers/redact': base
-    .extend({
-      customer,
-      orders_to_redact: z.array(identifier),
-    })
-    .strict(),
-  'shop/redact': base.strict(),
+  'customers/data_request': base.extend({
+    customer,
+    orders_requested: z.array(identifier),
+    data_request: z.object({ id: identifier }),
+    orders_to_redact: absent,
+  }),
+  'customers/redact': base.extend({
+    customer,
+    orders_to_redact: z.array(identifier),
+    orders_requested: absent,
+    data_request: absent,
+  }),
+  'shop/redact': base.extend({
+    customer: absent,
+    orders_requested: absent,
+    orders_to_redact: absent,
+    data_request: absent,
+  }),
 };
 
 /**

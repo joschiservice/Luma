@@ -168,6 +168,18 @@ it('names erasures by what happened, with their counts and no customer details',
   ]);
 });
 
+it('says when a Shopify shop deletion request was not applied', () => {
+  const skipped = event({
+    type: 'privacy',
+    action: 'customers.erasure_skipped',
+    summary: null,
+  });
+  expect(activityTitle(skipped)).toBe(
+    'Shop deletion request not applied: the store is still connected',
+  );
+  expect(activitySubject(skipped)).toEqual([]);
+});
+
 it('says what an event concerns without storage IDs', () => {
   expect(
     activitySubject(

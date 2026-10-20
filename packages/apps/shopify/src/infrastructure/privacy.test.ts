@@ -158,24 +158,40 @@ it('queues the shop for data removal only on shop/redact', async () => {
   await f.send('shop/redact', base);
   expect(queued()).toEqual([['development:client', shop]]);
 });
-it('rejects a signed customers/data_request body relabelled as shop/redact', async () => {
+it('rejects a signed body relabelled with another privacy topic', async () => {
   const f = fixture();
-  const body = Buffer.from(
-    JSON.stringify({
+  const customer = { id: 456, email: 'customer@example.test' };
+  const bodies = {
+    'customers/data_request': {
       ...base,
-      customer: { id: 456, email: 'customer@example.test' },
+      customer,
       orders_requested: [1],
       data_request: { id: 12 },
-    }),
-  );
-  const signature = createHmac('sha256', config.clientSecret)
-    .update(body)
-    .digest('base64');
-  await expect(
-    f.intake(body, signature, shop, 'shop/redact'),
-  ).rejects.toMatchObject({ statusCode: 422 });
-  await expect(
-    f.intake(body, signature, shop, 'customers/redact'),
-  ).rejects.toMatchObject({ statusCode: 422 });
+    },
+    'customers/redact': { ...base, customer, orders_to_redact: [1] },
+    // A shop/redact body cannot pass as a customer request: it names no customer.
+    'shop/redact': base,
+  };
+  for (const [signed, payload] of Object.entries(bodies)) {
+    const body = Buffer.from(JSON.stringify(payload));
+    const signature = createHmac('sha256', config.clientSecret)
+      .update(body)
+      .digest('base64');
+    for (const topic of Object.keys(bodies).filter((t) => t !== signed))
+      await expect(
+        f.intake(body, signature, shop, topic),
+      ).rejects.toMatchObject({ statusCode: 422 });
+  }
   expect(f.transaction).not.toHaveBeenCalled();
+});
+it('accepts top-level fields Shopify adds to a topic later', async () => {
+  const f = fixture();
+  await f.send('shop/redact', { ...base, added_later: true });
+  await f.send('customers/redact', {
+    ...base,
+    customer: { id: 456 },
+    orders_to_redact: [],
+    added_later: true,
+  });
+  expect(f.transaction).toHaveBeenCalledTimes(2);
 });
