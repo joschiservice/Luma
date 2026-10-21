@@ -47,6 +47,35 @@ describe('shared Shopify admission failure boundaries', () => {
     });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it('admits a request with the cost calculated from its document until Shopify reports one', async () => {
+    const run = vi.fn<
+      (
+        script: string,
+        key: string,
+        args: readonly string[],
+      ) => Promise<number[]>
+    >(async () => [1, 10, Date.now() + 1000]);
+    const fetch = vi.fn(async () =>
+      Response.json({ data: { fulfillmentOrderReleaseHold: null } }),
+    );
+    const budget = createSharedReadBudget({ store: { run }, key: 'scoped' });
+    const client = createClient({
+      shop: 'example.myshopify.com',
+      accessToken: async () => 'token',
+      fetch,
+      budget,
+    });
+    await client(
+      'mutation Release($id: ID!) { fulfillmentOrderReleaseHold(id: $id) { userErrors { message } } }',
+      { id: 'gid://shopify/FulfillmentOrder/1' },
+    );
+    await budget.run('uncosted', async () => true);
+    const acquired = run.mock.calls
+      .map(([, , args]) => args)
+      .filter((args) => args[0] === 'acquire');
+    expect(acquired.map((args) => args[7])).toEqual(['10', '']);
+  });
+
   it('returns unused capacity when final authority checks reject dispatch', async () => {
     const run = vi.fn<
       (

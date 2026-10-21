@@ -19,6 +19,9 @@ describe('Shopify read admission', () => {
     budget.observe('orders', 727, 900, 100);
     await budget.run('orders', async () => undefined);
     expect(waits).toEqual([6270]);
+    // A calculated cost stands in for a shape Shopify has not reported yet.
+    await budget.run('calculated', async () => undefined, { cost: 900 });
+    expect(waits).toEqual([6270]);
     await budget.run('unknown', async () => undefined);
     expect(waits).toEqual([6270, 1000]);
   });

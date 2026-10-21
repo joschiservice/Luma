@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fail } from '@luma/connector-core/transport';
 import { z } from 'zod';
 
+import { maxQueryCost } from './query-cost.js';
 import type {
   BudgetFeedback,
   ReadBudget,
@@ -60,6 +61,11 @@ export function createSharedReadBudget(options: {
       const id = randomUUID();
       const digest = createHash('sha256').update(shape).digest('hex');
       const purpose = admission?.purpose ?? options.purpose ?? 'foreground';
+      const cost = admission?.cost;
+      const calculated =
+        cost !== undefined && Number.isFinite(cost)
+          ? String(Math.min(maxQueryCost, Math.max(1, Math.ceil(cost))))
+          : '';
       const deadline =
         performance.now() +
         (progressed
@@ -75,6 +81,7 @@ export function createSharedReadBudget(options: {
           String(options.leaseMs ?? 125000),
           String(options.concurrency ?? 4),
           admission?.mutation ? '1' : '0',
+          calculated,
         ]);
         advisedDelay = admitted ? 0 : wait;
         if (admitted) break;

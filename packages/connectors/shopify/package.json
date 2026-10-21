@@ -25,6 +25,7 @@
   "dependencies": {
     "zod": "catalog:",
     "@luma/connector-core": "workspace:*",
-    "@shopify/admin-api-client": "2.0.1"
+    "@shopify/admin-api-client": "2.0.1",
+    "graphql": "catalog:"
   }
 }
