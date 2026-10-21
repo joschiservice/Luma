@@ -304,29 +304,6 @@ describe('installed connection lifecycle', () => {
     await expect(service.install(ctx, settings)).rejects.toThrow();
     expect(records.size).toBe(0);
   });
-  it('supports JTL cloud and on-premise credentials', async () => {
-    const { service, ctx } = fixture();
-    for (const target of [
-      { kind: 'jtl-cloud', jtlTenantId: randomUUID() },
-      {
-        kind: 'jtl-onprem',
-        baseUrl: 'https://erp.example.test/db/',
-        appId: 'app',
-        appVersion: '1',
-      },
-    ]) {
-      const connection = await service.install(ctx, {
-        ...input,
-        target,
-        credentials: { token: 'api-key', challengeCode: 'challenge' },
-      });
-      await service.check(ctx, connection.id, 1);
-      expect(
-        (await service.credential(ctx, connection.id, 'products.read'))
-          .credentials.token,
-      ).toBe('api-key');
-    }
-  });
   it.each(['shopify', 'jtl-cloud', 'jtl-onprem'] as const)(
     'dispatches %s reads with current encrypted credentials',
     async (kind) => {

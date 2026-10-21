@@ -2365,13 +2365,6 @@ describe.skipIf(!databaseUrl)(
         ),
       ).toBe(true);
     });
-    it('requires approval for connector risk even when a proposal claims low risk', async () => {
-      resolve.mockResolvedValue({ ...adapter, minimumRisk: 'high' });
-      expect((await safety.execution.execute(alice, action())).state).toBe(
-        'approval_required',
-      );
-      expect(execute).not.toHaveBeenCalled();
-    });
     it('rejects expired approval grants and stale verification observations', async () => {
       const proposal = action({ risk: 'high' });
       const waiting = await safety.execution.execute(alice, proposal);

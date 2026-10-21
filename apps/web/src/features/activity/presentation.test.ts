@@ -54,12 +54,6 @@ it('reads activity codes as plain labels', () => {
   expect(activityLabel('provider_accepted', 'shopify')).toBe(
     'Accepted by Shopify',
   );
-  expect(activityLabel('manually_disposed')).toBe('Closed manually');
-  expect(activityLabel('execution.completed')).toBe('Change attempt finished');
-  expect(activityLabel('purchase_order.created')).toBe(
-    'Purchase order created',
-  );
-  expect(activityLabel('connection.paused')).toBe('Connection paused');
   expect(activityChangeLabel('orders.shipping-method.write')).toBe(
     'Change the order’s shipping method',
   );

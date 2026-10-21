@@ -756,9 +756,10 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
       ]),
     );
     await messaging.service.syncMailbox(adminContext(), connectionId);
-    // A queued read may not yet be due on PostgreSQL's clock, even after the caller requested sync.
+    // The requested read is stamped with the API clock, which may run ahead of PostgreSQL's;
+    // make it due on the database clock instead of waiting for the clocks to agree.
     await owner.query(
-      "UPDATE messaging_mailboxes SET hint_at=clock_timestamp()+interval '250 milliseconds' WHERE tenant_id=$1 AND connection_id=$2",
+      'UPDATE messaging_mailboxes SET hint_at=clock_timestamp() WHERE tenant_id=$1 AND connection_id=$2',
       [tenant, connectionId],
     );
     await vi.waitFor(

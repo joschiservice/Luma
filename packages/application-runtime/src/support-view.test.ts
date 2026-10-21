@@ -151,8 +151,9 @@ it('restricts handlers of allowed reads to read-only database transactions', asy
     '/v1/organizations/:organizationId/test-query',
     { config: { access: { access: 'member' }, readOnly: true } },
     async () => {
-      // Body parsing runs between the request hook and the handler; the scope must survive it.
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      // Body parsing runs between the request hook and the handler; the scope must survive it
+      // and later event-loop turns.
+      await new Promise((resolve) => setImmediate(resolve));
       seen.post = requestIsReadOnly();
 
       return {};

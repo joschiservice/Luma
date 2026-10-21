@@ -56,7 +56,7 @@ export async function connectionKey(path = connectionKeyPath) {
   return key;
 }
 
-export const project = `luma-${createHash('sha256').update(root).digest('hex').slice(0, 12)}`;
+const project = `luma-${createHash('sha256').update(root).digest('hex').slice(0, 12)}`;
 
 /**
  * Finds the Code Step runtime for local processes: an explicit `LUMA_CODE_RUNTIME_DIR` from
@@ -82,7 +82,7 @@ export async function codeRuntimeDirectory(
  * Returns a currently available loopback port; the port is released before returning and is
  * not reserved.
  */
-export async function freePort() {
+async function freePort() {
   const server = createServer();
   await new Promise((resolve, reject) => {
     server.once('error', reject);

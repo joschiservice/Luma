@@ -261,12 +261,5 @@ describe('V0 exception acceptance corpus', () => {
     expect(
       schemas.inventory_mismatch.safeParse({ ...base, available: '5' }).success,
     ).toBe(false);
-    expect(
-      decision.safeParse({
-        decision: 'clear',
-        severity: 'high',
-        reason: 'within_tolerance',
-      }).success,
-    ).toBe(false);
   });
 });

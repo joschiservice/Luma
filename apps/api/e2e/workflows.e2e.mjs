@@ -298,7 +298,11 @@ it('publishes native workflows without cases, retains immutable versions and exp
         method: 'POST',
         body: {},
       });
-      await new Promise((resolve) => setTimeout(resolve, 2100));
+      // Both starts come due now instead of when the schedule says.
+      await db.owner.query(
+        "UPDATE workflow_trigger_runs SET due_at=now()-interval '1 second' WHERE tenant_id=$1 AND id=ANY($2::uuid[])",
+        [tenantId, [result.body.id, cancelled.body.id]],
+      );
       const restartingWorker = await pool.connect();
       try {
         await restartingWorker.query('BEGIN');

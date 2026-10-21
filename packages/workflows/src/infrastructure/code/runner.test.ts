@@ -1,3 +1,5 @@
+import type { ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -6,6 +8,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodeRequestStopped } from '../../domain/code-step.js';
 import { createWasmtimeRunner } from './runner.js';
 import { defineCodeStep } from './schema.js';
+
+// Exposes each spawned Wasmtime process so cancellation tests can wait on its lifecycle events.
+const spawned = vi.hoisted(() => [] as ChildProcess[]);
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+
+  return {
+    ...actual,
+    spawn: (...args: Parameters<typeof actual.spawn>) => {
+      const child = actual.spawn(...args);
+      spawned.push(child);
+
+      return child;
+    },
+  };
+});
 
 const directory =
   process.env.LUMA_CODE_RUNTIME_DIR ??
@@ -100,8 +118,11 @@ describe.skipIf(!existsSync(`${directory}/wasmtime`))(
           return result;
         });
       await started;
+      const child = spawned.at(-1)!;
+      const closed = once(child, 'close');
       controller.abort();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await closed;
+      await new Promise((resolve) => setImmediate(resolve));
       expect(settled).toBe(false);
       release();
       expect((await task).telemetry.outcome).toBe('cancelled');
@@ -194,12 +215,17 @@ describe.skipIf(!existsSync(`${directory}/wasmtime`))(
       const source = step('function main() { while(true) {} }');
       source.limits.fuel = 1000000000;
       const pinned = defineCodeStep(source);
+      const count = spawned.length;
       const task = runner.run(
         pinned,
         {},
         { ...controls, signal: controller.signal },
       );
-      setTimeout(() => controller.abort(), 100);
+      // Abort only after the Wasmtime process exists, so the kill path is exercised.
+      await vi.waitFor(() => expect(spawned[count]?.pid).toBeDefined(), {
+        interval: 1,
+      });
+      controller.abort();
       expect((await task).telemetry.outcome).toBe('cancelled');
     });
     it('filters user error text and rejects undeclared output fields', async () => {

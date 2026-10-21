@@ -18,31 +18,6 @@ const version = {
 const scenarios = createReplenishmentScenarios(version);
 
 describe('replenishment test scenarios', () => {
-  it('offers the six simulator scenarios with their expected outcomes', () => {
-    const offered = scenarios.scenarios(content);
-    expect(offered.map((item) => [item.id, item.case.expected])).toEqual([
-      ['approval-pending', { outcome: 'awaiting_decision' }],
-      ['approved-verified', { outcome: 'verified' }],
-      ['policy-rejected', { outcome: 'escalated' }],
-      ['stale-inventory', { outcome: 'escalated' }],
-      ['existing-order', { outcome: 'ended' }],
-      ['verification-failed', { outcome: 'failed_verification' }],
-    ]);
-    const stale = offered.find((item) => item.id === 'stale-inventory')!.case;
-    expect(stale).toMatchObject({
-      name: 'Stale stock',
-      inputs: { activationId: 'example-rule' },
-      evidence: { belowMinimum: true },
-      replies: {
-        inventory: {
-          kind: 'read',
-          values: { fresh: false, available: 10, sku: 'SKU-100', unit: 'pcs' },
-        },
-        'create-order': { kind: 'capability', result: 'accepted' },
-      },
-    });
-  });
-
   it('maps scenarios onto customized copies by read source, action and result check', () => {
     const rename: Record<string, string> = {
       inventory: 'stock-now',

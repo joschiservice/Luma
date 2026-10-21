@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { appScopes } from './app-scopes.mjs';
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { addMembership, availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -297,6 +297,7 @@ test('opens an imported customer from an order, lists their imported orders and 
   await page.getByRole('button', { name: /^Has account/ }).waitFor();
   await page.getByRole('button', { name: /^No account/ }).waitFor();
   await page.getByText('Modified', { exact: true }).waitFor();
+  const remembered = rememberedView(page, 'customers');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Spenders by account');
@@ -319,7 +320,7 @@ test('opens an imported customer from an order, lists their imported orders and 
 
   // Opening Customers without a view returns to the remembered one, and a customer's
   // breadcrumb returns to it too.
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/customers`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page

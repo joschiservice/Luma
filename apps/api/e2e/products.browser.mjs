@@ -1,7 +1,7 @@
 /* global document */
 import { createObservability } from '@luma/platform/composition';
 
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { productsFixture } from './products-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -164,6 +164,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page.getByRole('option', { name: 'Status', exact: true }).click();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /^Active/ }).waitFor();
+  const remembered = rememberedView(page, 'products');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Vendor listings');
@@ -179,7 +180,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
     path: '/tmp/luma319-products-view.png',
     fullPage: true,
   });
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/products`);
   await page.waitForURL((link) => link.searchParams.get('view') === viewId);
   await page.getByRole('button', { name: /^Edit filter: Vendor/ }).waitFor();

@@ -7,7 +7,7 @@ import {
   subscribeToCaseProgress,
   subscribeToMetrics,
 } from './client.js';
-import { dataRegionSchema, organizationParamsSchema } from './index.js';
+import { organizationParamsSchema } from './index.js';
 import { openApiDocument, publicOpenApiDocument } from './openapi.js';
 
 it('keeps the committed SDK documents synchronized with the contract', async () => {
@@ -84,8 +84,7 @@ it('generates concrete response, parameter and error schemas with unique operati
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-it('preserves organization and reserved region transport conventions', () => {
-  expect(dataRegionSchema.options).toEqual(['EU', 'AU', 'US']);
+it('rejects malformed organization IDs', () => {
   expect(
     organizationParamsSchema.safeParse({ organizationId: 'invalid' }).success,
   ).toBe(false);

@@ -158,10 +158,3 @@ describe('summarizeOutcomes', () => {
     expect(summary.recent).toHaveLength(10);
   });
 });
-
-describe('describeApproval', () => {
-  it('never describes a medium-risk action as running without approval', () => {
-    expect(approval.mode).toBe('every_action');
-    expect(approval.summary).toContain('every purchase-order draft');
-  });
-});

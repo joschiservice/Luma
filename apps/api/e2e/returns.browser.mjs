@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { createObservability } from '@luma/platform/composition';
 
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -255,6 +255,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.getByRole('region', { name: /^Refund processing/ }).waitFor();
   // The store owns the stage, so cards never move between columns.
   expect(await page.getByRole('button', { name: 'Move to…' }).count()).toBe(0);
+  const remembered = rememberedView(page, 'returns');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Defective by stage');
@@ -271,7 +272,7 @@ test('opens a return from its order, tells pending work from money returned and 
   );
   const viewId = new URL(page.url()).searchParams.get('view');
   await screenshot('board');
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/returns`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page.getByRole('region', { name: /^Refund processing/ }).waitFor();

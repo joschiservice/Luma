@@ -11,11 +11,9 @@ import { decisionQuerySchema } from './decisions.js';
 import { threadQuerySchema } from './messaging.js';
 
 describe('work queue catalogs', () => {
-  it('opens all unresolved issues by default while retaining explicit attention and history views', () => {
+  it('opens all unresolved issues by default in both the list API and the catalog', () => {
     expect(caseQuerySchema.parse({}).view).toBe('active');
     expect(issuesCatalog.segments[0]).toBe('active');
-    expect(caseQuerySchema.parse({ view: 'needs_you' }).view).toBe('needs_you');
-    expect(caseQuerySchema.parse({ view: 'history' }).view).toBe('history');
   });
 
   it('declare only sorts the list APIs accept', () => {

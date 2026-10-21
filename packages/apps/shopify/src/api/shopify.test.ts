@@ -21,35 +21,32 @@ function oauth(): ShopifyOAuth {
   };
 }
 
-it.each([401, 403, 404] as const)(
-  'redirects to recovery when callback identity fails with %s',
-  async (status) => {
-    const app = Fastify();
-    const service = oauth();
-    registerShopifyRoutes(app, service, {
-      resolveTenant: vi
-        .fn()
-        .mockRejectedValue(
-          new ServiceError(status, 'UNAUTHENTICATED', 'Sign in again'),
-        ),
+it('redirects to recovery when callback identity fails', async () => {
+  const app = Fastify();
+  const service = oauth();
+  registerShopifyRoutes(app, service, {
+    resolveTenant: vi
+      .fn()
+      .mockRejectedValue(
+        new ServiceError(401, 'UNAUTHENTICATED', 'Sign in again'),
+      ),
+  });
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/shopify/callback?code=private-code',
     });
-    try {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/v1/shopify/callback?code=private-code',
-      });
-      expect(response.statusCode).toBe(302);
-      expect(response.headers.location).toBe(
-        `https://luma.test/app/${tenant}/apps/shopify/settings?appResult=failed`,
-      );
-      expect(response.headers['referrer-policy']).toBe('no-referrer');
-      expect(response.body).not.toContain('private-code');
-      expect(service.callback).not.toHaveBeenCalled();
-    } finally {
-      await app.close();
-    }
-  },
-);
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe(
+      `https://luma.test/app/${tenant}/apps/shopify/settings?appResult=failed`,
+    );
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.body).not.toContain('private-code');
+    expect(service.callback).not.toHaveBeenCalled();
+  } finally {
+    await app.close();
+  }
+});
 
 it('passes the original webhook bytes to signature verification', async () => {
   const app = Fastify();

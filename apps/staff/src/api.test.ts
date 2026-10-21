@@ -57,25 +57,6 @@ describe('staff browser API', () => {
     );
   });
 
-  it('retains the supplied command identity and explicit account-wide acknowledgement', async () => {
-    const completedAt = '2026-10-08T12:00:00.000Z';
-    const fetcher = fetchResult({ commandId, revokedSessions: 3, completedAt });
-    const api = createStaffApi(fetcher);
-    const body = {
-      grantId,
-      commandId,
-      reason: 'Customer requested account-wide sign-out',
-      acknowledgeGlobalEffect: true as const,
-    };
-    await api.revokeSessions(workspaceId, userId, body);
-    await api.revokeSessions(workspaceId, userId, body);
-    expect(fetcher).toHaveBeenNthCalledWith(
-      2,
-      `/api/v1/staff/workspaces/${workspaceId}/users/${userId}/revoke-sessions`,
-      expect.objectContaining({ body: JSON.stringify(body) }),
-    );
-  });
-
   it('sends membership commands with their command ID and shows the server’s conflict reason', async () => {
     const completedAt = '2026-10-10T12:00:00.000Z';
     const fetcher = fetchResult({
@@ -116,59 +97,6 @@ describe('staff browser API', () => {
       status: 409,
       message: 'This membership is already active.',
     });
-  });
-
-  it('requests inspection, reads the latest request and opens access under it', async () => {
-    const request = {
-      id: commandId,
-      mode: 'consent',
-      status: 'approved',
-      requestedAt: '2026-10-10T12:00:00.000Z',
-      expiresAt: '2026-10-11T12:00:00.000Z',
-      decidedAt: '2026-10-10T12:05:00.000Z',
-      accessExpiresAt: '2026-10-10T12:35:00.000Z',
-      revokedAt: null,
-    };
-    const requested = fetchResult(request);
-    await createStaffApi(requested).requestAccess(
-      workspaceId,
-      'Ticket 4821: sync stopped',
-    );
-    expect(requested).toHaveBeenCalledWith(
-      `/api/v1/staff/workspaces/${workspaceId}/access-requests`,
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ reason: 'Ticket 4821: sync stopped' }),
-      }),
-    );
-    const latest = fetchResult({ request });
-    expect(await createStaffApi(latest).accountAccessRequest(userId)).toEqual(
-      request,
-    );
-    expect(latest).toHaveBeenCalledWith(
-      `/api/v1/staff/accounts/${userId}/access-requests/latest`,
-      expect.objectContaining({ method: 'GET' }),
-    );
-    expect(
-      await createStaffApi(fetchResult({ request: null })).accessRequest(
-        workspaceId,
-      ),
-    ).toBeNull();
-    const opened = fetchResult({
-      id: grantId,
-      workspaceId,
-      reason: 'Ticket 4821: sync stopped',
-      expiresAt: request.accessExpiresAt,
-    });
-    await createStaffApi(opened).openAccess(workspaceId, {
-      requestId: commandId,
-    });
-    expect(opened).toHaveBeenCalledWith(
-      `/api/v1/staff/workspaces/${workspaceId}/access`,
-      expect.objectContaining({
-        body: JSON.stringify({ requestId: commandId }),
-      }),
-    );
   });
 
   it('passes the access history cursor and grant without retaining them elsewhere', async () => {

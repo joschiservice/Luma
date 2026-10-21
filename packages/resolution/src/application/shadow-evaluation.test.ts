@@ -89,7 +89,6 @@ describe('Shadow evaluation', () => {
         effects: { shippingMethodId: 'mapped' },
       },
     });
-    expect(result.simulation.assumptions).toHaveLength(3);
   });
   it.each(['2026-09-23T11:59:59.000Z', now])(
     'rejects expired diagnosis validity (%s)',

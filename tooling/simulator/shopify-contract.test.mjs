@@ -946,18 +946,26 @@ test('orders.read rereads one order exactly as a scan observes it', async () => 
 });
 
 test('throttling and drift fail reads the way Luma recovers from them', async () => {
-  const shop = createShop();
+  // Waits advance a shared test clock, which also refills the shop's bucket.
+  let time = Date.now();
+  const shop = createShop(() => time);
   await seed(shop);
-  const page = pages(shop);
+  const wait = async (ms) => {
+    time += ms;
+  };
+  const page = pages(shop, {
+    budget: createReadBudget({ now: () => time, sleep: wait }),
+    readRetry: { attempts: 3, maxDelayMs: 2000, sleep: wait },
+  });
   // A short throttle is waited out in place at Shopify's restore rate.
   shop.bucket.available = 50;
-  shop.bucket.at = Date.now();
-  const started = Date.now();
+  shop.bucket.at = time;
+  const started = time;
   assert.equal((await page('orders.read', { limit: 100 })).ok, true);
-  assert.ok(Date.now() - started >= 900);
+  assert.ok(time - started >= 900);
   // A longer one is returned with its delay after the last attempt, so the sync schedules the retry.
   shop.bucket.available = -500;
-  shop.bucket.at = Date.now();
+  shop.bucket.at = time;
   const throttled = await page('orders.read', { limit: 100 });
   assert.equal(throttled.ok, false);
   assert.equal(throttled.error.code, 'rate_limited');

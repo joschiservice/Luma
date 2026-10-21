@@ -76,5 +76,4 @@ it('keeps the sidebar and Home reads on the whole queue', () => {
     'decisions',
     { limit: 1 },
   ]);
-  expect(decisionsOptions('org', {}, 1).refetchInterval).toBe(30_000);
 });

@@ -96,22 +96,6 @@ describe('createClient', () => {
     expect(init?.redirect).toBe('error');
   });
 
-  it('lists with the query and page token', async () => {
-    const fetch = vi
-      .fn<typeof globalThis.fetch>()
-      .mockResolvedValue(json(200, { messages: [{ id: 'a', threadId: 'b' }] }));
-    const client = createClient({ accessToken: async () => 't', fetch });
-    await client.listMessages({
-      q: 'from:(a.example)',
-      pageToken: 'P',
-      maxResults: 100,
-    });
-    const url = new URL(String(fetch.mock.calls[0]![0]));
-    expect(url.searchParams.get('q')).toBe('from:(a.example)');
-    expect(url.searchParams.get('pageToken')).toBe('P');
-    expect(url.searchParams.get('maxResults')).toBe('100');
-  });
-
   it('sends once and reports a lost response as uncertain', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

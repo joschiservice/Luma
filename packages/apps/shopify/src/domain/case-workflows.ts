@@ -190,7 +190,7 @@ export const releasableHoldReasons: readonly string[] = [
 ];
 
 /** Who answers the dispatch task and who takes it over once it is overdue. */
-export const dispatchTask = {
+const dispatchTask = {
   assignee: { kind: 'role', key: 'member' },
   escalationTarget: { kind: 'role', key: 'admin' },
   dueAfterSeconds: 4 * 60 * 60,
