@@ -11,7 +11,9 @@
     "start": "node --env-file-if-exists=.env dist/composition/bootstrap.js",
     "db:migrate": "node --env-file-if-exists=.env ../../packages/application-runtime/scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:browser": "playwright test --config playwright.config.ts"
+    "test:browser": "playwright test --config playwright.config.ts",
+    "test:e2e:performance": "vitest run --config vitest.performance.config.ts",
+    "test:browser:performance": "playwright test --config playwright.performance.config.ts"
   },
   "devDependencies": {
     "@luma/app-catalog": "workspace:*",

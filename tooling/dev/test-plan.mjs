@@ -13,8 +13,12 @@ const build = [
   '--filter=@luma/staff-web',
 ];
 
-/** The journey that checks Shopify admission under its own concurrent import load. */
-const admissionJourney = 'e2e/shopify-admission.e2e.mjs';
+// Timing scenarios, backend then browser, each with one worker: they measure Luma's speed, so
+// they must not compete with each other or with other journeys.
+const performanceScenarios = [
+  ['--filter', '@luma/api', 'test:e2e:performance'],
+  ['--filter', '@luma/api', 'test:browser:performance'],
+];
 
 /**
  * A pnpm command, or a group of independent pnpm commands that run concurrently.
@@ -40,6 +44,7 @@ const suites = {
   ui: [['--filter', '@luma/ui', 'test']],
   e2e: [build, ['--filter', '@luma/api', 'test:e2e']],
   browser: [build, ['--filter', '@luma/api', 'test:browser']],
+  performance: [build, ...performanceScenarios],
   full: [
     ['setup:code'],
     // Includes the build every later step uses; Turbo leaves cached outputs untouched.
@@ -48,7 +53,7 @@ const suites = {
     // a 14-core machine, and journeys with tight time limits then fail.
     {
       parallel: [
-        ['--filter', '@luma/api', 'test:e2e', '--exclude', admissionJourney],
+        ['--filter', '@luma/api', 'test:e2e'],
         ['test:region-eu'],
         ['test:simulator'],
         ['test:evaluation'],
@@ -56,9 +61,9 @@ const suites = {
         ['evaluate:code'],
       ],
     },
-    // It measures responsiveness beside its own importing processes, not a busy machine.
-    ['--filter', '@luma/api', 'test:e2e', admissionJourney],
     ['--filter', '@luma/api', 'test:browser'],
+    // Last and on their own, so a busy machine does not distort the measurements.
+    ...performanceScenarios,
   ],
   workflows: [
     [
@@ -206,7 +211,8 @@ const journeyFilters = {
 };
 
 /**
- * Returns isolated command arguments for a suite; rejects unsupported forwarding.
+ * Returns isolated command arguments for a suite; rejects unsupported forwarding. The
+ * performance suite accepts only name filters, which it passes to its backend and browser runs.
  * With `--affected`, unit tests run for affected Turbo tasks and journey suites run only the
  * selected journeys; a suite with no selected journeys returns no commands.
  * @param {string} suite
@@ -239,6 +245,16 @@ export function testCommands(suite, extraArgs = [], journeys) {
     : undefined;
   if (!commands) throw new Error(`Unknown test suite: ${suite}`);
   if (!extraArgs.length) return commands;
+  if (suite === 'performance') {
+    if (extraArgs.some((arg) => arg.startsWith('-')))
+      throw new Error('Performance arguments must be scenario name filters');
+    // Both suites receive each filter; a suite without matching scenarios passes.
+    const [, e2e, browser] = /** @type {string[][]} */ (commands);
+    e2e.push(...extraArgs, '--passWithNoTests');
+    browser.push(...extraArgs, '--pass-with-no-tests');
+
+    return commands;
+  }
   if (!['local', 'test', 'ui', 'e2e', 'browser'].includes(suite))
     throw new Error(
       'Test arguments are supported only for local, test, ui, e2e and browser',

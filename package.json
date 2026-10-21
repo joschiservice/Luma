@@ -25,6 +25,7 @@
     "test:style": "node --test tooling/style/*.test.mjs",
     "test:e2e": "node tooling/dev/test.mjs e2e",
     "test:browser": "node tooling/dev/test.mjs browser",
+    "test:performance": "node tooling/dev/test.mjs performance",
     "setup": "node tooling/dev/cli.mjs setup",
     "dev:manual": "turbo run dev",
     "dev:workflows": "node tooling/dev/cli.mjs workflows",

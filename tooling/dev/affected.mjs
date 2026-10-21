@@ -152,9 +152,12 @@ export function affectedJourneys(env = process.env) {
         reason: `no merge base with ${base}`,
       };
 
+  // Timing scenarios run only in the performance suite, never in the journey suites.
+  const functional = journeys.filter((name) => !name.includes('.performance.'));
+
   return {
-    e2e: journeys.filter((name) => name.endsWith(suffixes.e2e)),
-    browser: journeys.filter((name) => name.endsWith(suffixes.browser)),
+    e2e: functional.filter((name) => name.endsWith(suffixes.e2e)),
+    browser: functional.filter((name) => name.endsWith(suffixes.browser)),
     ...(reason ? { reason } : {}),
     changed: changed?.length ?? 0,
   };

@@ -243,12 +243,11 @@ cost grow with the workspace population. They were checked with about 200 cases,
 positions and rules and 60 purchase orders; the stock projection join is the most expensive
 reader.
 
-Browser tests enforce these budgets and write their measurements to `.luma/performance`:
-
-- Commit to visible count p95 below one second, with two API instances, six subscribers and
-  sequential writes (`metric-live.browser.mjs`). Frames stay under 4 KiB, and subscribers
-  receive under 128 KiB in that run.
-- At most 12 SQL statements per cross-domain summary read (`operational-metrics.browser.mjs`).
+Browser journeys assert that stream frames stay within 4 KiB and that a cross-domain summary
+read uses at most 12 SQL statements. The
+[performance suite](benchmarking.md#performance-budgets) checks that commit to visible count
+stays within three seconds at p95, with two API instances, six subscribers and sequential
+writes, and that subscribers receive at most 128 KiB in that run.
 
 Not measured: saturation at the 100-stream limit, internet latency, concurrent writers or
 large tenants. Source observation age is not a provider-to-Luma ingestion delay.

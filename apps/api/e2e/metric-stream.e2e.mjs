@@ -1,7 +1,6 @@
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { expect, it } from 'vitest';
 
-import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { until } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
@@ -166,7 +165,6 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   const isolated = await drain();
   expect(orderEvents(burst, isolated)).toEqual([]);
   // Kill both process listeners. Each publishes degraded state and reconciles after LISTEN.
-  const start = performance.now();
   await f.db.owner.query(
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND application_name='luma-metric-listener'",
   );
@@ -182,14 +180,9 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
     () => streams.every((s) => s.events.at(-1).connected),
     'listener recovery',
   );
-  await performanceReport(
-    'metric-recovery',
-    {
-      listenerRecoveryMs: Math.round(performance.now() - start),
-      burstInvalidations,
-      maxFrameBytes: Math.max(...streams.map((s) => s.maxFrameBytes)),
-    },
-    { maxFrameBytes: 4096 },
+  // Frames name changed topics and carry no record data.
+  expect(Math.max(...streams.map((s) => s.maxFrameBytes))).toBeLessThanOrEqual(
+    4096,
   );
   expect((await count()).metrics[0].observedCount).toBe(0);
   streams[0].close();

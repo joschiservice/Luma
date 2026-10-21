@@ -42,6 +42,7 @@ simulator fixtures; wait for observable state with bounded assertions instead of
 | One backend journey        | `pnpm test:e2e <file.e2e.mjs>`                                  |
 | One browser journey        | `pnpm test:browser <file.browser.mjs>`                          |
 | Shared UI components       | `pnpm test:ui`                                                  |
+| Timing budgets             | `pnpm test:performance <name>`                                  |
 | A feature area             | `pnpm verify:feature <area>`                                    |
 | Documentation-only changes | `pnpm format:check` and `pnpm test:architecture`                |
 | Ready for review           | `pnpm check`, then `pnpm test:affected`                         |

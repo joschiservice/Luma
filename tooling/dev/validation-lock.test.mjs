@@ -156,6 +156,10 @@ test('only API journey commands take a journey slot, and slot counts must be pos
   );
   assert.equal(runsJourneys(['--filter', '@luma/api', 'test:browser']), true);
   assert.equal(
+    runsJourneys(['--filter', '@luma/api', 'test:browser:performance']),
+    true,
+  );
+  assert.equal(
     runsJourneys(['exec', 'turbo', 'run', 'build', '--filter=@luma/api...']),
     false,
   );

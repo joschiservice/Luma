@@ -1,7 +1,6 @@
 /* global document, window */
 import { createObservability } from '@luma/platform/composition';
 
-import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -101,14 +100,9 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     `${fixture.base}/orders?limit=50`,
   );
   expect(orderPage.items).toHaveLength(50);
-  await performanceReport(
-    'orders-page',
-    {
-      datasetOrders: 153,
-      pageItems: orderPage.items.length,
-      payloadBytes: Buffer.byteLength(JSON.stringify(orderPage)),
-    },
-    { pageItems: 50, payloadBytes: 128 * 1024 },
+  // A full page of the 153 orders stays within the list payload budget.
+  expect(Buffer.byteLength(JSON.stringify(orderPage))).toBeLessThanOrEqual(
+    128 * 1024,
   );
 
   const listed = await fixture.request(

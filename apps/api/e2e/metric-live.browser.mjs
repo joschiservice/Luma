@@ -1,42 +1,23 @@
-import { buildRuntimeApp } from '@luma/application-runtime';
-
-import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
+import { liveInsights } from './live-insights-fixture.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import { seedMetricFulfillment, seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-test('updates visible totals and cohorts, crosses deadlines, and measures delivery and recovery', async ({
+test('updates visible totals and cohorts, crosses deadlines and recovers delivery', async ({
   resources: t,
   web,
 }) => {
-  const origin = web.origin;
-  const f = await settingsFixture(t, origin);
+  const f = await settingsFixture(t, web.origin);
   const seed = await seedMetricOrders(t, f);
   for (let i = 0; i < 200; i++) await seed(i);
-  const api = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const second = await buildRuntimeApp(f.config);
-  t.onTestFinished(() => second.close());
-  const other = await second.listen({ host: '127.0.0.1', port: 0 });
   // Five additional real streams across two API processes; the browser is the sixth.
-  const subscriptions = await Promise.all([
-    metricStream(t, api, f, f.member, true),
-    metricStream(t, api, f, f.member, true),
-    metricStream(t, other, f, f.owner, true),
-    metricStream(t, other, f, f.owner, true),
-    metricStream(t, other, f, f.owner, true),
-  ]);
-  await web.route(api);
-  const context = await t.newContext({
-    baseURL: origin,
-    viewport: { width: 1440, height: 1050 },
-  });
-  await context.addCookies(
-    f.owner.cookie.split('; ').map((value) => {
-      const [name, ...rest] = value.split('=');
-
-      return { name, value: rest.join('='), url: origin };
-    }),
+  const { subscriptions, context } = await liveInsights(
+    t,
+    web,
+    f,
+    { width: 1440, height: 1050 },
+    (origin, i) => metricStream(t, origin, f, i < 2 ? f.member : f.owner, true),
   );
   const page = await context.newPage();
   const streamResponses = [];
@@ -127,19 +108,6 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   await hasCount(0, 199);
   await setStatus('open');
   await hasCount(0, 200);
-  const durations = [];
-  const queryCosts = [];
-  const started = performance.now();
-  for (let i = 0; i < 20; i++) {
-    await setStatus(i % 2 === 0 ? 'cancelled' : 'open');
-    const committed = performance.now();
-    await hasCount(0, i % 2 === 0 ? 199 : 200);
-    durations.push(performance.now() - committed);
-    const read = performance.now();
-    await f.request(f.owner, `${f.base}/metrics/query`, 'POST', {});
-    queryCosts.push(performance.now() - read);
-  }
-  const workloadMs = performance.now() - started;
   await seed(200);
   await hasCount(0, 201);
   await f.db.owner.query(
@@ -182,11 +150,9 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   await context.setOffline(true);
   await live.getByText('Offline', { exact: true }).waitFor();
   await setStatus('cancelled');
-  const recoveryStart = performance.now();
   await context.setOffline(false);
   await hasCount(0, 199);
   await live.getByText('Live updates', { exact: true }).waitFor();
-  const browserRecoveryMs = performance.now() - recoveryStart;
   // Degraded connector observation state remains separate from live internal delivery.
   await f.db.owner.query(
     "UPDATE connector_installations SET document=jsonb_set(document,'{status}','\"degraded\"') WHERE tenant_id=$1",
@@ -194,40 +160,11 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   );
   await section.getByText('Data out of date', { exact: true }).waitFor();
   await live.getByText('Live updates', { exact: true }).waitFor();
-  const p95 = (values) =>
-    [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1];
   expect(subscriptions.flatMap((s) => s.readErrors)).toEqual([]);
-  expect(subscriptions.every((s) => s.readCosts.length >= 20)).toBe(true);
-  const latest = await f.request(
-    f.owner,
-    `${f.base}/metrics/query`,
-    'POST',
-    {},
-  );
-  const measurements = {
-    datasetOrders: 200,
-    subscriptions: 6,
-    apiInstances: 2,
-    mutations: 20,
-    writesPerSecond: 20 / (workloadMs / 1000),
-    commitToVisibleP95Ms: p95(durations),
-    metricHttpReadP95Ms: p95(queryCosts),
-    subscriberReadP95Ms: p95(subscriptions.flatMap((s) => s.readCosts)),
-    browserRecoveryMs,
-    latestSourceObservationAgeMs:
-      Date.parse(latest.readAt) - Date.parse(latest.observedAt),
-    durations,
-    subscriberBytes: subscriptions.reduce((sum, s) => sum + s.receivedBytes, 0),
-    maxFrameBytes: Math.max(...subscriptions.map((s) => s.maxFrameBytes)),
-  };
-  await performanceReport('metric-live', measurements, {
-    // Dashboards refresh at most every two seconds (liveRefreshMs).
-    commitToVisibleP95Ms: 3000,
-    maxFrameBytes: 4096,
-    subscriberBytes: 128 * 1024,
-  });
-  console.log(JSON.stringify(measurements));
-  expect(measurements.commitToVisibleP95Ms).toBeLessThan(3000);
+  // Frames name changed topics and carry no record data.
+  expect(
+    Math.max(...subscriptions.map((s) => s.maxFrameBytes)),
+  ).toBeLessThanOrEqual(4096);
   // Session loss clears the visible private result and stops further live reads.
   await f.db.owner.query('DELETE FROM sessions WHERE user_id=$1', [f.owner.id]);
   await expect.poll(() => values.count(), { timeout: 10000 }).toBe(0);

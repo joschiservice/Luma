@@ -742,16 +742,6 @@ const simulatorJourneys = [
 
 /** Source areas each journey exercises beyond the shared paths; `**` marks boot smoke tests. */
 export const journeyAreas = {
-  'shopify-admission.e2e.mjs': [
-    ...shopify,
-    'packages/commerce-sync/**',
-    'packages/platform/src/{application/atomic-store,infrastructure/valkey}.ts',
-    'packages/config/src/request-admission.ts',
-    'packages/connections/src/{application/capabilities,application/provider,infrastructure/installations/runtime}.ts',
-    'packages/execution/**',
-    'packages/simulator/{core,shopify}/**',
-    'apps/simulator/**',
-  ],
   'activity.browser.mjs': [
     ...appHost,
     ...activity,
@@ -1667,4 +1657,65 @@ export const journeyAreas = {
   ],
   'workflow-coordination.e2e.mjs': [...connections, ...workflows, ...decisions],
   'workflows.e2e.mjs': [...connections, ...workflows],
+  // Timing scenarios for `pnpm test:performance`; affected journey runs never select them.
+  // Each declares the areas of the journey whose behavior it measures.
+  'customers.performance.e2e.mjs': [...connections, ...customers],
+  'fulfillment.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...fulfillment,
+  ],
+  'insights.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...insights,
+    ...orders,
+    ...fulfillment,
+    ...procurement,
+    ...metrics,
+  ],
+  'inventory.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...inventory,
+    ...procurement,
+  ],
+  'metric-live.performance.browser.mjs': [
+    ...commerce,
+    ...metrics,
+    ...insights,
+    ...webShell,
+    ...webInsights,
+  ],
+  'metric-stream.performance.e2e.mjs': [...commerce, ...metrics],
+  'operational-metrics.performance.browser.mjs': [
+    ...operationalMetrics,
+    ...procurement,
+    ...cases,
+    ...insights,
+    ...webShell,
+    ...webInsights,
+  ],
+  'order-journey.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...orders,
+    ...inventory,
+  ],
+  'products.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...products,
+    ...inventory,
+  ],
+  'returns.performance.e2e.mjs': [...commerce, ...returns, ...orders],
+  'shopify-admission.performance.e2e.mjs': [
+    ...shopify,
+    'packages/commerce-sync/**',
+    'packages/platform/src/{application/atomic-store,infrastructure/valkey}.ts',
+    'packages/config/src/request-admission.ts',
+    'packages/connections/src/{application/capabilities,application/provider,infrastructure/installations/runtime}.ts',
+    'packages/execution/**',
+    'packages/simulator/{core,shopify}/**',
+    'apps/simulator/**',
+  ],
 };

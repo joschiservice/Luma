@@ -105,8 +105,8 @@ Order charts filter `orders_list` on its indexed `placed_at` range, and fulfillm
 `orders_fulfillment_list`; both stayed under 50 ms at 50,000 orders. Stock risk and
 purchase-order stages are classified in server memory by their owners, like the
 [operational metrics](operational-metrics.md#limits), so they share those scale limits. Each
-read has a 4-second statement timeout. Re-measure with `LUMA_INSIGHTS_BENCHMARK=<order count>`
-on `insights.e2e.mjs`.
+read has a 4-second statement timeout. Re-measure with
+`LUMA_INSIGHTS_BENCHMARK=<order count> pnpm test:performance insights`.
 
 ## Adding a chart
 

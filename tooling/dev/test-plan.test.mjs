@@ -20,7 +20,7 @@ function leaves(command) {
   return command.split(' && ').flatMap((part) => {
     // Full runs journeys directly after its single build.
     const journey = part.match(
-      /^pnpm --filter @luma\/api (test:e2e|test:browser)(?: .*)?$/,
+      /^pnpm --filter @luma\/api (test:(?:e2e|browser)(?::performance)?)(?: .*)?$/,
     );
     if (journey) return [journey[1]];
     const match = part.match(/^pnpm (?:run )?([\w:-]+)(?: .*)?$/);
@@ -34,6 +34,10 @@ function leaves(command) {
           leaves(`pnpm ${args.join(' ')}`),
         );
       if (['test:e2e', 'test:browser'].includes(match[1])) return [match[1]];
+      if (match[1] === 'test:performance')
+        return commandsOf('performance')
+          .slice(1)
+          .flatMap((args) => leaves(`pnpm ${args.join(' ')}`));
 
       return leaves(manifest.scripts[match[1]]);
     }
@@ -120,6 +124,24 @@ test('affected suite builds once and skips empty journey suites', () => {
     '@luma/api',
     'test:browser',
   ]);
+});
+
+test('performance filters reach both scenario suites and reject options', () => {
+  const [, e2e, browser] = testCommands('performance', ['metric-live']);
+  assert.deepEqual(e2e.slice(2), [
+    'test:e2e:performance',
+    'metric-live',
+    '--passWithNoTests',
+  ]);
+  assert.deepEqual(browser.slice(2), [
+    'test:browser:performance',
+    'metric-live',
+    '--pass-with-no-tests',
+  ]);
+  assert.throws(
+    () => testCommands('performance', ['--workers=2']),
+    /name filters/,
+  );
 });
 
 test('component tests keep forwarded story filters', () => {

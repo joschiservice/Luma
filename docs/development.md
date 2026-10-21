@@ -104,6 +104,7 @@ Start with the smallest check that proves the change, then widen:
 | Your branch         | `pnpm test:affected`                                                                      |
 | Shared components   | `pnpm test:ui`                                                                            |
 | A feature area      | `pnpm verify:feature <simulator\|workflows\|orders\|inbox\|purchasing\|stock-protection>` |
+| Timing budgets      | `pnpm test:performance`                                                                   |
 | Before review       | `pnpm check`                                                                              |
 | Every CI gate       | `pnpm test:full`                                                                          |
 
@@ -115,11 +116,11 @@ not touch your local simulator workspace. Extend its selection in
 
 ## Tests
 
-`pnpm test`, `pnpm test:e2e` and `pnpm test:browser` start PostgreSQL through
-Testcontainers and remove it afterwards. Each suite creates its own database and restricted
-runtime logins. To use a separate cluster, set `TEST_DATABASE_URL` to an administrator
-connection that can create databases and roles. Never point it at a development or
-production database.
+`pnpm test`, `pnpm test:e2e`, `pnpm test:browser` and `pnpm test:performance` start
+PostgreSQL through Testcontainers and remove it afterwards. Each suite creates its own
+database and restricted runtime logins. To use a separate cluster, set `TEST_DATABASE_URL`
+to an administrator connection that can create databases and roles. Never point it at a
+development or production database.
 
 The test runner provisions a disposable Valkey instance alongside PostgreSQL and overrides
 `SHOPIFY_ADMISSION_URL` for the run. Tests never use the checkout's admission service.
@@ -142,6 +143,8 @@ suites cannot run. Report that limitation when relying on it.
 - Browser journeys serve the web and staff apps from their production builds, which
   `pnpm test:browser` prepares. A dev server compiled each page on first request, which cost
   every test seconds. React's development-only checks therefore don't run in journeys.
+- Timing scenarios are not journeys: `pnpm test:performance` runs them one at a time after
+  the build. See [performance budgets](benchmarking.md#performance-budgets).
 - Retries are disabled so flaky failures stay visible. Reproduce with
   `pnpm test:browser --workers=1`, `pnpm test:e2e --maxWorkers=1`, `--grep "<name>"`,
   `--headed` or `--shard=1/4`.
@@ -208,7 +211,8 @@ and `pnpm test:browser --affected` apply the same selection to one suite. Journe
 
 When a full run names an unmapped path, map it to the journeys that exercise it rather than
 marking it shared. Every journey file must be mapped; `pnpm test:tooling` checks this and
-that every pattern still matches a file.
+that every pattern still matches a file. Performance scenarios are mapped like the journeys
+they measure, but affected selection never runs them.
 
 Pull requests in CI use affected selection for unit tests and journeys. Pushes to `main`
 run every journey, so a missing mapping still fails there. Selection trades coverage for
