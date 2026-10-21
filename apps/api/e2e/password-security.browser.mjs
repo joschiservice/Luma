@@ -1,6 +1,5 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 const password = 'settings-test-password-123';
@@ -8,18 +7,12 @@ const newPassword = 'new-browser-password-123';
 
 test('changes a password, signs out devices and recovers through a single-use email link', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://localhost:${port}`;
+  const origin = web.origin.replace('127.0.0.1', 'localhost');
   const f = await settingsFixture(t, origin);
   const address = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: address, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(address);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

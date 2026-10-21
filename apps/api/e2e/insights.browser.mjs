@@ -1,14 +1,13 @@
 /* global document, window */
 import { expect, test } from './browser-fixtures.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('opens the exact records behind a chart point and returns to them', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const work = await fulfillmentFixture(t, f);
   await work.issue();
@@ -22,13 +21,7 @@ test('opens the exact records behind a chart point and returns to them', async (
     lines: [{ external: 'line-405', quantity: '1' }],
   });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -193,18 +186,12 @@ test('opens the exact records behind a chart point and returns to them', async (
 
 test('keeps a 503 chart stable during live import events and supports explicit recovery', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({ baseURL: origin });
   await context.addCookies(
     f.member.cookie.split('; ').map((value) => {

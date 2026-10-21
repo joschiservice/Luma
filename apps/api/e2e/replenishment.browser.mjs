@@ -2,22 +2,15 @@
 import { processWorkflowId } from '@luma/workflow-temporal';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 test('reviews replenishment scope, recovers a lost response, approves and opens the verified order', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const contextFor = async (cookie) => {
     const context = await t.newContext({
       baseURL: origin,
@@ -228,9 +221,9 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
 
 test('keeps selections across stock pages and server search in narrow and dark layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
   const setup = await f.request('/replenishment');
   const first = setup.positions[0];
@@ -238,13 +231,7 @@ test('keeps selections across stock pages and server search in narrow and dark l
     (p) => p.positionId !== first.positionId && p.sku !== first.sku,
   );
   expect(second).toBeTruthy();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 390, height: 844 },

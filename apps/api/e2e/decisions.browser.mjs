@@ -4,22 +4,15 @@ import { randomUUID } from 'node:crypto';
 import { processWorkflowId } from '@luma/workflow-temporal';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 test('finds a replenishment approval in Needs you, decides it once and updates every surface', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const contextFor = async (cookie) => {
     const context = await t.newContext({
       baseURL: origin,

@@ -5,23 +5,17 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess, until } from './helpers.mjs';
+import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 test('sends an order with a second approver, follows the supplier to receipt and records cited commitments', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await setupSimulator(t, { origin });
   await f.pilot.observe();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const org = f.manifest.organizationId;
   const login = async (email) => {
     const response = await f.pilot.app.inject({
@@ -296,9 +290,9 @@ test('sends an order with a second approver, follows the supplier to receipt and
 
 test('settles an order email left uncertain by an unverified bounce with a confirmed decision', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const flags = { 'procurement-email-submission': true };
   const f = await setupSimulator(t, {
     origin,
@@ -311,13 +305,7 @@ test('settles an order email left uncertain by an unverified bounce with a confi
     }),
   });
   await f.pilot.observe();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const org = f.manifest.organizationId;
   const login = async (email) => {
     const response = await f.pilot.app.inject({

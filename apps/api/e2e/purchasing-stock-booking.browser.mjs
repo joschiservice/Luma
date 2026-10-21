@@ -10,7 +10,7 @@ import {
 } from '@luma/procurement/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { addMembership, availablePort, startProcess } from './helpers.mjs';
+import { addMembership } from './helpers.mjs';
 import { nativeStockFixture } from './native-stock-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
@@ -221,9 +221,9 @@ async function bookedOrder(t, origin) {
 
 test('shows a procurement-only member restricted stock booking rows and their restricted evidence', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const { f, org, api, reader, orderId } = await bookedOrder(t, origin);
   const record = `/procurement/purchase-orders/${orderId}/record`;
 
@@ -250,13 +250,7 @@ test('shows a procurement-only member restricted stock booking rows and their re
     expect(entry.actor).toBeUndefined();
   }
 
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
@@ -435,9 +429,9 @@ async function nativeBookedOrder(t, origin) {
 
 test('shows a procurement-only member restricted native stock booking rows and their restricted evidence', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const { org, apiOrigin, api, owner, reader, orderId, reviewId } =
     await nativeBookedOrder(t, origin);
   const record = `/procurement/purchase-orders/${orderId}/record`;
@@ -472,13 +466,7 @@ test('shows a procurement-only member restricted native stock booking rows and t
       evidenceRefs: [reviewId],
     });
 
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

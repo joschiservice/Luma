@@ -1,19 +1,12 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 
 test('serves searchable, sectioned guides without a session on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: 'http://127.0.0.1:1', TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  const origin = web.origin;
+  await web.route('http://127.0.0.1:1');
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

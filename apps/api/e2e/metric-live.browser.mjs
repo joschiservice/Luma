@@ -2,16 +2,15 @@ import { buildRuntimeApp } from '@luma/application-runtime';
 
 import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import { seedMetricFulfillment, seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('updates visible totals and cohorts, crosses deadlines, and measures delivery and recovery', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const seed = await seedMetricOrders(t, f);
   for (let i = 0; i < 200; i++) await seed(i);
@@ -27,13 +26,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     metricStream(t, other, f, f.owner, true),
     metricStream(t, other, f, f.owner, true),
   ]);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1050 },

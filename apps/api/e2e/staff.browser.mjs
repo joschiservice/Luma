@@ -444,23 +444,14 @@ test('staff suspends the only active owner after acknowledgement and reactivates
 
 test('staff disables an account, its sign-in is refused, and enabling restores it', async ({
   resources: t,
+  web,
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
   // The customer signs in through their own web app and API origin.
-  const customerPort = await availablePort();
-  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerOrigin = web.origin;
   const customerWebApi = await startApi(t, db, customerOrigin);
-  const customerWeb = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    {
-      TEST_API_ORIGIN: customerWebApi.origin,
-      TEST_WEB_PORT: String(customerPort),
-    },
-    true,
-  );
-  await customerWeb.message('listening');
+  await web.route(customerWebApi.origin);
   const customerContext = await t.newContext({
     baseURL: customerOrigin,
     viewport: { width: 1440, height: 900 },
@@ -561,6 +552,7 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
 
 test('staff schedules, restores and erases an account, and history shows a former member', async ({
   resources: t,
+  web,
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
@@ -676,19 +668,9 @@ test('staff schedules, restores and erases an account, and history shows a forme
   ).toBeVisible();
 
   // The workspace owner sees the person's history as a former member.
-  const customerPort = await availablePort();
-  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerOrigin = web.origin;
   const customerWebApi = await startApi(t, db, customerOrigin);
-  const customerWeb = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    {
-      TEST_API_ORIGIN: customerWebApi.origin,
-      TEST_WEB_PORT: String(customerPort),
-    },
-    true,
-  );
-  await customerWeb.message('listening');
+  await web.route(customerWebApi.origin);
   const customerPage = await (
     await t.newContext({
       baseURL: customerOrigin,

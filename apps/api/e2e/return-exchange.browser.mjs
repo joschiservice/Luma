@@ -1,14 +1,13 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { returnBrowserCommand } from './return-browser-commands.mjs';
 import { settlementFixture } from './return-settlement-fixture.mjs';
 
 test('requests a replacement by keyboard and verifies charge payment before approving hold release on a narrow case', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`,
+  const origin = web.origin,
     f = await settlementFixture(t, { origin, resolution: 'exchange' });
   const replacement = (await f.request(`${f.path}/exchange`)).choices[0],
     variant = (
@@ -23,13 +22,7 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     product: variant.data.product,
     price: ((variant.data.price + 100) / 100).toFixed(2),
   });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
 
   async function pageFor(cookie) {
     const context = await t.newContext({

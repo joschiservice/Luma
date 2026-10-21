@@ -1,23 +1,16 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { procurementFixture } from './procurement-fixture.mjs';
 
 test('creates, reviews and lists procurement records with saved views and safe retries on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await procurementFixture(t, origin, {
     FEATURE_FLAG_OVERRIDES: 'adaptive-saved-views=true',
   });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

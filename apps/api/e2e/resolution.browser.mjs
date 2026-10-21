@@ -15,32 +15,20 @@ import {
   resolutionReview,
 } from '../../../packages/ui/src/components/issues/resolution-fixtures.ts';
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('reviews decisions, recovers ambiguous commands and escalates through the connected API', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const role = new URL(db.runtimeUrl).username;
   await db.owner.query(`GRANT luma_connectors,luma_exceptions TO "${role}"`);
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

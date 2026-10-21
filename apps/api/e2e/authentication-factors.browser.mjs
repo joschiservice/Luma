@@ -2,13 +2,7 @@
 import { createHmac } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 const password = 'browser-test-password-123';
 
@@ -33,21 +27,14 @@ function totp(setupKey) {
   ).padStart(6, '0');
 }
 
-async function fixture(t) {
-  const port = await availablePort();
+async function fixture(t, web) {
   // WebAuthn relying-party IDs must be domains, so this journey uses localhost.
-  const origin = `http://localhost:${port}`;
+  const origin = web.origin.replace('127.0.0.1', 'localhost');
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const api = await startApi(t, db, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -95,8 +82,9 @@ async function signInWithPassword(page) {
 
 test('protects sign-in with an authenticator app and signs in with a passkey', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page, errors, cdp, authenticatorId } = await fixture(t);
+  const { db, page, errors, cdp, authenticatorId } = await fixture(t, web);
   await createAccount(page, db, {
     name: 'Grace',
     email: 'grace@example.test',

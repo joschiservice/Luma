@@ -4,15 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { seedResolutionMeasurement } from './resolution-measurement-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('reports distinct detection and verification cohorts, filters exact evidence, and handles unavailable reads', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -34,13 +33,7 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
   });
   await seedResolutionMeasurement(f, { synthetic: true });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },

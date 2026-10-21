@@ -1,15 +1,14 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture.mjs';
 
 test('publishes an exact downstream parcel from the shared fulfillment view with independent approval, then reviews a tracking correction and customer notification choice', async ({
   resources: t,
+  web,
 }) => {
   // Two independent approval/publication cycles include provider rereads under parallel journeys.
   test.setTimeout(180_000);
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await shipmentPublishingFixture(t, { origin });
   const source = await f.dispatch('BROWSER-PARCEL-1', 1);
   const canonicalOrder = (
@@ -28,13 +27,7 @@ test('publishes an exact downstream parcel from the shared fulfillment view with
   );
   expect(work).toBeTruthy();
   const route = `/app/${f.manifest.organizationId}/fulfillment/${work.id}`;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const errors = [];
   const pageFor = async (cookie) => {
     const context = await t.newContext({

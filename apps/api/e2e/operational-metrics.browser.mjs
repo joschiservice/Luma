@@ -11,7 +11,6 @@ import { createOperationalSummary } from '@luma/read-models/composition';
 
 import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import {
   operationalEndpoint,
@@ -22,9 +21,9 @@ import { settingsFixture } from './settings-fixture.mjs';
 
 test('keeps cross-domain cohorts live, recovers races and measures committed changes with concurrent readers', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const seed = await seedOperationalMetrics(f, 200);
   for (let i = 0; i < 40; i++) await seed.createOrder(seed.rows[i].sku);
@@ -40,13 +39,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
       }),
     ),
   );
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },

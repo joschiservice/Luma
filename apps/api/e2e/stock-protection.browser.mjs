@@ -2,15 +2,14 @@
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { correctionFixture } from './shopify-inventory-fixture.mjs';
 import { protectionFixture } from './stock-protection-fixture.mjs';
 
 test('stock protection settings save Preview and remain usable on a narrow dark screen', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -19,13 +18,7 @@ test('stock protection settings save Preview and remain usable on a narrow dark 
   });
   const { f } = await correctionFixture(t, origin, { observability });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -105,8 +98,9 @@ test('stock protection settings save Preview and remain usable on a narrow dark 
 
 test('active stock protection links banners, per-SKU evidence and an explicit verified release', async ({
   resources: t,
+  web,
 }) => {
-  const origin = `http://127.0.0.1:${await availablePort()}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -119,13 +113,7 @@ test('active stock protection links banners, per-SKU evidence and an explicit ve
   const { f } = protection;
   await protection.service.tick(protection.actor, protection.incidentId);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: new URL(origin).port },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

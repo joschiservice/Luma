@@ -4,19 +4,13 @@ import { readFile } from 'node:fs/promises';
 
 import { seedActivity } from './activity-fixture.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('filters, saves views, previews, returns, loads older and new events and recovers workspace activity on desktop and narrow screens', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -24,13 +18,7 @@ test('filters, saves views, previews, returns, loads older and new events and re
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs', {
     FEATURE_FLAG_OVERRIDES: 'adaptive-saved-views=true',
   });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

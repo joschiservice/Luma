@@ -1,22 +1,15 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { linkedOrderFixture } from './order-change-plan-fixture.mjs';
 
 test('previews a quantity plan, opens the Shopify edit prefilled and hands the warehouse step to a person after packing starts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const fixture = await linkedOrderFixture(t, origin);
   const { f, shop, tenantId } = fixture;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

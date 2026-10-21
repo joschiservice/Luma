@@ -2,19 +2,13 @@
 
 import { expect, test } from './browser-fixtures.mjs';
 import { seedCodeSteps } from './code-steps-fixture.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('reviews and evaluates a code example on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -22,12 +16,7 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
     `GRANT luma_connectors TO "${new URL(db.runtimeUrl).username}"`,
   );
   const api = await startApi(t, db, origin, 'e2e/code-server.mjs');
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(api.origin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

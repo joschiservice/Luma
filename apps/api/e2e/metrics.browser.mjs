@@ -1,15 +1,14 @@
 /* global document, window */
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('explains unknown order totals, opens accessible cohorts and recovers from errors on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const endpoint = `${f.base}/metrics/query`;
   const empty = await f.request(f.member, endpoint, 'POST', {});
@@ -20,13 +19,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await f.request(f.outsider, endpoint, 'POST', {}, 404);
   await f.request(null, endpoint, 'POST', {}, 401);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },

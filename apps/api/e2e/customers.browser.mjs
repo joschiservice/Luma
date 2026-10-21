@@ -5,15 +5,15 @@ import { createObservability } from '@luma/platform/composition';
 
 import { appScopes } from './app-scopes.mjs';
 import { expect, rememberedView, test } from './browser-fixtures.mjs';
-import { addMembership, availablePort, startProcess } from './helpers.mjs';
+import { addMembership } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('opens an imported customer from an order, lists their imported orders and keeps other stores and workspaces apart', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   // Saved views are behind a release flag.
   const observability = createObservability({
     environment: 'test',
@@ -58,13 +58,7 @@ test('opens an imported customer from an order, lists their imported orders and 
   await f.request(null, mapping, 'GET', undefined, 401);
 
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

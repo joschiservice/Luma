@@ -1,6 +1,5 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { returnBrowserCommand } from './return-browser-commands.mjs';
 import {
   providerWrites,
@@ -9,18 +8,12 @@ import {
 
 test('independently approves a refund, distinguishes pending payment, and checks actual settlement on a narrow case', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settlementFixture(t, { origin });
   const apiOrigin = f.apiOrigin;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
 
   async function pageFor(cookie) {
     const context = await t.newContext({

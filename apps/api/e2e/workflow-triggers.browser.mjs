@@ -10,20 +10,14 @@ import {
 } from '@luma/workflows/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 
 test('starts a scoped native workflow, preserves uncertain retries and withholds unavailable scheduled starts on mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -31,13 +25,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     `GRANT luma_connectors TO "${new URL(db.runtimeUrl).username}"`,
   );
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },

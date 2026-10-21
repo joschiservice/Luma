@@ -2,7 +2,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { inboxFixture, splitDelivery } from './inbox-fixture.mjs';
 
 /** Opens a browser context signed in with an API session cookie. */
@@ -32,16 +31,10 @@ const fitsViewport = (page) =>
 
 test('works supplier and customer threads, documents, replies and mailbox rules', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const f = await inboxFixture(t, `http://127.0.0.1:${port}`);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  const f = await inboxFixture(t, web.origin);
+  await web.route(f.apiOrigin);
 
   // A supplier's split delivery for a tracked purchase order and a customer asking about an order.
   const { summary: supplierThread, order, reference } = await splitDelivery(f);

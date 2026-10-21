@@ -9,16 +9,15 @@ import pg from 'pg';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 // Only the model response is scripted. Context lookup, permissions, source facts, citations,
 // tenant release checks and the API are the real application path over disposable data.
 test('explains a record beside its page and preserves exact chart selection', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const work = await fulfillmentFixture(t, f);
   const model = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0';
@@ -94,12 +93,7 @@ test('explains a record beside its page and preserves exact chart selection', as
     await observability.shutdown();
   });
   const apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(apiOrigin);
   const browser = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

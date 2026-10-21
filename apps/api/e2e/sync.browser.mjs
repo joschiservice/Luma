@@ -1,13 +1,12 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { syncFixture } from './sync-fixture.mjs';
 
 test('follows history import coverage, explains waits and pauses a sync', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await syncFixture(t, origin);
   await f.db.owner.query(
     `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,full_scan,started_at,outcome,pages,records,changed)
@@ -15,13 +14,7 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     [f.org.id, f.stream],
   );
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
