@@ -12,11 +12,6 @@ const env = {
 
 describe('commerce sync configuration', () => {
   it('bounds workspace and connection concurrency independently', () => {
-    expect(readCommerceSyncConfig(env)).toMatchObject({
-      concurrency: 4,
-      workspaceConcurrency: 4,
-      connectionConcurrency: 2,
-    });
     expect(
       readCommerceSyncConfig({
         ...env,

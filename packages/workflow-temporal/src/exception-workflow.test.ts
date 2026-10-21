@@ -225,23 +225,25 @@ it('does not turn failed business verification into resolution', async () => {
   });
 }, 15_000);
 
-it('expires approval without dispatching again', async () => {
+it('expires approval without dispatching again', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
   const activities = fixture();
-  activities.propose.mockImplementation(async () => ({
+  activities.propose.mockResolvedValue({
     id: 'proposal',
     revision: 1,
-    expiresAt: new Date(Date.now() + 1000).toISOString(),
-  }));
+    expiresAt: new Date((await clock.currentTimeMs()) + 1000).toISOString(),
+  });
   activities.execute.mockResolvedValue({
     state: 'approval_required',
     decisionId: 'decision',
   });
-  expect(await run(activities)).toMatchObject({
+  expect(await run(activities, clock)).toMatchObject({
     phase: 'denied',
     reason: 'proposal_expired',
   });
   expect(activities.execute).toHaveBeenCalledTimes(1);
-}, 15_000);
+}, 40_000);
 
 it('leaves unsupported proposals for manual intervention', async () => {
   const activities = fixture();
@@ -274,17 +276,19 @@ it('routes a detector clear result through fresh business verification', async (
   expect(activities.verify).toHaveBeenCalledTimes(1);
 }, 15_000);
 
-it('honors diagnosis backoff and evaluates the next revision', async () => {
+it('honors diagnosis backoff and evaluates the next revision', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
   const activities = fixture();
   activities.diagnose.mockResolvedValueOnce({
     status: 'pending',
     revision: 1,
     verificationRequired: false,
-    retryAfter: new Date(Date.now() + 1000).toISOString(),
+    retryAfter: new Date((await clock.currentTimeMs()) + 1000).toISOString(),
   });
-  expect(await run(activities)).toMatchObject({ phase: 'resolved' });
+  expect(await run(activities, clock)).toMatchObject({ phase: 'resolved' });
   expect(activities.diagnose).toHaveBeenCalledTimes(2);
-}, 15_000);
+}, 40_000);
 
 it('recovers committed approval without a notification', async (t) => {
   const clock = await TestWorkflowEnvironment.createTimeSkipping();

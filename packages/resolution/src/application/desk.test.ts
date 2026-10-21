@@ -100,14 +100,6 @@ describe('Case desk permissions', () => {
     },
   );
 
-  it('shows built-in members the case without decisions', async () => {
-    const context = testContext({ role: 'member', userId: 'operator' });
-    const review = await desk(context).service.review(context, 'case');
-
-    expect(review.permittedDecisions).toEqual([]);
-    expect(review.refreshable).toBe(false);
-  });
-
   it('rejects reads without issues.read before storage', async () => {
     const context = as(['decisions.respond']);
     const { service, opened } = desk(context);

@@ -427,13 +427,21 @@ describe('observability baseline', () => {
   it('isolates concurrent tenants and requests, rejecting client request IDs and malformed action IDs', async () => {
     const { spans, observability, identity } = fixture();
     const app = buildApp({}, { observability, identity });
+    // Both requests stay inside their workflow spans until the other one has entered too.
+    let entered = 0;
+    let bothEntered!: () => void;
+    const overlapping = new Promise<void>((resolve) => {
+      bothEntered = resolve;
+    });
     app.get(
       '/v1/organizations/:organizationId/concurrent',
       { config: { access: { access: 'member' } } },
       async (request) => {
         const context = request.observation!.context;
         await observability.run(context, 'workflow.run', async () => {
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          entered += 1;
+          if (entered === 2) bothEntered();
+          await overlapping;
         });
 
         return {};

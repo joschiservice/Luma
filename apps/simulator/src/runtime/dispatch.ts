@@ -149,14 +149,16 @@ export function createDispatcher(pool: Pool) {
     }
   }
 
+  // A batch can fail, for example when its run was deleted meanwhile; it is dropped, not retried.
+  const save = () =>
+    flush().catch((error: unknown) =>
+      console.error('Simulator request metrics were not saved', error),
+    );
+
   const timer = setInterval(() => {
-    flushing ??= flush()
-      .catch((error: unknown) =>
-        console.error('Simulator request metrics were not saved', error),
-      )
-      .finally(() => {
-        flushing = undefined;
-      });
+    flushing ??= save().finally(() => {
+      flushing = undefined;
+    });
   }, 2_000);
   timer.unref();
 
@@ -308,11 +310,11 @@ export function createDispatcher(pool: Pool) {
   }
 
   return {
-    /** Writes pending request metrics and stops the batch timer. */
+    /** Writes pending request metrics and stops the batch timer; a failed write is logged. */
     async close() {
       clearInterval(timer);
       await flushing;
-      await flush();
+      await save();
     },
     /** Forgets cached rule state; call after the transaction that changed the rules commits. */
     rulesChanged(runId: string) {

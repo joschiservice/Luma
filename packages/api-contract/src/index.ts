@@ -106,7 +106,6 @@ export * from './collections.js';
 export {
   anyMember,
   apiErrorSchema,
-  dataRegionSchema,
   organizationParamsSchema,
 } from './common.js';
 

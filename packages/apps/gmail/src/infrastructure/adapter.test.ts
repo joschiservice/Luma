@@ -7,6 +7,7 @@ import type {
   MailboxFilter,
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
+import { createQuotaPacer } from '@luma/connector-gmail';
 import type { TenantContext } from '@luma/identity';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -92,6 +93,8 @@ function connector(
     emailAddress: mailbox,
     accessToken: async () => 'access-token',
     fetch,
+    // Admission spacing is covered by the client tests; here it would only add real waiting.
+    pacer: createQuotaPacer({ sleep: async () => {} }),
     now: () => new Date('2026-10-03T00:00:00Z'),
     ...(watch ? { watch: { topic: 'projects/p/topics/gmail', ...watch } } : {}),
   });

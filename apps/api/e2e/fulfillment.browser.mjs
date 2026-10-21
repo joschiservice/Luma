@@ -1,7 +1,7 @@
 /* global document */
 import { createObservability } from '@luma/platform/composition';
 
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -162,6 +162,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   await page.getByRole('button', { name: /^Waiting to start/ }).waitFor();
   await page.getByRole('button', { name: /^Completed/ }).waitFor();
   await page.getByText('Modified', { exact: true }).waitFor();
+  const remembered = rememberedView(page, 'fulfillment');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Deadlines by status');
@@ -183,7 +184,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   });
 
   // Opening Fulfillment without a view returns to the remembered one.
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/fulfillment`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page

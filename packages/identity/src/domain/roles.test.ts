@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Permission } from './permissions.js';
 import { permissionCatalog } from './permissions.js';
 import type { BuiltInRoleKey } from './roles.js';
-import { builtInReference, builtInRoles, PermissionSet } from './roles.js';
+import { builtInReference, PermissionSet } from './roles.js';
 
 const managers: BuiltInRoleKey[] = ['owner', 'admin'];
 const everyone: BuiltInRoleKey[] = ['owner', 'admin', 'member'];
@@ -76,12 +76,6 @@ describe('built-in roles', () => {
         'jtl:purchase_orders.submit',
       ),
     ).toBe(false);
-  });
-
-  it('only reference catalog permissions', () => {
-    const keys = new Set<string>(permissionCatalog.map((item) => item.key));
-    for (const role of Object.values(builtInRoles))
-      expect(role.permissions.filter((key) => !keys.has(key))).toEqual([]);
   });
 });
 

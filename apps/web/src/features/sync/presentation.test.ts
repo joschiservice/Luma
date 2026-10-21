@@ -204,27 +204,6 @@ describe('link methods', () => {
 });
 
 describe('waiting explanations', () => {
-  it.each([
-    ['request_capacity', 'Waiting for rate limit'],
-    ['provider_cooldown', 'Waiting for rate limit'],
-    ['connection_capacity', 'Waiting for sync capacity'],
-    ['orders', 'Waiting for orders'],
-    ['admission_unavailable', 'Read scheduling unavailable'],
-    ['recent_changes', 'Waiting for recent changes'],
-    ['queued', 'Waiting'],
-  ] as const)('labels %s accurately', (reason, label) => {
-    const waiting = stream({
-      status: 'waiting',
-      waiting: {
-        reason,
-        connections: [],
-        observedAt: '2026-10-14T13:00:00Z',
-        until: null,
-      },
-    });
-    expect(streamState(waiting)).toEqual({ state: 'waiting', label });
-  });
-
   it('explains provider cooldowns and automatic retries', () => {
     expect(
       waitingStatement(

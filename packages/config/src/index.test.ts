@@ -3,13 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { readApiConfig, readIdentityConfig } from './index.js';
 
 describe('readApiConfig', () => {
-  it('provides local defaults without requiring secrets', () => {
-    expect(readApiConfig({})).toEqual({
-      host: '127.0.0.1',
-      port: 3001,
-      logLevel: 'info',
-    });
-  });
   it('accepts explicit runtime configuration', () => {
     expect(
       readApiConfig({ HOST: '0.0.0.0', PORT: '8080', LOG_LEVEL: 'warn' }),

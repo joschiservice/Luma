@@ -78,7 +78,7 @@ export function detectionText(incident: IncidentView) {
 }
 
 /** Describes a workflow run's state as people read it in Luma. */
-export function workflowStateText(state: string) {
+function workflowStateText(state: string) {
   switch (state) {
     case 'awaiting_decision':
       return 'waiting for approval';

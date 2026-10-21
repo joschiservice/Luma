@@ -1,5 +1,3 @@
-import { setTimeout as wait } from 'node:timers/promises';
-
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { expect, it } from 'vitest';
 
@@ -102,8 +100,30 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
       ),
     ).toBe(true);
   }
-  await wait(120);
-  const before = streams.map((s) => s.events.length);
+  // A wake-up for one area this workspace can read marks a point in every stream: once an event
+  // naming that area arrives, every earlier notification has been delivered and sent.
+  const drain = async () => {
+    const marks = streams.map((s) => s.events.length);
+    await f.db.owner.query("SELECT pg_notify('luma_metrics',$1)", [
+      `${f.org.id}:connections`,
+    ]);
+    await until(
+      () =>
+        streams.every((s, i) =>
+          s.events
+            .slice(marks[i])
+            .some((e) => e.topics.includes('connections')),
+        ),
+      'drained stream',
+    );
+
+    return streams.map((s) => s.events.length);
+  };
+  const orderEvents = (from, to) =>
+    streams.flatMap((s, i) =>
+      s.events.slice(from[i], to[i]).filter((e) => e.topics.includes('orders')),
+    );
+  const before = await drain();
   const tx = await f.db.owner.connect();
   try {
     await tx.query('BEGIN');
@@ -115,8 +135,9 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   } finally {
     tx.release();
   }
-  await wait(200);
-  expect(streams.map((s) => s.events.length)).toEqual(before);
+  // A rolled-back change is never announced.
+  const rolledBack = await drain();
+  expect(orderEvents(before, rolledBack)).toEqual([]);
   expect((await count()).metrics[0].observedCount).toBe(1);
   // Reordered and duplicate wake-ups cannot add to or subtract from authoritative totals.
   await Promise.all(
@@ -124,22 +145,26 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
       f.db.owner.query("SELECT pg_notify('luma_metrics',$1)", [f.org.id]),
     ),
   );
+  // Workspace-wide wake-ups reconcile every area.
   await until(
-    () => streams.every((s, i) => s.events.length > before[i]),
+    () =>
+      streams.every((s, i) =>
+        s.events.slice(rolledBack[i]).some((e) => e.topics.includes('orders')),
+      ),
     'burst',
   );
-  await wait(150);
-  const burstInvalidations = streams.map((s, i) => s.events.length - before[i]);
+  const burst = await drain();
+  const burstInvalidations = streams.map((s, i) => burst[i] - rolledBack[i]);
   expect(burstInvalidations.every((count) => count > 0 && count < 10)).toBe(
     true,
   );
   expect((await count()).metrics[0].observedCount).toBe(1);
-  const isolated = streams.map((s) => s.events.length);
+  // Another workspace's wake-up would reconcile every area, orders included.
   await f.db.owner.query(
     "SELECT pg_notify('luma_metrics','00000000-0000-4000-8000-000000000000')",
   );
-  await wait(200);
-  expect(streams.map((s) => s.events.length)).toEqual(isolated);
+  const isolated = await drain();
+  expect(orderEvents(burst, isolated)).toEqual([]);
   // Kill both process listeners. Each publishes degraded state and reconciles after LISTEN.
   const start = performance.now();
   await f.db.owner.query(

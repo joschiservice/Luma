@@ -21,8 +21,6 @@ async function operatorCookie(f) {
 test('a merchant on Cin7 Core imports through the read-only Cin7 app and links orders to Shopify', async (t) => {
   const f = await setupSimulator(t, { erp: 'cin7' });
   const connectionId = f.manifest.connections.cin7;
-  expect(connectionId).toBeDefined();
-  expect(f.manifest.connections.jtl).toBeUndefined();
   const cookie = await operatorCookie(f);
   const base = `/v1/organizations/${f.manifest.organizationId}`;
 

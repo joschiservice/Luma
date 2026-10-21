@@ -763,77 +763,6 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     ).toHaveLength(1);
   });
 
-  it('leaves a supplier send uncertain on a delivery report from an unauthenticated sender', async () => {
-    const { reply } = await supplierDraft();
-    const requested = await messaging.replies.request(alice(), reply.id, {
-      id: randomUUID(),
-    });
-    await messaging.replies.decide(bob(), reply.id, {
-      decisionId: requested.decisionId!,
-      outcome: 'approved',
-    });
-    expect((await messaging.replies.check(alice(), reply.id)).state).toBe(
-      'sent',
-    );
-    const at = new Date().toISOString();
-    mailbox.push({
-      providerMessageId: `forged-bounce-${reply.id}`,
-      data: {
-        thread: { externalId: `new-${reply.id}`, scopeKey: '' },
-        rfcMessageId: `forged.${reply.id}@attacker.example`,
-        inReplyTo: `luma.${reply.id}@shop.example`,
-        references: [],
-        direction: 'inbound',
-        from: { address: 'mailer-daemon@attacker.example', name: null },
-        senderAuthentication: 'unaligned',
-        to: [ops],
-        cc: [],
-        replyTo: [],
-        subject: 'Delivery failure',
-        text: 'Permanent failure',
-        truncated: false,
-        sentAt: at,
-        receivedAt: at,
-        labels: ['INBOX'],
-        attachments: [],
-        deliveryFailure: {
-          originalMessageId: `luma.${reply.id}@shop.example`,
-          recipient: anna.address,
-          status: '5.1.1',
-        },
-      },
-    });
-    await messaging.store.transaction(tenant, async (tx) => {
-      const row = await tx.outbound.get(reply.id, true);
-      if (row)
-        await tx.outbound.update({
-          ...row,
-          document: {
-            ...row.document,
-            deliveryCheckedAt: '2026-01-01T00:00:00Z',
-          },
-        });
-    });
-    await messaging.replies.pass(alice());
-    // Reading the thread again proves acceptance only; it must not settle delivery.
-    await messaging.replies.pass(alice());
-    await messaging.replies.check(alice(), reply.id);
-    const uncertain = await messaging.replies.get(alice(), reply.id);
-    expect(uncertain.state).toBe('uncertain');
-    expect(uncertain.stateReason).toContain('could not verify');
-    expect(
-      supplierEvents
-        .filter((event) => event.id === reply.id)
-        .map((e) => e.state),
-    ).toContain('uncertain');
-    expect(
-      supplierEvents.some(
-        (event) => event.id === reply.id && event.state === 'failed',
-      ),
-    ).toBe(false);
-    expect(await sendCount(reply.id)).toBe(1);
-  });
-
   /** Pushes a message into the supplier send's provider thread. */
   function pushToSend(
     outboundId: string,
@@ -896,7 +825,9 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
       decisionId: requested.decisionId!,
       outcome: 'approved',
     });
-    await messaging.replies.check(alice(), drafted.reply.id);
+    expect(
+      (await messaging.replies.check(alice(), drafted.reply.id)).state,
+    ).toBe('sent');
     pushToSend(drafted.reply.id, 'forged-report', {
       from: { address: 'mailer-daemon@attacker.example', name: null },
       senderAuthentication: 'unaligned',
@@ -909,15 +840,25 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
       },
     });
     await readSendAgain(drafted.reply.id);
+    // Reading the thread again proves acceptance only; it must not settle delivery.
+    await messaging.replies.pass(alice());
+    await messaging.replies.check(alice(), drafted.reply.id);
     const reply = await messaging.replies.get(alice(), drafted.reply.id);
     expect(reply).toMatchObject({
       state: 'uncertain',
+      stateReason: expect.stringContaining('could not verify'),
       canResolveDelivery: true,
       delivery: {
         report: { recipient: anna.address, status: '5.1.1' },
         resolution: null,
       },
     });
+    const states = supplierEvents
+      .filter((event) => event.id === reply.id)
+      .map((event) => event.state);
+    expect(states).toContain('uncertain');
+    expect(states).not.toContain('failed');
+    expect(await sendCount(reply.id)).toBe(1);
 
     return { ...drafted, reply };
   }

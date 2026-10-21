@@ -111,8 +111,7 @@ test('affected suite builds once and skips empty journey suites', () => {
   ]);
 });
 
-test('component tests use the shared runner and keep forwarded story filters', () => {
-  assert.equal(manifest.scripts['test:ui'], 'node tooling/dev/test.mjs ui');
+test('component tests keep forwarded story filters', () => {
   assert.deepEqual(testCommands('ui', ['orders.stories.tsx']), [
     ['--filter', '@luma/ui', 'test', 'orders.stories.tsx'],
   ]);

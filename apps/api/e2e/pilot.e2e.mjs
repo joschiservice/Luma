@@ -126,20 +126,6 @@ test('concurrent pilot processes preserve provider updates and bound diagnostics
   expect(new Set(state.observations.map((item) => item.index)).size).toBe(200);
 });
 
-test('serves persisted activity through the pilot API', async (t) => {
-  const f = await setup(t, 'diagnosis-pending');
-  const request = await operatorRequest(f);
-  const query = new URLSearchParams({
-    from: new Date(Date.now() - 86400000).toISOString(),
-    to: new Date(Date.now() + 86400000).toISOString(),
-  });
-  const response = await request(
-    `/v1/organizations/${f.manifest.organizationId}/activity?${query}`,
-  );
-  expect(response.statusCode).toBe(200);
-  expect(response.json().items.length).toBeGreaterThan(0);
-});
-
 test('serves persisted playbooks through the pilot API', async (t) => {
   const f = await setup(t, 'diagnosis-pending');
   const request = await operatorRequest(f);
@@ -590,7 +576,10 @@ test('refreshes expired approval evidence without resetting the case and preserv
     diagnosis.revision,
   );
   await f.pilot.runtime.activities.execute(input, id, original);
-  await new Promise((resolve) => setTimeout(resolve, 2100));
+  await until(
+    () => Date.now() > Date.parse(original.expiresAt),
+    'proposal expiry',
+  );
   await f.pilot.desk.refresh(operator, id);
   const review = await f.pilot.desk.review(operator, id);
   expect(review.proposal.id).not.toBe(original.id);

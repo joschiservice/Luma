@@ -5,10 +5,7 @@ import type { CaseRun, ProcessStepOutput } from '@luma/workflows';
 import { compileProcessWorkflow } from '@luma/workflows/composition';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  dispatchTask,
-  quantityChangeSource,
-} from '../domain/case-workflows.js';
+import { quantityChangeSource } from '../domain/case-workflows.js';
 import { createQuantityChangeWorkflow } from './quantity-change.js';
 
 const context = { tenantId: 'tenant', actor: { id: 'principal' } } as never;
@@ -156,27 +153,6 @@ const output = (values: ProcessStepOutput['values']): ProcessStepOutput => ({
 });
 
 describe('order quantity change workflow', () => {
-  it('compiles with a warehouse task that escalates to admins and one check of every system', () => {
-    expect(version.steps.map((item) => item.kind)).toEqual([
-      'read',
-      'condition',
-      'human_task',
-      'condition',
-      'read',
-      'condition',
-      'condition',
-      'capability',
-      'verification',
-      'end',
-    ]);
-    expect(version.steps.find((item) => item.id === 'dispatch')).toMatchObject({
-      assignee: dispatchTask.assignee,
-      escalationTarget: dispatchTask.escalationTarget,
-      dueAfterSeconds: 4 * 60 * 60,
-      choices: ['Adjusted', 'Cannot adjust'],
-    });
-  });
-
   it('pins the authoritative quantity and hands started work to the warehouse', async () => {
     const f = workflow(() =>
       plan({

@@ -11,9 +11,9 @@ const token = 'local-synthetic-simulator-token';
 
 /** Waits up to five seconds for an asynchronous condition. */
 async function until(condition) {
-  for (let attempt = 0; attempt < 50; attempt++) {
+  for (let attempt = 0; attempt < 200; attempt++) {
     if (await condition()) return;
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 

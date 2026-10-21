@@ -662,9 +662,15 @@ describe('draft generation', () => {
       replies: Reply[];
       message: RegExp;
       calls: number;
-      signal?: () => AbortSignal;
+      timeoutMs?: number;
+      cancel?: boolean;
     }[] = [
-      { replies: ['hang'], message: /took too long.*Try again/, calls: 1 },
+      {
+        replies: ['hang'],
+        message: /took too long.*Try again/,
+        calls: 1,
+        timeoutMs: 10,
+      },
       {
         replies: [{ error: 'provider_error' }],
         message: /couldn’t answer.*Try again/,
@@ -684,19 +690,28 @@ describe('draft generation', () => {
         message: /couldn’t turn.*Try again/,
         calls: 3,
       },
-      {
-        replies: ['hang'],
-        message: /cancelled/,
-        calls: 1,
-        signal: () => AbortSignal.timeout(20),
-      },
+      { replies: ['hang'], message: /cancelled/, calls: 1, cancel: true },
     ];
     for (const item of cases) {
-      const env = setup(item.replies, { timeoutMs: 100 });
+      const env = setup(
+        item.replies,
+        item.timeoutMs ? { timeoutMs: item.timeoutMs } : {},
+      );
       const request = describeRequest();
-      const failure = await env.generation
-        .describe(context('admin'), request, { signal: item.signal?.() })
+      const controller = new AbortController();
+      const pending = env.generation
+        .describe(context('admin'), request, {
+          signal: item.cancel ? controller.signal : undefined,
+        })
         .catch((error: unknown) => error);
+      if (item.cancel) {
+        // Cancel while the model call is in flight.
+        await vi.waitFor(() => expect(env.requests).toHaveLength(1), {
+          interval: 1,
+        });
+        controller.abort();
+      }
+      const failure = await pending;
       expect(failure).toMatchObject({
         statusCode: 503,
         message: expect.stringMatching(item.message),

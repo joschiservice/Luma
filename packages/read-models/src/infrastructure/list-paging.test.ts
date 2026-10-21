@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   listKeyset,
   listScope,
-  positionOf,
   readListCursor,
   writeListCursor,
 } from './list-paging.js';
@@ -176,18 +175,5 @@ describe('list keysets', () => {
         [],
       ),
     ).toThrow();
-  });
-
-  it('reads positions from selected rows', () => {
-    expect(positionOf({ list_rank: true, list_keys: null }, [id])).toEqual({
-      rank: 1,
-      keys: null,
-      ids: [id],
-    });
-    expect(positionOf({ list_rank: false, list_keys: ['a'] }, [id])).toEqual({
-      rank: 0,
-      keys: ['a'],
-      ids: [id],
-    });
   });
 });

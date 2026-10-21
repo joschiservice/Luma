@@ -39,11 +39,11 @@ describe.skipIf(!adminUrl)('simulator host', () => {
   }
 
   async function ready(id: string) {
-    for (let attempt = 0; attempt < 200; attempt++) {
+    for (let attempt = 0; attempt < 800; attempt++) {
       const run = await call<RunDetail>(`runs/${id}`);
       if (run.status === 'ready') return run;
       if (run.status === 'failed') throw new Error(run.error ?? 'failed');
-      await delay(100);
+      await delay(25);
     }
     throw new Error('Run did not become ready');
   }
@@ -373,18 +373,25 @@ describe.skipIf(!adminUrl)('simulator host', () => {
     }>('runs/host/journal?limit=5');
     expect(journal.items.length).toBe(5);
     expect(journal.nextCursor).not.toBeNull();
-    await delay(2_200);
-    const metrics = await call<{
-      series: { name: string; instance: string | null }[];
-    }>('runs/host/metrics?windowMs=3600000');
-    expect(metrics.series.map((series) => series.name)).toEqual(
-      expect.arrayContaining([
-        'orders.created',
-        'requests',
-        'requests.failed',
-        'latency.mean',
-      ]),
-    );
+    // Request metrics reach the database with the dispatcher's next batch write.
+    await expect
+      .poll(
+        async () =>
+          (
+            await call<{ series: { name: string }[] }>(
+              'runs/host/metrics?windowMs=3600000',
+            )
+          ).series.map((series) => series.name),
+        { timeout: 5_000 },
+      )
+      .toEqual(
+        expect.arrayContaining([
+          'orders.created',
+          'requests',
+          'requests.failed',
+          'latency.mean',
+        ]),
+      );
   });
 
   it('injects, recovers and scores incidents without Luma', async () => {
@@ -587,8 +594,9 @@ describe.skipIf(!adminUrl)('simulator host', () => {
       // The order's new customer is delivered too, under its own topic.
       const created = () =>
         deliveries.filter((delivery) => delivery.topic === 'orders/create');
-      for (let attempt = 0; attempt < 60 && created().length < 2; attempt++)
-        await delay(100);
+      await expect
+        .poll(() => created().length, { timeout: 6_000 })
+        .toBeGreaterThanOrEqual(2);
       expect(created()).toHaveLength(2);
       expect(created()[0]!.event).toBe(created()[1]!.event);
       expect(deliveries.every((delivery) => delivery.valid)).toBe(true);

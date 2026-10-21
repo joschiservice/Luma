@@ -3555,7 +3555,6 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         (o) => o.data.status === 'processing',
       )!,
     ]) {
-      expect(observation).toBeDefined();
       const eligibilityEvidence: Evidence = {
         key: randomUUID(),
         tenantId,

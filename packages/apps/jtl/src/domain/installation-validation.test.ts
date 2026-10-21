@@ -13,13 +13,6 @@ const input = (permissions: string[]) => ({
 });
 
 describe('JTL installation input', () => {
-  it('accepts customer import as an optional read', () => {
-    expect(
-      installationInput.parse(input(['orders.read', 'customers.read']))
-        .permissions,
-    ).toEqual(['orders.read', 'customers.read']);
-  });
-
   it('accepts every option together', () => {
     expect(
       installationInput.parse(

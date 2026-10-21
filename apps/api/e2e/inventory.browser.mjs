@@ -1,7 +1,7 @@
 /* global document */
 import { createObservability } from '@luma/platform/composition';
 
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -180,6 +180,7 @@ test('investigates stock differences, follows affected orders and preserves filt
     match: 'all',
     conditions: [{ field: 'available', op: 'lt', value: 0, source: 'lowest' }],
   });
+  const remembered = rememberedView(page, 'inventory');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Oversold by SKU');
@@ -195,7 +196,7 @@ test('investigates stock differences, follows affected orders and preserves filt
     path: '/tmp/luma320-inventory-view.png',
     fullPage: true,
   });
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/inventory`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page.getByRole('button', { name: /^Edit filter: Available/ }).waitFor();

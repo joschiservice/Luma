@@ -2,7 +2,7 @@
 import { createObservability } from '@luma/platform/composition';
 
 import { performanceReport } from '../../../tooling/performance/report.mjs';
-import { expect, test } from './browser-fixtures.mjs';
+import { expect, rememberedView, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -338,6 +338,7 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     .click();
   await expect(numberHeader).toHaveAttribute('aria-sort', 'descending');
   await page.getByText('Modified', { exact: true }).waitFor();
+  const remembered = rememberedView(page, 'orders');
   await page.getByRole('button', { name: 'Save as new view' }).click();
   const save = page.getByRole('dialog', { name: 'Save as new view' });
   await save.getByLabel('Name').fill('Placed orders');
@@ -352,7 +353,7 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   await page.screenshot({ path: '/tmp/luma286-orders-saved-view.png' });
 
   // Opening Orders without a view returns to the remembered one.
-  await page.waitForTimeout(1500);
+  expect(await remembered).toBe(viewId);
   await page.goto(`/app/${fixture.org.id}/orders`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
   await page

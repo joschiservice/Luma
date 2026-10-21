@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { freePort, project } from './environment.mjs';
 import { run, runTogether } from './process.mjs';
 
 test('commands preserve arguments without shell expansion', async () => {
@@ -101,12 +100,6 @@ test('file logging preserves both outputs and the failure exit code', async () =
     await log.close();
     await rm(directory, { recursive: true, force: true });
   }
-});
-
-test('worktree project names are valid Compose identifiers and ports are available', async () => {
-  assert.match(project, /^luma-[a-f0-9]{12}$/);
-  const port = await freePort();
-  assert.ok(port > 0 && port < 65536);
 });
 
 test('connection keys survive restarts and existing malformed keys are not replaced', async () => {

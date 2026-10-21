@@ -719,8 +719,9 @@ describe('JTL read adapter', () => {
         if (!order) return base.fetch(input, init);
         active += 1;
         peak = Math.max(peak, active);
-        // Holds each read open so overlapping requests are observable.
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        // Holds each read open past the current microtasks, so every read the adapter starts
+        // together is in flight at once.
+        await new Promise((resolve) => setImmediate(resolve));
         active -= 1;
 
         return Response.json(

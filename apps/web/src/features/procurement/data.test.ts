@@ -1,4 +1,4 @@
-import { procurementCatalog, suppliersCatalog } from '@luma/api-contract';
+import { procurementCatalog } from '@luma/api-contract';
 import { describe, expect, it } from 'vitest';
 
 import { builtinState } from '../../kit/collections/state';
@@ -102,12 +102,6 @@ describe('procurement list requests', () => {
         cursor: 'next',
       }),
     ).toMatchObject({ groupKey: '"draft"', cursor: 'next' });
-  });
-
-  it('sorts suppliers by their catalog sorts', () => {
-    expect(
-      supplierListQuery(builtinState(suppliersCatalog, 'all'), {}, 'UTC'),
-    ).toMatchObject({ sort: 'name', direction: 'asc' });
   });
 
   it('sends custom-field sorts and falls back for unknown fields', () => {

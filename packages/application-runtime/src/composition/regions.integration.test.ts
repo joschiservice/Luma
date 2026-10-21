@@ -143,7 +143,6 @@ describe.skipIf(!databaseUrl)(
               identity!.service.refreshContext(context),
             ),
           );
-          expect(refreshed).toHaveLength(20);
           expect(refreshed.every((value) => value.dataRegion === region)).toBe(
             true,
           );

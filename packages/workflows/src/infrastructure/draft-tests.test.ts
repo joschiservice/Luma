@@ -629,7 +629,12 @@ describe('draft test runs', () => {
     ).rejects.toThrow('Choose a saved test case or supply one.');
   });
 
-  it('limits concurrent runs, cancels running code and reads abandoned runs as failed', async () => {
+  it('limits concurrent runs, cancels running code and reads abandoned runs as failed', async (t) => {
+    // The service polls for cancellation every 200 ms; advance that interval instead of waiting it out.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    t.onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const gates: (() => void)[] = [];
     const signals: AbortSignal[] = [];
     const telemetry = (outcome: CodeTelemetry['outcome']): CodeTelemetry => ({
@@ -679,7 +684,7 @@ describe('draft test runs', () => {
     expect(Date.parse(first.expiresAt) - Date.parse(first.createdAt)).toBe(
       10_000,
     );
-    await vi.waitFor(() => expect(signals).toHaveLength(2));
+    await vi.waitFor(() => expect(signals).toHaveLength(2), { interval: 1 });
     await expect(f.service.start(owner, item.id, body())).rejects.toThrow(
       'The test runner is busy. Try again shortly.',
     );
@@ -687,8 +692,9 @@ describe('draft test runs', () => {
     // Cancelling stops the sandbox through the polled state; a late result is not recorded.
     const cancelled = await f.service.cancel(owner, item.id, first.id);
     expect(cancelled.state).toBe('cancelled');
+    await vi.advanceTimersByTimeAsync(200);
     await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true), {
-      timeout: 2000,
+      interval: 1,
     });
     gates[1]!();
     expect((await f.settle(owner, item.id, second.id)).result).toMatchObject({
@@ -982,12 +988,14 @@ describe('draft test runs', () => {
       'running',
       null,
     ]);
-    await vi.waitFor(async () =>
-      expect(
-        (await f.service.cases(member, item.id)).results.map(
-          (result) => result.state,
-        ),
-      ).toEqual(['completed', 'completed', null]),
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await f.service.cases(member, item.id)).results.map(
+            (result) => result.state,
+          ),
+        ).toEqual(['completed', 'completed', null]),
+      { interval: 1 },
     );
     const summary = await f.service.cases(member, item.id);
     expect(summary.results.map((result) => result.passed)).toEqual([
@@ -1014,10 +1022,12 @@ describe('draft test runs', () => {
       (await f.service.cases(owner, item.id)).results.map((r) => r.runId),
     ).toEqual([null, null, null]);
     await f.service.runAll(owner, item.id, { revision: 2 });
-    await vi.waitFor(async () =>
-      expect(
-        (await f.service.cases(owner, item.id)).results.map((r) => r.passed),
-      ).toEqual([true, false, null]),
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await f.service.cases(owner, item.id)).results.map((r) => r.passed),
+        ).toEqual([true, false, null]),
+      { interval: 1 },
     );
     expect(f.memory.runs.size).toBe(4);
 

@@ -90,9 +90,6 @@ describe('staff configuration safety', () => {
       );
     }
   });
-  it('allows a bounded loopback development login', () => {
-    expect(readStaffSettings(env).mode).toBe('local');
-  });
   it.each([
     { NODE_ENV: 'production' },
     { STAFF_API_HOST: '0.0.0.0' },

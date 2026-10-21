@@ -40,6 +40,20 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });
+  // Counts case stream resyncs, so a held read can wait for the next one.
+  await context.addInitScript(() => {
+    const Native = window.EventSource;
+    window.caseResyncs = 0;
+    window.EventSource = class extends Native {
+      constructor(url, options) {
+        super(url, options);
+        if (String(url).includes('/exceptions/'))
+          this.addEventListener('resync', () => {
+            window.caseResyncs += 1;
+          });
+      }
+    };
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   const errors = [];
@@ -452,7 +466,10 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   });
   await page.route(`**${caseApi}/timeline?**`, async (route) => {
     const laterPage = new URL(route.request().url()).searchParams.has('cursor');
-    if (slowRefresh) await new Promise((resolve) => setTimeout(resolve, 6500));
+    if (slowRefresh) {
+      const seen = await page.evaluate(() => window.caseResyncs);
+      await page.waitForFunction((count) => window.caseResyncs > count, seen);
+    }
     if (laterPage) await pageGate;
     await route.fulfill({
       json: {
@@ -475,7 +492,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   const recommendationSteps = issueSection('Overview').getByRole('listitem');
   const recommendations = await recommendationSteps.allTextContents();
   expect(recommendations.length).toBeGreaterThan(0);
-  // The request spans a second SSE heartbeat. It must finish without being cancelled.
+  // The request is held until the stream's next resync. It must finish without being cancelled.
   await page.waitForRequest((request) =>
     request.url().includes(`${caseApi}/timeline?`),
   );
