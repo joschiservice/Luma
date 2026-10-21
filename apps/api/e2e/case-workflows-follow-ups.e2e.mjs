@@ -5,6 +5,9 @@ import { expect, test } from 'vitest';
 import { caseWorkflowFixture } from './case-workflows-fixture.mjs';
 import { until } from './helpers.mjs';
 
+// Follow-up monitors only act on reads from the last five minutes, so these journeys import
+// their own shop instead of copying a prepared scenario whose reads may be older.
+
 /** The Needs you items a workflow handed to a person. */
 const handovers = async (f, definitionId) =>
   (
@@ -28,7 +31,6 @@ const scenario = async (f, name) =>
 
 test('a payment that stays pending goes to a person and leaves Needs you once it settles', async (t) => {
   const f = await caseWorkflowFixture(t, {
-    imported: true,
     detection: { followUps: { paymentWaitMs: 0 } },
   });
   const id = 'payment-follow-up';
@@ -71,7 +73,6 @@ test('a payment that stays pending goes to a person and leaves Needs you once it
 
 test('a return that arrived without a refund goes to a person, and Luma never refunds', async (t) => {
   const f = await caseWorkflowFixture(t, {
-    imported: true,
     detection: { followUps: { refundWaitMs: 0 } },
   });
   const id = 'refund-follow-up';
@@ -108,7 +109,6 @@ test('a return that arrived without a refund goes to a person, and Luma never re
 
 test('a silent supplier: Luma notes the follow-up, waits, and hands the order back to a buyer', async (t) => {
   const f = await caseWorkflowFixture(t, {
-    imported: true,
     detection: { followUps: { supplierWaitSeconds: 3 } },
   });
   const id = 'supplier-follow-up';
