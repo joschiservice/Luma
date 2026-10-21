@@ -85,6 +85,26 @@ export function createUpdateStore(database: TenantDatabase) {
           [tenant.tenantId, id, decisionId],
         ),
       ),
+    /**
+     * Runs `operation` while this update's start lock is held, so concurrent starts of one
+     * update run one after another, also across processes. A start that waited then finds the
+     * first start's execution instead of judging the update while that start changes it. The
+     * lock lives in a transaction that stays open until `operation` settles, which holds one
+     * pooled connection meanwhile.
+     */
+    exclusive: <T>(
+      tenant: TenantContext,
+      id: string,
+      operation: () => Promise<T>,
+    ) =>
+      database.transaction(tenant.tenantId, async (tx) => {
+        await tx.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+          [`starshipit-order-update:${tenant.tenantId}:${id}`],
+        );
+
+        return operation();
+      }),
     /** Mark before sending; concurrent starts and restarted workers cannot send twice. */
     send: (tenant: TenantContext, id: string) =>
       database.transaction(

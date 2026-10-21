@@ -360,11 +360,15 @@ export function createStarshipitUpdates(
       ? await policies.decision(tenant, saved.decision_id)
       : null;
     const record = execution && 'record' in execution ? execution.record : null;
+    // The send fence is stored before the provider write and commits on its own, so a
+    // concurrent start sees it while the dispatching attempt has not recorded its outcome yet.
+    // Its write already changed the order, so a reread would wrongly call the review changed.
+    const dispatched = !!record || !!saved.sent_at;
     const observeOnly =
       (await admission.writeMode?.(tenant, run.connectionId)) ===
       'observe_only';
     const eligible =
-      !record && !saved.closed && (await eligibility(tenant, run, reread));
+      !dispatched && !saved.closed && (await eligibility(tenant, run, reread));
     const current = eligible === 'current';
     const policyCurrent =
       decision?.policyVersion ===
@@ -380,7 +384,7 @@ export function createStarshipitUpdates(
     // An unfinished or failed refresh withholds approval and dispatch, but a later
     // independent read can restore eligibility. Inspection must not close that review.
     if (
-      !record &&
+      !dispatched &&
       (eligible === 'changed' ||
         !policyCurrent ||
         decision?.outcome === 'denied' ||
@@ -400,7 +404,7 @@ export function createStarshipitUpdates(
           ? 'verified'
           : execution?.state === 'not_executed'
             ? 'not_executed'
-            : record
+            : dispatched
               ? 'uncertain'
               : unavailable
                 ? 'unavailable'
@@ -415,14 +419,14 @@ export function createStarshipitUpdates(
                       ? 'approval_required'
                       : 'preview',
       canExecute:
-        !record &&
+        !dispatched &&
         current &&
         policyCurrent &&
         approved &&
         tenant.actor.id === run.action.proposedBy.id &&
         !observeOnly,
       canApprove:
-        !record &&
+        !dispatched &&
         current &&
         policyCurrent &&
         hasPermission(tenant, 'decisions.respond') &&
@@ -739,12 +743,16 @@ export function createStarshipitUpdates(
       if (saved.document.action.proposedBy.id !== tenant.actor.id)
         throw forbidden('Only the requester can send this correction.');
       await bind(tenant, saved.document);
-      const result = await admission.execute(tenant, {
-        runId: saved.document.id,
-        stepId: 'update',
+      // A concurrent start waits and then receives this start's execution, so neither can
+      // close the review or replace its decision while the other one sends.
+      await store.exclusive(tenant, saved.document.id, async () => {
+        const result = await admission.execute(tenant, {
+          runId: saved.document.id,
+          stepId: 'update',
+        });
+        if ('decision' in result)
+          await store.decision(tenant, saved.document.id, result.decision.id);
       });
-      if ('decision' in result)
-        await store.decision(tenant, saved.document.id, result.decision.id);
 
       return view(tenant, (await store.get(tenant, saved.document.id))!);
     },
