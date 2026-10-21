@@ -16,6 +16,7 @@ import { mailboxName, worldModel } from '../engine/model.js';
 import { type World, worldInstance } from '../engine/world.js';
 import { createPgStore, type RecordTable } from '../pg-store.js';
 import { readRun, type RunRecord, saveRun } from './runs.js';
+import { cacheReads } from './stores.js';
 
 const minute = 60_000;
 
@@ -218,13 +219,23 @@ export async function withRun<T>(
     if (!run)
       throw Object.assign(new Error('Run not found'), { statusCode: 404 });
     const sinks = createSinks();
-    const world = createWorld(
-      run,
-      (instance) =>
-        createPgStore(client, tableFor(run, instance), run.id, instance),
-      sinks,
-      { now: run.now, live: true },
-    );
+    // The run lock keeps other writers out, so each instance's reads can be remembered.
+    const stores = new Map<string, RecordStore>();
+    const store = (instance: string) => {
+      let value = stores.get(instance);
+      if (!value) {
+        value = cacheReads(
+          createPgStore(client, tableFor(run, instance), run.id, instance),
+        );
+        stores.set(instance, value);
+      }
+
+      return value;
+    };
+    const world = createWorld(run, store, sinks, {
+      now: run.now,
+      live: true,
+    });
     const result = await work({ client, run, world, sinks });
     run.now = Math.max(run.now, Math.round(world.now));
     await saveRun(client, run);

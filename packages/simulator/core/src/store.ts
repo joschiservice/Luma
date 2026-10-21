@@ -200,7 +200,21 @@ export function createMemoryStore(snapshot?: MemorySnapshot) {
         (order === 'updated'
           ? a.updatedAt - b.updatedAt || a.seq - b.seq
           : a.seq - b.seq);
-      let rows = select(query).sort(compare);
+      let rows = select(query);
+      // The engine asks for the first record often, such as its earliest event; that
+      // needs one pass rather than a sort.
+      if (query.limit === 1 && !query.after && !query.offset) {
+        const first = rows.reduce<StoredRecord | undefined>(
+          (best, row) => (!best || compare(row, best) < 0 ? row : best),
+          undefined,
+        );
+
+        return {
+          items: first ? [structuredClone(first) as StoredRecord<T>] : [],
+          next: rows.length > 1 && first ? encodeCursor(first, order) : null,
+        };
+      }
+      rows.sort(compare);
       if (query.after) {
         const position = decodeCursor(query.after, order);
         const marker = { ...position } as StoredRecord;

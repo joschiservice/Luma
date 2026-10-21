@@ -39,6 +39,7 @@ import {
   tableFor,
   withRun,
 } from './session.js';
+import { readOnly } from './stores.js';
 
 /** What the HTTP route sends back: a provider response, or a dropped connection. */
 export type DispatchResult =
@@ -120,7 +121,7 @@ function faultResponse(
 /**
  * Executes Luma's provider requests with the run's failure behavior: service health, manual
  * fault rules, the chaos profile, provider rate limits, latency and lost responses. Writes run
- * under the run lock with the engine; reads use their own short transaction.
+ * under the run lock with the engine; reads run outside it and cannot write records.
  */
 export function createDispatcher(pool: Pool) {
   const occurrences = new Map<string, number>();
@@ -287,23 +288,19 @@ export function createDispatcher(pool: Pool) {
 
         return response;
       });
+    // Reads need no transaction: at read committed it would add no consistency, only round
+    // trips. The read-only stores keep handlers from writing outside the run lock.
     const client = await pool.connect();
     try {
-      await client.query('BEGIN READ ONLY');
-      const sinks = createSinks();
       const world = createWorld(
         run,
-        (store) => createPgStore(client, tableFor(run, store), run.id, store),
-        sinks,
+        (store) =>
+          readOnly(createPgStore(client, tableFor(run, store), run.id, store)),
+        createSinks(),
         { now: currentTime(run), live: true },
       );
-      const response = await handleWith(kind, world, name, [], request);
-      await client.query('COMMIT');
 
-      return response;
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
+      return await handleWith(kind, world, name, [], request);
     } finally {
       client.release();
     }

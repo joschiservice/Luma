@@ -182,7 +182,7 @@ The manifest `.luma/simulator/pilot.json` binds each connection to its run and i
 
 Provider records, engine state and ground truth live in the PostgreSQL database `luma_simulator`, on the same server as Luma's database but never in it. Luma's runtime roles have no access to it, so Luma learns about provider data only through the adapters. The `luma_simulator` role reads and writes data; simulator migrations run with the owner connection.
 
-Each provider owns a record table with one row per provider record. Provider writes and clock ticks lock the run row, so they serialize per run; reads use their own short transactions. Request metrics and journal entries are written in batches.
+Each provider owns a record table with one row per provider record. Provider writes and clock ticks lock the run row, so they serialize per run. Inside that lock nobody else changes the run's records, so a transaction remembers each record read until it writes a record of the same kind; this keeps idle simulated minutes free of database reads. Provider reads run without the lock or a transaction and cannot write records. Request metrics and journal entries are written in batches.
 
 The control API at `/api` requires the bearer token (`LUMA_SIMULATOR_TOKEN`), and `@luma/simulator-contract` defines its schemas for the panel, pilot and tests. Run creation returns immediately and provisions in the background.
 
