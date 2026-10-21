@@ -11,7 +11,7 @@ export default defineConfig({
     hookTimeout: 30_000,
     // Each file provisions databases and processes; leave capacity for those services.
     maxWorkers: Math.min(
-      4,
+      6,
       Math.max(1, Math.floor(availableParallelism() / 2)),
     ),
     sequence: { hooks: 'stack' },
