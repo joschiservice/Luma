@@ -145,7 +145,10 @@ suites cannot run. Report that limitation when relying on it.
   every test seconds. React's development-only checks therefore don't run in journeys.
 - Timing scenarios are not journeys: `pnpm test:performance` runs them one at a time after
   the build. See [performance budgets](benchmarking.md#performance-budgets).
-- Retries are disabled so flaky failures stay visible. Reproduce with
+- Focused journey commands don't retry, so flaky failures stay visible. `pnpm test:full`
+  retries a failed journey once, because the full run's load makes rare timing failures
+  likely, and lists every journey that passed only on retry as flaky; a second failure
+  fails the run. Fix listed journeys rather than relying on the retry. Reproduce with
   `pnpm test:browser --workers=1`, `pnpm test:e2e --maxWorkers=1`, `--grep "<name>"`,
   `--headed` or `--shard=1/4`.
 - Browser failures keep traces and screenshots in `.luma/playwright`; open the report with

@@ -50,10 +50,11 @@ const suites = {
     // Includes the build every later step uses; Turbo leaves cached outputs untouched.
     ['check'],
     // The shorter suites fit alongside backend journeys. Both journey suites at once saturate
-    // a 14-core machine, and journeys with tight time limits then fail.
+    // a 14-core machine, and journeys with tight time limits then fail. A journey that fails
+    // once under load is retried and reported as flaky; failing twice still fails the run.
     {
       parallel: [
-        ['--filter', '@luma/api', 'test:e2e'],
+        ['--filter', '@luma/api', 'test:e2e', '--retry=1'],
         ['test:region-eu'],
         ['test:simulator'],
         ['test:evaluation'],
@@ -61,7 +62,7 @@ const suites = {
         ['evaluate:code'],
       ],
     },
-    ['--filter', '@luma/api', 'test:browser'],
+    ['--filter', '@luma/api', 'test:browser', '--retries=1'],
     // Last and on their own, so a busy machine does not distort the measurements.
     ...performanceScenarios,
   ],
