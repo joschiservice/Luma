@@ -13,6 +13,9 @@ const build = [
   '--filter=@luma/staff-web',
 ];
 
+/** The journey that checks Shopify admission under its own concurrent import load. */
+const admissionJourney = 'e2e/shopify-admission.e2e.mjs';
+
 /**
  * A pnpm command, or a group of independent pnpm commands that run concurrently.
  * @typedef {string[] | { parallel: string[][] }} Step
@@ -45,7 +48,7 @@ const suites = {
     // a 14-core machine, and journeys with tight time limits then fail.
     {
       parallel: [
-        ['--filter', '@luma/api', 'test:e2e'],
+        ['--filter', '@luma/api', 'test:e2e', '--exclude', admissionJourney],
         ['test:region-eu'],
         ['test:simulator'],
         ['test:evaluation'],
@@ -53,6 +56,8 @@ const suites = {
         ['evaluate:code'],
       ],
     },
+    // It measures responsiveness beside its own importing processes, not a busy machine.
+    ['--filter', '@luma/api', 'test:e2e', admissionJourney],
     ['--filter', '@luma/api', 'test:browser'],
   ],
   workflows: [
