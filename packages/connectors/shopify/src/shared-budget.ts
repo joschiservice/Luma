@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { ConnectorError } from '@luma/connector-core';
 import { fail } from '@luma/connector-core/transport';
 import { z } from 'zod';
 
@@ -47,6 +48,23 @@ export function createSharedReadBudget(options: {
       fail('unavailable', 1000, 'ADMISSION_DEFERRED');
     }
   };
+  /**
+   * Runs a step that happens before the request leaves. Its failures sent nothing, so they are
+   * marked not dispatched with their retry advice kept; execution can then tell a deferred
+   * action from one whose outcome is unknown.
+   */
+  const beforeSending = async <T>(step: () => Promise<T>): Promise<T> => {
+    try {
+      return await step();
+    } catch (error) {
+      if (error instanceof ConnectorError && !error.failure.dispatch)
+        throw new ConnectorError({
+          ...error.failure,
+          dispatch: 'not_dispatched',
+        });
+      throw error;
+    }
+  };
   const feedback: BudgetFeedback = {
     observe: () => undefined,
     async cooldown(milliseconds) {
@@ -71,34 +89,36 @@ export function createSharedReadBudget(options: {
         (progressed
           ? (options.continuationWaitMs ?? options.maxWaitMs ?? 2000)
           : (options.maxWaitMs ?? 2000));
-      for (;;) {
-        if (admission?.signal?.aborted) fail('timeout');
-        const [admitted, wait] = await call([
-          'acquire',
-          id,
-          digest,
-          purpose,
-          String(options.leaseMs ?? 125000),
-          String(options.concurrency ?? 4),
-          admission?.mutation ? '1' : '0',
-          calculated,
-        ]);
-        advisedDelay = admitted ? 0 : wait;
-        if (admitted) break;
-        if (performance.now() + wait > deadline)
-          fail('rate_limited', wait, 'ADMISSION_DEFERRED');
-        try {
-          await delay(Math.min(wait, 100), undefined, {
-            signal: admission?.signal,
-          });
-        } catch {
+      await beforeSending(async () => {
+        for (;;) {
+          if (admission?.signal?.aborted) fail('timeout');
+          const [admitted, wait] = await call([
+            'acquire',
+            id,
+            digest,
+            purpose,
+            String(options.leaseMs ?? 125000),
+            String(options.concurrency ?? 4),
+            admission?.mutation ? '1' : '0',
+            calculated,
+          ]);
+          advisedDelay = admitted ? 0 : wait;
+          if (admitted) break;
+          if (performance.now() + wait > deadline)
+            fail('rate_limited', wait, 'ADMISSION_DEFERRED');
+          try {
+            await delay(Math.min(wait, 100), undefined, {
+              signal: admission?.signal,
+            });
+          } catch {
+            fail('timeout');
+          }
+        }
+        if (admission?.signal?.aborted) {
+          await call(['cancel', id, digest, purpose]);
           fail('timeout');
         }
-      }
-      if (admission?.signal?.aborted) {
-        await call(['cancel', id, digest, purpose]);
-        fail('timeout');
-      }
+      });
       let dispatched = false;
       let observed: string[] = [];
       let cooldown = 0;
@@ -106,10 +126,11 @@ export function createSharedReadBudget(options: {
         dispatched() {
           dispatched = true;
         },
-        async beforeSend() {
-          const [valid] = await call(['check', id, digest, purpose]);
-          if (!valid) fail('unavailable', 1000, 'ADMISSION_DEFERRED');
-        },
+        beforeSend: () =>
+          beforeSending(async () => {
+            const [valid] = await call(['check', id, digest, purpose]);
+            if (!valid) fail('unavailable', 1000, 'ADMISSION_DEFERRED');
+          }),
         observe(_shape, requested, available, rate, actual, capacity) {
           dispatched = true;
           observed = [

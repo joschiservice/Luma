@@ -103,7 +103,7 @@ describe('shared Shopify admission failure boundaries', () => {
     expect(run.mock.calls.at(-1)?.[2]?.[0]).toBe('cancel');
   });
 
-  it('does not send or retry a mutation that cannot obtain capacity', async () => {
+  it('does not send a mutation that cannot obtain capacity and reports it as not sent', async () => {
     const run = vi.fn(async () => [0, 250, 0]);
     const fetch = vi.fn<typeof globalThis.fetch>();
     const client = createClient({
@@ -119,7 +119,13 @@ describe('shared Shopify admission failure boundaries', () => {
     await expect(
       client('mutation Apply { applied }', {}),
     ).rejects.toMatchObject({
-      failure: { providerCode: 'ADMISSION_DEFERRED', effect: 'none' },
+      failure: {
+        providerCode: 'ADMISSION_DEFERRED',
+        effect: 'none',
+        dispatch: 'not_dispatched',
+        retry: 'after_delay',
+        retryAfterMs: 250,
+      },
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
