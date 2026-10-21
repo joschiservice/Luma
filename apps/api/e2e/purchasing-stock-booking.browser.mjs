@@ -492,7 +492,8 @@ test('shows a procurement-only member restricted native stock booking rows and t
     .filter({ hasText: notice })
     .filter({ hasText: 'Independently verified' });
   await expect(verified).toHaveCount(1);
-  await expect(verified.getByText('38')).toHaveCount(0);
+  // The booked quantity stays hidden; a substring match would also find times such as 10:38.
+  await expect(verified.getByText(/(?<![\d:.,])38(?![\d:.,])/)).toHaveCount(0);
   await expect(verified.getByText(/Recorded by/)).toHaveCount(0);
   await verified.getByText(/^Evidence \(/).click();
   await expect(
