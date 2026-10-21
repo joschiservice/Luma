@@ -17,7 +17,6 @@ async function operatorCookie(f) {
     .join('; ');
 }
 
-// Cin7 admits about one request per second, so the import takes longer than other journeys.
 test('a merchant on Cin7 Core imports through the read-only Cin7 app and links orders to Shopify', async (t) => {
   const f = await setupSimulator(t, { erp: 'cin7' });
   const connectionId = f.manifest.connections.cin7;

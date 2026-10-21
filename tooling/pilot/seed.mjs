@@ -81,6 +81,7 @@ export async function seedPilot(
       ? {
           simulation: (connection) =>
             createSimulationTransport(manifest.simulator)(connection),
+          cin7RequestIntervalMs: manifest.simulator.cin7RequestIntervalMs,
         }
       : {}),
     refreshContext: identity.service.refreshContext,
@@ -99,6 +100,7 @@ export async function seedPilot(
         featureEnabled,
         jtlEndpoints: [],
         simulation: createSimulationTransport(manifest.simulator),
+        cin7RequestIntervalMs: manifest.simulator.cin7RequestIntervalMs,
       })(...args);
     },
   });

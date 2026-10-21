@@ -130,6 +130,8 @@ export async function createPilot(
     const simulation = manifest.simulator
       ? createSimulationTransport(manifest.simulator)
       : undefined;
+    // Set only by journeys whose simulator run does not rate-limit; pacing stays otherwise.
+    const cin7RequestIntervalMs = manifest.simulator?.cin7RequestIntervalMs;
     // Owners reread stale stock and order sources right before they act; created once
     // capabilities exist. Plans come from the Orders workspace composed below.
     let stockRefresh = null;
@@ -163,6 +165,7 @@ export async function createPilot(
       ...(simulation
         ? {
             simulation,
+            cin7RequestIntervalMs,
             // Signed simulator webhooks reach the real Shopify change route.
             env: simulatorShopifyEnv(manifest.simulator.webhookSecret, env),
             customerAccess: { contact: true, address: true },
@@ -177,7 +180,11 @@ export async function createPilot(
         ]),
       ),
       verify: simulation
-        ? createInstallationVerifier({ simulation, jtlEndpoints: [] })
+        ? createInstallationVerifier({
+            simulation,
+            cin7RequestIntervalMs,
+            jtlEndpoints: [],
+          })
         : async () => {
             throw new Error(
               'Synthetic pilot does not verify connected-system health',
@@ -302,6 +309,7 @@ export async function createPilot(
       internalSource: createSalesReadSource(db, observability),
       installations,
       simulation,
+      cin7RequestIntervalMs,
       jtlEndpoints: [],
       customerAccess: { contact: true, address: true },
       approveJtlEndpoint: async () => {

@@ -83,6 +83,11 @@ export async function createSimulatorEnvironment({
       runId: 'operations',
       ...simulatorInstances(run),
       ...(demo ? { demo } : {}),
+      // Cin7 pacing only spaces requests below a provider rate limit. Without simulated limits
+      // it would make journeys wait about a second per request without testing anything.
+      ...(run.chaosProfile.transport.rateLimits
+        ? {}
+        : { cin7RequestIntervalMs: 0 }),
     });
     pilot = await createPilot(env, directory, manifest, temporal, {
       ...(modelGateway ? { modelGateway } : {}),
