@@ -294,8 +294,21 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
   }
 
   return {
-    async discover(context: TenantContext, connectionId: string) {
-      const connection = await resolve(context, connectionId);
+    /**
+     * Lists the capabilities an active connection offers now, with their descriptors. Pass
+     * `capability` when only that one matters: the connection then builds only that adapter,
+     * which saves the credential and grant reads every other capability would cost.
+     */
+    async discover(
+      context: TenantContext,
+      connectionId: string,
+      capability?: Capability,
+    ) {
+      const connection = await resolve(
+        context,
+        connectionId,
+        capability ? { capability } : undefined,
+      );
       if (!connection) return [];
 
       return Object.entries(connection.capabilities).map(

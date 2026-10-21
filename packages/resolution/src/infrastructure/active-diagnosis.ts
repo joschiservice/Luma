@@ -210,7 +210,7 @@ export async function planActiveDiagnosis(
   const requests: CapabilityRequest<ReadCapability>[] = [];
   for (const entry of requested) {
     const descriptor = (
-      await reader.discover(context, entry.connectionId)
+      await reader.discover(context, entry.connectionId, entry.capability)
     ).find((item) => item.capability === entry.capability);
     if (!descriptor) return null;
     requests.push({ ...entry, version: descriptor.version });

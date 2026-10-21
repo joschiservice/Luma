@@ -146,8 +146,8 @@ export function createActiveDiagnosisRereader(options: {
             retryAfter: new Date(notBefore).toISOString(),
           };
         const boundedReader: CapabilityReader = {
-          discover: async (acting, connectionId) =>
-            reader.discover(await authorized(acting), connectionId),
+          discover: async (acting, connectionId, capability) =>
+            reader.discover(await authorized(acting), connectionId, capability),
           read: async (acting, request) => {
             signal.throwIfAborted();
             if (!(await options.enabled(acting.tenantId)))
