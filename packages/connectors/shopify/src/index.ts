@@ -19,7 +19,7 @@ export {
 
 export { verifyWebhook } from './webhooks.js';
 
-export { calculateQueryCost, maxQueryCost } from './query-cost.js';
+export { calculateQueryCost } from './query-cost.js';
 
 export { createReadBudget, type ReadBudget } from './read-budget.js';
 
