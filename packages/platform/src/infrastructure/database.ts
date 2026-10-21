@@ -17,16 +17,16 @@ export function createTenantDatabase(
       return measure('db.transaction', async () => {
         const client = await pool.connect();
         try {
+          const begin = options?.readOnlySnapshot
+            ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
+            : settings.readOnly?.()
+              ? 'BEGIN READ ONLY'
+              : 'BEGIN';
+          // One round trip opens the transaction and scopes it to the tenant. A query with
+          // several statements takes no parameters, so the tenant ID is an escaped literal.
           await client.query(
-            options?.readOnlySnapshot
-              ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
-              : settings.readOnly?.()
-                ? 'BEGIN READ ONLY'
-                : 'BEGIN',
+            `${begin}; SELECT set_config('app.tenant_id', ${client.escapeLiteral(tenantId)}, true)`,
           );
-          await client.query("SELECT set_config('app.tenant_id', $1, true)", [
-            tenantId,
-          ]);
           const result = await operation(client);
           await client.query('COMMIT');
 
