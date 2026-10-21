@@ -59,13 +59,6 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   expect(await table.getByRole('row').count()).toBe(4);
   await expect(table).toContainText('Held: Incorrect address.');
   await expect(table).toContainText('Delivery attempted · 4521-8876-0012.');
-  await page.screenshot({
-    path: '/tmp/luma102-list-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({ path: '/tmp/luma102-list-dark.png', fullPage: true });
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   // A tracking number search keeps the view in the address.
   await page.getByRole('tab', { name: /^All/ }).click();
@@ -93,20 +86,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
     .waitFor();
   await expect(page.getByText('Hold added: Incorrect address')).toHaveCount(2);
   await page.getByRole('link', { name: 'stuck fulfillment' }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma102-detail-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma102-detail-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma102-detail-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -114,7 +94,6 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   // The order links back to the same fulfillment.
@@ -178,10 +157,6 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({
-    path: '/tmp/luma318-fulfillment-view.png',
-    fullPage: true,
-  });
 
   // Opening Fulfillment without a view returns to the remembered one.
   expect(await remembered).toBe(viewId);

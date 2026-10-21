@@ -153,15 +153,7 @@ test('authors reviewed live views and business fields with search, history and r
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-light.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByRole('link', { name: '#ADAPTIVE', exact: true }),
@@ -171,10 +163,6 @@ test('authors reviewed live views and business fields with search, history and r
   await page.keyboard.press('Tab');
   await expect(menu).not.toBeFocused();
   await expect(page.locator(':focus')).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-narrow.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 
   // Shared metadata never grants writes or cross-tenant record access.

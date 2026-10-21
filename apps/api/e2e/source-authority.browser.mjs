@@ -135,21 +135,8 @@ test('reviews source authority, safely retries an override and resolves each ord
     connectionId: orders.erp,
     lines: [{ quantity: '7' }],
   });
-  await page.screenshot({
-    path: '/tmp/luma171-authority-desktop.png',
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-  await page.screenshot({
-    path: '/tmp/luma171-authority-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(input).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma171-authority-narrow.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`/app/${f.org.id}/orders/${id}`);
   await page.getByRole('button', { name: /^Show all \d+ facts$/ }).click();
@@ -162,9 +149,5 @@ test('reviews source authority, safely retries an override and resolves each ord
   await expect(
     comparison.getByRole('row').filter({ hasText: 'Order items' }),
   ).toContainText('JTL-Wawi (override)');
-  await page.screenshot({
-    path: '/tmp/luma171-order-authority.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

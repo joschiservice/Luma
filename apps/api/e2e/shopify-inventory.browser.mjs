@@ -73,19 +73,11 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
     panel.getByText('Quantity not verified', { exact: true }),
   ).toBeVisible();
   expect(mutations).toHaveLength(1);
-  await page.screenshot({
-    path: '/tmp/luma-106-stock-light.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(
     panel.getByRole('button', { name: 'Verify stock' }),
   ).toBeEnabled();
-  await page.screenshot({
-    path: '/tmp/luma-106-stock-dark-mobile.png',
-    fullPage: true,
-  });
   delayVerification(false);
   await panel.getByRole('button', { name: 'Verify stock' }).click();
   await expect(
@@ -125,10 +117,6 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-204-attribution-dark-mobile.png',
-    fullPage: true,
-  });
   expect(mutations).toHaveLength(1);
   expect(errors).toEqual([]);
 });

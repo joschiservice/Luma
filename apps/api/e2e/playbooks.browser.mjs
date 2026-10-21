@@ -1,6 +1,5 @@
 /* global document, innerWidth, window */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import {
@@ -93,11 +92,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .waitFor();
   await page.getByRole('heading', { name: 'Review activation' }).waitFor();
   await page.getByText('Off', { exact: true }).first().waitFor();
-  await mkdir('/tmp/luma72-browser', { recursive: true });
-  await page.screenshot({
-    path: '/tmp/luma72-browser/overview-desktop.png',
-    fullPage: false,
-  });
   await page
     .getByRole('button', { name: 'Review activation', exact: true })
     .click();
@@ -184,10 +178,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   expect(await repair.getAttribute('href')).toContain(
     `#connection-${connectionId}`,
   );
-  await page.screenshot({
-    path: '/tmp/luma72-browser/blocked-desktop.png',
-    fullPage: false,
-  });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Workflows' })
@@ -302,7 +292,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page
     .getByRole('heading', { name: 'Recent runs', exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma72-browser/runs-desktop.png' });
   expect(await page.locator('body').innerText()).not.toMatch(/playbook/i);
 
   await page.getByRole('tab', { name: 'Setup' }).click();
@@ -310,11 +299,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
   await page.getByText('Scope and review details', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
-  await mkdir('/tmp/luma72-browser', { recursive: true });
-  await page.screenshot({
-    path: '/tmp/luma72-browser/detail-desktop.png',
-    fullPage: true,
-  });
   await page
     .getByRole('button', { name: 'Revoke activation', exact: true })
     .click();
@@ -341,7 +325,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma72-browser/runs-mobile.png' });
   await page.getByRole('tab', { name: 'How it works' }).click();
   await page.getByRole('heading', { name: 'Verify the result' }).waitFor();
   expect(
@@ -349,10 +332,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma72-browser/overview-mobile.png',
-    fullPage: false,
-  });
   await page.getByRole('tab', { name: 'Setup' }).click();
   await page.waitForURL((url) => url.hash === '#rules');
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
@@ -361,10 +340,6 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
       .getByRole('button', { name: 'Review activation', exact: true })
       .isEnabled(),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma72-browser/detail-mobile.png',
-    fullPage: true,
-  });
   await db.owner.query(
     "UPDATE memberships SET role='member' WHERE tenant_id=$1",
     [tenantId],

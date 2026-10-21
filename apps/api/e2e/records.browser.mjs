@@ -76,20 +76,12 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   await page.getByRole('link', { name: /#1000/ }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
   await page.getByRole('heading', { name: 'Data from sources' }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma97-record-desktop.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma97-record-mobile.png',
-    fullPage: true,
-  });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'All records' })

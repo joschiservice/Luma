@@ -117,10 +117,6 @@ test('creates, reviews and lists procurement records with saved views and safe r
     .click();
   await page.getByText('Draft → Open', { exact: true }).waitFor();
   const detailUrl = page.url();
-  await page.screenshot({
-    path: '/tmp/luma69-order-desktop.png',
-    fullPage: true,
-  });
   await page.reload();
   await page.getByText('Draft → Open', { exact: true }).waitFor();
   await page
@@ -128,10 +124,6 @@ test('creates, reviews and lists procurement records with saved views and safe r
     .getByRole('link', { name: 'Procurement' })
     .click();
   await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma69-list-desktop.png',
-    fullPage: true,
-  });
   await page
     .getByRole('searchbox', { name: 'Search purchase orders' })
     .fill('missing');
@@ -214,10 +206,6 @@ test('creates, reviews and lists procurement records with saved views and safe r
     .getByRole('rowheader', { name: 'Northstar Supply', exact: true })
     .waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma69-suppliers-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -229,10 +217,6 @@ test('creates, reviews and lists procurement records with saved views and safe r
   await page
     .getByRole('heading', { name: 'PO-2026-001', exact: true })
     .waitFor();
-  await page.screenshot({
-    path: '/tmp/luma69-order-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

@@ -103,7 +103,6 @@ test('opens the exact records behind a chart point and returns to them', async (
   await expect(sheet).toContainText('matches the chart');
   const total = Number(/: (\d+) orders?/.exec(names[day])[1]);
   expect(await sheet.getByRole('listitem').count()).toBe(total);
-  await page.screenshot({ path: '/tmp/luma107-sheet-light.png' });
 
   // A record opens with a way back to these records.
   const drill = page.url();
@@ -151,11 +150,8 @@ test('opens the exact records behind a chart point and returns to them', async (
     .getByRole('heading', { name: /No progress · 2–7 days$/ })
     .waitFor();
   await expect(sheet.getByRole('link', { name: /^#201/ })).toBeVisible();
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({ path: '/tmp/luma107-sheet-dark.png' });
   await page.keyboard.press('Escape');
   await checkScroll();
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   // The command menu opens a view directly.
   await page.keyboard.press('Control+k');
@@ -176,7 +172,6 @@ test('opens the exact records behind a chart point and returns to them', async (
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma107-narrow.png', fullPage: true });
 
   // The previous stretch opens its records like any chart point. Orders filter by whole
   // days, so no Orders link is offered for a stretch that ends at a time of day.

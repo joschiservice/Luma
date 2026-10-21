@@ -87,20 +87,6 @@ test('opens a return from its order, tells pending work from money returned and 
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const screenshot = async (name) => {
-    await page.screenshot({
-      path: `/tmp/luma103-${name}-light.png`,
-      fullPage: true,
-    });
-    await page.evaluate(() => document.documentElement.classList.add('dark'));
-    await page.screenshot({
-      path: `/tmp/luma103-${name}-dark.png`,
-      fullPage: true,
-    });
-    await page.evaluate(() =>
-      document.documentElement.classList.remove('dark'),
-    );
-  };
 
   // The order lists its returns; the pending refund is not money returned.
   await page.goto(`/app/${f.org.id}/orders/${r.orders[1002]}`);
@@ -122,12 +108,7 @@ test('opens a return from its order, tells pending work from money returned and 
     .getByText('Failed', { exact: true })
     .first()
     .waitFor();
-  await screenshot('detail');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma103-detail-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -147,12 +128,7 @@ test('opens a return from its order, tells pending work from money returned and 
   expect(
     await page.getByRole('link', { name: '#1003-R1', exact: true }).count(),
   ).toBe(0);
-  await screenshot('list');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma103-list-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -271,7 +247,6 @@ test('opens a return from its order, tells pending work from money returned and 
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await screenshot('board');
   expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/returns`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
@@ -305,12 +280,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await expect(timeline).toContainText('Warehouse received both items');
   await expect(timeline).toContainText('Refund payment pending');
   await expect(timeline).toContainText('Luma decision');
-  await screenshot('service');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma193-service-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

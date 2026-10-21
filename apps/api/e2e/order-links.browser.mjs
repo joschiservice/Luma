@@ -114,10 +114,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
   ).toBeVisible();
   const listed = await f.request(f.owner, `${f.base}/orders?q=SO-10`);
   expect(listed.items.map((item) => item.id)).toEqual([a]);
-  await page.screenshot({
-    path: '/tmp/luma117-order-linked-light.png',
-    fullPage: true,
-  });
   await page.goto(`/app/${f.org.id}/orders/${b}`);
   await expect(page).toHaveURL(new RegExp(`/orders/${a}`));
   await expect(
@@ -125,7 +121,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
       exact: false,
     }),
   ).toBeVisible();
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -135,7 +130,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     ),
   ).toBe(true);
   await openLinks();
-  await panel.screenshot({ path: '/tmp/luma117-order-linked-dark-mobile.png' });
   await panel
     .locator('li')
     .filter({ has: page.getByText('JTL-Wawi', { exact: true }) })

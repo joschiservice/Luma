@@ -1,6 +1,5 @@
 /* global document, window */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { createConnectionCoverage } from '@luma/connections/composition';
@@ -187,9 +186,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     .waitFor();
   await context.setOffline(false);
   await count('inventory.replenishment_unknown', 2);
-  await mkdir('/tmp/luma87-ui', { recursive: true });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma87-ui/desktop.png', fullPage: true });
   await section
     .locator('[data-metric="inventory.replenishment_unknown"]')
     .click();
@@ -197,11 +194,9 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({ path: '/tmp/luma87-ui/cohort.png', fullPage: true });
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma87-ui/mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

@@ -109,15 +109,7 @@ test('configures deadlines by keyboard and follows independently verified native
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma216-waiting-narrow-light.png',
-    fullPage: true,
-  });
   await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma216-waiting-narrow-dark.png',
-    fullPage: true,
-  });
   await f.command({ kind: 'refund-settle', order: f.providerOrderId });
   await waiting
     .getByRole('button', { name: 'Check progress', exact: true })

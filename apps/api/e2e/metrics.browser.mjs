@@ -1,5 +1,4 @@
 /* global document, window */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
@@ -63,11 +62,9 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
       .getByRole('button', { name: 'Next', exact: true })
       .isDisabled(),
   ).toBe(true);
-  await mkdir('/tmp/luma84-ui', { recursive: true });
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({ path: '/tmp/luma84-ui/desktop.png', fullPage: true });
   await page.keyboard.press('Escape');
   await expect
     .poll(() =>
@@ -78,7 +75,6 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     .toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma84-ui/mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -138,10 +134,6 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({
-    path: '/tmp/luma84-ui/mobile-cohort.png',
-    fullPage: true,
-  });
   // A live change keeps the page in place until the person asks for the latest records.
   await seed(26);
   await dialog.getByText('The matching orders changed').waitFor();
@@ -151,11 +143,5 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   expect(await dialog.getByText('The matching orders changed').count()).toBe(0);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await section.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma84-ui/populated.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

@@ -167,10 +167,6 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-a667004c-human-desktop-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -181,10 +177,6 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .not.toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-a667004c-human-mobile-light.png',
-    fullPage: true,
-  });
   await page.getByLabel('Answer', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await page.getByRole('option', { name: 'Started', exact: true }).click();

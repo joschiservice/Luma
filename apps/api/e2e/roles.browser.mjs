@@ -170,13 +170,5 @@ test('creates a custom role, invites with it, restricts views and applies edits 
   expect(
     await small.evaluate(() => document.documentElement.scrollWidth <= 390),
   ).toBe(true);
-  await small.screenshot({
-    path: '/tmp/luma135-role-narrow-dark.png',
-    fullPage: true,
-  });
-  await page.screenshot({
-    path: '/tmp/luma135-role-desktop.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

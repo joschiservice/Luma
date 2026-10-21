@@ -160,22 +160,12 @@ test('works supplier and customer threads, documents, replies and mailbox rules'
       page.evaluate(() => document.documentElement.classList.contains('dark')),
     )
     .toBe(true);
-  await page.screenshot({
-    path: test.info().outputPath('inbox-thread-dark.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await page.emulateMedia({ colorScheme: 'light' });
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.classList.contains('dark')),
     )
     .toBe(false);
-  await page.screenshot({
-    path: test.info().outputPath('inbox-thread-light.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
 
   // The purchase order shows the thread under Inbox threads.
   await page.goto(`/app/${f.org}/procurement/${order.id}`);
@@ -225,11 +215,6 @@ test('works supplier and customer threads, documents, replies and mailbox rules'
   ).toBeVisible();
   await expect(page.locator(`#thread-${supplierThread.id}`)).toBeHidden();
   expect(await fitsViewport(page)).toBe(true);
-  await page.screenshot({
-    path: test.info().outputPath('inbox-thread-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   // Esc inside the thread returns to the list and focuses the thread's row.
   await detail.getByRole('button', { name: 'Close panel' }).focus();
   await page.keyboard.press('Escape');

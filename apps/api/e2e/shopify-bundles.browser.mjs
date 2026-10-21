@@ -51,10 +51,6 @@ test('inspects catalog recipes and sold component groups with keyboard, light, d
   await page
     .getByRole('heading', { name: 'Bundle components', exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma-219-bundle-light.png',
-    fullPage: true,
-  });
   const component = recipe.getByRole('link', {
     name: 'LUMA-001',
     exact: true,
@@ -75,10 +71,6 @@ test('inspects catalog recipes and sold component groups with keyboard, light, d
     .getByText(/Bundle: Travel bundle at sale/)
     .first()
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma-219-order-dark-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -93,10 +85,6 @@ test('inspects catalog recipes and sold component groups with keyboard, light, d
   await page
     .getByRole('heading', { name: 'Bundle components', exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma-219-bundle-dark-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

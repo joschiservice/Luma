@@ -246,10 +246,6 @@ test('confirms source order and line identities, reviews the exact shipping corr
         ).length,
     )
     .toBe(1);
-  await correction.screenshot({
-    path: '/tmp/luma-starshipit-correction-desktop.png',
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
   await correction.scrollIntoViewIfNeeded();
   expect(
@@ -259,9 +255,6 @@ test('confirms source order and line identities, reviews the exact shipping corr
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await correction.screenshot({
-    path: '/tmp/luma-starshipit-correction-mobile-dark.png',
-  });
   const observer = await f.page('warehouse');
   await observer.goto(orderUrl);
   await expect(

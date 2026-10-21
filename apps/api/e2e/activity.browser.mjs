@@ -1,6 +1,6 @@
 /* global document, innerWidth */
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 import { seedActivity } from './activity-fixture.mjs';
 import { expect, test } from './browser-fixtures.mjs';
@@ -352,11 +352,6 @@ test('filters, saves views, previews, returns, loads older and new events and re
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await mkdir('/tmp/luma64-screenshots', { recursive: true });
-  await page.screenshot({
-    path: '/tmp/luma64-screenshots/activity-mobile.png',
-    fullPage: true,
-  });
   await page.getByRole('button', { name: 'Back to list', exact: true }).click();
   expect(param('event')).toBeNull();
   await page.setViewportSize({ width: 1440, height: 1000 });

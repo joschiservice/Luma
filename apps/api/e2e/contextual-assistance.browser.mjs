@@ -130,7 +130,6 @@ test('explains a record beside its page and preserves exact chart selection', as
   await expect(panel.getByRole('heading', { name: 'Sources' })).toBeVisible();
   await expect(panel.locator('.assistant-source-time')).toHaveCount(1);
   expect(modelRequests[0].messages.at(-1).content).toContain(work.ids.held);
-  await page.screenshot({ path: '/tmp/luma109-record-light.png' });
 
   await page.goto(
     `/app/${f.org.id}/insights?range=7d&chart=fulfillment&series=held`,
@@ -147,10 +146,5 @@ test('explains a record beside its page and preserves exact chart selection', as
   expect(navigation.content).toContain('"range":"7d"');
   expect(navigation.content).toContain('"series":"held"');
   expect(navigation.content).toContain('"asOf":');
-  await page.evaluate(() =>
-    globalThis.document.documentElement.classList.add('dark'),
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '/tmp/luma109-chart-dark-narrow.png' });
   expect(errors).toEqual([]);
 });

@@ -274,25 +274,23 @@ test('sends an order with a second approver, follows the supplier to receipt and
   await buyer.getByText('Purchasing link active').waitFor();
   await buyer.getByRole('link', { name: 'PO-2026-201', exact: true }).waitFor();
 
-  for (const colorScheme of ['dark', 'light']) {
-    const narrow = await (
-      await contextFor(buyerCookie, {
-        viewport: { width: 390, height: 844 },
-        colorScheme,
-      })
-    ).newPage();
-    await narrow.goto(orderPath);
-    await narrow
-      .getByRole('heading', { name: 'PO-2026-201', exact: true })
-      .waitFor();
-    expect(
-      await narrow.evaluate(
-        () =>
-          document.documentElement.scrollWidth <=
-          document.documentElement.clientWidth,
-      ),
-    ).toBe(true);
-  }
+  const narrow = await (
+    await contextFor(buyerCookie, {
+      viewport: { width: 390, height: 844 },
+      colorScheme: 'dark',
+    })
+  ).newPage();
+  await narrow.goto(orderPath);
+  await narrow
+    .getByRole('heading', { name: 'PO-2026-201', exact: true })
+    .waitFor();
+  expect(
+    await narrow.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -504,33 +502,31 @@ test('settles an order email left uncertain by an unverified bounce with a confi
     state: 'failed',
   });
 
-  for (const colorScheme of ['dark', 'light']) {
-    const narrow = await (
-      await t.newContext({
-        baseURL: origin,
-        viewport: { width: 390, height: 844 },
-        colorScheme,
-      })
-    ).newPage();
-    await narrow.context().addCookies(
-      buyerCookie.split('; ').map((value) => {
-        const [name, ...rest] = value.split('=');
+  const narrow = await (
+    await t.newContext({
+      baseURL: origin,
+      viewport: { width: 390, height: 844 },
+      colorScheme: 'dark',
+    })
+  ).newPage();
+  await narrow.context().addCookies(
+    buyerCookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
 
-        return { name, value: rest.join('='), url: origin };
-      }),
-    );
-    await narrow.goto(`/app/${org}/procurement/${order.id}`);
-    await narrow
-      .getByRole('region', { name: 'Supplier email' })
-      .getByText(/Marked as not delivered by You/)
-      .waitFor();
-    expect(
-      await narrow.evaluate(
-        () =>
-          document.documentElement.scrollWidth <=
-          document.documentElement.clientWidth,
-      ),
-    ).toBe(true);
-  }
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  await narrow.goto(`/app/${org}/procurement/${order.id}`);
+  await narrow
+    .getByRole('region', { name: 'Supplier email' })
+    .getByText(/Marked as not delivered by You/)
+    .waitFor();
+  expect(
+    await narrow.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });

@@ -1,5 +1,4 @@
 /* global document, window */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
@@ -102,17 +101,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
     .getByRole('option', { name: 'Live operations', exact: true })
     .click();
   await expect(value('verified')).toHaveText('2');
-  await mkdir('/tmp/luma80-ui', { recursive: true });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma80-ui/desktop-light.png',
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma80-ui/desktop-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
   expect(
@@ -120,19 +109,11 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma80-ui/mobile-dark.png',
-    fullPage: true,
-  });
   await section.locator('[data-metric="resolution.human"]').click();
   await dialog.getByText('A person helped', { exact: true }).waitFor();
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({
-    path: '/tmp/luma80-ui/mobile-cohort.png',
-    fullPage: true,
-  });
   await page.keyboard.press('Escape');
   // A failed read hides prior claims; retry loads authoritative facts again.
   // Only the resolution part of the page's metric summary fails.

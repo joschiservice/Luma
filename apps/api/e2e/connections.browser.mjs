@@ -159,11 +159,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     .getByRole('listitem')
     .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
   await jtlSummary.getByText('2 connections', { exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma-apps-overview.png',
-    fullPage: true,
-    animations: 'disabled',
-  });
   expect(
     await page.getByRole('article', { name: 'Main shop', exact: true }).count(),
   ).toBe(0);
@@ -198,11 +193,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   ).toBe('page');
   await shop.getByText('Importing', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Refresh list' }).focus();
-  await page.screenshot({
-    path: '/tmp/luma-34-desktop.png',
-    fullPage: true,
-    animations: 'disabled',
-  });
   const listed = await context.request.get(
     `/api/v1/organizations/${organizationId}/connections`,
   );
@@ -240,11 +230,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   const dialogBox = await page.getByRole('dialog').boundingBox();
   expect(dialogBox.y).toBeGreaterThanOrEqual(0);
   expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(844);
-  await page.screenshot({
-    path: '/tmp/luma-34-mobile.png',
-    fullPage: false,
-    animations: 'disabled',
-  });
   await page.getByRole('button', { name: 'Confirm disconnect' }).click();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
   expect(

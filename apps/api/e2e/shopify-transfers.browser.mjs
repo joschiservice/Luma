@@ -51,10 +51,6 @@ test('investigates exact transfer and receiving evidence in light, dark and narr
       'Live location identity unavailable. The historical name does not establish a stock pool.',
     ),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-218-transfer-light.png',
-    fullPage: true,
-  });
   await page
     .getByRole('link', { name: 'Receiving shipment', exact: true })
     .click();
@@ -86,10 +82,6 @@ test('investigates exact transfer and receiving evidence in light, dark and narr
   await expect(
     page.getByRole('table', { name: 'Observed history' }),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-218-shipment-dark-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

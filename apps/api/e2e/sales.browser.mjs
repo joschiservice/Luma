@@ -135,19 +135,7 @@ test('accepts and edits a Luma order with explicit authority in both themes and 
   await expect(
     page.getByText('Pending propagation', { exact: true }).first(),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma176-sales-light.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma176-sales-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(form.getByRole('button', { name: 'Save order' })).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma176-sales-narrow.png',
-    fullPage: true,
-  });
 });

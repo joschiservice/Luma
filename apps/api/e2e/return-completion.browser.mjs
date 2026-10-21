@@ -268,13 +268,4 @@ test('records receipt and inspection, approves stock and exchange separately, th
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await approver.screenshot({
-    path: '/tmp/luma196-completed-light.png',
-    fullPage: true,
-  });
-  await approver.evaluate(() => document.documentElement.classList.add('dark'));
-  await approver.screenshot({
-    path: '/tmp/luma196-completed-dark.png',
-    fullPage: true,
-  });
 });

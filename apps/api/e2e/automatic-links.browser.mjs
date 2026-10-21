@@ -47,10 +47,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
     page.getByText('1 match can be linked', { exact: true }),
   ).toBeVisible();
   await expect(page.getByText('auto-1', { exact: true })).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-light.png',
-    fullPage: true,
-  });
   await page.getByRole('button', { name: 'Enable automatic linking' }).click();
   await expect(
     page.getByText('Unique SKU code', { exact: true }),
@@ -71,10 +67,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
     page.getByText('Waiting for both connections', { exact: false }),
   ).toBeVisible();
   await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Preview matches' }).focus();
   await page.keyboard.press('Tab');
@@ -86,10 +78,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
       .getByRole('dialog')
       .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

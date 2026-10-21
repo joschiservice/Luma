@@ -120,10 +120,6 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   ).toBe(0);
   const reason = page.getByLabel('Reason for your decision (required)');
   await reason.fill('Apply the checked shipping correction');
-  await page.screenshot({
-    path: '/tmp/luma-approval-ready.png',
-    fullPage: true,
-  });
   const providerPath = join(directory, `provider-${manifest.runId}.json`);
   const originalState = await pilot.provider();
   await writeFile(
@@ -203,13 +199,4 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   }
   expect((await pilot.provider()).patchRequests).toBe(1);
   expect(errors).toEqual([]);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByText('Confirmed by a fresh check', { exact: true })
-    .first()
-    .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma-approval-mobile.png',
-    fullPage: true,
-  });
 });

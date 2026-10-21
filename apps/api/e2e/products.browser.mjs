@@ -67,20 +67,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page
     .getByRole('img', { name: /Tokyo store: 3 units in 1 order/ })
     .waitFor();
-  await page.screenshot({
-    path: '/tmp/luma101-detail-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma101-detail-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma101-detail-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -88,7 +75,6 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**/orders/${catalog.soldOrderId}*`);
@@ -97,13 +83,6 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page.goto(`/app/${f.org.id}/products`);
   await page.getByRole('heading', { name: 'Products', exact: true }).waitFor();
   await page.getByRole('link', { name: 'SKU-100', exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma101-list-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({ path: '/tmp/luma101-list-dark.png', fullPage: true });
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.getByRole('tab', { name: /Not in every source/ }).click();
   await page.waitForURL((url) => url.searchParams.get('view') === 'missing');
 
@@ -176,10 +155,6 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({
-    path: '/tmp/luma319-products-view.png',
-    fullPage: true,
-  });
   expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/products`);
   await page.waitForURL((link) => link.searchParams.get('view') === viewId);

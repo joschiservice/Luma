@@ -103,11 +103,6 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
   await expect(report.getByRole('alert')).toHaveCount(0);
   await expect(value('completed')).toHaveText('2');
   await report.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma65-report-light.png',
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: 'dark' });
   await page.setViewportSize({ width: 390, height: 844 });
   await report.scrollIntoViewIfNeeded();
   expect(
@@ -115,10 +110,6 @@ test('reports distinct detection and verification cohorts, filters exact evidenc
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma65-report-dark-narrow.png',
-    fullPage: true,
-  });
   await report.getByRole('tab', { name: 'Table', exact: true }).click();
   const cohortDay = report
     .getByRole('table', { name: 'Daily counts (UTC)' })

@@ -255,20 +255,7 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await activity.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: test.info().outputPath('security-activity-light-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
-  await page.emulateMedia({ colorScheme: 'dark' });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({
-    path: test.info().outputPath('security-activity-dark.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
-  await page.emulateMedia({ colorScheme: 'light' });
 
   await page.goto('/sign-out');
   await signInWithPassword(page);

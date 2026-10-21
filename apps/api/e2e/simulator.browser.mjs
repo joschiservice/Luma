@@ -39,7 +39,6 @@ test('panel shows problem removal separately from verified case resolution on de
   await expect(check.getByText('Case resolved')).toBeVisible();
   await page.getByRole('tab', { name: 'Scorecard' }).click();
   await expect(page.getByText('Luma connected')).toBeVisible();
-  await page.screenshot({ path: '/tmp/luma-simulator-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('tab', { name: 'Incidents' }).click();
   await check.scrollIntoViewIfNeeded();
@@ -48,6 +47,5 @@ test('panel shows problem removal separately from verified case resolution on de
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma-simulator-mobile.png' });
   expect(errors).toEqual([]);
 });

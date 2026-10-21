@@ -185,9 +185,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   await expect(orderRange).toHaveText('1–50');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(orderRange).toHaveText('51–100');
-  await page
-    .getByRole('navigation', { name: 'Order pages' })
-    .screenshot({ path: '/tmp/luma116-order-pagination.png' });
   expect(new URL(page.url()).searchParams.get('page')).toBe('2');
   await page.getByRole('button', { name: 'Previous' }).click();
   await expect(orderRange).toHaveText('1–50');
@@ -250,17 +247,9 @@ test('finds an order by number or SKU, explains it, pages a historical import an
         .nth(comparisonHeaders.indexOf(source) - 1),
     ).toHaveText(quantity);
   const detailUrl = page.url();
-  await page.screenshot({
-    path: '/tmp/luma98-order-desktop.png',
-    fullPage: true,
-  });
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await page.screenshot({
-    path: '/tmp/luma170-order-dark.png',
-    fullPage: true,
-  });
 
   // Deep links reload into the same order and filters.
   await page.reload();
@@ -272,10 +261,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma98-order-mobile.png',
-    fullPage: true,
-  });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Orders' })
@@ -312,7 +297,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
       .getAttribute('aria-sort'),
   ).toBe('ascending');
   await page.getByRole('link', { name: '#2001' }).waitFor();
-  await page.screenshot({ path: '/tmp/luma98-orders-desktop.png' });
 
   // Filter with the condition builder, sort, and keep it as a personal view.
   await page.goto(`/app/${fixture.org.id}/orders?view=all`);
@@ -350,7 +334,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({ path: '/tmp/luma286-orders-saved-view.png' });
 
   // Opening Orders without a view returns to the remembered one.
   expect(await remembered).toBe(viewId);

@@ -87,7 +87,6 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     [first],
   );
   expect(row.rows[0].data_region).toBe('AU');
-  await page.screenshot({ path: '/tmp/luma-30-desktop.png', fullPage: true });
   await page.goto('/app');
   await page.waitForURL(`**/app/${first}/home*`);
   await page.goto('/sign-out');
@@ -175,7 +174,6 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     .getByRole('link', { name: 'Manage apps' })
     .click();
   await heading(page, 'Manage apps');
-  await page.screenshot({ path: '/tmp/luma-30-mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

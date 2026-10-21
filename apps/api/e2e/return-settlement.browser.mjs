@@ -112,15 +112,6 @@ test('independently approves a refund, distinguishes pending payment, and checks
   });
   const bounds = await restockButton.boundingBox();
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
-  await approver.screenshot({
-    path: '/tmp/luma195-settlement-narrow-light.png',
-    fullPage: true,
-  });
-  await approver.evaluate(() => document.documentElement.classList.add('dark'));
-  await approver.screenshot({
-    path: '/tmp/luma195-settlement-narrow-dark.png',
-    fullPage: true,
-  });
   expect(
     await approver.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

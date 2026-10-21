@@ -190,29 +190,15 @@ test('opens an imported customer from an order, lists their imported orders and 
   await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();
   await page.getByText('71@example.test', { exact: true }).waitFor();
   await page.getByRole('link', { name: '#2001', exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma-customer-desktop.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-customer-mobile.png',
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma-customer-dark.png',
-    fullPage: true,
-  });
 
   // An order opened from the history returns to the customer.
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.emulateMedia({ colorScheme: 'light' });
   await page.getByRole('link', { name: '#2001', exact: true }).click();
   await page.waitForURL(`**/orders/${orderId}**`);
   await page.getByRole('link', { name: 'Back to previous page' }).click();
@@ -243,10 +229,6 @@ test('opens an imported customer from an order, lists their imported orders and 
   );
   // Only the query string could carry search text; ports and IDs may contain the digits.
   expect(decodeURIComponent(new URL(page.url()).search)).not.toContain('72@');
-  await page.screenshot({
-    path: '/tmp/luma-customers-list.png',
-    fullPage: true,
-  });
 
   // A link's search is adopted and leaves the address.
   await page.goto(`/app/${f.org.id}/customers?q=72%40`);
@@ -313,10 +295,6 @@ test('opens an imported customer from an order, lists their imported orders and 
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({
-    path: '/tmp/luma317-customers-view.png',
-    fullPage: true,
-  });
 
   // Opening Customers without a view returns to the remembered one, and a customer's
   // breadcrumb returns to it too.

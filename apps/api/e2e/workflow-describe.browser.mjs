@@ -1,5 +1,4 @@
 /* global document, innerWidth */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import {
@@ -9,8 +8,6 @@ import {
   startApi,
   startProcess,
 } from './helpers.mjs';
-
-const screenshots = '/tmp/luma88-browser';
 
 test('drafts a workflow from a description and applies a reviewed change', async ({
   resources: t,
@@ -38,7 +35,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
   page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await mkdir(screenshots, { recursive: true });
 
   await createAccount(page, db, {
     name: 'Grace',
@@ -81,10 +77,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
   await page
     .getByText(/^When below minimum is yes, read current stock/)
     .waitFor();
-  await page.screenshot({
-    path: `${screenshots}/described-desktop.png`,
-    fullPage: true,
-  });
 
   // A follow-up instruction becomes a step-level proposal; nothing changes until it's accepted.
   await page.getByText('All changes saved').waitFor();
@@ -100,10 +92,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
       .getByText('Wait 10 minute(s).')
       .count(),
   ).toBe(0);
-  await page.screenshot({
-    path: `${screenshots}/proposal-desktop.png`,
-    fullPage: true,
-  });
   await proposal.getByRole('button', { name: 'Accept change' }).click();
   await page
     .getByRole('list', { name: 'Workflow steps' })
@@ -116,9 +104,5 @@ test('drafts a workflow from a description and applies a reviewed change', async
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: `${screenshots}/described-mobile.png`,
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

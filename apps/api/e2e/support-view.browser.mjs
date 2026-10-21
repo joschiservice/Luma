@@ -234,10 +234,6 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     new RegExp(`/app/${f.workspace.id}/home(\\?|$)`),
   );
   expect(new URL(view.url()).hash).toBe('');
-  await view.screenshot({
-    path: test.info().outputPath('support-view-light.png'),
-    animations: 'disabled',
-  });
   await view.goto(
     `${f.customerOrigin}/app/${f.workspace.id}/settings/notifications`,
   );
@@ -253,17 +249,12 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     ),
   ).toBeVisible();
   await view.setViewportSize({ width: 390, height: 844 });
-  await view.emulateMedia({ colorScheme: 'dark' });
   await expect(banner).toBeVisible();
   await expect
     .poll(() =>
       view.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await view.screenshot({
-    path: test.info().outputPath('support-view-dark-narrow.png'),
-    animations: 'disabled',
-  });
   const preferences = await f.db.owner.query(
     'SELECT count(*)::int AS count FROM notification_preferences WHERE tenant_id=$1',
     [f.workspace.id],
@@ -341,16 +332,11 @@ test('a person approves account inspection in Settings › Security and can end 
     member.getByText('Member cannot sign in with their passkey'),
   ).toBeVisible();
   await member.setViewportSize({ width: 390, height: 844 });
-  await member.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() =>
       member.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await member.screenshot({
-    path: test.info().outputPath('account-inspection-request-dark-narrow.png'),
-    animations: 'disabled',
-  });
   const approve = member.getByRole('button', { name: 'Approve', exact: true });
   await approve.focus();
   await member.keyboard.press('Enter');

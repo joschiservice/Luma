@@ -1,6 +1,5 @@
 /* global document, innerWidth */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 
 import { shippingMethodPlaybook } from '@luma/resolution';
 import { resolutionWorkflow } from '@luma/workflows';
@@ -119,9 +118,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     await form.getByRole('combobox', { name: field }).click();
     await page.getByRole('option', { name: 'True', exact: true }).click();
   }
-  await mkdir('/tmp/luma67-browser', { recursive: true });
   await form.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma67-browser/triggers-desktop.png' });
   // Simulate a lost response after the server commits; retry must use the same body.
   let dropped = false;
   await page.route('**/workflows/*/starts', async (route) => {
@@ -172,7 +169,6 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
   await expect(
     form.getByRole('button', { name: 'Schedule start', exact: true }),
   ).toHaveCount(0);
-  await page.screenshot({ path: '/tmp/luma67-browser/triggers-mobile.png' });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -321,13 +317,10 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
   // Steps read by their business title, not their ID.
   await timeline.getByText('Refresh context', { exact: true }).waitFor();
   expect(await timeline.getByRole('listitem').count()).toBe(3);
-  await page.screenshot({ path: '/tmp/luma67-browser/process-mobile.png' });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await page.screenshot({ path: '/tmp/luma67-browser/process-desktop.png' });
   expect(errors).toEqual([]);
 });

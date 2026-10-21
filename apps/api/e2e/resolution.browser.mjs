@@ -278,10 +278,6 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
   await openSection('Change and outcome check');
   await page.getByText('Live updates interrupted', { exact: true }).waitFor();
   await expect.poll(() => approve.isEnabled()).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-observation-stream.png',
-    fullPage: true,
-  });
 
   await page.route(
     `**/api/v1/organizations/${organizationId}/exceptions?*`,
@@ -306,10 +302,6 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
     .getByText('History couldn’t be refreshed', { exact: true })
     .waitFor();
   await expect.poll(() => approve.isEnabled()).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-observation-history.png',
-    fullPage: true,
-  });
   historyFailure = false;
   await page
     .getByRole('button', { name: 'Retry history', exact: true })
@@ -492,7 +484,6 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
       page.getByRole('button', { name: 'Send same decision again' }).count(),
     )
     .toBe(0);
-  await page.screenshot({ path: '/tmp/luma-35-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page
     .getByRole('article', { name: 'Proposed change' })
@@ -502,25 +493,17 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma-35-mobile.png', fullPage: true });
   review = { ...structuredClone(resolutionReview), observeOnly: true };
   progress = structuredClone(resolutionProgress);
-  for (const colorScheme of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme });
-    await page.reload();
-    await openSection('Proposed change');
-    await page.getByText('Observe-only', { exact: true }).waitFor();
-    await expect(
-      page.getByText('Would run when writes are enabled.', { exact: false }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Approve change', exact: true }),
-    ).toHaveCount(0);
-    await page.screenshot({
-      path: `/tmp/luma173-observe-${colorScheme}.png`,
-      fullPage: true,
-    });
-  }
+  await page.reload();
+  await openSection('Proposed change');
+  await page.getByText('Observe-only', { exact: true }).waitFor();
+  await expect(
+    page.getByText('Would run when writes are enabled.', { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Approve change', exact: true }),
+  ).toHaveCount(0);
   // Remove only fixture endpoints; the final decision reaches authenticated policy services and PostgreSQL.
   await page.unroute(`**${path}`);
   await page.unroute(`**${path}/events`);

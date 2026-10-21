@@ -39,10 +39,6 @@ test('serves searchable, sectioned guides without a session on desktop and mobil
   expect(await page.title()).toBe('Find and prioritize issues · Luma');
   expect(new URL(page.url()).pathname).toBe('/docs/issues');
   expect(await page.locator('vite-error-overlay').count()).toBe(0);
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-desktop.png',
-    fullPage: true,
-  });
   await page
     .getByRole('searchbox', { name: 'Search documentation' })
     .fill('reverse');
@@ -88,18 +84,10 @@ test('serves searchable, sectioned guides without a session on desktop and mobil
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-mobile.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-dark.png',
-    fullPage: true,
-  });
   const missing = await page.goto('/docs/unknown-guide');
   await page.getByRole('heading', { name: 'Guide not found' }).waitFor();
   expect(missing.status()).toBe(404);

@@ -76,10 +76,6 @@ test('investigates stock differences, follows affected orders and preserves filt
   await expect(
     page.getByRole('link', { name: 'SKU-100', exact: true }),
   ).toHaveCount(1);
-  await page.screenshot({
-    path: '/tmp/luma99-inventory-light.png',
-    fullPage: true,
-  });
   await page.getByRole('link', { name: 'SKU-100', exact: true }).click();
   await page
     .getByRole('heading', {
@@ -107,20 +103,7 @@ test('investigates stock differences, follows affected orders and preserves filt
   await expect(
     page.getByRole('table', { name: 'Unavailable stock and activation' }),
   ).toContainText('No');
-  await page.screenshot({
-    path: '/tmp/luma99-detail-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma99-detail-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma99-detail-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -192,10 +175,6 @@ test('investigates stock differences, follows affected orders and preserves filt
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({
-    path: '/tmp/luma320-inventory-view.png',
-    fullPage: true,
-  });
   expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/inventory`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);

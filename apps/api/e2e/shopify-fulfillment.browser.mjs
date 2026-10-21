@@ -99,22 +99,13 @@ test('reviews a held fulfillment, obtains separate approval and verifies progres
     page.getByText('Progress not verified', { exact: true }),
   ).toBeVisible();
   expect(mutations).toHaveLength(1);
-  await page.screenshot({
-    path: '/tmp/luma-105-recovery-light.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ colorScheme: 'dark' });
   await expect(
     page.getByRole('button', { name: 'Check fulfillment progress' }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Check fulfillment progress' }),
   ).toBeEnabled();
-  await page.screenshot({
-    path: '/tmp/luma-105-recovery-dark-mobile.png',
-    fullPage: true,
-  });
   fulfillment.lineItems.nodes[0].remainingQuantity = 1;
   await page
     .getByRole('button', { name: 'Check fulfillment progress' })

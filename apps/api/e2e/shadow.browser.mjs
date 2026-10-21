@@ -192,20 +192,17 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
     .click();
   await panel.getByRole('heading', { name: 'Review saved' }).waitFor();
   await panel.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma47-ui-live-case.png' });
   await panel
     .getByRole('link', { name: 'Compare results across issues' })
     .click();
   await page.getByText('1 issue tested', { exact: true }).waitFor();
   await page.locator('#shadow-report').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma47-ui-live-report.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma47-ui-live-mobile.png' });
   expect(
     (await db.owner.query('SELECT count(*)::int AS n FROM shadow_evaluations'))
       .rows[0].n,

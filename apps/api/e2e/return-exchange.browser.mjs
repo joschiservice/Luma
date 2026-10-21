@@ -134,15 +134,6 @@ test('requests a replacement by keyboard and verifies charge payment before appr
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await approver.screenshot({
-    path: '/tmp/luma194-exchange-narrow-light.png',
-    fullPage: true,
-  });
-  await approver.evaluate(() => document.documentElement.classList.add('dark'));
-  await approver.screenshot({
-    path: '/tmp/luma194-exchange-narrow-dark.png',
-    fullPage: true,
-  });
   await f.command({ kind: 'exchange-pay', order: f.providerOrderId });
   await returnBrowserCommand(approver, f.path, 'check', () =>
     review.getByRole('button', { name: 'Check source' }).last().click(),

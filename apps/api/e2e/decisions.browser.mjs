@@ -103,10 +103,6 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     .waitFor();
   await inspector.getByRole('button', { name: 'Take it' }).click();
   await inspector.getByRole('button', { name: 'Unassign me' }).waitFor();
-  await approver.screenshot({
-    path: '/tmp/luma78-needs-you-desktop.png',
-    fullPage: true,
-  });
 
   // A reload restores the selected decision from the URL.
   await approver.reload();
@@ -166,10 +162,6 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   expect(
     (await requester.locator('.decisions-toolbar').boundingBox()).height,
   ).toBeLessThan(280);
-  await requester.screenshot({
-    path: '/tmp/luma78-needs-you-mobile.png',
-    fullPage: true,
-  });
   expect(
     await requester.evaluate(
       () =>

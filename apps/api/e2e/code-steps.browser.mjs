@@ -1,5 +1,4 @@
 /* global document, innerWidth */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { seedCodeSteps } from './code-steps-fixture.mjs';
@@ -49,18 +48,8 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
   const tenantId = new URL(page.url()).pathname.split('/')[2];
   const { version } = await seedCodeSteps(db, tenantId);
   await page.goto(`/app/${tenantId}/workflows/${version.definition.id}`);
-  await mkdir('/tmp/luma51-browser', { recursive: true });
-  await page.screenshot({
-    path: '/tmp/luma51-browser/before.png',
-    fullPage: true,
-  });
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await page.getByLabel('TypeScript source', { exact: true }).waitFor();
-  await mkdir('/tmp/luma51-browser', { recursive: true });
-  await page.screenshot({
-    path: '/tmp/luma51-browser/source-desktop.png',
-    fullPage: true,
-  });
   await page.getByRole('tab', { name: 'Test example' }).click();
   await page
     .getByLabel('Example inputs', { exact: true })
@@ -92,20 +81,12 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
     .fill('{"value":6}');
   await page.getByRole('button', { name: 'Run test', exact: true }).click();
   await page.getByText('Example passed', { exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma51-browser/evaluation-desktop.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page
     .getByRole('tab', { name: 'Test example' })
     .evaluate((element) =>
       element.scrollIntoView({ block: 'center', behavior: 'instant' }),
     );
-  await page.screenshot({
-    path: '/tmp/luma51-browser/evaluation-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

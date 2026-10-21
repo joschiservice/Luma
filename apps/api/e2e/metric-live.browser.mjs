@@ -1,5 +1,3 @@
-import { mkdir } from 'node:fs/promises';
-
 import { buildRuntimeApp } from '@luma/application-runtime';
 
 import { performanceReport } from '../../../tooling/performance/report.mjs';
@@ -203,10 +201,6 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   );
   await section.getByText('Data out of date', { exact: true }).waitFor();
   await live.getByText('Live updates', { exact: true }).waitFor();
-  await mkdir('/tmp/luma85-ui', { recursive: true });
-  await section.screenshot({ path: '/tmp/luma85-ui/desktop.png' });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await section.screenshot({ path: '/tmp/luma85-ui/mobile.png' });
   const p95 = (values) =>
     [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1];
   expect(subscriptions.flatMap((s) => s.readErrors)).toEqual([]);

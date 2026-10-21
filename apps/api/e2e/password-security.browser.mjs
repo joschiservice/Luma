@@ -55,25 +55,12 @@ test('changes a password, signs out devices and recovers through a single-use em
   await expect(sessions.getByRole('listitem')).toHaveCount(1);
   await f.request(f.owner, '/v1/organizations', 'GET', undefined, 401);
 
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: test.info().outputPath('account-security-dark.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
-  await page.emulateMedia({ colorScheme: 'light' });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await sessions.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: test.info().outputPath('account-security-light-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
 
   await page.goto('/sign-out');
   await page.getByRole('link', { name: 'Forgot password?' }).click();

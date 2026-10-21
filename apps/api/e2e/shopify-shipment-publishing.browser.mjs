@@ -246,8 +246,6 @@ test('publishes an exact downstream parcel from the shared fulfillment view with
   const verified = await f.call('inspect', { ...f.target, source });
   expect(verified.snapshot.shipments).toHaveLength(1);
   expect(verified.snapshot.shipments[0].tracking[0].url).toBe(correctedUrl);
-  await panel.screenshot({ path: '/tmp/luma-shopify-publication-desktop.png' });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
   await panel.scrollIntoViewIfNeeded();
   expect(
@@ -257,9 +255,6 @@ test('publishes an exact downstream parcel from the shared fulfillment view with
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await panel.screenshot({
-    path: '/tmp/luma-shopify-publication-mobile-dark.png',
-  });
   const member = await pageFor(f.member);
   await member.goto(route);
   await expect(
