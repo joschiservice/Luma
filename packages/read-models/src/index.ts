@@ -1,3 +1,5 @@
+export { changeRetentionDays } from './domain/changes.js';
+
 export type { OrderWorkspace } from './application/orders.js';
 
 export type { InventoryWorkspace } from './application/inventory.js';

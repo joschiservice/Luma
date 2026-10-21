@@ -1,4 +1,5 @@
 import {
+  changeRoutes,
   customerRoutes,
   decisionRoutes,
   evidenceRoutes,
@@ -19,6 +20,7 @@ import type { AppDependencies } from '../http-app.js';
 /** Implements the routes `@luma/read-models` serves. Missing services answer as unavailable. */
 export function readModelsHttp(services: AppDependencies) {
   return {
+    changes: changeRoutes(services.changes),
     customers: customerRoutes(services.customers),
     decisions: decisionRoutes(services.decisions, services.decisionAssignments),
     evidence: evidenceRoutes(services.evidence),

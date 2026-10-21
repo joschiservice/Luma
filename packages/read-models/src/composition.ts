@@ -1,3 +1,5 @@
+export { createChangeFeed } from './infrastructure/changes.js';
+
 export { createOperationalMetrics } from './infrastructure/metrics.js';
 
 export { createOperationalSummary } from './infrastructure/operational-summary.js';

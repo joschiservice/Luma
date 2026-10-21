@@ -267,6 +267,8 @@ flowchart TD
   app. `api_apps_queue_expiry_notices` queues expiry notices hourly, once per credential;
   delivery rechecks that the member is active and the token is still current and unrevoked, and
   cancels the notice otherwise.
+- **Change feed.** Apps keep copies current through `/changes`, which reports only the record
+  types their scopes can read. See the [change feed](api.md#change-feed).
 - **Writes.** No public route changes data yet. Before one does, action admission must treat an
   app as its own requester, and durable work started by an app must not continue with the
   member's full permissions.

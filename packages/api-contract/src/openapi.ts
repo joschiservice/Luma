@@ -90,7 +90,7 @@ publicOpenApiDocument.info = {
   title: 'Luma public API',
   version: '1.0.0',
   description:
-    'Read your workspace’s orders, fulfillment, stock, products, customers, returns, issues, workflows and activity with a personal API app token. Send it as `Authorization: Bearer <token>`. A token works in one workspace, with the permissions it was granted that its creator still holds. Requests are limited per token and per workspace: responses report the tighter limit in `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`, and a 429 response says when to retry in `Retry-After`. Reads of operations marked `x-luma-personal-data` by a token that can read customers are counted and recorded in the workspace’s activity.',
+    'Read your workspace’s orders, fulfillment, stock, products, customers, returns, issues, workflows and activity with a personal API app token. Send it as `Authorization: Bearer <token>`. A token works in one workspace, with the permissions it was granted that its creator still holds. Requests are limited per token and per workspace: responses report the tighter limit in `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`, and a 429 response says when to retry in `Retry-After`. Reads of operations marked `x-luma-personal-data` by a token that can read customers are counted and recorded in the workspace’s activity. `/changes` reports which records changed, so a copy stays current without reading everything again.',
 };
 publicOpenApiDocument.security = [{ apiToken: [] }];
 const publicPaths = (publicOpenApiDocument.paths ??= {}) as Record<

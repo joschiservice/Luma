@@ -226,6 +226,7 @@ export interface ApplicationServices {
     adaptive: ReturnType<typeof createAdaptiveWorkspaceRuntime>;
     assistant: ReturnType<typeof createWorkspaceAssistant>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
+    changes: ReadModelServices['changes'];
     commitments: SupplierCommitments;
     connectionCoverage: import('@luma/connections').CoverageReader;
     customerErasure: ReturnType<typeof createCustomerErasure>;
@@ -1074,6 +1075,7 @@ export function createApplicationServices(
       (tenantId) => purchasingRelease(tenantId, 'action-review-diffs'),
     );
   const {
+    changes,
     customers,
     evidence,
     fulfillment,
@@ -1173,6 +1175,7 @@ export function createApplicationServices(
       adaptive,
       assistant,
       cases: detection.cases,
+      changes,
       commitments,
       connectionCoverage: createConnectionCoverage(database),
       customerErasure: createCustomerErasure({

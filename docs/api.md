@@ -28,22 +28,47 @@ Personal API apps call the API directly with `Authorization: Bearer <token>`, ei
 - A new resource adds its schemas and routes to the shared contract, implements the owning package's application port and API mapping, and is wired in application runtime composition. Only API layers import the contract; inner layers stay framework independent. HTTP handlers map validated requests and use-case results; they hold no business rules.
 - Tenant resources follow [ADR-003](architecture/003-tenant-isolation-and-data-residency.md): `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Schemas reserve `EU | US | APAC`, but only EU provisioning is enabled. Never treat path IDs or caller-supplied region or context as authorization.
 
+## Change feed
+
+`GET /v1/organizations/:organizationId/changes` tells API clients which public records changed, so they can keep a copy current ([ADR-017](architecture/017-api-apps.md)). Items carry a record type, ID and `upserted` or `deleted`, never content.
+
+```mermaid
+sequenceDiagram
+  participant W as Writer transaction
+  participant T as workspace_change trigger
+  participant F as workspace_changes
+  participant R as Feed reader
+  W->>T: insert, update or delete a record row
+  T->>F: one row per record and transaction (xact, id)
+  W-->>F: commit
+  R->>F: rows after cursor with xact < pg_snapshot_xmin
+  F-->>R: settled changes in commit-safe order
+```
+
+- **Order and visibility.** Rows are keyed by `pg_current_xact_id()` and read only below the snapshot's `xmin`, so a row behind a cursor can never commit later. A long transaction anywhere in the cluster holds the feed back; it never skips a change. A page that isn't full moves the cursor to the newest settled position even when its rows were filtered out by type.
+- **Operations.** A record is `deleted` when, after a delete, no row of its table holds its ID; everything else is `upserted`. Updates that change no column are not recorded. Source-side soft deletes are `upserted`, and the reread returns 404.
+- **Writers.** The trigger function is `SECURITY DEFINER` and owned by the login-less `luma_change_feed`, which may only read the ID columns it checks. Runtime roles can read the feed but never write it.
+- **Retention.** The data-retention worker prunes rows after 30 days and records each workspace's newest pruned position. A cursor before it returns `410 GONE`.
+- **Purges.** Purging a closed workspace records nothing. Removing a connection's data and erasing a customer record deletions, so outside copies remove them too.
+- **New record types.** A table that backs a public record needs the triggers, a type in the contract and a read permission in the read model's map. Child tables (lines, evidence) are covered only when their changes also rewrite the record's row.
+
 ## Errors
 
 Errors have `{ code, message, requestId }`, and `requestId` matches the `x-request-id` header.
 
-| Condition                                         | Response                                        |
-| ------------------------------------------------- | ----------------------------------------------- |
-| Request fails schema validation                   | `400 VALIDATION_ERROR`                          |
-| Body parser failure                               | normalized 400, 413 or 415                      |
-| No session                                        | `401 UNAUTHENTICATED`                           |
-| Member lacks the declared permission              | `403 FORBIDDEN`                                 |
-| API app token on a route that isn't public        | `403 FORBIDDEN`                                 |
-| API app over its token or workspace limit         | `429 TOO_MANY_REQUESTS` with `Retry-After`      |
-| Unknown route or resource, or inaccessible tenant | `404 NOT_FOUND`                                 |
-| Provisioning in an inactive region                | `422 REGION_UNAVAILABLE`                        |
-| Request served by the wrong regional cell         | `503 REGION_UNAVAILABLE`                        |
-| Unexpected exception or invalid handler output    | sanitized `500 INTERNAL_ERROR`, details in logs |
+| Condition                                          | Response                                        |
+| -------------------------------------------------- | ----------------------------------------------- |
+| Request fails schema validation                    | `400 VALIDATION_ERROR`                          |
+| Body parser failure                                | normalized 400, 413 or 415                      |
+| No session                                         | `401 UNAUTHENTICATED`                           |
+| Member lacks the declared permission               | `403 FORBIDDEN`                                 |
+| API app token on a route that isn't public         | `403 FORBIDDEN`                                 |
+| API app over its token or workspace limit          | `429 TOO_MANY_REQUESTS` with `Retry-After`      |
+| Unknown route or resource, or inaccessible tenant  | `404 NOT_FOUND`                                 |
+| Change feed cursor older than the retained changes | `410 GONE`                                      |
+| Provisioning in an inactive region                 | `422 REGION_UNAVAILABLE`                        |
+| Request served by the wrong regional cell          | `503 REGION_UNAVAILABLE`                        |
+| Unexpected exception or invalid handler output     | sanitized `500 INTERNAL_ERROR`, details in logs |
 
 Authenticated routes declare 401, 403, 404 and the regional errors where they apply. Responses carry `Cache-Control: no-store`.
 

@@ -1,3 +1,5 @@
+export { changeRoutes } from './api/changes.js';
+
 export { metricRoutes } from './api/metrics.js';
 
 export { recordRoutes } from './api/records.js';

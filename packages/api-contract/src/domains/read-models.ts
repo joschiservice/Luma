@@ -1,3 +1,4 @@
+import { changesContract } from '../contracts/changes.js';
 import { customersContract } from '../contracts/customers.js';
 import { decisionsContract } from '../contracts/decisions.js';
 import { evidenceContract } from '../contracts/evidence.js';
@@ -13,6 +14,7 @@ import { returnsContract } from '../contracts/returns.js';
 
 /** Routes served by `@luma/read-models`. */
 type ReadModelsContracts = {
+  changes: typeof changesContract;
   customers: typeof customersContract;
   decisions: typeof decisionsContract;
   evidence: typeof evidenceContract;
@@ -29,6 +31,7 @@ type ReadModelsContracts = {
 
 /** Routes served by `@luma/read-models`, keyed by area. */
 export const readModelsContracts: ReadModelsContracts = {
+  changes: changesContract,
   customers: customersContract,
   decisions: decisionsContract,
   evidence: evidenceContract,

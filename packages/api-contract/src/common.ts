@@ -17,6 +17,7 @@ export const apiErrorSchema = z.object({
     'READ_ONLY',
     'NOT_FOUND',
     'CONFLICT',
+    'GONE',
     'REGION_UNAVAILABLE',
     'SERVICE_UNAVAILABLE',
     'NOT_READY',
@@ -53,7 +54,7 @@ export function requires<const P extends string | readonly string[]>(
 }
 
 /** Error statuses a route documents; every route also documents 400, 413, 415 and 500. */
-export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 503;
+export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 503;
 
 /** Route metadata read by the identity guard and the OpenAPI document. */
 export interface RouteMeta {
