@@ -33,31 +33,30 @@ function capabilities(env) {
 }
 
 /**
- * Runs independent pnpm commands at once and prints each one's output when it finishes, so
- * their logs do not interleave. Waits for every command, then fails if any of them failed.
+ * Runs independent pnpm commands at once, streaming each output line behind the command's
+ * name. Waits for every command, then fails if any of them failed.
  * @param {string[][]} group
  * @param {NodeJS.ProcessEnv} env
  */
 async function runTogether(group, env) {
   const results = await Promise.allSettled(
-    group.map(async (args) => {
-      const title = `$ pnpm ${args.join(' ')}`;
-      try {
-        console.log(
-          `${title}\n${await run('pnpm', args, { env, capture: true })}`,
-        );
-      } catch (error) {
-        console.error(
-          `${title}\n${error instanceof Error ? error.message : String(error)}`,
-        );
-        throw error;
-      }
+    group.map((args) => {
+      const name =
+        args.find((arg) => !arg.startsWith('-') && !arg.startsWith('@')) ??
+        args[0];
+      console.log(`$ pnpm ${args.join(' ')}`);
+
+      return run('pnpm', args, { env, prefix: `[${name}]` });
     }),
   );
-  const failed = results.filter((result) => result.status === 'rejected');
+  const failed = results.flatMap((result, index) =>
+    result.status === 'rejected' ? [{ args: group[index], ...result }] : [],
+  );
+  for (const { args } of failed)
+    console.error(`Failed: pnpm ${args.join(' ')}`);
   if (failed.length)
     throw Object.assign(
-      new Error(`${failed.length} of ${group.length} checks failed`),
+      new Error(`${failed.length} of ${group.length} commands failed`),
       { exitCode: failed[0].reason?.exitCode ?? 1 },
     );
 }
@@ -125,6 +124,13 @@ try {
   env.LUMA_VALIDATION_OWNER = validation.owner;
   for (const args of commands) {
     if (!Array.isArray(args)) {
+      if (!journeySlot && args.parallel.some(runsJourneys))
+        journeySlot = await acquireJourneySlot(root, {
+          onWait: (holders) =>
+            console.log(
+              `Journeys are running from ${holders.join(', ')}; waiting for a free journey slot.`,
+            ),
+        });
       await runTogether(args.parallel, env);
       continue;
     }

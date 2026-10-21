@@ -39,14 +39,21 @@ const suites = {
   browser: [build, ['--filter', '@luma/api', 'test:browser']],
   full: [
     ['setup:code'],
+    // Includes the build every later step uses; Turbo leaves cached outputs untouched.
     ['check'],
-    ['test:region-eu'],
-    ['test:e2e'],
-    ['test:browser'],
-    ['test:simulator'],
-    ['test:evaluation'],
-    ['evaluate:playbook'],
-    ['evaluate:code'],
+    // The shorter suites fit alongside backend journeys. Both journey suites at once saturate
+    // a 14-core machine, and journeys with tight time limits then fail.
+    {
+      parallel: [
+        ['--filter', '@luma/api', 'test:e2e'],
+        ['test:region-eu'],
+        ['test:simulator'],
+        ['test:evaluation'],
+        ['evaluate:playbook'],
+        ['evaluate:code'],
+      ],
+    },
+    ['--filter', '@luma/api', 'test:browser'],
   ],
   workflows: [
     [

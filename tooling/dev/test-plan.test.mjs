@@ -18,6 +18,11 @@ const commandsOf = (suite) =>
 
 function leaves(command) {
   return command.split(' && ').flatMap((part) => {
+    // Full runs journeys directly after its single build.
+    const journey = part.match(
+      /^pnpm --filter @luma\/api (test:e2e|test:browser)$/,
+    );
+    if (journey) return [journey[1]];
     const match = part.match(/^pnpm (?:run )?([\w:-]+)(?: .*)?$/);
     if (match && manifest.scripts[match[1]]) {
       if (match[1] === 'check')
