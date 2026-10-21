@@ -8,6 +8,7 @@ import { until } from './helpers.mjs';
 
 test('releases an overdue fraud hold after approval and leaves warehouse progress to detection', async (t) => {
   const f = await caseWorkflowFixture(t, {
+    imported: true,
     detection: {
       configuration: {
         ...defaultConfiguration,

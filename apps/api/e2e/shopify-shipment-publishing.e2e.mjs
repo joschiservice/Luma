@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture.mjs';
 
 test('physical downstream parcels use exact approval, partial Shopify fulfillment and independent tracking verification', async (t) => {
-  const f = await shipmentPublishingFixture(t),
+  const f = await shipmentPublishingFixture(t, { imported: true }),
     source = await f.dispatch('PARCEL-1', 1, 'Printed');
   await f.call(
     'preview',

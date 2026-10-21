@@ -4,7 +4,7 @@ import { linkedOrderFixture } from './order-change-plan-fixture.mjs';
 
 test('plans a Shopify quantity change across Shopify and JTL before and after the warehouse starts packing', async (t) => {
   const { f, api, shopify, jtl, shop, lineKey, detail, packing } =
-    await linkedOrderFixture(t);
+    await linkedOrderFixture(t, undefined, { imported: true });
   expect(detail.sources.map((source) => source.connectionId).sort()).toEqual(
     [shopify, jtl, f.manifest.connections.starshipit].sort(),
   );

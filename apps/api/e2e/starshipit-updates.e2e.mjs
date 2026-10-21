@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import { starshipitUpdatesFixture } from './starshipit-updates-fixture.mjs';
 
 test('Starshipit mapped authoritative quantities require independent approval, dispatch once across concurrent starts and API restart, and appear in the order timeline', async (t) => {
-  const f = await starshipitUpdatesFixture(t);
+  const f = await starshipitUpdatesFixture(t, { imported: true });
   await f.call('inspect', f.target, { cookie: f.member, status: 403 });
   const preview = await f.preview();
   assert.equal(preview.state, 'approval_required');

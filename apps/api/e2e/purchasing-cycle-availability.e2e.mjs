@@ -7,6 +7,7 @@ import { purchasingCycleFixture } from './purchasing-cycle-fixture.mjs';
 for (const channel of ['jtl', 'email'])
   it(`observes availability through receipt and a deferred recommendation stockout through ${channel}`, async (t) => {
     const f = await purchasingCycleFixture(t, channel, {
+      imported: true,
       positiveStock: true,
       ignoreAlternative: true,
     });

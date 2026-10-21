@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import { starshipitUpdatesFixture } from './starshipit-updates-fixture.mjs';
 
 test('an inconclusive authoritative refresh withholds a correction without closing its review, and a fresh read restores approval', async (t) => {
-  const f = await starshipitUpdatesFixture(t),
+  const f = await starshipitUpdatesFixture(t, { imported: true }),
     preview = await f.preview();
   await f.hostCall('runs/operations/control', {
     action: 'fault',

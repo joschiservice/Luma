@@ -109,7 +109,7 @@ test('inventory drift is detected, verified, scored and recurs through the same 
 });
 
 test('scheduled detection compares linked stock and closes the case only after fresh verification', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const actor = await f.pilot.operator();
   const stockCases = async () =>
     (await f.pilot.detection.exceptions.list(actor)).filter(
@@ -176,7 +176,7 @@ test('scheduled detection compares linked stock and closes the case only after f
 });
 
 test('sustained malformed shop responses escalate after retries and close only after a complete scan', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const actor = await f.pilot.operator();
   const syncCases = async () =>
     (await f.pilot.detection.exceptions.list(actor)).filter(

@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture.mjs';
 
 test('an applied fulfillment with a lost response reconciles by read and cannot create a second remote shipment', async (t) => {
-  const f = await shipmentPublishingFixture(t),
+  const f = await shipmentPublishingFixture(t, { imported: true }),
     source = await f.dispatch(),
     preview = await f.preview(source);
   await f.call(

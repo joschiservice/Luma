@@ -24,7 +24,7 @@ import {
 // an independent read.
 
 it('reconciles a lost-response refund from the worker by reading, without another refund, across a restart', async (t) => {
-  const f = await settlementFixture(t);
+  const f = await settlementFixture(t, { imported: true });
   await f.request('/return-deadlines', {
     commandId: randomUUID(),
     expectedRevision: 0,
@@ -136,7 +136,7 @@ it('reconciles a lost-response refund from the worker by reading, without anothe
 });
 
 it('refunds an approved return from the sync worker once and verifies it after a lost response and restart', async (t) => {
-  const f = await settlementFixture(t);
+  const f = await settlementFixture(t, { imported: true });
   await addAdmin(f);
   const refund = await f.request(`${f.path}/settlements`, {
     id: randomUUID(),
@@ -229,7 +229,7 @@ it('refunds an approved return from the sync worker once and verifies it after a
 });
 
 it('records an approved return refund that was never sent as expired once its approval ends', async (t) => {
-  const f = await settlementFixture(t);
+  const f = await settlementFixture(t, { imported: true });
   await addAdmin(f);
   const refund = await f.request(`${f.path}/settlements`, {
     id: randomUUID(),

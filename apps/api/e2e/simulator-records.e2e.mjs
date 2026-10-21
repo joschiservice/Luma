@@ -70,7 +70,7 @@ test('imports JTL customers with their orders and flags a customer deleted in JT
 });
 
 test('signed Shopify webhooks reach the real change route and schedule early reads', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   await f.pilot.observe();
   const hints = async () =>
     (
@@ -96,7 +96,7 @@ test('signed Shopify webhooks reach the real change route and schedule early rea
 });
 
 test('stuck-fulfillment candidates carry the source references their import mapped', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const actor = await f.pilot.operator();
   await f.call('runs/operations/control', {
     action: 'order',
@@ -162,7 +162,7 @@ test('stuck-fulfillment candidates carry the source references their import mapp
 });
 
 test('reads simulated quantity edits into new immutable snapshots and exposes current units in order detail', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const connectionId = f.manifest.connections.shopify;
   const tenantId = f.manifest.organizationId;
   const cookie = await operatorCookie(f);

@@ -13,6 +13,7 @@ import { setupSimulator } from './simulator-fixture.mjs';
 /**
  * Runs case workflows against the simulator, PostgreSQL, the HTTP API and a local Temporal
  * server. The operator turns workflows on, so the requester is the different approver.
+ * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
  */
 export async function caseWorkflowFixture(
   t,
@@ -22,6 +23,7 @@ export async function caseWorkflowFixture(
     demo,
     observability,
     timeSkipping = false,
+    imported = false,
   } = {},
 ) {
   const temporal = timeSkipping
@@ -35,6 +37,7 @@ export async function caseWorkflowFixture(
     dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   };
   const f = await setupSimulator(t, {
+    imported,
     temporal: settings,
     origin,
     ...(detection ? { detection } : {}),

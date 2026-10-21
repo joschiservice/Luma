@@ -73,7 +73,7 @@ async function citedPurchasingReads(f, proposalId, purchaseOrderId) {
 }
 
 it('places an approved purchase order from the worker once and verifies it after a lost response and restart', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   await f.pilot.observe();
   const org = f.manifest.organizationId;
   const buyer = await login(f, 'pilot-operator@example.test');
@@ -210,7 +210,7 @@ it('places an approved purchase order from the worker once and verifies it after
 });
 
 it('sends an approved reply from the worker once and confirms it by reading the thread after a restart', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   await f.join('Worker', 'admin');
   const incident = await f.scenario('customer-delay-mail');
   const orderName = incident.resources.find(
@@ -292,7 +292,10 @@ it('sends an approved reply from the worker once and confirms it by reading the 
 });
 
 it('creates an approved return from the sync worker once and records it after a lost response and restart', async (t) => {
-  const f = await settlementFixture(t, { prepare: 'opened' });
+  const f = await settlementFixture(t, {
+    imported: true,
+    prepare: 'opened',
+  });
   await addAdmin(f);
   const requested = await f.request(`${f.path}/creations`, {
     id: randomUUID(),

@@ -6,12 +6,17 @@ import { createObservability } from '@luma/platform/composition';
 import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
-/** Real Shopify and Starshipit services, isolated PostgreSQL and physical parcel dispatch for governed publication journeys. */
+/**
+ * Real Shopify and Starshipit services, isolated PostgreSQL and physical parcel dispatch for
+ * governed publication journeys.
+ * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
+ */
 export async function shipmentPublishingFixture(
   t,
-  { origin = 'http://127.0.0.1:3000' } = {},
+  { origin = 'http://127.0.0.1:3000', imported = false } = {},
 ) {
   const f = await setupSimulator(t, {
+    imported,
     origin,
     observability: createObservability({
       environment: 'test',

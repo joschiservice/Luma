@@ -7,6 +7,7 @@ import { purchasingCycleFixture } from './purchasing-cycle-fixture.mjs';
 
 it('settles an order email made uncertain by a forged bounce through a person’s decision or the supplier’s authenticated reply', async (t) => {
   const f = await purchasingCycleFixture(t, 'email', {
+    imported: true,
     ignoreAlternative: true,
   });
   const date = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);

@@ -25,7 +25,10 @@ const configuration = {
 test('a store that stops following stock changes opens one verified, scored and recurring stall case', async (t) => {
   // The test world never pushes stock to the shop on its own; ERP changes stay unfollowed until
   // the journey writes the shop, as a restarted stock sync would.
-  const f = await setupSimulator(t, { detection: { configuration } });
+  const f = await setupSimulator(t, {
+    imported: true,
+    detection: { configuration },
+  });
   const actor = await f.pilot.operator();
   const { jtl, shopify } = f.manifest.connections;
   const command = (instance, body) =>

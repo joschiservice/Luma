@@ -3,9 +3,12 @@ import { randomUUID } from 'node:crypto';
 
 import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture.mjs';
 
-/** Real shipping updates with explicitly reviewed order and line mappings, source authority and isolated PostgreSQL. */
-export async function starshipitUpdatesFixture(t) {
-  const f = await shipmentPublishingFixture(t);
+/**
+ * Real shipping updates with explicitly reviewed order and line mappings, source authority and
+ * isolated PostgreSQL. `options` go to `shipmentPublishingFixture`.
+ */
+export async function starshipitUpdatesFixture(t, options) {
+  const f = await shipmentPublishingFixture(t, options);
   const target = {
     connectionId: f.manifest.connections.starshipit,
     orderId: '1',

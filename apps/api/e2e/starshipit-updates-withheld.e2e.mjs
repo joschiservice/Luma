@@ -7,7 +7,7 @@ import { starshipitUpdatesFixture } from './starshipit-updates-fixture.mjs';
 
 // Three previews, approvals and fresh reads run in sequence, so this journey needs more than the default.
 test('labels, changed authority, and cancelled authoritative orders withhold approved shipping corrections', async (t) => {
-  const f = await starshipitUpdatesFixture(t),
+  const f = await starshipitUpdatesFixture(t, { imported: true }),
     preview = await f.preview();
   await f.call(
     'approve',

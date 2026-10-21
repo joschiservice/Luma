@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { Pool } from 'pg';
 
+import { dropScenarioSnapshots } from './scenario-snapshots.mjs';
+
 const migrate = fileURLToPath(
   new URL(
     '../../../packages/application-runtime/scripts/migrate.mjs',
@@ -17,7 +19,8 @@ const migrate = fileURLToPath(
  * `LUMA_E2E_TEMPLATE_DATABASE`, so each journey copies it instead of migrating its own database.
  * Runs as the Vitest and Playwright global setup, before workers start and inherit the variable.
  * Without `TEST_DATABASE_URL` it does nothing; journeys then fail on their own database check.
- * Returns the teardown that drops the template.
+ * Returns the teardown that drops the template and the imported scenario snapshots named after
+ * it.
  */
 export default async function prepareTemplateDatabase() {
   const adminUrl = process.env.TEST_DATABASE_URL;
@@ -67,6 +70,7 @@ export default async function prepareTemplateDatabase() {
 
   return async () => {
     try {
+      await dropScenarioSnapshots(admin, name);
       await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     } finally {
       await admin.end();

@@ -22,13 +22,17 @@ const flags = {
   'adaptive-view-actions': true,
 };
 
-/** Runs the real purchasing services against supplier, mail and stock provider observations. */
+/**
+ * Runs the real purchasing services against supplier, mail and stock provider observations.
+ * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
+ */
 export async function purchasingCycleFixture(
   t,
   channel,
-  { positiveStock = false, ignoreAlternative = false } = {},
+  { positiveStock = false, ignoreAlternative = false, imported = false } = {},
 ) {
   const f = await setupSimulator(t, {
+    imported,
     historyDays: 14,
     featureFlagOverrides: flags,
     supplierExtraction: { available: true },

@@ -6,7 +6,7 @@ import { expect, it, vi } from 'vitest';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 it('deduplicates monitored conditions and isolates rules, reviews and decisions by current membership', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const rule = await f.configure();
   await Promise.all([
     f.pilot.replenishment.tick(f.actor),
@@ -66,7 +66,7 @@ it('deduplicates monitored conditions and isolates rules, reviews and decisions 
 }, 120000);
 
 it('reports readiness, previews bulk setup and keeps every surface honest when stock goes stale', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const org = f.manifest.organizationId;
   const coverage = async (positionId, { cookie = f.ownerCookie } = {}) => {
     const response = await f.pilot.app.inject({
@@ -337,7 +337,7 @@ it('reports readiness, previews bulk setup and keeps every surface honest when s
 }, 120000);
 
 it('keeps rule readiness independent of stock choice search and pages', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const rule = await f.configure();
   const searched = await f.request('/replenishment?q=no-such-sku');
   expect(searched.positions).toEqual([]);
@@ -380,7 +380,7 @@ it('keeps rule readiness independent of stock choice search and pages', async (t
 }, 120000);
 
 it('reads watched stock once per monitor pass and rereads only a refreshed position', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const setup = await f.request('/replenishment');
   const chosen = setup.positions
     .filter(

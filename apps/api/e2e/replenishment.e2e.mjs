@@ -128,7 +128,7 @@ it('retains supplier cost and lead time with the proposal and draft even when te
 });
 
 it('replenishes through Temporal, policy, procurement and verification without an exception', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   expect((await f.request('')).presentation).toBe('procurement.replenishment');
   const initialExceptions = (await f.pilot.detection.exceptions.list(f.actor))
     .length;
@@ -351,7 +351,7 @@ it('replenishes through Temporal, policy, procurement and verification without a
 }, 120000);
 
 it('keeps a proposal open for hours and rereads stock before creating the order', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const rule = await f.configure();
   await f.pilot.replenishment.tick(f.actor);
   const [run] = (await f.request('/runs')).items;
@@ -388,7 +388,7 @@ it('keeps a proposal open for hours and rereads stock before creating the order'
 }, 120000);
 
 it('lets the requester approve replenishment when the team independent approval preference is off', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const base = `/v1/organizations/${f.manifest.organizationId}`;
   const settings = await f.pilot.app.inject({
     method: 'PATCH',

@@ -6,7 +6,7 @@ import { caseWorkflowFixture } from './case-workflows-fixture.mjs';
 import { until } from './helpers.mjs';
 
 test('a connection check ends without handing over when reads have already recovered', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   const check = 'connection-sync-check';
   await f.activate(check);
   await f.pilot.observe({ check: false });
@@ -48,7 +48,7 @@ test('a connection check ends without handing over when reads have already recov
 });
 
 test('lost store access opens a case for a person, and reconnecting closes it after a fresh scan', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   const check = 'connection-sync-check';
   const shop = f.manifest.connections.shopify;
   await f.activate(check);

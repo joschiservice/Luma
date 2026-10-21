@@ -7,7 +7,7 @@ import {
 } from './order-quantity-change-fixture.mjs';
 
 test('a lost Shopify commit response is reconciled from the order and never sent again', async (t) => {
-  const f = await quantityChangeFixture(t);
+  const f = await quantityChangeFixture(t, { imported: true });
   await f.activate(workflow);
   await f.changeQuantity('1');
   const opened = await f.caseOpened();

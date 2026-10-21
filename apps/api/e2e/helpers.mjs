@@ -94,13 +94,28 @@ export function startProcess(t, script, env = {}, ipc = false) {
   };
 }
 
+/** Shared runtime roles that `database(t).grantRuntime()` grants a journey's login. */
+export const runtimeRoles = [
+  'luma_identity',
+  'luma_case_reader',
+  'luma_desk',
+  'luma_policies',
+  'luma_execution',
+  'luma_audit',
+  'luma_connectors',
+  'luma_commerce_sync',
+  'luma_sales',
+  'luma_adaptive',
+];
+
 /**
  * Creates an isolated database and restricted login; the context must register teardown
  * callbacks. The database is a copy of the run's migrated template when one exists, so
  * `migrate()` with the default script has nothing left to do. Pass `empty: true` for a test
- * that migrates the database itself.
+ * that migrates the database itself, or `template` to copy another migrated database, such
+ * as an imported scenario snapshot, that nobody is connected to.
  */
-export async function database(t, { empty = false } = {}) {
+export async function database(t, { empty = false, template: source } = {}) {
   assert.ok(
     process.env.TEST_DATABASE_URL,
     'TEST_DATABASE_URL is required for backend E2E tests',
@@ -117,7 +132,9 @@ export async function database(t, { empty = false } = {}) {
       await admin.end();
     }
   });
-  const template = empty ? undefined : process.env.LUMA_E2E_TEMPLATE_DATABASE;
+  const template = empty
+    ? undefined
+    : (source ?? process.env.LUMA_E2E_TEMPLATE_DATABASE);
   await admin.query(
     `CREATE DATABASE "${id}"${template ? ` TEMPLATE "${template}"` : ''}`,
   );
@@ -177,9 +194,7 @@ export async function database(t, { empty = false } = {}) {
       }
     },
     async grantRuntime() {
-      await admin.query(
-        `GRANT luma_identity,luma_case_reader,luma_desk,luma_policies,luma_execution,luma_audit,luma_connectors,luma_commerce_sync,luma_sales,luma_adaptive TO "${id}"`,
-      );
+      await admin.query(`GRANT ${runtimeRoles.join(',')} TO "${id}"`);
     },
   };
 }

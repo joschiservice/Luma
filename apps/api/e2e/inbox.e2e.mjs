@@ -13,7 +13,7 @@ import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 const origin = 'http://127.0.0.1:3000';
 
 test('reads only mail its rules select, links supplier mail to the purchase order and hands it to procurement', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const [mailbox] = (await f.messaging('/mailboxes')).items;
   expect(mailbox).toMatchObject({
     connectionId: f.mailboxId,
@@ -177,7 +177,7 @@ test('reads only mail its rules select, links supplier mail to the purchase orde
 });
 
 test('links a customer’s delay email to the order, and suggests profiles that share the address', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const incident = await f.scenario('customer-delay-mail');
   const orderName = incident.resources.find(
     (item) => item.kind === 'Order',
@@ -243,7 +243,7 @@ test('links a customer’s delay email to the order, and suggests profiles that 
 });
 
 test('thread work is permission-checked, idempotent and revision-checked, notes are never sent, and overdue threads reach Needs you', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const { summary } = await splitDelivery(f);
   const member = await f.join('Member', 'member');
   const roles = await f.request('/roles', undefined, { cookie: f.owner });
@@ -374,7 +374,7 @@ test('thread work is permission-checked, idempotent and revision-checked, notes 
 });
 
 test('documents from attachments become facts to review, with duplicates and versions', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const { summary, reference } = await splitDelivery(f);
   let detail;
   await f.readUntil(async () => {
@@ -558,7 +558,7 @@ test('documents from attachments become facts to review, with duplicates and ver
 });
 
 test('replies cite records, send once after a fresh read, need another admin for commitments, and are withheld in observe-only', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const incident = await f.scenario('customer-delay-mail');
   const orderName = incident.resources.find(
     (item) => item.kind === 'Order',
@@ -757,7 +757,7 @@ test('replies cite records, send once after a fresh read, need another admin for
 });
 
 test('another workspace cannot read or act on this inbox’s threads, documents or replies', async (t) => {
-  const f = await inboxFixture(t);
+  const f = await inboxFixture(t, undefined, { imported: true });
   const { summary } = await splitDelivery(f);
   let document;
   await f.readUntil(async () => {

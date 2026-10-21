@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture.mjs';
 
 test('changed Shopify work and cancellation withhold approved publication without remote side effects', async (t) => {
-  const f = await shipmentPublishingFixture(t),
+  const f = await shipmentPublishingFixture(t, { imported: true }),
     source = await f.dispatch(),
     preview = await f.preview(source);
   await f.call(

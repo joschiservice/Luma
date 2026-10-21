@@ -7,7 +7,7 @@ import {
 } from './order-quantity-change-fixture.mjs';
 
 test('hands a started pick to the warehouse, survives a worker restart while waiting, and edits Shopify only after fresh reads show the pick was reset', async (t) => {
-  const f = await quantityChangeFixture(t);
+  const f = await quantityChangeFixture(t, { imported: true });
   await f.activate(workflow);
   await f.packing();
   await f.changeQuantity('1');
@@ -52,7 +52,7 @@ test('hands a started pick to the warehouse, survives a worker restart while wai
 }, 300_000);
 
 test('a missed warehouse deadline escalates the task to admins, and an answer fresh reads contradict hands the case to its owner', async (t) => {
-  const f = await quantityChangeFixture(t);
+  const f = await quantityChangeFixture(t, { imported: true });
   await f.activate(workflow);
   await f.packing();
   await f.changeQuantity('1');

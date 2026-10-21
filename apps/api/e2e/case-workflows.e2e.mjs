@@ -11,7 +11,7 @@ import {
 import { until } from './helpers.mjs';
 
 test('corrects Shopify stock from the ERP after a different admin approves, and detection closes the case', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   const detail = await f.request(`/workflows/${stock}`);
   expect(detail).toMatchObject({
     presentation: 'workflows.case',
@@ -190,7 +190,7 @@ test('corrects Shopify stock from the ERP after a different admin approves, and 
 });
 
 test('a rejected correction hands the case to a person without writing to Shopify', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   await f.activate(stock);
   await driftedStock(f);
   const before = await shopStock(f);
@@ -214,7 +214,7 @@ test('a rejected correction hands the case to a person without writing to Shopif
 });
 
 test('a proposal waits hours for a decision, one item follows a stock change, and a late approval acts on a fresh read', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   await f.activate(stock);
   await driftedStock(f);
   await f.tick();

@@ -10,7 +10,7 @@ import {
 } from './case-workflows-stock-fixture.mjs';
 
 test('closing an issue blocks its waiting workflow change without counting a verified fix', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   await f.activate(stock);
   const { opened } = await driftedStock(f);
   await f.tick();
@@ -46,7 +46,7 @@ test('closing an issue blocks its waiting workflow change without counting a ver
 });
 
 test('turning a workflow off stops new runs and blocks a waiting change', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   const { activation } = await f.activate(stock);
   await driftedStock(f);
   await f.tick();
@@ -75,7 +75,7 @@ test('turning a workflow off stops new runs and blocks a waiting change', async 
 });
 
 test('records observe-only capability work without provider writes or retries after worker replacement', async (t) => {
-  const f = await caseWorkflowFixture(t);
+  const f = await caseWorkflowFixture(t, { imported: true });
   const settings = await f.request('/settings', undefined, {
     cookie: f.approverCookie,
   });

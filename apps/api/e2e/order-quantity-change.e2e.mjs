@@ -9,7 +9,7 @@ import {
 } from './order-quantity-change-fixture.mjs';
 
 test('carries a quantity change from Luma ERP to Shopify after the warehouse confirms, and detection closes the case only after fresh reads', async (t) => {
-  const f = await quantityChangeFixture(t);
+  const f = await quantityChangeFixture(t, { imported: true });
   const detail = await f.request(`/workflows/${workflow}`);
   expect(detail.summary.readiness).toMatchObject({
     enablement: 'not_enabled',
@@ -143,7 +143,7 @@ test('carries a quantity change from Luma ERP to Shopify after the warehouse con
 }, 300_000);
 
 test('a simulated customer’s quantity request reaches Luma through support, and the scorecard reports the case', async (t) => {
-  const f = await quantityChangeFixture(t);
+  const f = await quantityChangeFixture(t, { imported: true });
   const id = randomUUID();
   await f.call('runs/operations/incidents', {
     id,

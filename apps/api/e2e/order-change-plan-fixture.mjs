@@ -74,10 +74,15 @@ export async function packFixtureOrder(f, api, shop) {
 /**
  * Starts the simulator pilot, links the fixture order 1 in Shopify with its JTL import and
  * returns the linked order, its line's comparison key and an API helper for the operator.
- * `packing()` lets the JTL warehouse start packing the order and reads it again.
+ * `packing()` lets the JTL warehouse start packing the order and reads it again. `imported`
+ * starts from the simulator's completed initial import, as `setupSimulator` does.
  */
-export async function linkedOrderFixture(t, origin = 'http://127.0.0.1:3000') {
-  const f = await setupSimulator(t, { origin });
+export async function linkedOrderFixture(
+  t,
+  origin = 'http://127.0.0.1:3000',
+  { imported = false } = {},
+) {
+  const f = await setupSimulator(t, { imported, origin });
   const tenantId = f.manifest.organizationId;
   const shopify = f.manifest.connections.shopify;
   const jtl = f.manifest.connections.jtl;

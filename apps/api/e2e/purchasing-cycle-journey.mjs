@@ -12,10 +12,11 @@ import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
  * Runs a reviewed purchasing cycle through one submission channel, `jtl` or `email`: the
  * supplier changes its commitment and a damaged partial receipt follows, while a separate
  * purchasing worker process sends, restarts and verifies by fresh reads. Each channel runs in
- * its own journey file so the two long cycles do not run in sequence.
+ * its own journey file so the two long cycles do not run in sequence. `options` go to
+ * `purchasingCycleFixture`.
  */
-export async function reviewedPurchasingCycle(t, channel) {
-  const f = await purchasingCycleFixture(t, channel);
+export async function reviewedPurchasingCycle(t, channel, options) {
+  const f = await purchasingCycleFixture(t, channel, options);
   let worker = await purchasingWorker(t, f.f.purchasingWorkerConfiguration());
   const restartWorker = async () => {
     const pid = worker.pid;

@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import { starshipitUpdatesFixture } from './starshipit-updates-fixture.mjs';
 
 test('committed updates with a lost response reconcile after restart without another provider write even after the action release is removed', async (t) => {
-  const f = await starshipitUpdatesFixture(t),
+  const f = await starshipitUpdatesFixture(t, { imported: true }),
     preview = await f.preview();
   await f.call(
     'approve',
@@ -55,7 +55,7 @@ test('committed updates with a lost response reconcile after restart without ano
 });
 
 test('observe-only and action-release removal send no shipping correction and another tenant cannot use the saved reference', async (t) => {
-  const f = await starshipitUpdatesFixture(t);
+  const f = await starshipitUpdatesFixture(t, { imported: true });
   const settings = await f.api('/settings');
   await f.api('/settings/write-mode', {
     method: 'PATCH',
