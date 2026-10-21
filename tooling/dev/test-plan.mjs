@@ -13,13 +13,16 @@ const build = [
   '--filter=@luma/staff-web',
 ];
 
-/** @type {Record<string, string[][]>} */
+/**
+ * A pnpm command, or a group of independent pnpm commands that run concurrently.
+ * @typedef {string[] | { parallel: string[][] }} Step
+ */
+
+/** @type {Record<string, Step[]>} */
 const suites = {
   check: [
-    ['format:check'],
-    ['lint'],
-    ['knip:check'],
-    ['typecheck'],
+    // Static checks read only sources, so they run together; tests and the build follow.
+    { parallel: [['format:check'], ['lint'], ['knip:check'], ['typecheck']] },
     ['test'],
     ['build'],
   ],
@@ -180,16 +183,19 @@ const journeyFilters = {
  * @param {string} suite
  * @param {string[]} extraArgs
  * @param {{ e2e: string[], browser: string[] }} [journeys] affected journey selection
+ * @returns {Step[]}
  */
 export function testCommands(suite, extraArgs = [], journeys) {
   if (suite === 'affected') {
     if (extraArgs.length)
       throw new Error('Test arguments are not supported for affected');
 
-    /** @type {string[][]} */
-    const e2e = testCommands('e2e', ['--affected'], journeys);
-    /** @type {string[][]} */
-    const browser = testCommands('browser', ['--affected'], journeys);
+    const e2e = /** @type {string[][]} */ (
+      testCommands('e2e', ['--affected'], journeys)
+    );
+    const browser = /** @type {string[][]} */ (
+      testCommands('browser', ['--affected'], journeys)
+    );
 
     // Both journey suites share one build.
     return [
@@ -200,7 +206,7 @@ export function testCommands(suite, extraArgs = [], journeys) {
     ];
   }
   const commands = Object.hasOwn(suites, suite)
-    ? suites[suite].map((args) => [...args])
+    ? structuredClone(suites[suite])
     : undefined;
   if (!commands) throw new Error(`Unknown test suite: ${suite}`);
   if (!extraArgs.length) return commands;
@@ -217,7 +223,10 @@ export function testCommands(suite, extraArgs = [], journeys) {
       ...journeyFilters[suite](journeys[suite]),
     ];
   }
-  commands[commands.length - 1].push(...args);
+  const last = commands.at(-1);
+  if (!Array.isArray(last))
+    throw new Error('Test arguments need a single final command');
+  last.push(...args);
 
   return commands;
 }

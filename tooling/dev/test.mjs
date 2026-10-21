@@ -32,6 +32,36 @@ function capabilities(env) {
     .join(',');
 }
 
+/**
+ * Runs independent pnpm commands at once and prints each one's output when it finishes, so
+ * their logs do not interleave. Waits for every command, then fails if any of them failed.
+ * @param {string[][]} group
+ * @param {NodeJS.ProcessEnv} env
+ */
+async function runTogether(group, env) {
+  const results = await Promise.allSettled(
+    group.map(async (args) => {
+      const title = `$ pnpm ${args.join(' ')}`;
+      try {
+        console.log(
+          `${title}\n${await run('pnpm', args, { env, capture: true })}`,
+        );
+      } catch (error) {
+        console.error(
+          `${title}\n${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    }),
+  );
+  const failed = results.filter((result) => result.status === 'rejected');
+  if (failed.length)
+    throw Object.assign(
+      new Error(`${failed.length} of ${group.length} checks failed`),
+      { exitCode: failed[0].reason?.exitCode ?? 1 },
+    );
+}
+
 try {
   const [suite, ...args] = process.argv.slice(2);
   const journeys =
@@ -94,6 +124,10 @@ try {
   env.LUMA_TEST_CAPABILITIES = capabilities(env);
   env.LUMA_VALIDATION_OWNER = validation.owner;
   for (const args of commands) {
+    if (!Array.isArray(args)) {
+      await runTogether(args.parallel, env);
+      continue;
+    }
     // Held from the first journey command to the end of the run, so one run's backend and
     // browser journeys are not interleaved with another checkout's.
     if (!journeySlot && runsJourneys(args))

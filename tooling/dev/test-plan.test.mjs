@@ -10,16 +10,22 @@ const manifest = JSON.parse(
   await readFile(new URL('../../package.json', import.meta.url)),
 );
 
+/** Lists a suite's commands, including those that run together. */
+const commandsOf = (suite) =>
+  testCommands(suite).flatMap((step) =>
+    Array.isArray(step) ? [step] : step.parallel,
+  );
+
 function leaves(command) {
   return command.split(' && ').flatMap((part) => {
     const match = part.match(/^pnpm (?:run )?([\w:-]+)(?: .*)?$/);
     if (match && manifest.scripts[match[1]]) {
       if (match[1] === 'check')
-        return testCommands('check').flatMap((args) =>
+        return commandsOf('check').flatMap((args) =>
           leaves(`pnpm ${args.join(' ')}`),
         );
       if (['test', 'test:local'].includes(match[1]))
-        return testCommands('local').flatMap((args) =>
+        return commandsOf('local').flatMap((args) =>
           leaves(`pnpm ${args.join(' ')}`),
         );
       if (['test:e2e', 'test:browser'].includes(match[1])) return [match[1]];
@@ -42,7 +48,7 @@ test('full validation covers every CI matrix command', async () => {
     ),
   );
   const full = new Set(
-    testCommands('full').flatMap((args) => leaves(`pnpm ${args.join(' ')}`)),
+    commandsOf('full').flatMap((args) => leaves(`pnpm ${args.join(' ')}`)),
   );
   for (const job of ci.jobs.checks.strategy.matrix.include) {
     for (const command of leaves(job.command))

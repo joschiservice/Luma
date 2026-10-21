@@ -174,6 +174,12 @@ because each run gets new disposable containers. Run tests through the `pnpm tes
 Running `turbo run test` directly with `TEST_DATABASE_URL` set bypasses the marker. Add
 `--force` to rerun cached results.
 
+`pnpm lint` and `pnpm format:check` keep caches in `node_modules/.cache`. ESLint keys a cached
+pass by file content and configuration, not by rule code, so `tooling/dev/eslint.mjs` names its
+cache after the ESLint configuration, the lockfile and the repository's own rules in
+`tooling/architecture` and `tooling/style`. A local rule that reads files other than the one
+being linted must add them to that key, or edits to them replay stale passes.
+
 The root `package.json` must not depend on workspace packages. Turbo adds the sources of
 root dependencies to every task hash, so a change to any of them would miss every cache
 and select every task. Scripts under `tooling/` declare the packages they import in
