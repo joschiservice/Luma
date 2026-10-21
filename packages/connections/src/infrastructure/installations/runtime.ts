@@ -59,16 +59,39 @@ function installedRuntime(options: InstalledRuntimeOptions) {
         const build = async (
           readPurpose?: ProviderRuntimeOptions['readPurpose'],
         ) => {
-          snapshot = await options.installations.credential(
+          const current = await options.installations.credential(
             context,
             id,
             capability,
           );
-
-          return provider.build(context, id, capability, {
-            ...options,
-            ...(readPurpose ? { readPurpose } : {}),
-          });
+          snapshot = current;
+          // Providers read the same credential while building; they get the snapshot just
+          // authorized. Reads after the build, such as rechecks during a paginated read, stay
+          // fresh.
+          let building = true;
+          const installations: typeof options.installations = {
+            ...options.installations,
+            credential: (requested, requestedId, requestedCapability) =>
+              building &&
+              requested === context &&
+              requestedId === id &&
+              requestedCapability === capability
+                ? Promise.resolve(current)
+                : options.installations.credential(
+                    requested,
+                    requestedId,
+                    requestedCapability,
+                  ),
+          };
+          try {
+            return await provider.build(context, id, capability, {
+              ...options,
+              installations,
+              ...(readPurpose ? { readPurpose } : {}),
+            });
+          } finally {
+            building = false;
+          }
         };
         let adapter: ConnectorConnection;
         try {
