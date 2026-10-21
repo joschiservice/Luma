@@ -1,5 +1,6 @@
 import { forbidden, notFound, ServiceError } from '@luma/platform';
 
+import { apiAppPermissions } from './api-apps.js';
 import type { AppPermission, Permission } from './permissions.js';
 import type { BuiltInRoleKey, RoleReference } from './roles.js';
 import { builtInReference, PermissionSet } from './roles.js';
@@ -49,6 +50,16 @@ export interface SupportView {
   expiresAt: string;
 }
 
+/**
+ * A personal API app acting for its member through one bearer credential. Its effective
+ * permissions are its scopes that the member's current role still grants.
+ */
+export interface ApiAppAccess {
+  id: string;
+  credentialId: string;
+  scopes: readonly string[];
+}
+
 export interface TenantContext {
   readonly [resolvedContext]: true;
   readonly tenantId: string;
@@ -69,6 +80,11 @@ export interface TenantContext {
    * they see; every change is refused.
    */
   readonly supportView?: Readonly<SupportView>;
+  /**
+   * Present when a personal API app made the request. The actor is the app's member, the
+   * permissions are narrowed to the app's scopes, and `actor.sessionId` is the credential ID.
+   */
+  readonly apiApp?: Readonly<ApiAppAccess>;
 }
 
 /**
@@ -203,6 +219,28 @@ export function makeTenantContext(
     permissions: member.permissions,
     requestId,
     ...(supportView ? { supportView: Object.freeze({ ...supportView }) } : {}),
+  });
+}
+
+/**
+ * Narrows a member's context to what an API app may do for them: the app's scopes that the
+ * member's role still grants. The actor stays the member, so attribution and approval rules
+ * apply to the person who created the app; `actor.sessionId` is the credential ID.
+ */
+export function apiAppContext(
+  context: TenantContext,
+  app: ApiAppAccess,
+): TenantContext {
+  if (context.supportView) throw new ReadOnlyAccessError();
+
+  return Object.freeze({
+    ...context,
+    actor: Object.freeze({
+      ...context.actor,
+      sessionId: app.credentialId,
+    }),
+    permissions: apiAppPermissions(context.permissions, app.scopes),
+    apiApp: Object.freeze({ ...app, scopes: Object.freeze([...app.scopes]) }),
   });
 }
 

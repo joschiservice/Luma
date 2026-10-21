@@ -35,6 +35,23 @@ describe('renderEmail', () => {
     expect(de.text).toContain('19.10.2026, 11:30 MESZ');
   });
 
+  it('names the API app, when its token expires and who revoked it', async () => {
+    const expiring = await renderEmail(samples.api_app_expiring, 'de');
+    const revoked = await renderEmail(
+      { ...samples.api_app_revoked, revokedBy: null },
+      'en',
+    );
+
+    expect(expiring.subject).toBe(
+      'Dein API-App-Token läuft am 19.10.2026, 11:30 MESZ ab',
+    );
+    expect(expiring.text).toContain('Weekly sales report');
+    expect(revoked.subject).toBe(
+      'Your API app Weekly sales report was revoked',
+    );
+    expect(revoked.text).toContain('A workspace admin revoked your API app');
+  });
+
   it('shows text from people as text, never as markup', async () => {
     const rendered = await renderEmail(
       {

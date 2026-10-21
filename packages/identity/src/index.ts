@@ -40,6 +40,8 @@ export { MailRateLimited } from './application/mail.js';
 
 export type { SettingsService } from './application/settings.js';
 
+export type { ApiAppsService } from './application/api-apps.js';
+
 export type { AppPermissionGroup, RolesService } from './application/roles.js';
 
 export {

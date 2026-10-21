@@ -139,5 +139,15 @@
   "email_workspace_closure_scheduled_body": "{workspace} ist geschlossen. Am {date} löscht Luma seine Daten.",
   "email_workspace_closure_reminder_body": "{workspace} ist geschlossen, und Luma löscht seine Daten am {date}.",
   "email_workspace_closure_scope": "Dabei werden Bestellungen, Bestand, Kunden, Nachrichten, Probleme, Workflows und alle anderen Datensätze im Workspace entfernt. Das Protokoll der im Workspace ausgeführten Aktionen bewahrt Luma danach noch für begrenzte Zeit auf. Gelöschte Daten lassen sich nicht wiederherstellen.",
-  "email_workspace_closure_keep": "Um {workspace} zu behalten, bitte den Luma-Support vor dem {date}, ihn wieder zu öffnen."
+  "email_workspace_closure_keep": "Um {workspace} zu behalten, bitte den Luma-Support vor dem {date}, ihn wieder zu öffnen.",
+  "email_api_app_expiring_subject": "Dein API-App-Token läuft am {date} ab",
+  "email_api_app_expiring_preview": "Ersetze das Token von {app}, bevor es nicht mehr funktioniert.",
+  "email_api_app_expiring_heading": "Dein API-App-Token läuft bald ab",
+  "email_api_app_expiring_body": "Das Token deiner API-App {app} in {workspace} funktioniert ab {date} nicht mehr. Ersetze das Token vorher und aktualisiere die Tools, die es nutzen.",
+  "email_api_app_revoked_subject": "Deine API-App {app} wurde widerrufen",
+  "email_api_app_revoked_preview": "Ihr Token funktioniert nicht mehr.",
+  "email_api_app_revoked_heading": "Deine API-App wurde widerrufen",
+  "email_api_app_revoked_body": "{person} hat deine API-App {app} in {workspace} widerrufen. Ihr Token funktioniert nicht mehr. Wenn du weiterhin Zugriff brauchst, erstelle eine neue API-App.",
+  "email_api_app_revoked_person_unknown": "Eine Workspace-Admin-Person",
+  "email_api_app_action": "API-Apps öffnen"
 }

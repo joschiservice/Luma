@@ -468,6 +468,15 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'api_apps.create',
+    group: 'connections',
+    label: 'Create personal API apps',
+    description:
+      'Create API apps that read workspace data for you with a token, limited to permissions you hold. People who manage apps can see and revoke them.',
+    consequential: true,
+    introduced: '2026-10-20',
+  },
+  {
     key: 'assistant.use',
     group: 'assistant',
     label: 'Use Ask Luma',

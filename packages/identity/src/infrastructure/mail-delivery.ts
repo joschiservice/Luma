@@ -35,7 +35,9 @@ interface Delivery {
     | 'support_view_ended'
     | 'support_access_requested'
     | 'support_inspection_requested'
-    | 'support_inspection_emergency';
+    | 'support_inspection_emergency'
+    | 'api_app_expiring'
+    | 'api_app_revoked';
   user_id: string | null;
   invitation_id: string | null;
   generation: number | null;
@@ -193,6 +195,75 @@ async function supportMail(
       activityLink,
     },
   };
+}
+
+/**
+ * Builds an API app notice for the active member the app acts for, in their language. An
+ * expiry notice is sent only while its token is still the app's current one and works; a
+ * revocation notice names who revoked the app. Notices for removed apps are cancelled.
+ */
+async function apiAppMail(
+  tx: PoolClient,
+  tenantId: string,
+  message: Delivery,
+  origin: string,
+  workspace: Workspace,
+): Promise<Addressed | null> {
+  const member = (
+    await tx.query<{ email: string; locale: string | null }>(
+      `SELECT u.email,u.locale FROM memberships m JOIN users u ON u.id=m.user_id
+      WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active' AND NOT EXISTS(SELECT FROM account_disablements d WHERE d.user_id=m.user_id)`,
+      [tenantId, message.user_id],
+    )
+  ).rows[0];
+  if (!member) return null;
+  const recipient = { to: member.email, locale: language(member.locale) };
+  const link = `${origin}/app/${tenantId}/settings/api-apps`;
+  if (message.kind === 'api_app_expiring') {
+    const credential = (
+      await tx.query<{ name: string; expiresAt: Date }>(
+        `SELECT a.name,c.expires_at AS "expiresAt" FROM api_app_credentials c
+        JOIN api_apps a ON a.tenant_id=c.tenant_id AND a.id=c.app_id
+        WHERE c.tenant_id=$1 AND c.id=$2 AND a.user_id=$3 AND a.revoked_at IS NULL AND c.revoked_at IS NULL AND c.expires_at>now()`,
+        [tenantId, message.target_id, message.user_id],
+      )
+    ).rows[0];
+
+    return credential
+      ? {
+          ...recipient,
+          email: {
+            kind: 'api_app_expiring',
+            workspace: workspace.name,
+            app: credential.name,
+            expiresAt: credential.expiresAt,
+            timeZone: workspace.timeZone,
+            link,
+          },
+        }
+      : null;
+  }
+  const app = (
+    await tx.query<{ name: string; revokedBy: string | null }>(
+      `SELECT a.name,NULLIF(p.name,'') AS "revokedBy" FROM api_apps a
+      LEFT JOIN workspace_people p ON p.tenant_id=a.tenant_id AND p.user_id=a.revoked_by
+      WHERE a.tenant_id=$1 AND a.id=$2 AND a.user_id=$3 AND a.revoke_reason='revoked'`,
+      [tenantId, message.target_id, message.user_id],
+    )
+  ).rows[0];
+
+  return app
+    ? {
+        ...recipient,
+        email: {
+          kind: 'api_app_revoked',
+          workspace: workspace.name,
+          app: app.name,
+          revokedBy: app.revokedBy,
+          link,
+        },
+      }
+    : null;
 }
 
 /**
@@ -469,7 +540,16 @@ export function createMailDelivery(
                     message.kind === 'support_inspection_requested' ||
                     message.kind === 'support_inspection_emergency'
                   ? await supportMail(tx, tenantId, message, origin, workspace)
-                  : await memberMail(tx, tenantId, message, origin, workspace);
+                  : message.kind === 'api_app_expiring' ||
+                      message.kind === 'api_app_revoked'
+                    ? await apiAppMail(tx, tenantId, message, origin, workspace)
+                    : await memberMail(
+                        tx,
+                        tenantId,
+                        message,
+                        origin,
+                        workspace,
+                      );
             if (!addressed) {
               await tx.query(
                 "UPDATE workspace_mail SET state='cancelled' WHERE tenant_id=$1 AND id=$2",

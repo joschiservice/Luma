@@ -271,6 +271,7 @@ export async function buildRuntimeApp(
         : {}),
       identity: identity.service,
       settings: identity.settings,
+      apiApps: identity.apiApps,
       roles: identity.roles((tenantId) =>
         installedConnections.apps.permissions(tenantId),
       ),
@@ -364,6 +365,12 @@ export async function buildRuntimeApp(
     schedule(
       'Account erasure pass failed',
       () => identity.eraseDueAccounts(),
+      60_000,
+    );
+    schedule(
+      'API app expiry notice pass failed',
+      () => identity.queueApiAppExpiryNotices(),
+      60 * 60_000,
       60_000,
     );
     resources.add(async () => {

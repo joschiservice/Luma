@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   Bell,
+  Braces,
   Building2,
   Check,
   IdCard,
@@ -39,6 +40,7 @@ import { regionLabel } from '../../kit/identity/region';
 import { settingsApi, settingsOptions } from '../../kit/settings/data';
 import { stockProtectionOptions } from '../../shared/stock-protection/data';
 import { StockProtectionNotice } from '../../shared/stock-protection/notice';
+import { ApiAppsSettings } from './api-apps';
 import {
   CommandFeedback,
   useSettingsCommand,
@@ -91,6 +93,12 @@ export const settingsSections = [
     label: m.settings_section_support,
     group: m.settings_group_workspace,
     Icon: LifeBuoy,
+  },
+  {
+    id: 'api-apps',
+    label: m.settings_section_api_apps,
+    group: m.settings_group_workspace,
+    Icon: Braces,
   },
   {
     id: 'security',
@@ -329,6 +337,15 @@ export function SettingsView({
                   key={`${organizationId}:support`}
                   organizationId={organizationId}
                   disabled={!online}
+                />
+              ) : null}
+              {section === 'api-apps' ? (
+                <ApiAppsSettings
+                  key={`${organizationId}:api-apps`}
+                  organizationId={organizationId}
+                  actorId={actorId}
+                  can={can}
+                  disabled={!online || supportView}
                 />
               ) : null}
               {section === 'appearance' ? <AppearanceSettings /> : null}

@@ -14,7 +14,9 @@ export const Route = createFileRoute('/app/$organizationId/settings/$section')({
         ? 'roles-and-permissions'
         : section === 'security'
           ? 'account-security'
-          : 'workspace-settings',
+          : section === 'api-apps'
+            ? 'api-apps'
+            : 'workspace-settings',
   },
   validateSearch: z.object({ role: z.string().max(100).optional() }),
   beforeLoad: ({ params }) => {

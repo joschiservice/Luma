@@ -36,6 +36,7 @@ export const memberPermissions = [
   'procurement.read',
   'assistant.use',
   'activity.read',
+  'api_apps.create',
 ];
 
 /** Builds a tenant context response for a built-in or custom role, for stories and tests. */

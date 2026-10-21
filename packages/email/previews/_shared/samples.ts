@@ -88,6 +88,21 @@ export const samples = {
     timeZone,
     activityLink: `${origin}/app/${tenant}/activity`,
   },
+  api_app_expiring: {
+    kind: 'api_app_expiring',
+    workspace,
+    app: 'Weekly sales report',
+    expiresAt: new Date('2026-10-19T09:30:00Z'),
+    timeZone,
+    link: `${origin}/app/${tenant}/settings/api-apps`,
+  },
+  api_app_revoked: {
+    kind: 'api_app_revoked',
+    workspace,
+    app: 'Weekly sales report',
+    revokedBy: 'Jonas Becker',
+    link: `${origin}/app/${tenant}/settings/api-apps`,
+  },
   support_view_started: {
     kind: 'support_view_started',
     workspace,

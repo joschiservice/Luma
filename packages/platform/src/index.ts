@@ -5,6 +5,7 @@ export {
   forbidden,
   invalid,
   notFound,
+  RateLimitedError,
   ServiceError,
   unavailable,
 } from './domain/service-error.js';

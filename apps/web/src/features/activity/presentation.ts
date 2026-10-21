@@ -158,6 +158,10 @@ const activityLabels: Record<string, Label> = {
   'support_inspection.revoked': m.activity_action_support_inspection_revoked,
   'support_inspection.emergency_opened':
     m.activity_action_support_inspection_emergency_opened,
+  'api_app.created': m.activity_action_api_app_created,
+  'api_app.rotated': m.activity_action_api_app_rotated,
+  'api_app.revoked': m.activity_action_api_app_revoked,
+  'api_app.personal_data_read': m.activity_action_api_app_personal_data_read,
   'invitation.created': m.activity_action_invitation_created,
   'invitation.accepted': m.activity_action_invitation_accepted,
   'invitation.revoked': m.activity_action_invitation_revoked,

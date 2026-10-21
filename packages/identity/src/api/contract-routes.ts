@@ -9,6 +9,8 @@ import {
 } from '@orpc/standard-server-fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
+import type { TenantContext } from '../domain/context.js';
+
 /**
  * Context every contract handler receives: the Fastify request after the identity guard ran,
  * and its reply for response headers such as cookies.
@@ -16,6 +18,18 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 export interface HttpContext {
   request: FastifyRequest;
   reply: FastifyReply;
+}
+
+export interface ContractRouteOptions {
+  /**
+   * Runs after an API app read a route marked `personalData` successfully, before the response
+   * is sent, with the response body. A failure fails the request, so no unrecorded read leaves.
+   */
+  recordPersonalRead?(
+    context: TenantContext,
+    route: string,
+    body: unknown,
+  ): Promise<void>;
 }
 
 /**
@@ -28,6 +42,7 @@ export function registerContractRoutes<T extends AnyContractRouter>(
   app: FastifyInstance,
   contract: T,
   router: Router<T, HttpContext>,
+  options: ContractRouteOptions = {},
 ) {
   const failures = new WeakMap<FastifyRequest, unknown>();
   const handler = new StandardOpenAPIHandler<HttpContext>(router, {
@@ -49,6 +64,7 @@ export function registerContractRoutes<T extends AnyContractRouter>(
       config: {
         ...(route.meta.access ? { access: route.meta.access } : {}),
         ...(route.meta.readOnly ? { readOnly: true as const } : {}),
+        ...(route.meta.publicApi ? { publicApi: true as const } : {}),
       },
       handler: async (request, reply) => {
         const standardRequest = toStandardLazyRequest(request, reply);
@@ -60,6 +76,16 @@ export function registerContractRoutes<T extends AnyContractRouter>(
         if (failures.has(request)) throw requestError(failures.get(request));
         if (!result.matched)
           throw new Error(`Contract route ${route.key} did not match`);
+        if (
+          route.meta.personalData &&
+          request.tenantContext?.apiApp &&
+          result.response.status < 300
+        )
+          await options.recordPersonalRead?.(
+            request.tenantContext,
+            route.path,
+            result.response.body,
+          );
         await sendStandardResponse(reply, result.response);
       },
     });

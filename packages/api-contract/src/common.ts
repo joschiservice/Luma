@@ -64,6 +64,17 @@ export interface RouteMeta {
    * `GET` routes are reads already; every other route is refused in a support view.
    */
   readOnly?: true;
+  /**
+   * Marks a route as part of the public API: personal API apps may call it with a bearer token,
+   * and it is listed in the public API document. Every other route needs a signed-in person.
+   * Public routes keep their shape within `/v1`; see the API guide's contract rules.
+   */
+  publicApi?: true;
+  /**
+   * The route's response can include customer personal data when the caller holds
+   * `customers.read`. API app reads of it are counted and recorded in workspace activity.
+   */
+  personalData?: true;
 }
 
 /**

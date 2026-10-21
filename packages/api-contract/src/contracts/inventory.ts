@@ -55,7 +55,11 @@ export const inventoryContract = {
       description:
         'Search SKUs and locations and compare current stock quantities by source. Quantities are never added across sources. Null means unknown. Results contain up to `limit` positions, by SKU and location unless sorted otherwise; nextCursor continues the same filters and sort. Source filters select positions while retaining all sources for comparison.',
     })
-    .meta({ access: requires('inventory.read'), errors: [400, 401, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('inventory.read'),
+      errors: [400, 401, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema,
@@ -71,7 +75,11 @@ export const inventoryContract = {
       description:
         'Compare sources for one SKU, location and unit. Includes up to 100 observed snapshots and 50 entries per related record type. Orders and purchase orders relate to the SKU; they do not confirm location allocation or incoming supply. Incoming quantities and distinct provider stock states remain unknown until reported. Location activity, item activation and tracking are separate facts; quantities do not establish sellability.',
     })
-    .meta({ access: requires('inventory.read'), errors: [401, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('inventory.read'),
+      errors: [401, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema.extend({

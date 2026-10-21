@@ -27,6 +27,7 @@ decisions.
 
 | [015](015-shared-provider-admission.md) | Shared Shopify request admission | Accepted |
 | [016](016-aws-deployment.md) | AWS deployment and the single-host Lite cell | Accepted |
+| [017](017-api-apps.md) | API apps and the public API | Accepted |
 
 ## Baseline
 

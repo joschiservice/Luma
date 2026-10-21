@@ -81,6 +81,10 @@ export * from './adaptive-view-query.js';
 
 export * from './adaptive-views.js';
 
+export { apiAppLifetimeDays } from './contracts/api-apps.js';
+
+export type { ApiApp } from './contracts/api-apps.js';
+
 export * from './apps.js';
 
 export { shopifyAccessSchema } from './apps.js';

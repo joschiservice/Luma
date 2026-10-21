@@ -1,4 +1,4 @@
-import type { Membership, SettingsSnapshot } from '@luma/api-contract';
+import type { ApiApp, Membership, SettingsSnapshot } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -46,6 +46,28 @@ const data: SettingsSnapshot = {
   lastTest: null,
 };
 
+const apiAppFixture: ApiApp = {
+  id: '88888888-8888-4888-8888-888888888888',
+  name: 'Weekly sales report',
+  scopes: ['customers.read', 'orders.read'],
+  status: 'active',
+  owner: { userId: '22222222-2222-4222-8222-222222222222', name: 'Mara Owner' },
+  createdAt: '2026-10-01T08:00:00.000Z',
+  expiresAt: '2026-12-30T08:00:00.000Z',
+  lastUsedAt: '2026-10-19T06:30:00.000Z',
+  lastFour: '3f9a',
+  revokedAt: null,
+  personalDataReads: { requests: 12, records: 1480 },
+};
+
+const apiAppScopesFixture = [
+  'orders.read',
+  'fulfillment.read',
+  'inventory.read',
+  'products.read',
+  'customers.read',
+].map((key) => ({ key, sensitive: key === 'customers.read' }));
+
 // Enough people to need three pages of 25.
 const largeTeam: Membership[] = [
   ...membersFixture,
@@ -81,6 +103,7 @@ function mockTeam({
     roles: rolesFixture,
     autonomy: { available: false, policies: [] },
     'source-environments': { available: false, items: [] },
+    'api-apps': { items: [apiAppFixture], scopes: apiAppScopesFixture },
   };
   globalThis.fetch = async (input, init) => {
     const url = new URL(
@@ -95,6 +118,17 @@ function mockTeam({
       resource in answers
     )
       return Response.json(answers[resource]);
+    if (
+      url.pathname.endsWith(`/organizations/${organizationId}/api-apps`) &&
+      method === 'POST'
+    )
+      return Response.json(
+        {
+          app: { ...apiAppFixture, id: '99999999-9999-4999-8999-999999999999' },
+          token: `luma_eu_${'x'.repeat(43)}0a1b2c3d`,
+        },
+        { status: 201 },
+      );
 
     return original(input, init);
   };
@@ -337,5 +371,40 @@ export const MorningBrief: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
+  },
+};
+
+export const ApiApps: Story = {
+  args: { section: 'api-apps' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Weekly sales report'),
+    ).toBeInTheDocument();
+    await expect(canvas.getByText('Token ends in 3f9a')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('1,480 customer records read in the last 30 days'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Create API app' }),
+    );
+    const dialog = within(await within(document.body).findByRole('dialog'));
+    await expect(dialog.getByText('Personal data')).toBeVisible();
+    const create = dialog.getByRole('button', { name: 'Create API app' });
+    await expect(create).toBeDisabled();
+    await userEvent.type(dialog.getByLabelText('Name'), 'Stock export');
+    await userEvent.click(
+      dialog.getByRole('checkbox', { name: /View inventory/ }),
+    );
+    await expect(create).toBeEnabled();
+    await userEvent.click(create);
+    const issued = within(
+      await within(document.body).findByRole('dialog', {
+        name: 'Copy your token',
+      }),
+    );
+    await expect(issued.getByLabelText('API token')).toHaveTextContent(
+      /^luma_eu_/,
+    );
   },
 };

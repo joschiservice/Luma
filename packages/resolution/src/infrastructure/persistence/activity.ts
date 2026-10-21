@@ -31,9 +31,10 @@ const outcomeSql =
     .join(' ') +
   " ELSE 'recorded' END";
 
-// Access events carry bounded role, member and invitation values. Summaries name the role or
-// setting that changed, the member a support view showed, or the path it read; e-mail
-// addresses, permission lists and invitation secrets stay out.
+// Access events carry bounded role, member, invitation and API app values. Summaries name the
+// role, setting or API app that changed, the app and route that read personal data, the member
+// a support view showed, or the path it read;
+// e-mail addresses, permission lists, invitation secrets and tokens stay out.
 const accessRole = (value: string) =>
   `COALESCE(${value}->>'roleName',CASE WHEN jsonb_typeof(${value}->'role')='string' THEN ${value}->>'role' END)`;
 const accessSummarySql = `CASE
@@ -43,6 +44,8 @@ const accessSummarySql = `CASE
   WHEN event_type LIKE 'member.%' OR event_type LIKE 'invitation.%' THEN COALESCE(${accessRole('after_value')},${accessRole('before_value')})
   WHEN event_type='policy.updated' THEN CASE after_value->>'required' WHEN 'true' THEN 'Approval always required' WHEN 'false' THEN 'Approval follows the workspace policy' END
   WHEN event_type='workspace.updated' THEN after_value->>'name'
+  WHEN event_type='api_app.personal_data_read' THEN concat_ws(' · ',after_value->>'name',after_value->>'path')
+  WHEN event_type LIKE 'api_app.%' THEN COALESCE(after_value->>'name',before_value->>'name')
   WHEN event_type='support_view.read' THEN after_value->>'path'
   WHEN event_type LIKE 'support_view.%' THEN subject.subject_name
 END`;

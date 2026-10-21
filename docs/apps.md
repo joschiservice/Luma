@@ -4,7 +4,8 @@ Apps are trusted first-party packages in `packages/apps/<app-id>` that a workspa
 installs. An app owns its provider settings, validation, adapters, OAuth, webhooks,
 configuration and UI; core never imports a provider implementation or branches on
 provider IDs. Installation, permissions and uninstall are tenant-scoped and transactional,
-and an app acts only within the access its installation was granted.
+and an app acts only within the access its installation was granted. Tools outside Luma use
+[API apps](identity.md#api-apps) instead: bearer tokens on public routes, owned by identity.
 
 ## Ownership
 

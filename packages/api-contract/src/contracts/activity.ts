@@ -20,6 +20,7 @@ export const activityContract = {
         'The `business` view groups events by issue, run or proposal and hides routine checks; `detail=steps` includes up to 100 earlier steps under the same visibility and filters. The default event view retains each immutable record. Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, issue class, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring), and events of the issue classes named in `searchIssueClasses`. Raw payloads are not searched. `actor` keeps events recorded by any of the named actors and `outcome` keeps events with any of the named outcomes; both only narrow what the caller may already see. Cursors are bound to workspace, restricted-activity access, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection changes and access changes (members, invitations, roles and workspace settings, type `access`) are visible only with the View restricted activity permission; `visibility` is `admin` for those callers. Approval and provider acceptance do not establish verified resolution.',
     })
     .meta({
+      publicApi: true,
       access: requires('activity.read'),
       errors: [400, 401, 403, 404, 503],
     })

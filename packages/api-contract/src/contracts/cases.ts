@@ -45,7 +45,11 @@ export const exceptionsContract = {
       description:
         'List issues that need a person, active work or history. `where` takes conditions on the issues catalog fields, such as class, state, owner, source, attention reason, freshness, diagnosis, resolution, record type and dates; `q` searches summaries and records. Results sort by urgency by default: severity, then the oldest attention request or detection, then ID. `group` returns each group’s count and first rows. Freshness is fresh only while the investigation’s evidence is still valid; stale and unknown evidence are never reported as fresh. Use the returned cursor with the same query. Refresh from the first page as cases change.',
     })
-    .meta({ access: requires('issues.read'), errors: [400, 401, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('issues.read'),
+      errors: [400, 401, 404, 503],
+    })
     .input(
       z.object({ params: organizationParamsSchema, query: caseQuerySchema }),
     )
@@ -58,7 +62,11 @@ export const exceptionsContract = {
       description:
         'Returns persisted observation and verification references ordered by immutable ID, including evidence outside the current diagnosis. Pages default to 25 references and allow at most 100. Reuse cursors only for the same organization, case and page size. As evidence arrives, refresh from the first page and deduplicate by ID. Completeness is unknown unless explicitly recorded for the observation. A null source update time means unknown, regardless of observation freshness.',
     })
-    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('issues.read'),
+      errors: [401, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema.extend({
@@ -76,7 +84,11 @@ export const exceptionsContract = {
       description:
         'Returns the current persisted investigation and up to 100 evidence references. Use the evidence endpoint to read further historical references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.',
     })
-    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .meta({
+      publicApi: true,
+      access: requires('issues.read'),
+      errors: [401, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema.extend({
