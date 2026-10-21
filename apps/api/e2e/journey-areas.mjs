@@ -661,6 +661,85 @@ const webAuthRecovery = [
   'apps/web/src/routes/{forgot-password,reset-password}.tsx',
 ];
 
+// Journeys split across files by topic share the areas of the flow they exercise.
+const caseWorkflowJourneys = [
+  ...simulator,
+  ...caseWorkflows,
+  ...decisions,
+  ...supplierCommitments,
+  ...replenishment,
+];
+const cin7Journeys = [...simulator, ...cin7, ...sync];
+const purchasingCycleJourneys = [
+  'apps/api/e2e/purchasing-reconciliation-worker.mjs',
+  ...simulator,
+  ...evidence,
+  ...procurement,
+  ...decisions,
+  ...inventory,
+  'packages/api-contract/src/**/{supplier-email,supplier-terms,purchasing,incoming-stock}.ts',
+];
+const workerEffectJourneys = [
+  'apps/api/e2e/purchasing-reconciliation-worker.mjs',
+  ...simulator,
+  ...procurement,
+  ...supplierCommitments,
+  ...returns,
+  ...returnCases,
+  ...decisions,
+  ...commerce,
+];
+const quantityChangeJourneys = [
+  ...simulator,
+  ...sync,
+  ...orders,
+  ...sales,
+  ...shopify,
+  ...jtl,
+  ...caseWorkflows,
+  ...decisions,
+];
+const pilotJourneys = [
+  ...pilot,
+  ...replenishmentRuntime,
+  'tooling/pilot/{process,background}.mjs',
+  'tooling/observability/**',
+];
+const replenishmentJourneys = [
+  ...simulator,
+  ...replenishment,
+  ...decisions,
+  ...activity,
+];
+const shipmentPublishingJourneys = [
+  'apps/api/e2e/shopify-shipment-publishing-fixture.mjs',
+  ...connections,
+  ...shopify,
+  ...ordersFixture,
+  ...rmFulfillment,
+  'packages/apps/starshipit/**',
+  'packages/connectors/starshipit/**',
+  'packages/simulator/{core,shopify,starshipit}/**',
+];
+const starshipitUpdateJourneys = [
+  'apps/api/e2e/starshipit-updates-fixture.mjs',
+  'apps/api/e2e/shopify-shipment-publishing-fixture.mjs',
+  ...connections,
+  ...simulator,
+  ...ordersFixture,
+  ...rmFulfillment,
+  'packages/apps/starshipit/**',
+  'packages/connectors/starshipit/**',
+  'packages/simulator/{core,shopify,starshipit}/**',
+];
+const simulatorJourneys = [
+  ...simulator,
+  ...sync,
+  ...customers,
+  ...orders,
+  ...metrics,
+];
+
 /** Source areas each journey exercises beyond the shared paths; `**` marks boot smoke tests. */
 export const journeyAreas = {
   'shopify-admission.e2e.mjs': [
@@ -721,13 +800,12 @@ export const journeyAreas = {
   'automatic-links.e2e.mjs': [...commerce, ...sync],
   // Boot smoke: the built API composes every package, migrates and recovers execution.
   'backend.e2e.mjs': ['**'],
-  'case-workflows.e2e.mjs': [
-    ...simulator,
-    ...caseWorkflows,
-    ...decisions,
-    ...supplierCommitments,
-    ...replenishment,
-  ],
+  'case-workflows.e2e.mjs': caseWorkflowJourneys,
+  'case-workflows-stock-guards.e2e.mjs': caseWorkflowJourneys,
+  'case-workflows-connections.e2e.mjs': caseWorkflowJourneys,
+  'case-workflows-follow-ups.e2e.mjs': caseWorkflowJourneys,
+  'case-workflows-hold-release.e2e.mjs': caseWorkflowJourneys,
+  'case-workflows-demo.e2e.mjs': caseWorkflowJourneys,
   'cases.browser.mjs': [
     ...appHost,
     ...detectionFixture,
@@ -738,7 +816,8 @@ export const journeyAreas = {
     ...webCases,
     ...webNeedsYou,
   ],
-  'cin7.e2e.mjs': [...simulator, ...cin7, ...sync],
+  'cin7.e2e.mjs': cin7Journeys,
+  'cin7-anz.e2e.mjs': cin7Journeys,
   'code-steps.browser.mjs': [
     ...appHost,
     ...codeSteps,
@@ -819,25 +898,12 @@ export const journeyAreas = {
     ...webInbox,
     ...webNeedsYou,
   ],
-  'purchasing-cycle.e2e.mjs': [
-    'apps/api/e2e/purchasing-reconciliation-worker.mjs',
-    ...simulator,
-    ...evidence,
-    ...procurement,
-    ...decisions,
-    ...inventory,
-    'packages/api-contract/src/**/{supplier-email,supplier-terms,purchasing,incoming-stock}.ts',
-  ],
-  'worker-effects.e2e.mjs': [
-    'apps/api/e2e/purchasing-reconciliation-worker.mjs',
-    ...simulator,
-    ...procurement,
-    ...supplierCommitments,
-    ...returns,
-    ...returnCases,
-    ...decisions,
-    ...commerce,
-  ],
+  'purchasing-cycle.e2e.mjs': purchasingCycleJourneys,
+  'purchasing-cycle-email.e2e.mjs': purchasingCycleJourneys,
+  'purchasing-cycle-availability.e2e.mjs': purchasingCycleJourneys,
+  'purchasing-cycle-bounce.e2e.mjs': purchasingCycleJourneys,
+  'worker-effects.e2e.mjs': workerEffectJourneys,
+  'worker-effects-refunds.e2e.mjs': workerEffectJourneys,
   'purchase-order-changes.e2e.mjs': [
     ...simulator,
     ...procurement,
@@ -1076,16 +1142,9 @@ export const journeyAreas = {
     ...webNeedsYou,
     ...webOrders,
   ],
-  'order-quantity-change.e2e.mjs': [
-    ...simulator,
-    ...sync,
-    ...orders,
-    ...sales,
-    ...shopify,
-    ...jtl,
-    ...caseWorkflows,
-    ...decisions,
-  ],
+  'order-quantity-change.e2e.mjs': quantityChangeJourneys,
+  'order-quantity-change-warehouse.e2e.mjs': quantityChangeJourneys,
+  'order-quantity-change-lost-response.e2e.mjs': quantityChangeJourneys,
   'order-links.browser.mjs': [
     ...ordersFixture,
     ...orders,
@@ -1121,12 +1180,10 @@ export const journeyAreas = {
     'packages/i18n/messages/*/identity.json',
   ],
   // The pilot process is spawned by path, so it is outside the import closure.
-  'pilot.e2e.mjs': [
-    ...pilot,
-    ...replenishmentRuntime,
-    'tooling/pilot/{process,background}.mjs',
-    'tooling/observability/**',
-  ],
+  'pilot.e2e.mjs': pilotJourneys,
+  'pilot-workflows.e2e.mjs': pilotJourneys,
+  'pilot-approvals.e2e.mjs': pilotJourneys,
+  'pilot-recovery.e2e.mjs': pilotJourneys,
   'playbooks.browser.mjs': [
     ...appHost,
     ...workflows,
@@ -1220,12 +1277,8 @@ export const journeyAreas = {
     ...webEvidence,
     ...webNeedsYou,
   ],
-  'replenishment.e2e.mjs': [
-    ...simulator,
-    ...replenishment,
-    ...decisions,
-    ...activity,
-  ],
+  'replenishment.e2e.mjs': replenishmentJourneys,
+  'replenishment-monitoring.e2e.mjs': replenishmentJourneys,
   'resolution-measurement.browser.mjs': [
     ...measurement,
     ...cases,
@@ -1433,16 +1486,10 @@ export const journeyAreas = {
     'packages/connectors/starshipit/**',
     'packages/simulator/{core,shopify,starshipit}/**',
   ],
-  'shopify-shipment-publishing.e2e.mjs': [
-    'apps/api/e2e/shopify-shipment-publishing-fixture.mjs',
-    ...connections,
-    ...shopify,
-    ...ordersFixture,
-    ...rmFulfillment,
-    'packages/apps/starshipit/**',
-    'packages/connectors/starshipit/**',
-    'packages/simulator/{core,shopify,starshipit}/**',
-  ],
+  'shopify-shipment-publishing.e2e.mjs': shipmentPublishingJourneys,
+  'shopify-shipment-publishing-lost-response.e2e.mjs':
+    shipmentPublishingJourneys,
+  'shopify-shipment-publishing-withheld.e2e.mjs': shipmentPublishingJourneys,
   'shopify-fulfillment.e2e.mjs': [...connections, ...shopify],
   'shopify-inventory.browser.mjs': [
     ...ordersFixture,
@@ -1499,25 +1546,14 @@ export const journeyAreas = {
     ...connections,
     ...webOrders,
   ],
-  'starshipit-updates.e2e.mjs': [
-    'apps/api/e2e/starshipit-updates-fixture.mjs',
-    'apps/api/e2e/shopify-shipment-publishing-fixture.mjs',
-    ...connections,
-    ...simulator,
-    ...ordersFixture,
-    ...rmFulfillment,
-    'packages/apps/starshipit/**',
-    'packages/connectors/starshipit/**',
-    'packages/simulator/{core,shopify,starshipit}/**',
-  ],
+  'starshipit-updates.e2e.mjs': starshipitUpdateJourneys,
+  'starshipit-updates-restart.e2e.mjs': starshipitUpdateJourneys,
+  'starshipit-updates-refresh.e2e.mjs': starshipitUpdateJourneys,
+  'starshipit-updates-withheld.e2e.mjs': starshipitUpdateJourneys,
   'starshipit-simulator.e2e.mjs': [...simulator, ...sync, ...connections],
-  'simulator.e2e.mjs': [
-    ...simulator,
-    ...sync,
-    ...customers,
-    ...orders,
-    ...metrics,
-  ],
+  'simulator.e2e.mjs': simulatorJourneys,
+  'simulator-records.e2e.mjs': simulatorJourneys,
+  'simulator-detection.e2e.mjs': simulatorJourneys,
   'stock-protection.browser.mjs': [
     'apps/api/e2e/stock-protection-fixture.mjs',
     ...simulator,

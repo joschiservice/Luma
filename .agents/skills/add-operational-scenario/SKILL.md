@@ -80,7 +80,7 @@ needs it.
 
 ## 4. Test the journey
 
-Extend [simulator.e2e.mjs](../../../apps/api/e2e/simulator.e2e.mjs) or use `setupSimulator(t)`
+Extend [simulator-detection.e2e.mjs](../../../apps/api/e2e/simulator-detection.e2e.mjs) or use `setupSimulator(t)`
 from [simulator-fixture.mjs](../../../apps/api/e2e/simulator-fixture.mjs) in a new suite. The
 fixture provisions isolated Luma and simulator databases, a paused `test` run with `calm`
 failures, installations, identity, the HTTP bridge and webhooks, with cleanup and failure
