@@ -65,6 +65,7 @@ function fixture() {
   const mutations: { query: string; variables: Record<string, unknown> }[] = [];
   let timeout = false;
   let userErrors = false;
+  let throttled = false;
   const transport = vi.fn<typeof fetch>(async (_url, init) => {
     const body = JSON.parse(String(init?.body));
     expect(validate(schema, parseGraphql(body.query))).toEqual([]);
@@ -83,6 +84,9 @@ function fixture() {
         },
       });
     }
+
+    if (throttled)
+      return new Response('', { status: 429, headers: { 'retry-after': '2' } });
 
     return Response.json({
       data: {
@@ -103,6 +107,8 @@ function fixture() {
     shop: 'recovery.myshopify.com',
     accessToken: async () => 'test-token',
     fetch: transport,
+    // Throttled reads are retried after Shopify's advised delay; tests skip the real wait.
+    readRetry: { attempts: 3, maxDelayMs: 5000, sleep: async () => {} },
     record,
   });
   const context = {
@@ -124,6 +130,9 @@ function fixture() {
     },
     reject: () => {
       userErrors = true;
+    },
+    throttle: () => {
+      throttled = true;
     },
   };
 }
@@ -181,6 +190,28 @@ describe('Shopify fulfillment recovery', () => {
         await f.provider.read(gid('Order'), gid('FulfillmentOrder')),
       ),
     ).toBe(true);
+  });
+
+  it('reports a throttled check before the mutation as not sent, keeping the retry advice', async () => {
+    const f = fixture();
+    const before = await f.provider.read(gid('Order'), gid('FulfillmentOrder'));
+    f.throttle();
+    await expect(
+      f.provider.capabilities['fulfillment.hold.release'].run(f.context, {
+        orderId: before.orderId,
+        fulfillmentOrderId: before.fulfillmentOrderId,
+        expectedRevision: before.revision,
+        holdId: gid('FulfillmentHold', 2),
+      }),
+    ).rejects.toMatchObject({
+      failure: {
+        code: 'rate_limited',
+        effect: 'none',
+        dispatch: 'not_dispatched',
+        retry: 'after_delay',
+      },
+    });
+    expect(f.mutations).toHaveLength(0);
   });
 
   it('withholds a changed revision, incomplete reads, unavailable destinations and removed holds', async () => {

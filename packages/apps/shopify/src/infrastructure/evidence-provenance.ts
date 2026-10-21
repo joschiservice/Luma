@@ -62,6 +62,25 @@ export async function storeAcceptance(store: () => Promise<void>) {
   }
 }
 
+/**
+ * Runs a read a handler makes before attempting any mutation. Nothing was sent when it fails,
+ * so its provider failure is marked not dispatched with its retry advice kept; without that,
+ * execution would have to treat the outcome as unclear.
+ */
+export async function beforeDispatch<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof ConnectorError && !error.failure.dispatch)
+      throw new ConnectorError({
+        ...error.failure,
+        effect: 'none',
+        dispatch: 'not_dispatched',
+      });
+    throw error;
+  }
+}
+
 /** True for a failure whose dispatch the handler already established, which callers rethrow. */
 export function settledDispatch(error: unknown) {
   return (
