@@ -7,6 +7,8 @@ export default defineConfig({
     name: 'backend-e2e',
     environment: 'node',
     include: ['e2e/**/*.e2e.mjs'],
+    // Migrates one template database; each journey copies it instead of migrating.
+    globalSetup: ['e2e/template-database.mjs'],
     testTimeout: 60_000,
     hookTimeout: 30_000,
     // Each file provisions databases and processes; leave capacity for those services.

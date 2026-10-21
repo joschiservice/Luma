@@ -94,8 +94,13 @@ export function startProcess(t, script, env = {}, ipc = false) {
   };
 }
 
-/** Creates an isolated database and restricted login; the context must register teardown callbacks. */
-export async function database(t) {
+/**
+ * Creates an isolated database and restricted login; the context must register teardown
+ * callbacks. The database is a copy of the run's migrated template when one exists, so
+ * `migrate()` with the default script has nothing left to do. Pass `empty: true` for a test
+ * that migrates the database itself.
+ */
+export async function database(t, { empty = false } = {}) {
   assert.ok(
     process.env.TEST_DATABASE_URL,
     'TEST_DATABASE_URL is required for backend E2E tests',
@@ -112,7 +117,11 @@ export async function database(t) {
       await admin.end();
     }
   });
-  await admin.query(`CREATE DATABASE "${id}"`);
+  const template = empty ? undefined : process.env.LUMA_E2E_TEMPLATE_DATABASE;
+  await admin.query(
+    `CREATE DATABASE "${id}"${template ? ` TEMPLATE "${template}"` : ''}`,
+  );
+  const migrated = Boolean(template);
   const url = new URL(process.env.TEST_DATABASE_URL);
   url.pathname = `/${id}`;
   const ownerUrl = url.toString();
@@ -132,6 +141,13 @@ export async function database(t) {
       script = `${runtimeDirectory}/scripts/migrate.mjs`,
       expectedCode = 0,
     ) {
+      // A copy of the template is already migrated and provisioned for the run's region.
+      if (
+        migrated &&
+        script === `${runtimeDirectory}/scripts/migrate.mjs` &&
+        expectedCode === 0
+      )
+        return '';
       // Shared runtime roles are cluster-wide, including across integration suites.
       const lock = await admin.connect();
       try {

@@ -109,7 +109,7 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
 });
 
 test('migration command installs, reruns unchanged, and rejects a changed applied migration atomically', async (t) => {
-  const db = await database(t);
+  const db = await database(t, { empty: true });
   const names = (await readdir(join(runtimeDirectory, 'migrations')))
     .filter((name) => name.endsWith('.sql'))
     .sort();
