@@ -164,7 +164,7 @@ interface PlacementDirectory {
 }
 
 /** What resolving a user's tenant context reads, all from one transaction. */
-export interface MemberLookup {
+interface MemberLookup {
   member: Membership | null;
   organization: Organization | null;
   /** Whether the user's account was erased, so background work can pause instead of fail. */
