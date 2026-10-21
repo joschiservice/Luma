@@ -80,10 +80,11 @@ test('a return that arrived without a refund goes to a person, and Luma never re
   const incident = await scenario(f, 'refund-missing');
   const label = incident.resources[0].label;
   await f.pilot.observe({ check: false });
-  await f.tick();
   let item;
+  // Like the scheduled worker, keep starting runs until the waiting return has one.
   await until(
     async () => {
+      await f.tick();
       item = (await handovers(f, id)).find((entry) =>
         entry.title.endsWith(label),
       );
