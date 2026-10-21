@@ -165,9 +165,15 @@ test('real installed adapters read remote state, verify a lost write after resta
       },
       expectedPostcondition: { shippingMethodId: '8' },
     };
+    // Verification may cite only reads its owner stored; the lost write has no receipt.
+    const storedReads = [];
     const binding = {
       map: async () => input,
       checkPreconditions: async () => true,
+      storeRead: async (_context, _intent, read) => {
+        storedReads.push(read.id);
+      },
+      storeReceipt: async () => assert.fail('A lost write has no receipt'),
     };
     await host.call('runs', {
       id: 'test',
@@ -268,7 +274,9 @@ test('real installed adapters read remote state, verify a lost write after resta
       options(host.endpoint),
       binding,
     ).resolve(context, intent);
-    assert.equal((await recreated.verify(intent)).outcome, 'passed');
+    const verification = await recreated.verify(intent);
+    assert.equal(verification.outcome, 'passed');
+    assert.deepEqual(verification.observationRefs, storedReads);
     const run = await host.call('runs/test');
     assert.equal(run.faults[0].status, 'triggered');
     const writes = await host.call('runs/test/journal?kind=provider-write');
