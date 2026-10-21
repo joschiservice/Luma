@@ -162,6 +162,11 @@ function fixture() {
     listSecurityEvents: async () => [],
     setLanguage: async () => undefined,
     withUser: async (_userId, operation) => operation(tx),
+    memberOf: async (_userId, organizationId) => ({
+      member: await tx.findMembership(organizationId),
+      organization: await tx.findOrganization(organizationId),
+      erased: await tx.accountErased(),
+    }),
   });
   const app = Fastify();
   apps.push(app);
