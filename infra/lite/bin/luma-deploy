@@ -82,6 +82,38 @@ ensure_temporal_certificates() {
   chmod 0644 "$tls/server.pem"
 }
 
+# Prints the memory settings for compose.env from the host's memory. Each service gets a share
+# with a floor, and the shares leave about a fifth for the kernel, Docker, the agents and the
+# page cache. A limit caps a service; it reserves nothing. Node heaps take a percentage of
+# their container limit in compose.yaml.
+memory_plan() {
+  local total
+  total=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+  # Prints the larger of a percentage of host memory and a floor, in MiB.
+  share() {
+    local value=$((total * $1 / 100))
+    echo $((value > $2 ? value : $2))
+  }
+  local postgres valkey
+  postgres=$(share 24 768)
+  valkey=$(share 4 256)
+  cat <<EOF
+LUMA_POSTGRES_MEMORY=${postgres}m
+LUMA_POSTGRES_SHARED_BUFFERS=$((postgres / 3))MB
+LUMA_POSTGRES_CACHE=${postgres}MB
+LUMA_POSTGRES_WORK_MEM=$((total / 1024 > 4 ? total / 1024 : 4))MB
+LUMA_POSTGRES_MAINTENANCE_WORK_MEM=$((postgres / 16))MB
+LUMA_TEMPORAL_MEMORY=$(share 7 320)m
+LUMA_VALKEY_MEMORY=${valkey}m
+LUMA_VALKEY_MAXMEMORY=$((valkey / 2))mb
+LUMA_API_MEMORY=$(share 11 384)m
+LUMA_WORKER_MEMORY=$(share 16 768)m
+LUMA_SYNC_MEMORY=$(share 11 384)m
+LUMA_WEB_MEMORY=$(share 4 192)m
+LUMA_STAFF_API_MEMORY=$(share 3 192)m
+EOF
+}
+
 render_environment() {
   local env=$LUMA_STATE_DIR/env domain app_host tailnet staff_node staff_api_node valkey
   domain=$(parameter host/DOMAIN)
@@ -109,6 +141,7 @@ VALKEY_PASSWORD=$(parameter generated/VALKEY_PASSWORD)
 TEMPORAL_DATABASE_PASSWORD=$(parameter generated/TEMPORAL_DATABASE_PASSWORD)
 TS_AUTHKEY=$(parameter host/TS_AUTHKEY)
 EOF
+  memory_plan >>"$env/compose.env"
 
   cat >"$env/migrate.env" <<EOF
 MIGRATION_DATABASE_URL=postgresql://postgres:$(parameter generated/POSTGRES_PASSWORD)@postgres:5432/luma

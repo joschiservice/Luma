@@ -41,6 +41,11 @@ x-depends-on-data: &depends-on-data
   valkey: { condition: service_healthy }
 
 services:
+  # Connection budget: the API opens at most 15, the worker 20, sync 44 with its default
+  # concurrency, the staff API 5 and Temporal 32. The remaining 34 cover the three superuser
+  # slots, migrations, backups and operator sessions; raise max_connections before raising a
+  # pool or the sync concurrency. luma-deploy sizes the memory settings for the host. JIT is
+  # off: Luma's short queries pay its compilation cost without benefiting.
   postgres:
     image: postgres:17.11-alpine
     command:
@@ -50,10 +55,23 @@ services:
         'shared_preload_libraries=pg_stat_statements',
         '-c',
         'track_io_timing=on',
+        '-c',
+        'max_connections=150',
+        '-c',
+        'shared_buffers=${LUMA_POSTGRES_SHARED_BUFFERS:?}',
+        '-c',
+        'effective_cache_size=${LUMA_POSTGRES_CACHE:?}',
+        '-c',
+        'work_mem=${LUMA_POSTGRES_WORK_MEM:?}',
+        '-c',
+        'maintenance_work_mem=${LUMA_POSTGRES_MAINTENANCE_WORK_MEM:?}',
+        '-c',
+        'jit=off',
       ]
     environment:
       POSTGRES_DB: luma
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    mem_limit: ${LUMA_POSTGRES_MEMORY:?}
     shm_size: 256mb
     restart: unless-stopped
     logging: *logging
@@ -70,16 +88,18 @@ services:
     image: valkey/valkey:9.1.2-alpine
     # The password reaches the server as configuration on standard input and the health check
     # through REDISCLI_AUTH, so it never appears in process arguments. The image entrypoint
-    # still drops to the valkey user.
+    # still drops to the valkey user. Shopify admission requires noeviction; every key expires,
+    # so usage follows traffic. maxmemory is half the limit to leave room for AOF rewrites.
     command:
       - sh
       - -c
       - |
-        exec docker-entrypoint.sh valkey-server - --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction <<EOF
+        exec docker-entrypoint.sh valkey-server - --appendonly yes --maxmemory ${LUMA_VALKEY_MAXMEMORY:?} --maxmemory-policy noeviction <<EOF
         requirepass $$VALKEY_PASSWORD
         EOF
     environment:
       VALKEY_PASSWORD: ${VALKEY_PASSWORD:?}
+    mem_limit: ${LUMA_VALKEY_MEMORY:?}
     restart: unless-stopped
     logging: *logging
     networks: [luma]
@@ -92,7 +112,8 @@ services:
       retries: 30
 
   # Self-hosted Temporal on the cell's PostgreSQL. Clients connect over TLS with a private CA,
-  # as production configuration requires.
+  # as production configuration requires. Each of its four services opens its own pools, so
+  # Temporal holds at most 4 × (6 + 2) connections.
   temporal:
     image: temporalio/server:1.32.1
     environment: &temporal-database
@@ -101,12 +122,17 @@ services:
       POSTGRES_SEEDS: postgres
       POSTGRES_USER: luma_temporal
       POSTGRES_PWD: ${TEMPORAL_DATABASE_PASSWORD:?}
+      SQL_MAX_CONNS: '6'
+      SQL_MAX_IDLE_CONNS: '6'
+      SQL_VIS_MAX_CONNS: '2'
+      SQL_VIS_MAX_IDLE_CONNS: '2'
       BIND_ON_IP: 0.0.0.0
       DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig.yaml
       TEMPORAL_TLS_FRONTEND_CERT: /etc/temporal/tls/server.pem
       TEMPORAL_TLS_FRONTEND_KEY: /etc/temporal/tls/server.key
       TEMPORAL_TLS_SERVER_CA_CERT: /etc/temporal/tls/ca.pem
       TEMPORAL_TLS_FRONTEND_SERVER_NAME: temporal
+    mem_limit: ${LUMA_TEMPORAL_MEMORY:?}
     restart: unless-stopped
     logging: *logging
     networks: [luma]
@@ -182,6 +208,8 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: '3001'
+      NODE_OPTIONS: --max-old-space-size-percentage=75
+    mem_limit: ${LUMA_API_MEMORY:?}
     depends_on:
       <<: *depends-on-data
       temporal: { condition: service_healthy }
@@ -205,6 +233,9 @@ services:
     env_file: *worker-env
     environment:
       WORKFLOW_WORKER_HEALTH_PORT: '9470'
+      # Code Step processes run in this container too, up to four at a time.
+      NODE_OPTIONS: --max-old-space-size-percentage=50
+    mem_limit: ${LUMA_WORKER_MEMORY:?}
     # Shutdown waits up to six minutes for running activities, such as provider writes.
     stop_grace_period: 7m
     depends_on:
@@ -230,6 +261,8 @@ services:
     env_file: *worker-env
     environment:
       COMMERCE_SYNC_HEALTH_PORT: '9470'
+      NODE_OPTIONS: --max-old-space-size-percentage=75
+    mem_limit: ${LUMA_SYNC_MEMORY:?}
     depends_on: *depends-on-data
     healthcheck: *worker-health
 
@@ -251,6 +284,9 @@ services:
     env_file:
       - path: ${LUMA_STATE_DIR:?}/env/web.env
         format: raw
+    environment:
+      NODE_OPTIONS: --max-old-space-size-percentage=75
+    mem_limit: ${LUMA_WEB_MEMORY:?}
     healthcheck:
       test:
         [
@@ -272,6 +308,9 @@ services:
     env_file:
       - path: ${LUMA_STATE_DIR:?}/env/staff.env
         format: raw
+    environment:
+      NODE_OPTIONS: --max-old-space-size-percentage=75
+    mem_limit: ${LUMA_STAFF_API_MEMORY:?}
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
@@ -292,6 +331,7 @@ services:
   # nodes below reach; they are never published on the host.
   caddy:
     image: caddy:2.11.7-alpine
+    mem_limit: 192m
     restart: unless-stopped
     logging: *logging
     environment:
@@ -316,6 +356,7 @@ services:
   tailscale-staff:
     image: tailscale/tailscale:v1.104.1
     profiles: [staff]
+    mem_limit: 96m
     restart: unless-stopped
     logging: *logging
     environment: &tailscale
@@ -335,6 +376,7 @@ services:
   tailscale-staff-api:
     image: tailscale/tailscale:v1.104.1
     profiles: [staff]
+    mem_limit: 96m
     restart: unless-stopped
     logging: *logging
     environment:
