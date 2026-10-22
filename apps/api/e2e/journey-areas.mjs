@@ -846,6 +846,12 @@ export const journeyAreas = {
     ...webNeedsYou,
   ],
   'decisions.e2e.mjs': [...simulator, ...replenishment, ...decisions, ...cases],
+  'decisions-statements.e2e.mjs': [
+    ...decisions,
+    ...returns,
+    'packages/policies/**',
+    'packages/procurement/**',
+  ],
   'docs.browser.mjs': [...webDocs],
   'action-diffs.e2e.mjs': [...detection, ...connections],
   'action-diffs.browser.mjs': [

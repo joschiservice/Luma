@@ -30,6 +30,11 @@ export interface PolicyRepository {
   delivered(tenantId: string, id: string): Promise<void>;
   saveDecision(decision: PolicyDecision): Promise<void>;
   findDecision(tenantId: string, id: string): Promise<PolicyDecision | null>;
+  /** Reads several decisions, each with the approval `findApproval` would return, in one read. */
+  findDecisions(
+    tenantId: string,
+    ids: string[],
+  ): Promise<{ decision: PolicyDecision; approval: Approval | null }[]>;
   findApproval(
     tenantId: string,
     proposalId: string,
@@ -134,15 +139,23 @@ export function createPolicyService(deps: PolicyDependencies) {
         | null
       >();
       if (!unique.length) return result;
-      const workspace = await deps.repository.workspacePolicy(context.tenantId);
+      const [workspace, found] = await Promise.all([
+        deps.repository.workspacePolicy(context.tenantId),
+        deps.repository.findDecisions(context.tenantId, unique),
+      ]);
+      const byId = new Map(found.map((row) => [row.decision.id, row]));
       for (const id of unique) {
-        const decision = await readDecision(context.tenantId, id);
+        const row = byId.get(id);
         result.set(
           id,
-          decision && {
-            ...decision,
-            requireIndependentApproval: workspace.requireIndependentApproval,
-          },
+          row
+            ? {
+                ...row.decision,
+                approval: row.approval,
+                requireIndependentApproval:
+                  workspace.requireIndependentApproval,
+              }
+            : null,
         );
       }
 

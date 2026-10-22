@@ -60,6 +60,24 @@ function service(
     ['b', decision('b')],
   ]);
   const refresh = vi.fn(refreshContext);
+  const findApproval = async (_tenant: string, proposalId: string) =>
+    proposalId === approval.proposalId ? approval : null;
+  const findDecisions = vi.fn(async (tenant: string, ids: string[]) =>
+    Promise.all(
+      ids.flatMap((id) => {
+        const found = decisions.get(id);
+
+        return found
+          ? [
+              findApproval(tenant, found.proposalId).then((value) => ({
+                decision: found,
+                approval: value,
+              })),
+            ]
+          : [];
+      }),
+    ),
+  );
   const workspacePolicy = vi.fn(async () => ({
     revision: 1,
     required: true,
@@ -69,6 +87,7 @@ function service(
   return {
     refresh,
     workspacePolicy,
+    findDecisions,
     policies: createPolicyService({
       repository: {
         workspacePolicy,
@@ -76,8 +95,8 @@ function service(
         delivered: async () => {},
         saveDecision: async () => {},
         findDecision: async (_tenant, id) => decisions.get(id) ?? null,
-        findApproval: async (_tenant, proposalId) =>
-          proposalId === approval.proposalId ? approval : null,
+        findDecisions,
+        findApproval,
         saveApproval: async (value) => value,
       },
       appendEvidence: async () => {},
@@ -102,6 +121,11 @@ describe('batch policy decision reads', () => {
     expect(read.get('a')?.approval).toEqual(approval);
     expect(batch.refresh).toHaveBeenCalledOnce();
     expect(batch.workspacePolicy).toHaveBeenCalledOnce();
+    expect(batch.findDecisions).toHaveBeenCalledExactlyOnceWith('tenant', [
+      'a',
+      'b',
+      'missing',
+    ]);
   });
 
   it('rejects a context whose membership no longer belongs to the actor', async () => {

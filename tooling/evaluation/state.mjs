@@ -208,6 +208,20 @@ export function createState(document = {}) {
     delivered: async () => undefined,
     saveDecision: async (d) => put('decisions', [d.tenantId, d.id], d),
     findDecision: async (tenant, id) => get('decisions', tenant, id),
+    findDecisions: async (tenant, ids) =>
+      ids.flatMap((id) => {
+        const decision = get('decisions', tenant, id);
+        if (!decision) return [];
+        const approval = get(
+          'approvals',
+          tenant,
+          decision.proposalId,
+          decision.actionHash,
+          decision.policyVersion,
+        );
+
+        return [{ decision, approval: approval ?? null }];
+      }),
     findApproval: async (tenant, proposal, hash, version) =>
       get('approvals', tenant, proposal, hash, version),
     saveApproval: async (a) => {

@@ -345,3 +345,33 @@ it('keeps the narrowing when a context is refreshed, and stops after revocation'
     statusCode: 401,
   });
 });
+
+it('reuses a context it just refreshed and reads it again once that window passes', async () => {
+  vi.useFakeTimers();
+  try {
+    const { service, apiCredentials } = fixture();
+    const { context } = await service.resolveApiApp(
+      token,
+      organization.id,
+      'r1',
+    );
+    const fresh = await service.refreshContext(context);
+    apiCredentials.find.mockClear();
+
+    // Owners rechecking the context handed to them in the same request read nothing.
+    expect(await service.refreshContext(fresh)).toBe(fresh);
+    expect(apiCredentials.find).not.toHaveBeenCalled();
+    // A context the service did not just refresh is always read again.
+    apiCredentials.find.mockResolvedValue({ ...credential, status: 'revoked' });
+    await expect(service.refreshContext(context)).rejects.toMatchObject({
+      statusCode: 401,
+    });
+    // After the window, a refreshed context is read again and revocation applies.
+    vi.advanceTimersByTime(2000);
+    await expect(service.refreshContext(fresh)).rejects.toMatchObject({
+      statusCode: 401,
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+});

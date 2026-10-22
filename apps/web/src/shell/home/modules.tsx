@@ -42,7 +42,11 @@ import {
   activityState,
   activityTitle,
 } from '../../features/activity/presentation';
-import { decisionsOptions } from '../../features/decisions/data';
+import {
+  attentionOptions,
+  decisionsRefresh,
+} from '../../features/decisions/data';
+import { useDecisionUpdatesState } from '../../features/decisions/live';
 import {
   decisionStatus,
   domainIcons,
@@ -163,7 +167,10 @@ export function AttentionModule({
   overview: OperationsOverview;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
-  const decisions = useQuery(decisionsOptions(organizationId, {}, 5));
+  const decisions = useQuery({
+    ...attentionOptions(organizationId),
+    ...decisionsRefresh(useDecisionUpdatesState()),
+  });
   const now = useNow();
   if (decisions.isPending) return <ModuleSkeleton />;
   if (decisions.isError)

@@ -6,8 +6,10 @@ import { expect, it } from 'vitest';
 
 import { builtinState } from '../../kit/collections/state';
 import {
+  attentionOptions,
   decisionListQuery,
   decisionsOptions,
+  decisionsRefresh,
   hasLegacyFilters,
   needsYouSearch,
   withoutLegacyFilters,
@@ -68,12 +70,27 @@ it('sends conditions, sort and grouping, with search kept out of the view', () =
   ).toMatchObject({ group: 'cause', groupLimit: 10 });
 });
 
-it('keeps the sidebar and Home reads on the whole queue', () => {
-  expect(decisionsOptions('org', {}, 1).queryKey).toEqual([
+it('shares one whole-queue read between the sidebar and Home', () => {
+  expect(attentionOptions('org').queryKey).toEqual([
     'private',
     'organization',
     'org',
     'decisions',
-    { limit: 1 },
+    { limit: 5 },
   ]);
+});
+
+it('polls Needs you reads only while the live stream is not delivering', () => {
+  expect(decisionsRefresh('live')).toEqual({
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  for (const stream of [undefined, 'connecting', 'interrupted'] as const)
+    expect(decisionsRefresh(stream)).toEqual({
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: 'always',
+      staleTime: 0,
+    });
+  expect(decisionsOptions('org', {}).refetchInterval).toBe(30_000);
 });

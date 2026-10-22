@@ -103,9 +103,18 @@ Every table the queue reads for its items carries the `decisions` topic on the s
 tables, admission steps, workflow process steps, replenishment activations, purchase orders,
 supplier submissions, commitments and follow-ups, executed actions, the Shopify recovery and
 claim tables, message threads, document facts and replies, and assignments. Record links and handover signals from orders refresh with the
-stream's 30-second reconciliation. The web queue and the sidebar count refetch when an event
-lists `decisions`, coalescing bursts over 500 ms and letting active reads finish, and poll
-every 30 seconds as a fallback.
+stream's 30-second reconciliation. The workspace shell holds one subscription for the queue,
+Home's attention module and the sidebar count. They refetch when an event lists `decisions`,
+coalescing bursts over 500 ms and letting active reads finish. While the stream is live they do
+not poll, refetch on focus or refetch when a screen mounts. While it connects or is interrupted
+they poll every 30 seconds. The sidebar and Home share one read, so opening Home doesn't build
+the queue again.
+
+Each read builds the whole queue, so its cost must not grow with the number of decisions an
+owner lists. Owners read their decisions and the policy decisions behind them in bulk. Nested
+owner checks reuse the request's refreshed membership (see
+[identity](identity.md#context-and-isolation)). A statement budget journey holds this for 200
+return cases.
 
 The web queue tracks the focused and open decision by ID, so a refresh that reorders the queue
 leaves the reader where they were. Saved views keep conditions, sort, grouping and properties;

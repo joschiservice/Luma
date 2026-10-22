@@ -16,7 +16,9 @@ describes.
 
 1. **Read in the owner.** Keep the decision and its checks in the owning domain. Add a read
    that returns only decisions that need a person now, from persisted state, bounded in size.
-   It must not call providers or models.
+   It must not call providers or models. Every queue read runs it, so read in bulk: a fixed
+   number of statements however many decisions it returns, with no per-item policy or record
+   reads. `apps/api/e2e/decisions-statements.e2e.mjs` holds the queue's statement budget.
 2. **Present it.** Give each decision a stable ID with a new prefix (`<source>:`), the
    reason, why a person is needed, what each response causes, the exact change, the deadline
    and evidence validity. Map it to the shared decision item in `@luma/read-models` and the

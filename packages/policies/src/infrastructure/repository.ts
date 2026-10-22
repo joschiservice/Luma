@@ -65,6 +65,24 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
 
         return result.rows[0]?.document ?? null;
       }),
+    findDecisions: (tenantId, ids) =>
+      db.transaction(tenantId, async (tx) => {
+        // Each decision's approval follows the same rule as `findApproval`.
+        const result = await tx.query<{
+          decision: PolicyDecision;
+          approval: Approval | null;
+        }>(
+          `SELECT d.document AS decision,a.document AS approval FROM policy_decisions d
+           LEFT JOIN LATERAL (SELECT p.document FROM policy_approvals p WHERE p.tenant_id=d.tenant_id
+            AND p.proposal_id=d.proposal_id AND p.action_hash=d.action_hash
+            AND (p.policy_version=d.document->>'policyVersion' OR p.document->>'outcome'='rejected')
+            ORDER BY (p.document->>'outcome'='rejected') DESC,p.created_at DESC LIMIT 1) a ON true
+           WHERE d.tenant_id=$1 AND d.id=ANY($2::uuid[])`,
+          [tenantId, ids],
+        );
+
+        return result.rows;
+      }),
     findApproval: (tenantId, proposalId, hash, version) =>
       db.transaction(tenantId, async (tx) => {
         const result = await tx.query<{ document: Approval }>(
