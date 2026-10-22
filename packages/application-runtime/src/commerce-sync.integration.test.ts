@@ -1524,6 +1524,44 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     ).toBe(2);
   });
 
+  it('reads a fulfillment again once the order it waits for is imported', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    await drain();
+    await owner.query(
+      "UPDATE commerce_sync_streams SET due_at=now()+interval '1 hour' WHERE tenant_id=$1",
+      [tenant],
+    );
+    const due = (recordType: string) =>
+      owner.query(
+        "UPDATE commerce_sync_streams SET due_at=now()-interval '1 second' WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3",
+        [tenant, shop, recordType],
+      );
+    const status = async () =>
+      (
+        await owner.query<{ status: string }>(
+          "SELECT status FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 AND record_type='fulfillments' AND external_id='f2'",
+          [tenant, shop],
+        )
+      ).rows[0]?.status;
+
+    // The fulfillment stream reads a new shipment before the orders stream reads its order.
+    const updated = new Date().toISOString();
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      order(shop, '2', { updated }),
+    ]);
+    source.set(shop, 'fulfillment.read', [
+      { ...shipment(shop, 'f2', '2'), sourceUpdatedAt: updated },
+    ]);
+    await due('fulfillments');
+    await drain();
+    expect(await status()).toBe('pending');
+
+    await due('orders');
+    await drain();
+    expect(await status()).toBe('current');
+  });
+
   it('rotates a hinted scan, preserves retry backoff and consumes the hint after completion', async () => {
     const store = createSyncStore(db);
     await store.createStreams(tenant, shop, ['orders', 'products'], 'operator');

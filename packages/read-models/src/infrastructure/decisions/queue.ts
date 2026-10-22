@@ -4,7 +4,7 @@ import { exceptionClassLabel } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { hasPermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { forbidden } from '@luma/platform';
+import { forbidden, settleLimited } from '@luma/platform';
 import { z } from 'zod';
 
 import { canReadRecord } from '../../application/access.js';
@@ -61,6 +61,9 @@ type QueueRow = {
     external: string | null;
   };
 };
+
+/** Owner reads one Needs-you request runs at once. */
+const ownerReadConcurrency = 3;
 
 const emptyCounts = <K extends string>(keys: readonly K[]) =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
@@ -261,8 +264,12 @@ export function createDecisionQueue(
       (provider) =>
         !provider.permission || hasPermission(fresh, provider.permission),
     );
-    const answers = await Promise.allSettled(
-      providers.map((provider) => provider.pending(fresh)),
+    // Each owner opens its own transaction; a few at a time keeps one read from taking the
+    // request pool from concurrent requests.
+    const answers = await settleLimited(
+      providers,
+      ownerReadConcurrency,
+      (provider) => provider.pending(fresh),
     );
     // Groups are incomplete while an owner's decisions are missing.
     const complete = answers.every((answer) => answer.status === 'fulfilled');

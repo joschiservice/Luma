@@ -6,8 +6,26 @@ describe('readApiConfig', () => {
   it('accepts explicit runtime configuration', () => {
     expect(
       readApiConfig({ HOST: '0.0.0.0', PORT: '8080', LOG_LEVEL: 'warn' }),
-    ).toEqual({ host: '0.0.0.0', port: 8080, logLevel: 'warn' });
+    ).toEqual({
+      host: '0.0.0.0',
+      port: 8080,
+      logLevel: 'warn',
+      databasePoolMax: 20,
+    });
   });
+  it('reads the request pool size', () => {
+    expect(readApiConfig({ API_DATABASE_POOL_MAX: '40' }).databasePoolMax).toBe(
+      40,
+    );
+  });
+  it.each(['', '0', '101', '1.5', '-1', '20x'])(
+    'rejects invalid pool size %j',
+    (API_DATABASE_POOL_MAX) => {
+      expect(() => readApiConfig({ API_DATABASE_POOL_MAX })).toThrow(
+        'API_DATABASE_POOL_MAX',
+      );
+    },
+  );
   it('accepts port zero for an operating-system assigned listener', () => {
     expect(readApiConfig({ PORT: '0' }).port).toBe(0);
   });

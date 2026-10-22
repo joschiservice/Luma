@@ -113,11 +113,11 @@ until the old one releases the data volume, then restores the last deployment.
 
 ## Capacity
 
-PostgreSQL allows 150 connections. Luma's pools can open 84 (sync's share grows with
-`COMMERCE_SYNC_CONCURRENCY` and `COMMERCE_SYNC_WORKSPACE_CONCURRENCY`) and Temporal's 32;
-the rest covers superuser slots, migrations, backups and operator sessions. Check the
-budget in `compose.yaml` before raising a pool or the sync concurrency, and compare it with
-`pg_stat_activity` under load.
+PostgreSQL allows 165 connections. Luma's pools can open 99 (the API's share grows with
+`app/API_DATABASE_POOL_MAX`, default 20, and sync's with `COMMERCE_SYNC_CONCURRENCY` and
+`COMMERCE_SYNC_WORKSPACE_CONCURRENCY`) and Temporal's 32; the rest covers superuser slots,
+migrations, backups and operator sessions. Check the budget in `compose.yaml` before raising
+a pool or the sync concurrency, and compare it with `pg_stat_activity` under load.
 
 Each deploy divides the host's memory among the containers by share, with a floor per
 service, and sizes PostgreSQL's buffers and Valkey's `maxmemory` from the same plan. On the

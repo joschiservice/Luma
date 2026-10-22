@@ -61,7 +61,10 @@ import { createRegionalTemporalSettings } from './temporal-settings.js';
  * releases its database pools and workflow reader.
  */
 export async function buildRuntimeApp(
-  settings: Parameters<typeof createIdentity>[0],
+  settings: Parameters<typeof createIdentity>[0] & {
+    /** Connections in the tenant request pool; defaults to 20. */
+    databasePoolMax?: number;
+  },
   options: FastifyServerOptions = {},
   observability?: Observability,
   modelSettings?: ModelGatewayConfig,
@@ -112,7 +115,7 @@ export async function buildRuntimeApp(
     resources.add(identity.close);
     const casePool = createDatabasePool({
       connectionString: settings.databaseUrl,
-      max: 5,
+      max: settings.databasePoolMax ?? 20,
       workload: 'request',
       onError: (error) => log('Case database connection failed', error),
     });

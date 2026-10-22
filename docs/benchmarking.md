@@ -40,6 +40,10 @@ Performance suite ceilings:
   seconds, and import progress averaging below ten seconds per imported record. The
   synthetic workload offers one live read per second alongside two sync processes and
   simulated provider throttling. These ceilings cover the whole foreground request.
+- Request pool: ten concurrent Needs-you reads and ten order-list reads, five rounds, with
+  100 purchasing plans and a 5 ms delay on each direction of the database connection. No
+  request may fail, and each read's p95 stays within two seconds. The delay makes connection
+  hold time, not local query speed, decide whether the pool keeps up.
 
 Operational-metric latency and metric listener recovery are recorded without a ceiling.
 These are regression ceilings, not production latency guarantees. Review the scenario and

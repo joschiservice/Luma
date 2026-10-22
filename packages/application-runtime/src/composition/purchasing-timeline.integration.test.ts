@@ -537,9 +537,10 @@ describe.skipIf(!databaseUrl)(
         location,
         accountId('available'),
         'delivery note',
-        ':37',
       ])
         expect(shown).not.toContain(hidden);
+      // The booked quantity as a whole JSON value; times and IDs may contain the digits.
+      expect(shown).not.toMatch(/:"?-?37"?[,}\]]/);
       const evidence = await createEvidenceReader(
         db,
         createEvidenceOwners([]),

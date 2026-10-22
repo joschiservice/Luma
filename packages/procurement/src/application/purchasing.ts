@@ -9,6 +9,7 @@ import {
   canonicalJson,
   conflict,
   forbidden,
+  mapLimited,
   notFound,
   unavailable,
 } from '@luma/platform';
@@ -59,6 +60,9 @@ export interface PurchasingAdmission {
     reconcile: boolean,
   ): Promise<{ state: PurchasingPlan['state']; failure: string | null }>;
 }
+
+/** Plan decisions one plan list reads at once. */
+const decisionReadConcurrency = 3;
 
 /** Authorizes purchasing reads and binds immutable supplier plans to governed draft creation. */
 export function createPurchasingService(deps: {
@@ -400,8 +404,12 @@ export function createPurchasingService(deps: {
       context = await authorize(context);
       const plans = await deps.store.plans(context);
       const active = await deps.released(context, 'purchasing-plans');
-      const items = await Promise.all(
-        plans.map(async (plan) => {
+      // Each decision read opens its own transactions; a few at a time keeps a long plan list
+      // from taking the request pool from concurrent requests.
+      const items = await mapLimited(
+        plans,
+        decisionReadConcurrency,
+        async (plan) => {
           const decision =
             deps.admission && plan.decisionId
               ? await deps.admission.decision(context, plan)
@@ -437,7 +445,7 @@ export function createPurchasingService(deps: {
               (decision.requireIndependentApproval === false ||
                 context.actor.id !== plan.requestedBy),
           };
-        }),
+        },
       );
 
       return { items };
