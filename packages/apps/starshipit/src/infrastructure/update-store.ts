@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import type { TenantContext } from '@luma/identity';
 import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
@@ -86,25 +87,66 @@ export function createUpdateStore(database: TenantDatabase) {
         ),
       ),
     /**
-     * Runs `operation` while this update's start lock is held, so concurrent starts of one
-     * update run one after another, also across processes. A start that waited then finds the
-     * first start's execution instead of judging the update while that start changes it. The
-     * lock lives in a transaction that stays open until `operation` settles, which holds one
-     * pooled connection meanwhile.
+     * Runs `operation` while this start holds the update's start lease, so concurrent starts of
+     * one update run one after another, also across processes. A start that waited then finds
+     * the first start's execution instead of judging the update while that start changes it.
+     * No connection is held while a start runs or waits: the lease is renewed while `operation`
+     * runs and expires after a crash. Throws a conflict when another start keeps the lease for
+     * longer than the wait limit.
      */
-    exclusive: <T>(
+    async exclusive<T>(
       tenant: TenantContext,
       id: string,
       operation: () => Promise<T>,
-    ) =>
-      database.transaction(tenant.tenantId, async (tx) => {
-        await tx.query(
-          'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-          [`starshipit-order-update:${tenant.tenantId}:${id}`],
+      limits: { leaseMs?: number; waitMs?: number; pollMs?: number } = {},
+    ) {
+      const leaseMs = limits.leaseMs ?? 30_000;
+      const token = randomUUID();
+      const claim = () =>
+        database.transaction(
+          tenant.tenantId,
+          async (tx) =>
+            (
+              await tx.query(
+                "UPDATE starshipit_order_updates SET start_token=$3,start_lease_until=now()+$4*interval '1 millisecond' WHERE tenant_id=$1 AND id=$2 AND (start_lease_until IS NULL OR start_lease_until<=now()) RETURNING id",
+                [tenant.tenantId, id, token, leaseMs],
+              )
+            ).rowCount === 1,
         );
+      const deadline = Date.now() + (limits.waitMs ?? 60_000);
+      while (!(await claim())) {
+        if (Date.now() >= deadline)
+          throw conflict(
+            'This correction is still being sent. Check it again shortly.',
+          );
+        await delay(limits.pollMs ?? 250);
+      }
 
-        return operation();
-      }),
+      // A failed renewal lets the lease lapse; the send fence still prevents a second send.
+      const renewal = setInterval(() => {
+        database
+          .transaction(tenant.tenantId, (tx) =>
+            tx.query(
+              "UPDATE starshipit_order_updates SET start_lease_until=now()+$4*interval '1 millisecond' WHERE tenant_id=$1 AND id=$2 AND start_token=$3",
+              [tenant.tenantId, id, token, leaseMs],
+            ),
+          )
+          .catch(() => undefined);
+      }, leaseMs / 3);
+      try {
+        return await operation();
+      } finally {
+        clearInterval(renewal);
+        await database
+          .transaction(tenant.tenantId, (tx) =>
+            tx.query(
+              'UPDATE starshipit_order_updates SET start_token=NULL,start_lease_until=NULL WHERE tenant_id=$1 AND id=$2 AND start_token=$3',
+              [tenant.tenantId, id, token],
+            ),
+          )
+          .catch(() => undefined);
+      }
+    },
     /** Mark before sending; concurrent starts and restarted workers cannot send twice. */
     send: (tenant: TenantContext, id: string) =>
       database.transaction(

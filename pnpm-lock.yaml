@@ -1030,6 +1030,9 @@ importers:
       '@luma/app-jtl':
         specifier: workspace:*
         version: link:../apps/jtl
+      '@luma/app-starshipit':
+        specifier: workspace:*
+        version: link:../apps/starshipit
       '@luma/connector-shopify':
         specifier: workspace:*
         version: link:../connectors/shopify
