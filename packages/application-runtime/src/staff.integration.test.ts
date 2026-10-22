@@ -2617,6 +2617,15 @@ describe.skipIf(!databaseUrl)(
         };
         const first = await signIn(beforeSubject);
         expect(first.headers.location).toBe(origin + '/workspaces');
+        const setCookies = first.headers['set-cookie'];
+        const session = (
+          Array.isArray(setCookies) ? setCookies : [setCookies]
+        ).find((cookie) =>
+          cookie?.startsWith('__Host-google-rebind.session_token='),
+        );
+        expect(session).toMatch(/; Secure/i);
+        expect(session).toMatch(/; Path=\/(;|$)/i);
+        expect(session).not.toMatch(/; Domain=/i);
         const firstCookie = cookies(first);
         const firstSession = await app.inject({
           url: '/v1/staff/session',

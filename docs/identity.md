@@ -302,7 +302,7 @@ location /api/ {
 }
 ```
 
-`luma_api` is the deployment's fixed private API upstream. Forward all other paths to the TanStack Start server. Keep session cookies host-only, secure and HttpOnly, with no Domain attribute; never expose session tokens to JavaScript or browser storage. The development Vite proxy applies the same rewrite and preserves Origin and cookies.
+`luma_api` is the deployment's fixed private API upstream. Forward all other paths to the TanStack Start server. Keep session cookies host-only, secure and HttpOnly, with no Domain attribute; never expose session tokens to JavaScript or browser storage. Over HTTPS every auth cookie name starts with `__Host-`, so the browser rejects a cookie of the same name planted by a sibling subdomain; a proxy that rewrites cookie names, paths or domains breaks sign-in. The development Vite proxy applies the same rewrite and preserves Origin and cookies.
 
 The web server adds a Content Security Policy, `nosniff`, a `strict-origin-when-cross-origin` referrer policy and, in production, HSTS to every response it serves. The policy runs only scripts that carry the response's nonce or that such scripts load, keeps network, image and font loads on the page's origin, and forbids framing, plugins, base URL changes and cross-origin form posts; the [frontend guide](frontend-ui.md#content-security-policy) lists what this means for app code. Proxies must pass these headers through unchanged and must not cache HTML responses: a cached page reuses its nonce across visitors.
 

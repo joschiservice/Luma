@@ -235,6 +235,58 @@ describe.skipIf(!databaseUrl)(
         await Promise.all(apps.map((instance) => instance.close()));
       }
     });
+    it('binds the session cookie to the exact host over HTTPS', async () => {
+      const secureOrigin = 'https://luma.example.test';
+      const secureApp = await buildRuntimeApp({
+        databaseUrl: runtimeUrl,
+        secret,
+        baseURL: secureOrigin,
+        trustedOrigins: [secureOrigin],
+        cookiePrefix: 'host-bound',
+      });
+      try {
+        const signedIn = await secureApp.inject({
+          method: 'POST',
+          url: '/auth/sign-in/email',
+          headers: { origin: secureOrigin },
+          payload: {
+            email: 'alice@example.test',
+            password: 'test-password-long-enough',
+          },
+        });
+        expect(signedIn.statusCode, signedIn.body).toBe(200);
+        const value = signedIn.headers['set-cookie'];
+        const session = (Array.isArray(value) ? value : [value!]).find(
+          (cookie) => cookie.startsWith('__Host-host-bound.session_token='),
+        );
+        expect(session).toBeDefined();
+        expect(session).toMatch(/; Secure/i);
+        expect(session).toMatch(/; Path=\/(;|$)/i);
+        expect(session).not.toMatch(/; Domain=/i);
+
+        const cookie = session!.split(';')[0]!;
+        const list = await secureApp.inject({
+          url: '/v1/organizations',
+          headers: { cookie, origin: secureOrigin },
+        });
+        expect(list.statusCode, list.body).toBe(200);
+        expect(
+          list.json().items.map((item: { id: string }) => item.id),
+        ).toEqual([orgA]);
+
+        // A cookie without the prefix, as a sibling subdomain could set, is not a session.
+        const planted = await secureApp.inject({
+          url: '/v1/organizations',
+          headers: {
+            cookie: cookie.slice('__Host-'.length),
+            origin: secureOrigin,
+          },
+        });
+        expect(planted.statusCode).toBe(401);
+      } finally {
+        await secureApp.close();
+      }
+    });
     it('authenticates sessions and lists only the caller’s organizations', async () => {
       const list = await app.inject({
         url: '/v1/organizations',
