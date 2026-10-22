@@ -11,13 +11,21 @@ import {
   CodeRequestStopped,
   type CodeRunner,
   codeRuntime,
+  codeSlotWaitMs,
   type CodeTelemetry,
 } from '../../domain/code-step.js';
 import { canonicalPlaybook, playbookHash } from '../playbooks/schema.js';
 import { compileCodeSource } from './compiler.js';
 import { checkCodeStep } from './schema.js';
+import { createSlotQueue } from './slots.js';
 
-let activeProcesses = 0;
+// Shared by every runner in the process: at most four Wasmtime children run at once, and one
+// tenant holds at most three of them.
+const processSlots = createSlotQueue({
+  slots: 4,
+  perTenant: 3,
+  waitMs: codeSlotWaitMs,
+});
 
 const guestHash =
   process.platform === 'linux'
@@ -137,8 +145,13 @@ export function createWasmtimeRunner(options: {
           ]
         : args;
 
-      if (activeProcesses >= 4) throw new Error('Code runner is busy');
-      activeProcesses++;
+      // The wall-time budget starts once a slot is free; a run that waits too long retries.
+      const admission = await processSlots.acquire(
+        controls.tenantId,
+        controls.signal,
+      );
+      if (admission === 'cancelled') return finish('cancelled');
+      if (admission === 'busy') throw new Error('Code runner is busy');
 
       return new Promise((resolveResult, rejectResult) => {
         const child = spawn(executable, commandArgs, {
@@ -278,7 +291,7 @@ export function createWasmtimeRunner(options: {
           result = finish('unavailable');
         });
         child.once('close', () => {
-          activeProcesses--;
+          processSlots.release(controls.tenantId);
           stopped = true;
           clearTimeout(timer);
           if (sampling) clearInterval(sampling);

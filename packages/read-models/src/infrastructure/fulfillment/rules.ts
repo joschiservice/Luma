@@ -5,7 +5,7 @@ import type {
   FulfillmentSignal,
   FulfillmentSource,
 } from '../../application/fulfillment.js';
-import { connectionLabel, iso, object, text } from '../orders/values.js';
+import { connectionLabel, iso, link, object, text } from '../orders/values.js';
 
 /** Open work without reported progress for this long is stalled. */
 export const stalledAfterHours = 48;
@@ -97,7 +97,7 @@ export function readItem(value: Record<string, unknown>): FulfillmentItem {
       return {
         carrier: text(item.carrier),
         number: text(item.number),
-        url: text(item.url),
+        url: link(item.url),
       };
     }),
     shipping: readShipping(value.shipping),
@@ -128,7 +128,7 @@ export function readShipping(
     stage === 'unknown'
     ? {
         stage,
-        sourceUrl: text(shipping.sourceUrl),
+        sourceUrl: link(shipping.sourceUrl),
         trackingUpdatedAt: iso(shipping.trackingUpdatedAt),
       }
     : null;

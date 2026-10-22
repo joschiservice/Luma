@@ -523,7 +523,11 @@ const orderFulfillmentSchema = z.object({
       z.object({
         carrier: z.string().nullable(),
         number: z.string().nullable(),
-        url: z.string().nullable(),
+        url: z
+          .string()
+          .url()
+          .regex(/^https?:\/\//i)
+          .nullable(),
       }),
     )
     .nullable(),

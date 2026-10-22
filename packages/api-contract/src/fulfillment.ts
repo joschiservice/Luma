@@ -93,7 +93,11 @@ const fulfillmentDeliverySchema = z.enum([
 const trackingSchema = z.object({
   carrier: z.string().nullable(),
   number: z.string().nullable(),
-  url: z.string().url().nullable(),
+  url: z
+    .string()
+    .url()
+    .regex(/^https?:\/\//i)
+    .nullable(),
 });
 
 const shippingSchema = z.object({

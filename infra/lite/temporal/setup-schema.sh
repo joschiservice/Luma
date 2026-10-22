@@ -8,7 +8,7 @@ for database in temporal temporal_visibility; do
   [ "$database" = temporal_visibility ] && schema=visibility
   sql() {
     temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 \
-      -u luma_temporal --pw "$POSTGRES_PWD" --db "$database" "$@"
+      -u luma_temporal --db "$database" "$@"
   }
   if ! sql update-schema -d "/etc/temporal/schema/postgresql/v12/$schema/versioned"; then
     sql setup-schema -v 0.0

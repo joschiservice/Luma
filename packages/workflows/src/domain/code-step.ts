@@ -57,12 +57,20 @@ export interface CodeActivityResult extends CodeResult {
   evidenceRefs: string[];
 }
 
+/**
+ * Longest wait for a sandbox process before a run fails as busy. Code activities and example
+ * evaluations budget it on top of the step's wall time.
+ */
+export const codeSlotWaitMs = 15_000;
+
 /** Runs an exact artifact. Capability requests must be authorized independently by the host. */
 export interface CodeRunner {
   run(
     step: CodeStep,
     input: unknown,
     options: {
+      /** Tenants take turns for the runner's process slots. */
+      tenantId: string;
       now: string;
       signal?: AbortSignal;
       request(grant: string): Promise<unknown>;

@@ -56,8 +56,10 @@ const quantityPatterns: RegExp[] = [
 
 const moneyPatterns: RegExp[] = [
   /[€$£]\s?\d/u,
-  /\d(?:[\d.,'\s]*\d)?\s?(?:€|\$|£)/u,
-  /\b\d(?:[\d.,']*\d)?\s?(?:eur|euro|euros|usd|gbp|chf|dollars?|pounds?)\b/iu,
+  // Bounded runs keep matching linear on long digit strings; a longer amount still matches
+  // from a later digit.
+  /\d(?:[\d.,'\s]{0,30}\d)?\s?(?:€|\$|£)/u,
+  /\b\d(?:[\d.,']{0,30}\d)?\s?(?:eur|euro|euros|usd|gbp|chf|dollars?|pounds?)\b/iu,
   /\b(?:eur|usd|gbp|chf)\s?\d/iu,
   /\b(?:refund\w*|reimburse\w*|credit(?:s|ed| note)?|discount\w*|compensat\w*|voucher\w*|rebate\w*)\b/iu,
   /(?:gutschrift\w*|erstatt\w*|rückerstatt\w*|rueckerstatt\w*|rabatt\w*|nachlass\w*|gutschein\w*|entschädigung\w*)/iu,

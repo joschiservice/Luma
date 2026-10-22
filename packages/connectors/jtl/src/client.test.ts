@@ -29,6 +29,21 @@ describe('JTL package transport', () => {
     );
   });
 
+  it('refuses a path that leaves the API host before reading the credential', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const accessToken = vi.fn(async () => 'token');
+    const client = createClient({
+      connection: { ...cloud, accessToken },
+      fetch,
+    });
+    for (const path of ['//attacker.example/x', 'https://attacker.example/x'])
+      await expect(client.request(path)).rejects.toMatchObject({
+        failure: { code: 'invalid_input' },
+      });
+    expect(accessToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('sends a write once and requires reconciliation when its response is lost', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

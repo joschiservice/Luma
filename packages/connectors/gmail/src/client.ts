@@ -132,6 +132,8 @@ export function createClient(options: GmailTransportOptions) {
     } = {},
   ): Promise<unknown> {
     const url = new URL(path, API_ROOT);
+    // A path with its own scheme or host would send the token elsewhere.
+    if (url.origin !== new URL(API_ROOT).origin) fail('invalid_input');
     for (const [key, value] of Object.entries(request.query ?? {}))
       for (const item of value === undefined ? [] : [value].flat())
         url.searchParams.append(key, item);

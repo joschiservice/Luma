@@ -48,6 +48,8 @@ export function createClient(options: StarshipitTransportOptions) {
     )
       fail('authentication');
     const url = new URL(path, root);
+    // A path with its own scheme or host would send the keys elsewhere.
+    if (url.origin !== new URL(root).origin) fail('invalid_input');
     url.search = query.toString();
     const signal = AbortSignal.timeout(timeoutMs);
     try {

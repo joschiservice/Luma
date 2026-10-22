@@ -50,8 +50,14 @@ describe('consequential replies', () => {
     'Sie erhalten eine Gutschrift.',
     'Wir gewähren 5% Rabatt.',
     'USD 20 have been sent.',
+    'The total is 1 234 567,89 €.',
+    'Wir erstatten 12.000.000.000.000.000.000.000.000.000.000.000,00 €.',
   ])('flags the money in "%s"', (text) => {
     expect(reasons(text)).toContain('money');
+  });
+
+  it('flags an amount after a very long digit run', () => {
+    expect(reasons(`That is ${'1'.repeat(20000)} €.`)).toContain('money');
   });
 
   it.each([
