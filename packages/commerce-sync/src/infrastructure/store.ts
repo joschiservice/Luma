@@ -677,6 +677,19 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               current.scan_id,
             ],
           );
+        // A connection's streams read concurrently, so a fulfillment or return can arrive just
+        // before its order and wait as pending. Records this page imported may be what they wait
+        // for: the connection's other streams with pending records read again now instead of at
+        // their next poll. Rereading a record that still waits does not count as a change, so
+        // streams do not wake each other repeatedly.
+        if (page.counts.changed > 0)
+          await tx.query(
+            `UPDATE commerce_sync_streams s SET hint_at=LEAST(COALESCE(s.hint_at,'infinity'),now()),updated_at=now()
+            WHERE s.tenant_id=$1 AND s.connection_id=$2 AND s.record_type<>$3 AND EXISTS (
+              SELECT 1 FROM commerce_sync_items x WHERE x.tenant_id=s.tenant_id AND x.connection_id=s.connection_id
+                AND x.record_type=s.record_type AND x.status='pending')`,
+            scope,
+          );
         if (page.unchanged.length)
           await tx.query(
             `UPDATE commerce_sync_items i SET last_seen_at=$5,seen_scan_id=$6,missing_since=NULL

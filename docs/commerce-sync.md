@@ -67,7 +67,12 @@ controlled text by connector error code; provider text is never stored.
 A record that fails Luma's validation is marked `failed` with a controlled problem
 without failing the page: the page transaction rolls back and its records are imported
 one at a time. Records whose related records are not imported yet, such as a fulfillment
-before its order, are `pending` and retried on the next scan. If PostgreSQL cancels a page
+before its order, are `pending` and retried on the next scan. A connection's streams read
+concurrently, so a fulfillment or return can arrive moments before its order. When a page
+imports or changes records, the connection's other streams with pending records get a hint
+for an immediate change read; its overlap reads the waiting record again. Rereading a record
+that still waits is not a change, so streams do not keep waking each other. A pending record
+older than the overlap waits for the next full scan. If PostgreSQL cancels a page
 transaction to break a lock cycle, the import is retried once before the page fails.
 
 A stream whose person no longer manages the workspace is blocked until someone with
@@ -118,7 +123,7 @@ stateDiagram-v2
     [*] --> current: imported
     [*] --> pending: related record not imported yet
     [*] --> failed: fails validation
-    pending --> current: a later scan imports it
+    pending --> current: a later scan imports it, prompted by its related record's import
     failed --> current: a later read passes validation
     current --> missing: a full scan does not return it
     missing --> current: any later read returns it
