@@ -14,6 +14,16 @@ export function text(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/**
+ * Returns the value when it is an absolute http(s) URL, otherwise null. Stored provider links
+ * pass through this before they reach a contract that clients render as a link.
+ */
+export function link(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) return null;
+
+  return URL.canParse(value) ? value : null;
+}
+
 /** Returns the value when it is a plain JSON object, otherwise an empty object. */
 export function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)

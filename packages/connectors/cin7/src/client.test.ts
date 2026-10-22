@@ -39,6 +39,21 @@ describe('Cin7 transport', () => {
     expect(init?.redirect).toBe('error');
   });
 
+  it('refuses a path that leaves the API host before reading the key', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const applicationKey = vi.fn(async () => 'key');
+    const client = createClient({
+      connection: { ...connection, applicationKey },
+      fetch,
+    });
+    for (const path of ['//attacker.example/x', 'https://attacker.example/x'])
+      expect(await failure(client.request(path))).toMatchObject({
+        code: 'invalid_input',
+      });
+    expect(applicationKey).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('keeps decimal tokens exact', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

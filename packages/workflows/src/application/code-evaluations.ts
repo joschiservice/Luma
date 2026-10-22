@@ -7,7 +7,11 @@ import type {
   EvaluateCode,
 } from '../domain/code-evaluation.js';
 import { codeOwnedSteps } from '../domain/code-grants.js';
-import { CodeRequestStopped, type CodeRunner } from '../domain/code-step.js';
+import {
+  CodeRequestStopped,
+  type CodeRunner,
+  codeSlotWaitMs,
+} from '../domain/code-step.js';
 import type { PublishedWorkflowVersion } from '../domain/workflow.js';
 
 /** Persists evaluation reservations and supports cancellation across API instances. */
@@ -174,7 +178,7 @@ export function createCodeEvaluations(deps: {
           state: 'running',
           createdAt: now.toISOString(),
           expiresAt: new Date(
-            now.getTime() + step.limits.wallTimeMs + 5000,
+            now.getTime() + codeSlotWaitMs + step.limits.wallTimeMs + 5000,
           ).toISOString(),
           result: null,
         },
@@ -193,6 +197,7 @@ export function createCodeEvaluations(deps: {
       void (async () => {
         try {
           const result = await deps.runner.run(step, request.input, {
+            tenantId: context.tenantId,
             now: request.now,
             signal: stop.signal,
             async request(grant) {

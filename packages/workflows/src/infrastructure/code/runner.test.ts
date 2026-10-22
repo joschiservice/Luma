@@ -46,6 +46,7 @@ const step = (source: string, grants: string[] = []) =>
     },
   });
 const controls = {
+  tenantId: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
   now: '2026-01-01T00:00:00.000Z',
   request: async () => ({ quantity: 4 }),
 };

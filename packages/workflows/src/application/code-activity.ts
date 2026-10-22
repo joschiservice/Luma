@@ -96,6 +96,7 @@ export function createCodeActivity(deps: {
     try {
       if (await deps.journal.cancelled(run, step)) stop.abort();
       const result = await deps.runner.run(step, input, {
+        tenantId: run.tenantId,
         now: run.createdAt,
         signal: stop.signal,
         async request(grant) {

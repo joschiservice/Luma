@@ -5840,7 +5840,7 @@
                                   "anyOf": [
                                     {
                                       "type": "string",
-                                      "format": "uri"
+                                      "pattern": "^https?:\\/\\/"
                                     },
                                     {
                                       "type": "null"
@@ -6592,7 +6592,7 @@
                                 "anyOf": [
                                   {
                                     "type": "string",
-                                    "format": "uri"
+                                    "pattern": "^https?:\\/\\/"
                                   },
                                   {
                                     "type": "null"
@@ -7191,7 +7191,7 @@
                                   "anyOf": [
                                     {
                                       "type": "string",
-                                      "format": "uri"
+                                      "pattern": "^https?:\\/\\/"
                                     },
                                     {
                                       "type": "null"
@@ -13306,7 +13306,8 @@
                                     "url": {
                                       "anyOf": [
                                         {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^https?:\\/\\/"
                                         },
                                         {
                                           "type": "null"
@@ -14753,7 +14754,8 @@
                                             "url": {
                                               "anyOf": [
                                                 {
-                                                  "type": "string"
+                                                  "type": "string",
+                                                  "pattern": "^https?:\\/\\/"
                                                 },
                                                 {
                                                   "type": "null"
@@ -14875,7 +14877,8 @@
                                             "url": {
                                               "anyOf": [
                                                 {
-                                                  "type": "string"
+                                                  "type": "string",
+                                                  "pattern": "^https?:\\/\\/"
                                                 },
                                                 {
                                                   "type": "null"

@@ -158,7 +158,12 @@ const maxCases = 20;
  * when that check is verified, and anything else is denied. Nothing leaves the process.
  */
 export async function runExampleCode(
-  options: { runner: CodeRunner; now: string; signal: AbortSignal },
+  options: {
+    runner: CodeRunner;
+    tenantId: string;
+    now: string;
+    signal: AbortSignal;
+  },
   version: Pick<ProcessWorkflowVersion, 'steps'>,
   step: CodeStep,
   input: unknown,
@@ -169,6 +174,7 @@ export async function runExampleCode(
   let waiting = false;
   let verifiedActions = 0;
   const result = await options.runner.run(step, input, {
+    tenantId: options.tenantId,
     now: options.now,
     signal: options.signal,
     async request(grant) {
@@ -320,7 +326,12 @@ function exampleActivities(
       live();
       if (!options.runner) throw new TestFailed(noRuntime);
       const { result, requests } = await runExampleCode(
-        { runner: options.runner, now: run.createdAt, signal },
+        {
+          runner: options.runner,
+          tenantId: run.tenantId,
+          now: run.createdAt,
+          signal,
+        },
         version,
         step,
         {

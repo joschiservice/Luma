@@ -61,6 +61,8 @@ export function createClient(options: Cin7TransportOptions) {
     query: Record<string, string>,
   ): Promise<unknown> {
     const url = new URL(path, API_ROOT);
+    // A path with its own scheme or host would send the key elsewhere.
+    if (url.origin !== new URL(API_ROOT).origin) fail('invalid_input');
     for (const [key, value] of Object.entries(query))
       url.searchParams.set(key, value);
     let key: string;

@@ -68,18 +68,16 @@ services:
 
   valkey:
     image: valkey/valkey:9.1.2-alpine
+    # The password reaches the server as configuration on standard input and the health check
+    # through REDISCLI_AUTH, so it never appears in process arguments. The image entrypoint
+    # still drops to the valkey user.
     command:
-      [
-        'valkey-server',
-        '--appendonly',
-        'yes',
-        '--maxmemory',
-        '128mb',
-        '--maxmemory-policy',
-        'noeviction',
-        '--requirepass',
-        '${VALKEY_PASSWORD:?}',
-      ]
+      - sh
+      - -c
+      - |
+        exec docker-entrypoint.sh valkey-server - --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction <<EOF
+        requirepass $$VALKEY_PASSWORD
+        EOF
     environment:
       VALKEY_PASSWORD: ${VALKEY_PASSWORD:?}
     restart: unless-stopped
@@ -88,11 +86,7 @@ services:
     volumes:
       - valkey:/data
     healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'valkey-cli --no-auth-warning -a "$$VALKEY_PASSWORD" ping',
-        ]
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$VALKEY_PASSWORD" valkey-cli ping']
       interval: 5s
       timeout: 5s
       retries: 30
@@ -132,7 +126,8 @@ services:
     profiles: [setup]
     entrypoint: ['sh', '/setup/setup-schema.sh']
     environment:
-      POSTGRES_PWD: ${TEMPORAL_DATABASE_PASSWORD:?}
+      # temporal-sql-tool reads the password from SQL_PASSWORD instead of its arguments.
+      SQL_PASSWORD: ${TEMPORAL_DATABASE_PASSWORD:?}
     logging: *logging
     networks: [luma]
     volumes:

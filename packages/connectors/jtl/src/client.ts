@@ -90,6 +90,8 @@ export function createClient(options: JtlTransportOptions) {
     },
   ): Promise<unknown> {
     const url = new URL(path, base);
+    // A path with its own scheme or host would send the credential elsewhere.
+    if (url.origin !== base.origin) fail('invalid_input');
     for (const [key, value] of Object.entries(query))
       url.searchParams.set(key, value);
     let credential: string;

@@ -26,7 +26,7 @@ import {
   readWorkflowRuns,
 } from './links.js';
 import type { OrderReadQueries } from './list-query.js';
-import { iso, object, text } from './values.js';
+import { iso, link, object, text } from './values.js';
 
 const activityWindow = 365 * 86_400_000;
 
@@ -86,7 +86,7 @@ export async function readFulfillments(
             return {
               carrier: text(tracking.carrier),
               number: text(tracking.number),
-              url: text(tracking.url),
+              url: link(tracking.url),
             };
           })
         : null,

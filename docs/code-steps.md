@@ -31,11 +31,14 @@ keep their original binding.
 
 Production requires Linux and `/usr/bin/prlimit` from util-linux. Each child gets a 1 GiB
 address-space limit and a CPU limit derived from its wall-time budget. Wasmtime separately
-enforces guest memory, stack, fuel and elapsed time, and the supervisor kills children at
-their deadline or on cancellation. At most four children run per API or worker process, and
-API example evaluations allow two concurrent jobs per tenant; size the worker deployment for
-those aggregates. macOS arm64 supports development with guest limits and supervised
-wall-time cancellation, but without `prlimit`.
+enforces guest memory, stack, fuel and elapsed time, and the supervisor kills children at their
+deadline or on cancellation. At most four children run per API or worker process, and one
+tenant holds at most three, so no single tenant can hold every child. Further runs wait up to
+15 seconds before their wall time starts, and waiting tenants take turns for each freed slot. A
+run still waiting after that fails as busy and its activity retries. API example evaluations
+allow two concurrent jobs per tenant; size the worker deployment for those aggregates. macOS
+arm64 supports development with guest limits and supervised wall-time cancellation, but without
+`prlimit`.
 
 ## Code contract
 

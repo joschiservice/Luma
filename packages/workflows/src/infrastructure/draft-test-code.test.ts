@@ -99,6 +99,8 @@ const version = {
   ],
 };
 
+const tenantId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+
 async function replay(runner: CodeRunner, fixture: Corpus['cases'][number]) {
   const replies: Record<string, StepReply> = Object.fromEntries(
     fixture.replies.map((reply) => [
@@ -108,7 +110,12 @@ async function replay(runner: CodeRunner, fixture: Corpus['cases'][number]) {
   );
 
   return runExampleCode(
-    { runner, now: fixture.now, signal: new AbortController().signal },
+    {
+      runner,
+      tenantId,
+      now: fixture.now,
+      signal: new AbortController().signal,
+    },
     version,
     step,
     fixture.input,
@@ -168,6 +175,7 @@ describe('replenishment code corpus through the draft test code path', () => {
     const { result } = await runExampleCode(
       {
         runner: javascriptRunner,
+        tenantId,
         now: fixture!.now,
         signal: new AbortController().signal,
       },
