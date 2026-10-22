@@ -10,6 +10,7 @@ import type { MorningBriefSource } from './application/morning-brief.js';
 import type { AppPermissionSource } from './application/roles.js';
 import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
+import type { DataRegion } from './domain/context.js';
 import { eraseDueAccounts } from './infrastructure/account-deletion.js';
 import {
   createApiAppReads,
@@ -31,6 +32,7 @@ import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
 import { purgeSecurityEvents } from './infrastructure/security-events.js';
 import { createSettingsRepository } from './infrastructure/settings.js';
+import { createWorkflowIdentityRepository } from './infrastructure/workflow-identity.js';
 
 /**
  * Creates identity services, an authentication handler, and readiness checks. Call close to
@@ -200,6 +202,38 @@ export function createIdentity(
         cell.rows[0]?.region === region
       );
     },
+    async close() {
+      await pool.end();
+    },
+  };
+}
+
+/**
+ * Creates the identity service background workers use, on a pool opened with `databaseUrl`, a
+ * login with `luma_workflow_identity`. It resolves workflow contexts and reads the selected
+ * workspace's members without names or emails. It needs no auth secret and has no session,
+ * support view, credential or member change access; those methods throw. Call close to release
+ * the owned database pool.
+ */
+export function createWorkflowIdentity(settings: {
+  databaseUrl: string;
+  region?: DataRegion;
+  enabledRegions?: readonly DataRegion[];
+}) {
+  const pool = new Pool({
+    connectionString: settings.databaseUrl,
+    max: 10,
+    connectionTimeoutMillis: 5000,
+    statement_timeout: 5000,
+    idle_in_transaction_session_timeout: 10000,
+  });
+  const region = settings.region ?? 'AU';
+
+  return {
+    service: createIdentityService(createWorkflowIdentityRepository(pool), {
+      region,
+      enabledRegions: settings.enabledRegions ?? [region],
+    }),
     async close() {
       await pool.end();
     },

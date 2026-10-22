@@ -55,8 +55,9 @@ import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createRegionalTemporalSettings } from './temporal-settings.js';
 
 /**
- * Creates the configured API and its database-backed services. Closing the app releases its
- * database pools and workflow reader.
+ * Creates the configured API and its database-backed services. With `workflowSettings`, the API
+ * starts workflows through Temporal; it never needs the worker's database login. Closing the app
+ * releases its database pools and workflow reader.
  */
 export async function buildRuntimeApp(
   settings: Parameters<typeof createIdentity>[0],
@@ -68,7 +69,7 @@ export async function buildRuntimeApp(
     | ((
         identity: IdentityService,
       ) => ConnectionManagement | ReturnType<typeof createAppHost>),
-  workflowSettings?: WorkflowConfig,
+  workflowSettings?: Pick<WorkflowConfig, 'temporal'>,
 ) {
   if (workflowSettings)
     workflowSettings = {

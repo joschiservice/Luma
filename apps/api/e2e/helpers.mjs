@@ -97,6 +97,7 @@ export function startProcess(t, script, env = {}, ipc = false) {
 /** Shared runtime roles that `database(t).grantRuntime()` grants a journey's login. */
 export const runtimeRoles = [
   'luma_identity',
+  'luma_workflow_identity',
   'luma_case_reader',
   'luma_desk',
   'luma_policies',

@@ -45,7 +45,9 @@ persistent Temporal deployment for durable operation. Settings are documented in
 `apps/api/.env.example`:
 
 - `WORKFLOW_DATABASE_URL` is a restricted login with the worker's
-  [database roles](development.md#database-roles).
+  [database roles](development.md#database-roles). Only the worker and sync processes receive
+  it, and they need neither `IDENTITY_DATABASE_URL` nor `BETTER_AUTH_SECRET`. The API is a
+  Temporal client only and starts workflows whenever `TEMPORAL_ADDRESS` is set.
 - `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE` and `TEMPORAL_TASK_QUEUE` select the service and
   queue. Each worker connection belongs to one namespace and task queue.
 - `TEMPORAL_DATA_REGION` must equal `LUMA_REGION` (`AU` by default). Operators must provision

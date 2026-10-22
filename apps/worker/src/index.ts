@@ -4,8 +4,8 @@ import {
 } from '@luma/application-runtime/worker';
 import {
   readConnectionsConfig,
-  readIdentityConfig,
   readObservabilityConfig,
+  readRegionConfig,
   readWorkflowConfig,
 } from '@luma/config';
 import {
@@ -42,7 +42,7 @@ export async function main(
     await health.listen();
     const config = workflowConfig();
     const worker = await createDefaultExceptionWorker(
-      readIdentityConfig(process.env),
+      readRegionConfig(process.env),
       {
         ...config,
         temporal: {

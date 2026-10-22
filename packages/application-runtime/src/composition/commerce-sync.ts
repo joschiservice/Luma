@@ -20,6 +20,7 @@ import type {
   CommerceSyncConfig,
   ConnectionsConfig,
   ModelGatewayConfig,
+  RegionConfig,
 } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
 import {
@@ -29,7 +30,7 @@ import {
 } from '@luma/connections/composition';
 import { createCustomerProfiles } from '@luma/customers/composition';
 import type { IdentityService } from '@luma/identity';
-import { createIdentity } from '@luma/identity/composition';
+import { createWorkflowIdentity } from '@luma/identity/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import {
@@ -216,7 +217,7 @@ export function createCommerceSyncService(
  * documents and supplier messages through the configured regional routes.
  */
 export async function createDefaultCommerceSyncWorker(
-  identitySettings: Parameters<typeof createIdentity>[0],
+  cell: RegionConfig,
   settings: CommerceSyncConfig,
   env: Readonly<Record<string, string | undefined>> = process.env,
   observability?: Observability,
@@ -232,7 +233,11 @@ export async function createDefaultCommerceSyncWorker(
             settings: modelSettings,
           }
         : undefined;
-    const identity = createIdentity(identitySettings);
+    // Members and workflow contexts are read with the worker login, never the API's.
+    const identity = createWorkflowIdentity({
+      databaseUrl: settings.databaseUrl,
+      ...cell,
+    });
     resources.add(identity.close);
     const pool = createDatabasePool({
       connectionString: settings.databaseUrl,
@@ -241,7 +246,7 @@ export async function createDefaultCommerceSyncWorker(
       onError: (error) => log('Sync database connection failed', error),
     });
     resources.add(() => pool.end());
-    await assertCellRegion(pool, identitySettings.region ?? 'AU');
+    await assertCellRegion(pool, cell.region);
     const worker = createCommerceSyncWorker({
       database: createTenantDatabase(pool),
       identity: identity.service,

@@ -42,7 +42,10 @@ const kmsRegions: Record<DataRegion, readonly string[]> = {
   US: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2'],
 };
 
-/** Validates regional Temporal transport and KMS encryption; production requires TLS and encryption. */
+/**
+ * Reads the worker settings: the restricted `WORKFLOW_DATABASE_URL` login and the Temporal
+ * connection from {@link readTemporalConfig}.
+ */
 export function readWorkflowConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): WorkflowConfig {
@@ -52,6 +55,17 @@ export function readWorkflowConfig(
     !['postgres:', 'postgresql:'].includes(new URL(databaseUrl).protocol)
   )
     throw new Error('WORKFLOW_DATABASE_URL must be a PostgreSQL URL');
+
+  return { databaseUrl, temporal: readTemporalConfig(env) };
+}
+
+/**
+ * Validates regional Temporal transport and KMS encryption without a database login, for
+ * clients such as the API. Production requires TLS and encryption.
+ */
+export function readTemporalConfig(
+  env: Readonly<Record<string, string | undefined>>,
+): WorkflowConfig['temporal'] {
   const { region } = readRegionConfig(env);
   const address = env.TEMPORAL_ADDRESS ?? '127.0.0.1:7233';
   const namespace = env.TEMPORAL_NAMESPACE ?? 'default';
@@ -87,18 +101,13 @@ export function readWorkflowConfig(
   const payloadEncryption = readEncryption(env, region);
 
   return {
-    databaseUrl,
-    temporal: {
-      address,
-      namespace,
-      taskQueue,
-      dataRegion: region,
-      tls: serverRootCACertificate
-        ? { serverRootCACertificate }
-        : tls === 'true',
-      ...(env.TEMPORAL_API_KEY ? { apiKey: env.TEMPORAL_API_KEY } : {}),
-      ...(payloadEncryption ? { payloadEncryption } : {}),
-    },
+    address,
+    namespace,
+    taskQueue,
+    dataRegion: region,
+    tls: serverRootCACertificate ? { serverRootCACertificate } : tls === 'true',
+    ...(env.TEMPORAL_API_KEY ? { apiKey: env.TEMPORAL_API_KEY } : {}),
+    ...(payloadEncryption ? { payloadEncryption } : {}),
   };
 }
 

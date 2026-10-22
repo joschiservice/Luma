@@ -5,7 +5,7 @@ import {
   readIdentityConfig,
   readModelGatewayConfig,
   readObservabilityConfig,
-  readWorkflowConfig,
+  readTemporalConfig,
 } from '@luma/config';
 import { createFailureLog } from '@luma/platform';
 import {
@@ -17,17 +17,13 @@ import {
 export async function main(
   localTelemetry?: Awaited<ReturnType<typeof startLocalTelemetry>>,
 ) {
-  const workflowConfig = () => {
-    const config = readWorkflowConfig(process.env);
-
-    return {
-      ...config,
-      temporal: {
-        ...config.temporal,
-        ...(localTelemetry ? { telemetry: localTelemetry } : {}),
-      },
-    };
-  };
+  // The API is a Temporal client only; the worker's database login stays with the worker.
+  const workflowConfig = () => ({
+    temporal: {
+      ...readTemporalConfig(process.env),
+      ...(localTelemetry ? { telemetry: localTelemetry } : {}),
+    },
+  });
   const config = readApiConfig(process.env);
   const identityConfig = readIdentityConfig(process.env);
   const modelSettings = readModelGatewayConfig(process.env);
@@ -54,7 +50,7 @@ export async function main(
     observability,
     modelSettings,
     readConnectionsConfig(process.env),
-    process.env.WORKFLOW_DATABASE_URL ? workflowConfig() : undefined,
+    process.env.TEMPORAL_ADDRESS ? workflowConfig() : undefined,
   );
 
   app.addHook('onClose', async () => {
