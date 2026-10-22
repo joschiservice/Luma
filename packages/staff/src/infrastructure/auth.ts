@@ -72,10 +72,17 @@ export function createStaffAuth(
       cookieCache: { enabled: false },
     },
     advanced: {
-      cookiePrefix: settings.cookiePrefix,
+      // Google mode runs only over HTTPS. There every staff cookie carries `__Host-`, so a sibling
+      // subdomain cannot plant a `Domain=` cookie of the same name. Better Auth would otherwise
+      // prepend `__Secure-` itself, so its secure prefixing stays off and `Secure` comes from the
+      // default attributes. No staff cookie sets a Domain or a path other than `/`.
+      cookiePrefix:
+        settings.mode === 'google'
+          ? `__Host-${settings.cookiePrefix}`
+          : settings.cookiePrefix,
       crossSubDomainCookies: { enabled: false },
       ipAddress: { ipAddressHeaders: ['x-luma-staff-client-ip'] },
-      useSecureCookies: settings.mode === 'google',
+      useSecureCookies: false,
       database: { generateId: () => randomUUID() },
       defaultCookieAttributes: {
         httpOnly: true,

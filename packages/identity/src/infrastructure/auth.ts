@@ -204,6 +204,22 @@ function factorPlugins(settings: AuthSettings): BetterAuthPlugin[] {
   ];
 }
 
+// Over HTTPS every auth cookie carries `__Host-`, so a sibling subdomain cannot plant a
+// `Domain=` cookie of the same name. Better Auth would otherwise prepend `__Secure-` itself;
+// its secure prefixing is turned off here and `Secure` is kept through the default attributes.
+// No auth cookie sets a Domain or a path other than `/`, which `__Host-` requires.
+function authCookieOptions(settings: AuthSettings) {
+  const prefix = settings.cookiePrefix ?? 'better-auth';
+  if (new URL(settings.baseURL).protocol !== 'https:')
+    return { useSecureCookies: false, cookiePrefix: prefix };
+
+  return {
+    useSecureCookies: false,
+    cookiePrefix: `__Host-${prefix}`,
+    defaultCookieAttributes: { secure: true },
+  };
+}
+
 // Unlike credential registration, reading or ending one's sessions does not need a fresh sign-in.
 // Sessions are addressed by ID; their tokens are bearer credentials and never reach the browser.
 function accountSessionsPlugin(
@@ -400,11 +416,10 @@ export function createAuth(
       },
     },
     advanced: {
-      useSecureCookies: new URL(settings.baseURL).protocol === 'https:',
+      ...authCookieOptions(settings),
       crossSubDomainCookies: { enabled: false },
       // The auth bridge sets this from the socket or the configured proxy header.
       ipAddress: { ipAddressHeaders: [clientAddressHeader] },
-      ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),
       database: {
         generateId: ({ model }) =>
           model === 'organization' && provisionId ? provisionId : randomUUID(),

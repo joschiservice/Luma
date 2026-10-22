@@ -387,7 +387,8 @@ verification, not a repeat.
 Serve the frontend on its own HTTPS origin. Proxy its `/api/` path exclusively to the staff
 API, removing that prefix; preserve cookies, `Origin` and `Set-Cookie`. Keep customer and
 staff cookies host-only with separate names and signing secrets. Staff cookies must not be
-shared with sibling subdomains. API mutations validate the exact staff origin; SameSite
+shared with sibling subdomains; in Google mode their names start with `__Host-`, so the browser
+rejects a same-named cookie planted by a sibling subdomain. API mutations validate the exact staff origin; SameSite
 cookies and CORS do not replace that check.
 
 Protect both the staff website and API ingress with the workforce access gateway or a
