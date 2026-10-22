@@ -38,6 +38,8 @@ export function assistantError(error: unknown) {
     return m.assistant_error_session_expired();
   if (error instanceof ApiError && error.status === 403)
     return m.assistant_error_access_changed();
+  if (error instanceof ApiError && error.status === 429)
+    return m.identity_error_rate_limited();
   if (error instanceof ApiError && error.code)
     return error.status === 400
       ? m.assistant_error_unreadable_question()

@@ -267,6 +267,7 @@ export function createFactExtractor(options: {
             spanId: randomBytes(8).toString('hex'),
           },
           {
+            tenantId: context.tenantId,
             profile: documentExtractionProfile,
             dataPolicy: { ...dataPolicy, region: context.dataRegion },
             maxOutputTokens: 8000,
@@ -290,7 +291,10 @@ export function createFactExtractor(options: {
           reason:
             error instanceof ModelGatewayError && error.code === 'rate_limited'
               ? 'The model was busy. Read the document again later, or add facts by hand.'
-              : 'The document could not be read automatically. Add facts by hand.',
+              : error instanceof ModelGatewayError &&
+                  error.code === 'budget_exhausted'
+                ? 'This workspace used today’s allowance for model features. Read the document again tomorrow, or add facts by hand.'
+                : 'The document could not be read automatically. Add facts by hand.',
         };
       }
       if (!result.output)

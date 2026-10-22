@@ -165,9 +165,9 @@ export const adaptiveViewsContract = {
       path: `${path}/generate`,
       summary: 'Draft a view from a description',
       description:
-        'Proposes a constrained query in format 2 and its preview. Saving requires explicit review. Ambiguous identities and unsupported requests need clarification.',
+        'Proposes a constrained query in format 2 and its preview. Saving requires explicit review. Ambiguous identities and unsupported requests need clarification. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`.',
     })
-    .meta(access)
+    .meta({ ...access, errors: [...access.errors, 429] })
     .input(
       z.object({
         params: organizationParamsSchema,

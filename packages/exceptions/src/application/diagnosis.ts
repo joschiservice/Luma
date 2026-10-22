@@ -187,6 +187,7 @@ export function createDiagnosisService(
         try {
           const response = await boundary.bounded((signal) =>
             options.model!.gateway.generate(boundary.trace(context.requestId), {
+              tenantId: context.tenantId,
               profile: options.model!.profile,
               dataPolicy: {
                 classification: 'sensitive',

@@ -14,6 +14,7 @@ import type {
   ModelRoute,
   ModelRoutingPolicy,
   ModelSchema,
+  ModelTokenBudget,
   ModelToolCall,
 } from '../application/model-gateway.js';
 import { createRoutedModelGateway } from '../application/model-gateway.js';
@@ -32,6 +33,7 @@ const answer: ModelSchema<{ answer: string }> = {
 };
 
 const request: ModelRequest<{ answer: string }> = {
+  tenantId: 'tenant-1',
   profile: 'reasoning',
   dataPolicy: {
     classification: 'public',
@@ -64,6 +66,7 @@ function setup(
     response?: unknown;
     transport?: typeof fetch;
     zeroDataRetention?: boolean;
+    budget?: ModelTokenBudget;
   } = {},
 ) {
   const model = options.model ?? 'anthropic/claude-sonnet-4.5';
@@ -118,6 +121,7 @@ function setup(
       return time;
     },
     options.policy,
+    options.budget,
   );
 
   return { gateway, root, telemetry, spans, langfuse, transport };
@@ -577,5 +581,54 @@ describe('tool history', () => {
         .filter((message: { role: string }) => message.role === 'tool')
         .map((message: { tool_call_id: string }) => message.tool_call_id),
     ).toEqual(['call-2', 'call-1', 'call-3']);
+  });
+});
+
+describe('tenant token budget', () => {
+  function budget(exhausted: boolean) {
+    return {
+      exhausted: vi.fn(async () => exhausted),
+      spend: vi.fn(async () => undefined),
+    };
+  }
+
+  it('refuses a tenant that used its daily tokens before calling the provider', async () => {
+    const tokens = budget(true);
+    const { gateway, root, transport } = setup({ budget: tokens });
+
+    await expect(gateway.generate(root.context, request)).rejects.toMatchObject(
+      { code: 'budget_exhausted' },
+    );
+    expect(tokens.exhausted).toHaveBeenCalledWith('tenant-1');
+    expect(transport).not.toHaveBeenCalled();
+    expect(tokens.spend).not.toHaveBeenCalled();
+  });
+
+  it('records input and output tokens, even when the output is unreadable', async () => {
+    const tokens = budget(false);
+    const { gateway, root } = setup({ budget: tokens });
+
+    await gateway.generate(root.context, request);
+    expect(tokens.spend).toHaveBeenLastCalledWith('tenant-1', 15);
+
+    const unreadable = setup({
+      budget: tokens,
+      response: completion('not json'),
+    });
+    await expect(
+      unreadable.gateway.generate(unreadable.root.context, request),
+    ).rejects.toMatchObject({ code: 'invalid_output' });
+    expect(tokens.spend).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a request without a tenant before reading the budget', async () => {
+    const tokens = budget(false);
+    const { gateway, root, transport } = setup({ budget: tokens });
+
+    await expect(
+      gateway.generate(root.context, { ...request, tenantId: '' }),
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(tokens.exhausted).not.toHaveBeenCalled();
+    expect(transport).not.toHaveBeenCalled();
   });
 });

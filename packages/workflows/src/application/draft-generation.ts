@@ -4,6 +4,7 @@ import type {
   ModelErrorCode,
   ModelGateway,
   ModelMessage,
+  ModelRequestLimit,
   ModelSchema,
   ModelUsage,
   TraceContext,
@@ -238,6 +239,7 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
  * the run and is returned instead of thrown.
  */
 async function runGeneration<T, R>(request: {
+  tenantId: string;
   dataRegion: TenantContext['dataRegion'];
   gateway: ModelGateway;
   trace: TraceContext;
@@ -275,6 +277,7 @@ async function runGeneration<T, R>(request: {
     try {
       const result = await untilAborted(
         request.gateway.generate(request.trace, {
+          tenantId: request.tenantId,
           profile: authoringModelProfile,
           dataPolicy: { ...dataPolicy, region: request.dataRegion },
           messages,
@@ -332,6 +335,7 @@ export interface GeneratedDraft extends GenerationSummary {
  * no answer was readable or the model failed; `failure` names the model error.
  */
 export async function generateDraft(request: {
+  tenantId: string;
   dataRegion: TenantContext['dataRegion'];
   gateway: ModelGateway;
   trace: TraceContext;
@@ -357,6 +361,7 @@ export async function generateDraft(request: {
     };
   };
   const { best, ...run } = await runGeneration({
+    tenantId: request.tenantId,
     dataRegion: request.dataRegion,
     gateway: request.gateway,
     trace: request.trace,
@@ -427,6 +432,8 @@ export function createDraftGeneration(deps: {
   id(): string;
   now(): Date;
   trace(context: TenantContext): TraceContext;
+  /** Throws 429 when the person sent too many model-backed requests recently. */
+  requestLimit?: ModelRequestLimit;
   /** Model calls per request, including re-asks. Defaults to 3. */
   maxAttempts?: number;
   /** Deadline for a whole request, across attempts. Defaults to 60 seconds. */
@@ -467,12 +474,14 @@ export function createDraftGeneration(deps: {
     return fresh;
   }
 
-  function available(): ModelGateway {
+  /** Returns the gateway for a request that will call it, after the person's request limit. */
+  async function admit(context: TenantContext): Promise<ModelGateway> {
     if (!deps.availability.available || !deps.gateway)
       throw unavailable(
         deps.availability.reason ??
           'Describing workflows isn’t available on this server.',
       );
+    await deps.requestLimit?.(context.tenantId, context.actor.id);
 
     return deps.gateway;
   }
@@ -593,9 +602,11 @@ export function createDraftGeneration(deps: {
             ? `The request was cancelled. ${unchanged}`
             : code === 'rate_limited'
               ? `The model is busy. ${unchanged} Try again in a minute.`
-              : code === 'route_denied' || code === 'adapter_unavailable'
-                ? `The EU model route isn’t available right now. ${unchanged} Whoever runs this Luma server needs to check the authoring route.`
-                : `The model couldn’t answer. ${unchanged} Try again.`;
+              : code === 'budget_exhausted'
+                ? `This workspace used today’s allowance for model features. ${unchanged} Try again tomorrow.`
+                : code === 'route_denied' || code === 'adapter_unavailable'
+                  ? `The EU model route isn’t available right now. ${unchanged} Whoever runs this Luma server needs to check the authoring route.`
+                  : `The model couldn’t answer. ${unchanged} Try again.`;
 
     throw unavailable(reason);
   }
@@ -751,12 +762,13 @@ export function createDraftGeneration(deps: {
             ...(previous.result as GenerationSummary),
           },
         };
-      const gateway = available();
+      const gateway = await admit(context);
       if (await draftExists(context, input.draftId))
         throw conflict('This draft ID was already used. Start a new draft.');
       const vocabulary = await deps.drafts.vocabulary(context);
       const limit = deadline(options);
       const run = await generateDraft({
+        tenantId: context.tenantId,
         dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),
@@ -865,11 +877,12 @@ export function createDraftGeneration(deps: {
         draftId,
       );
       if (previous) return proposalView(previous);
-      const gateway = available();
+      const gateway = await admit(context);
       editable(draft, input.revision);
       const vocabulary = await deps.drafts.vocabulary(context);
       const limit = deadline(options);
       const run = await generateDraft({
+        tenantId: context.tenantId,
         dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),
@@ -1120,7 +1133,7 @@ export function createDraftGeneration(deps: {
         draftId,
       );
       if (previous) return codeStepView(previous);
-      const gateway = available();
+      const gateway = await admit(context);
       editable(draft, input.revision);
       if (!codeStepsAvailable(await deps.drafts.vocabulary(context)))
         throw conflict(
@@ -1133,6 +1146,7 @@ export function createDraftGeneration(deps: {
         );
       const limit = deadline(options);
       const { best, ...run } = await runGeneration({
+        tenantId: context.tenantId,
         dataRegion: context.dataRegion,
         gateway,
         trace: options.trace ?? deps.trace(context),

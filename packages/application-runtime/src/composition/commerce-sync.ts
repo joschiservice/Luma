@@ -16,11 +16,12 @@ import {
   createIdentityReader,
   createSyncStore,
 } from '@luma/commerce-sync/composition';
-import type {
-  CommerceSyncConfig,
-  ConnectionsConfig,
-  ModelGatewayConfig,
-  RegionConfig,
+import {
+  type CommerceSyncConfig,
+  type ConnectionsConfig,
+  type ModelGatewayConfig,
+  readAuthProtectionConfig,
+  type RegionConfig,
 } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
 import {
@@ -37,6 +38,7 @@ import {
   createDatabasePool,
   createModelGateway,
   createTenantDatabase,
+  createValkeyStore,
 } from '@luma/platform/composition';
 import {
   createPurchasingTermsImporter,
@@ -226,10 +228,19 @@ export async function createDefaultCommerceSyncWorker(
   const resources = createResourceScope();
   const log = createFailureLog(observability);
   try {
+    // Mailbox reading counts against the same tenant token budgets as the API, in the Valkey
+    // that holds the API's request counters.
+    const counters = readAuthProtectionConfig(env).rateLimit.store;
+    const budgetStore = counters
+      ? createValkeyStore(counters.url, counters.cluster)
+      : undefined;
+    if (budgetStore) resources.add(() => budgetStore.close());
     const model =
       modelSettings && observability
         ? {
-            gateway: createModelGateway(modelSettings, observability),
+            gateway: createModelGateway(modelSettings, observability, {
+              ...(budgetStore ? { budgetStore } : {}),
+            }),
             settings: modelSettings,
           }
         : undefined;

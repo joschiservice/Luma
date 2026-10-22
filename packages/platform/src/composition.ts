@@ -1,3 +1,4 @@
+import type { AtomicStore } from './application/atomic-store.js';
 import type {
   DataRegion,
   ModelAdapter,
@@ -9,6 +10,7 @@ import { createRoutedModelGateway } from './application/model-gateway.js';
 import type { Observability } from './application/observability.js';
 import type { BedrockSettings } from './infrastructure/bedrock-model-adapter.js';
 import { createBedrockModelAdapter } from './infrastructure/bedrock-model-adapter.js';
+import { createDailyTokenBudget } from './infrastructure/model-limits.js';
 import { createVercelModelAdapter } from './infrastructure/vercel-model-adapter.js';
 
 export { createObservability } from './infrastructure/observability.js';
@@ -22,7 +24,8 @@ export { createDatabasePool } from './infrastructure/database-pool.js';
  * `bedrock` routes need `bedrock` settings or an injected regional adapter. A route whose
  * adapter is not installed fails with `adapter_unavailable` and never falls back to another
  * adapter. Throws when the Bedrock region is outside the cell jurisdiction or the adapter does not enforce
- * cell processing.
+ * cell processing. With `tenantDailyTokens`, each tenant's daily tokens are counted in
+ * `budgetStore`, shared with every process using the same store, or in this process without one.
  */
 export function createModelGateway(
   settings: {
@@ -31,6 +34,7 @@ export function createModelGateway(
     apiKey?: string;
     bedrock?: Pick<BedrockSettings, 'region' | 'credentials' | 'dataRegion'>;
     timeoutMs: number;
+    tenantDailyTokens?: number;
   },
   observability: Observability,
   dependencies: {
@@ -38,6 +42,7 @@ export function createModelGateway(
     routingPolicy?: ModelRoutingPolicy;
     transport?: typeof fetch;
     now?: () => number;
+    budgetStore?: AtomicStore;
   } = {},
 ) {
   const adapters: Partial<Record<ModelAdapterId, ModelAdapter>> = {};
@@ -73,11 +78,19 @@ export function createModelGateway(
     observability,
     dependencies.now ?? (() => performance.now()),
     dependencies.routingPolicy,
+    settings.tenantDailyTokens
+      ? createDailyTokenBudget(
+          settings.tenantDailyTokens,
+          dependencies.budgetStore,
+        )
+      : undefined,
   );
 }
 
 export { startLocalTelemetry } from './infrastructure/local-telemetry.js';
 
 export { createValkeyStore } from './infrastructure/valkey.js';
+
+export { createModelRequestLimit } from './infrastructure/model-limits.js';
 
 export { createKmsDataKeyService } from './infrastructure/kms-data-key.js';

@@ -159,8 +159,10 @@ AUTH_CLIENT_IP_HEADER=x-forwarded-for
 AUTH_RATE_LIMIT_URL=$valkey
 EOF
 
+  # Sync counts model tokens against the tenant budgets kept with the API's request counters.
   cat >"$env/worker.env" <<EOF
 WORKFLOW_DATABASE_URL=postgresql://luma_worker:$(parameter generated/WORKER_DATABASE_PASSWORD)@postgres:5432/luma
+AUTH_RATE_LIMIT_URL=$valkey
 EOF
 
   {

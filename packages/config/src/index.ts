@@ -253,6 +253,8 @@ export type { CommerceSyncConfig } from './sync.js';
 
 export { readRequestAdmissionConfig } from './request-admission.js';
 
+export { readAuthProtectionConfig } from './auth-protection.js';
+
 export { readRegionConfig } from './regions.js';
 
 export type { DataRegion, RegionConfig } from './regions.js';

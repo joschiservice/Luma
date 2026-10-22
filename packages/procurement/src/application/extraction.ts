@@ -92,6 +92,7 @@ Return no facts when the message states none.`;
  * Model failures are returned, never thrown, and contain no model text.
  */
 export async function extractFacts(input: {
+  tenantId: string;
   dataRegion: import('@luma/platform').DataRegion;
   gateway: ModelGateway | null;
   /** Validates the model's structured answer. */
@@ -114,6 +115,7 @@ export async function extractFacts(input: {
   let result;
   try {
     result = await input.gateway.generate(input.trace, {
+      tenantId: input.tenantId,
       profile: supplierExtractionProfile,
       dataPolicy: { ...dataPolicy, region: input.dataRegion },
       maxOutputTokens: 2000,
@@ -150,7 +152,10 @@ export async function extractFacts(input: {
       reason:
         error instanceof ModelGatewayError && error.code === 'rate_limited'
           ? 'The model is busy. Try reading the message again in a minute.'
-          : 'The message could not be read automatically. Try again, or record what the supplier said by hand.',
+          : error instanceof ModelGatewayError &&
+              error.code === 'budget_exhausted'
+            ? 'This workspace used today’s allowance for model features. Read the message again tomorrow, or record what the supplier said by hand.'
+            : 'The message could not be read automatically. Try again, or record what the supplier said by hand.',
     };
   }
   if (!result.output)

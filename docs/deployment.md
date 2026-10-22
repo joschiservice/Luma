@@ -20,6 +20,7 @@ flowchart LR
   Sync --> Postgres
   Temporal --> Postgres
   API --> Valkey
+  Sync --> Valkey
   Worker -->|scoped keys| AWS[KMS and Bedrock]
 ```
 

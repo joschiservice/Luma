@@ -44,6 +44,7 @@ export function createSupplierMessages({
     );
     const requestedDate = submission?.requestedDeliveryDate ?? null;
     const result = await extractFacts({
+      tenantId: context.tenantId,
       dataRegion: context.dataRegion,
       gateway: deps.model.gateway,
       output: deps.model.output,
