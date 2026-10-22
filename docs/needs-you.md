@@ -47,7 +47,8 @@ without the respond permission see the decision as view only.
 
 ## Ranking and paging
 
-The queue asks each provider for the refreshed reader, then runs one repeatable-read query
+The queue asks each provider for the refreshed reader, three at a time so one read does not
+take the API's shared request pool from concurrent requests, then runs one repeatable-read query
 (4-second statement timeout) that unions the case rows with the provider rows, joins
 assignments and resolves source record identities through tenant mappings.
 

@@ -1707,6 +1707,14 @@ export const journeyAreas = {
     ...products,
     ...inventory,
   ],
+  'request-pool.performance.e2e.mjs': [
+    ...ordersFixture,
+    ...orders,
+    ...decisions,
+    ...procurement,
+    'packages/platform/src/{application/concurrency,infrastructure/database,infrastructure/database-pool}.ts',
+    'packages/application-runtime/src/composition/runtime-app.ts',
+  ],
   'returns.performance.e2e.mjs': [...commerce, ...returns, ...orders],
   'shopify-admission.performance.e2e.mjs': [
     ...shopify,

@@ -48,6 +48,8 @@ export type {
 
 export { measure, measureSync } from './application/performance.js';
 
+export { mapLimited, settleLimited } from './application/concurrency.js';
+
 export type {
   OperationalMetricDefinition,
   OperationalMetricRead,

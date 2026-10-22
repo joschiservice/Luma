@@ -20,6 +20,8 @@ export interface ApiConfig {
   host: string;
   port: number;
   logLevel: LogLevel;
+  /** Connections in the API's tenant request pool. */
+  databasePoolMax: number;
 }
 
 /** Read once at startup; never expose the server environment to browser code. */
@@ -35,8 +37,19 @@ export function readApiConfig(
   const logLevel = env.LOG_LEVEL ?? 'info';
   if (!levels.includes(logLevel as LogLevel))
     throw new Error('LOG_LEVEL is invalid');
+  // Each API instance holds this many connections against PostgreSQL's max_connections.
+  const poolMax = env.API_DATABASE_POOL_MAX ?? '20';
+  if (!/^\d+$/.test(poolMax) || Number(poolMax) < 1 || Number(poolMax) > 100)
+    throw new Error(
+      'API_DATABASE_POOL_MAX must be an integer between 1 and 100',
+    );
 
-  return { host, port: Number(port), logLevel: logLevel as LogLevel };
+  return {
+    host,
+    port: Number(port),
+    logLevel: logLevel as LogLevel,
+    databasePoolMax: Number(poolMax),
+  };
 }
 
 export interface IdentityConfig {

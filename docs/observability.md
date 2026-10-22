@@ -162,6 +162,8 @@ All `pg` queries are traced, including identity and ORM queries and transaction 
 - `mise exec -- pnpm observe:queries <query-id>` hashes TypeScript string literals with the tracing algorithm and prints matching source locations. Dynamically assembled and ORM-generated SQL may have no match.
 - `mise exec -- pnpm observe:queries` prints the top `pg_stat_statements` patterns for the API and worker roles to the terminal, never to telemetry. Statistics accumulate across runs.
 
+Locally, `db.client.connection.pending_requests` shows requests waiting for a pool connection. Hosted exports have no metrics, so a tenant transaction that gets no connection within the pool's acquire timeout fails with `Database connection unavailable`, naming the pool's open, idle and waiting counts; that error reaches Sentry like any other request failure.
+
 Client spans include network and driver overhead; PostgreSQL statistics describe server execution. Use `EXPLAIN (ANALYZE, BUFFERS)` for plans, remembering that `ANALYZE` executes the statement: use disposable data or a rolled-back transaction for writes.
 
 ## Instrumenting an operation

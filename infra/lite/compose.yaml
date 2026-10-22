@@ -41,11 +41,12 @@ x-depends-on-data: &depends-on-data
   valkey: { condition: service_healthy }
 
 services:
-  # Connection budget: the API opens at most 15, the worker 20, sync 44 with its default
-  # concurrency, the staff API 5 and Temporal 32. The remaining 34 cover the three superuser
-  # slots, migrations, backups and operator sessions; raise max_connections before raising a
-  # pool or the sync concurrency. luma-deploy sizes the memory settings for the host. JIT is
-  # off: Luma's short queries pay its compilation cost without benefiting.
+  # Connection budget: the API opens at most 30 (API_DATABASE_POOL_MAX plus identity's 10),
+  # the worker 20, sync 44 with its default concurrency, the staff API 5 and Temporal 32. The
+  # remaining 34 cover the three superuser slots, migrations, backups and operator sessions;
+  # raise max_connections before raising a pool or the sync concurrency. luma-deploy sizes the
+  # memory settings for the host. JIT is off: Luma's short queries pay its compilation cost
+  # without benefiting.
   postgres:
     image: postgres:17.11-alpine
     command:
@@ -56,7 +57,7 @@ services:
         '-c',
         'track_io_timing=on',
         '-c',
-        'max_connections=150',
+        'max_connections=165',
         '-c',
         'shared_buffers=${LUMA_POSTGRES_SHARED_BUFFERS:?}',
         '-c',

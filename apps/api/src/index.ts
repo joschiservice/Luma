@@ -36,7 +36,7 @@ export async function main(
   const log = createFailureLog(observability);
 
   const app = await buildRuntimeApp(
-    identityConfig,
+    { ...identityConfig, databasePoolMax: config.databasePoolMax },
     {
       logger: {
         level: config.logLevel,

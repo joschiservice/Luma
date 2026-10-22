@@ -32,3 +32,24 @@ it('opens a tenant transaction in one round trip with the tenant as an escaped l
     'COMMIT',
   ]);
 });
+
+it('reports pool occupancy when no connection is acquired in time', async () => {
+  const timeout = new Error('timeout exceeded when trying to connect');
+  const pool = {
+    connect: async () => {
+      throw timeout;
+    },
+    totalCount: 20,
+    idleCount: 0,
+    waitingCount: 7,
+  } as unknown as Pool;
+
+  const failure = await createTenantDatabase(pool)
+    .transaction('tenant', (tx) => tx.query('SELECT 1'))
+    .catch((error: unknown) => error);
+
+  expect(failure).toMatchObject({
+    message: 'Database connection unavailable (20 open, 0 idle, 7 waiting)',
+    cause: timeout,
+  });
+});
