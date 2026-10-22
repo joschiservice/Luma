@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { conflict, notFound, ServiceError } from '@luma/platform';
+import { conflict, notFound } from '@luma/platform';
 import { APIError } from 'better-auth/api';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 
 import type { IdentityRepository, MemberDto } from '../application/identity.js';
-import type { Organization } from '../domain/context.js';
 import {
   builtInReference,
   isBuiltInRole,
@@ -22,6 +21,11 @@ import { membershipFromRow, membershipSelect, storedRole } from './access.js';
 import { createAccountInspections } from './account-inspections.js';
 import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
+import {
+  createMemberLookup,
+  createPlacement,
+  organizationDto,
+} from './member-lookup.js';
 import * as schema from './schema.js';
 import {
   listSecurityEvents,
@@ -30,28 +34,6 @@ import {
 } from './security-events.js';
 import { signInLockoutPlugin } from './sign-in-protection.js';
 import { createSupportViewCredentials } from './support-view.js';
-
-const organizationDto = (
-  row: typeof schema.organization.$inferSelect,
-): Organization => {
-  if (
-    !['EU', 'AU', 'US'].includes(row.dataRegion) ||
-    !['active', 'suspended', 'closed'].includes(row.status)
-  )
-    throw new ServiceError(
-      503,
-      'REGION_UNAVAILABLE',
-      'Organization placement is unavailable',
-    );
-
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    dataRegion: row.dataRegion as Organization['dataRegion'],
-    status: row.status as Organization['status'],
-  };
-};
 
 function normalizeDatabaseError(error: unknown): never {
   if (
@@ -82,15 +64,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
     securityEventsPlugin(pool, settings.secret, settings.passwordMail),
   ]);
   const repository: IdentityRepository = {
-    placement: {
-      async regionForTenant(tenantId) {
-        const result = await pool.query<{
-          region: Organization['dataRegion'] | null;
-        }>('SELECT identity_tenant_region($1) AS region', [tenantId]);
-
-        return result.rows[0]?.region ?? null;
-      },
-    },
+    placement: createPlacement(pool),
     async getSession(credentials) {
       const session = await auth.api.getSession({
         headers: new Headers(credentials),
@@ -123,42 +97,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
         language,
       ]);
     },
-    async memberOf(userId, organizationId) {
-      const client = await pool.connect();
-      try {
-        // One round trip opens the transaction as the user; several statements take no
-        // parameters, so the user ID is an escaped literal.
-        await client.query(
-          `BEGIN; SELECT set_config('app.user_id', ${client.escapeLiteral(userId)}, true)`,
-        );
-        const { rows } = await client.query<{
-          member: MembershipRow | null;
-          organization: typeof schema.organization.$inferSelect | null;
-          erased: boolean;
-        }>(
-          `SELECT (SELECT to_jsonb(m) FROM (${membershipSelect} WHERE m.tenant_id=$1 AND m.user_id=$2) m) AS member,
-            (SELECT jsonb_build_object('id',o.id,'name',o.name,'slug',o.slug,'dataRegion',o.data_region,'status',o.status)
-              FROM organizations o WHERE o.id=$1) AS organization,
-            EXISTS(SELECT 1 FROM account_deletions WHERE user_id=$2 AND status='erased') AS erased`,
-          [organizationId, userId],
-        );
-        await client.query('COMMIT');
-        const [row] = rows;
-
-        return {
-          member: row?.member ? membershipFromRow(row.member) : null,
-          organization: row?.organization
-            ? organizationDto(row.organization)
-            : null,
-          erased: row?.erased ?? false,
-        };
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
-    },
+    memberOf: createMemberLookup(pool),
     async withUser(userId, operation) {
       try {
         return await db.transaction(async (tx) => {

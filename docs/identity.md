@@ -10,6 +10,8 @@ Migrations run through the shared runner in `@luma/application-runtime` in one t
 
 The API needs `IDENTITY_DATABASE_URL` (the restricted login), `BETTER_AUTH_SECRET` (`openssl rand -base64 32`; production refuses sample values and repeated patterns), `BETTER_AUTH_URL` (the public browser origin) and `AUTH_TRUSTED_ORIGINS` (exact browser origins). Production origins require HTTPS. `/ready` checks connectivity, migrated tables and the runtime role restrictions.
 
+Background workers never receive the API login or the auth secret. They resolve workflow principals and read workspace members through their own login, which holds the read-only `luma_workflow_identity` role: memberships, roles, organization status and account status, without names, emails, sessions, credentials or write access. Identity methods outside those reads throw in a worker.
+
 ## Auth bridge
 
 The web proxy forwards `/api/auth/*` to `/auth/*` and `/api/v1/*` to `/v1/*`. Better Auth uses `/auth` as its backend base path; its browser client must use the public `/api/auth` path. Mutations need the session cookie and an allowed `Origin` header; CLI callers must send both.

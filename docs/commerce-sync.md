@@ -364,8 +364,9 @@ concurrency × 2 + 2` database connections; size PostgreSQL's connection limit f
 workers together.
 
 `pnpm dev` starts the sync process. In production run it with the workflow database URL,
-identity settings, the connection keyring, provider settings and the concurrency settings
-above. The worker login needs `luma_commerce_sync` and `luma_customers` in addition to the
+`LUMA_REGION`, the connection keyring, provider settings and the concurrency settings above;
+it needs neither the API login nor the auth secret. The worker login needs
+`luma_commerce_sync`, `luma_customers` and `luma_workflow_identity` in addition to the
 commerce owner roles; the API login needs `luma_commerce_sync`. Simulated connections
 without a local transport report unavailable and back off.
 

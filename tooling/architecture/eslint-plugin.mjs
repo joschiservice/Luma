@@ -201,6 +201,7 @@ export function violation(from, to) {
         'apps/api/src/connections.integration.test.ts',
         'apps/api/src/staff.integration.test.ts',
         'apps/api/src/membership-suspension.integration.test.ts',
+        'apps/api/src/workflow-identity.integration.test.ts',
         'apps/api/src/account-deletion.integration.test.ts',
         'apps/api/src/account-mail-outbox.integration.test.ts',
         'apps/api/src/api-apps.integration.test.ts',

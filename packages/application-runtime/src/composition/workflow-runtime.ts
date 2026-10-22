@@ -1,11 +1,15 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
-import type { ConnectionsConfig, WorkflowConfig } from '@luma/config';
+import type {
+  ConnectionsConfig,
+  RegionConfig,
+  WorkflowConfig,
+} from '@luma/config';
 import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { createIdentity } from '@luma/identity/composition';
+import { createWorkflowIdentity } from '@luma/identity/composition';
 import { createFailureLog, type Observability } from '@luma/platform';
 import {
   createDatabasePool,
@@ -228,7 +232,7 @@ const workerPoolMax = 10;
  * background monitor failures.
  */
 export async function createDefaultExceptionWorker(
-  identitySettings: Parameters<typeof createIdentity>[0],
+  cell: RegionConfig,
   settings: WorkflowConfig & { temporal: TemporalSettings },
   connections?: ConnectionsConfig,
   env?: Readonly<Record<string, string | undefined>>,
@@ -242,12 +246,16 @@ export async function createDefaultExceptionWorker(
       maxConcurrentActivities: workerPoolMax / 2,
     },
   };
-  if ((identitySettings.region ?? 'AU') !== settings.temporal.dataRegion)
+  if (cell.region !== settings.temporal.dataRegion)
     throw new Error('Workflow placement differs from the identity cell');
   const log = createFailureLog(observability);
   const resources = createResourceScope();
   try {
-    const identity = createIdentity(identitySettings);
+    // Members and workflow contexts are read with the worker login, never the API's.
+    const identity = createWorkflowIdentity({
+      databaseUrl: settings.databaseUrl,
+      ...cell,
+    });
     resources.add(identity.close);
     const pool = createDatabasePool({
       connectionString: settings.databaseUrl,
@@ -256,7 +264,7 @@ export async function createDefaultExceptionWorker(
       onError: (error) => log('Workflow database connection failed', error),
     });
     resources.add(() => pool.end());
-    await assertCellRegion(pool, identitySettings.region ?? 'AU');
+    await assertCellRegion(pool, cell.region);
     const processClient = await createProcessClient(
       {
         ...settings.temporal,

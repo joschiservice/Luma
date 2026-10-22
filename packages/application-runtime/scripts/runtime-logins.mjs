@@ -13,6 +13,7 @@ const runtimeLogins = {
     'luma_adaptive',
   ],
   luma_worker: [
+    'luma_workflow_identity',
     'luma_exceptions',
     'luma_policies',
     'luma_execution',

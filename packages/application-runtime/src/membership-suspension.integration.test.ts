@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 
-import { createIdentity } from '@luma/identity/composition';
+import { createWorkflowIdentity } from '@luma/identity/composition';
 import { createProcessWorker } from '@luma/workflow-temporal';
 import type {
   ProcessActivities,
@@ -23,7 +23,7 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
   const tenantId = randomUUID();
   const principal = randomUUID();
   let owner: Pool;
-  let identity: ReturnType<typeof createIdentity>;
+  let identity: ReturnType<typeof createWorkflowIdentity>;
 
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${database}"`);
@@ -46,22 +46,15 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
       );
       setup.release();
     }
-    // Identity resolves the principal with the restricted runtime role, as workers do.
+    // Identity resolves the principal with the workers' read-only identity role.
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
-    await admin.query(`GRANT luma_identity TO "${login}"`);
+    await admin.query(`GRANT luma_workflow_identity TO "${login}"`);
     url.username = login;
     url.password = password;
-    const origin = 'http://localhost:3208';
-    identity = createIdentity({
-      databaseUrl: url.toString(),
-      secret: 'suspension-test-secret-at-least-32-characters',
-      baseURL: origin,
-      trustedOrigins: [origin],
-      cookiePrefix: 'suspension-test',
-    });
+    identity = createWorkflowIdentity({ databaseUrl: url.toString() });
     await owner.query(
       "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Suspension test','suspension-test','active','AU',now())",
       [tenantId],

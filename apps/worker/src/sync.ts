@@ -1,9 +1,9 @@
 import { createDefaultCommerceSyncWorker } from '@luma/application-runtime/sync';
 import {
   readCommerceSyncConfig,
-  readIdentityConfig,
   readModelGatewayConfig,
   readObservabilityConfig,
+  readRegionConfig,
 } from '@luma/config';
 import {
   createObservability,
@@ -30,7 +30,7 @@ export async function main(
   try {
     await health.listen();
     const worker = await createDefaultCommerceSyncWorker(
-      readIdentityConfig(process.env),
+      readRegionConfig(process.env),
       readCommerceSyncConfig(process.env),
       process.env,
       observability,

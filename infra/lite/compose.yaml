@@ -22,6 +22,20 @@ x-server: &server
     - path: ${LUMA_STATE_DIR:?}/env/app.env
       format: raw
 
+# Each runtime login reaches only its processes: the API login and auth secret the API, the
+# worker login the workflow worker and sync. app.env comes last so its operator settings win.
+x-api-env: &api-env
+  - path: ${LUMA_STATE_DIR:?}/env/api.env
+    format: raw
+  - path: ${LUMA_STATE_DIR:?}/env/app.env
+    format: raw
+
+x-worker-env: &worker-env
+  - path: ${LUMA_STATE_DIR:?}/env/worker.env
+    format: raw
+  - path: ${LUMA_STATE_DIR:?}/env/app.env
+    format: raw
+
 x-depends-on-data: &depends-on-data
   postgres: { condition: service_healthy }
   valkey: { condition: service_healthy }
@@ -169,6 +183,7 @@ services:
   api:
     <<: *server
     command: ['node', 'apps/api/dist/composition/bootstrap.js']
+    env_file: *api-env
     environment:
       HOST: 0.0.0.0
       PORT: '3001'
@@ -192,6 +207,7 @@ services:
   worker:
     <<: *server
     command: ['node', 'apps/worker/dist/bootstrap.js']
+    env_file: *worker-env
     environment:
       WORKFLOW_WORKER_HEALTH_PORT: '9470'
     # Shutdown waits up to six minutes for running activities, such as provider writes.
@@ -216,6 +232,7 @@ services:
   sync:
     <<: *server
     command: ['node', 'apps/worker/dist/sync-bootstrap.js']
+    env_file: *worker-env
     environment:
       COMMERCE_SYNC_HEALTH_PORT: '9470'
     depends_on: *depends-on-data
