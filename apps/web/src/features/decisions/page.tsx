@@ -100,13 +100,13 @@ import {
   decisionPageSize,
   decisionsKey,
   decisionsOptions,
-  decisionsPollInterval,
+  decisionsRefresh,
   decisionView,
   defaultDecisionSort,
   type NeedsYouSearch,
 } from './data';
 import { DecisionDeadline, DecisionInspector, type Member } from './inspector';
-import { useDecisionUpdates } from './live';
+import { useDecisionUpdatesState } from './live';
 import { OwnerReview } from './owner-review';
 import {
   actionable,
@@ -763,7 +763,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const search = useSearch({ from: '/app/$organizationId/needs-you' });
   const navigate = useNavigate({ from: '/app/$organizationId/needs-you' });
   const client = useQueryClient();
-  const updates = useDecisionUpdates(organizationId);
+  const updates = useDecisionUpdatesState();
   const online = useOnline();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
@@ -835,12 +835,12 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       limit: 100,
       cursor: waitingCursor,
     }),
-    refetchInterval: decisionsPollInterval(updates),
+    ...decisionsRefresh(updates),
     enabled: ready && waitingOpen,
   });
   const list = useQuery({
     ...decisionsOptions(organizationId, query),
-    refetchInterval: decisionsPollInterval(updates),
+    ...decisionsRefresh(updates),
     enabled: ready && !clientIssues.length,
   });
   // With a page cursor, a refused request means the page link is stale, not the view.

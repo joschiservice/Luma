@@ -390,22 +390,37 @@ export function createReplenishmentService(deps: {
         [...previousRuns.values()].flatMap((run) => (run ? [run.id] : [])),
       ),
     ]);
-    const items: ReplenishmentDecision[] = [];
-    for (const run of existing) {
+    const awaiting = existing.flatMap((run) => {
       const outputs = evidence.get(run.id) ?? [];
       if (presentTriggerRun(run, outputs).processState !== 'awaiting_decision')
-        continue;
+        return [];
       const waiting = outputs.find(
         (step) => step.kind === 'capability' && step.state === 'waiting',
       );
       const rule = rules.find(
         (r) => r.id === String(run.context.inputs.activationId),
       );
-      if (!waiting?.evidenceRefs[0] || !rule) continue;
-      const [binding, decision] = await Promise.all([
-        deps.safety.provisioning.step(context, run.id, 'create-order'),
-        deps.safety.policies.decision(context, waiting.evidenceRefs[0]),
-      ]);
+      const decisionId = waiting?.evidenceRefs[0];
+
+      return waiting && decisionId && rule
+        ? [{ run, outputs, waiting, rule, decisionId }]
+        : [];
+    });
+    // One policy read covers every waiting run's decision.
+    const decisions = awaiting.length
+      ? await deps.safety.policies.decisions(
+          context,
+          awaiting.map((item) => item.decisionId),
+        )
+      : new Map();
+    const items: ReplenishmentDecision[] = [];
+    for (const { run, outputs, waiting, rule, decisionId } of awaiting) {
+      const binding = await deps.safety.provisioning.step(
+        context,
+        run.id,
+        'create-order',
+      );
+      const decision = decisions.get(decisionId);
       if (
         !binding ||
         decision?.outcome !== 'approval_required' ||

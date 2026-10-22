@@ -201,6 +201,12 @@ export interface IdentityRepository {
 }
 
 /**
+ * How long a refreshed context stays current for further refreshes. It bounds how long work
+ * already admitted in one request may continue after its membership changes.
+ */
+const refreshReuseMs = 2000;
+
+/**
  * Creates session and tenant resolution plus organization and membership commands backed by
  * the supplied repository.
  */
@@ -211,6 +217,12 @@ export function createIdentityService(
     enabledRegions: ['AU'],
   },
 ) {
+  // Contexts this service refreshed, with when. Owners refresh the context they receive before
+  // acting, so one request that fans out to many owners, such as Needs you, would otherwise
+  // reread the same membership once per owner. Only objects returned by `refreshContext` are
+  // recorded, so a context from sign-in or an older request is always read again.
+  const refreshed = new WeakMap<TenantContext, number>();
+
   // Placement uses the same pool as tenant transactions. Resolve it before acquiring a
   // transaction connection so simultaneous requests cannot each hold one and wait for another.
   async function requirePlacement(tenantId: string) {
@@ -332,6 +344,31 @@ export function createIdentityService(
       credentialId: credential.id,
       scopes: credential.scopes,
     });
+  }
+
+  /** Reads the actor's current membership, or the API app's credential, for `refreshContext`. */
+  async function readContext(context: TenantContext) {
+    if (context.apiApp) {
+      const credential = await repository.apiCredentials?.find(
+        context.tenantId,
+        context.apiApp.credentialId,
+      );
+      if (!credential || credential.userId !== context.actor.id)
+        throw apiTokenRefused();
+
+      return resolveApiCredential(
+        credential,
+        context.tenantId,
+        context.requestId,
+      );
+    }
+
+    return resolveMember(
+      { userId: context.actor.id, sessionId: context.actor.sessionId },
+      context.tenantId,
+      context.requestId,
+      context.supportView,
+    );
   }
 
   async function withTenant<T>(
@@ -489,31 +526,18 @@ export function createIdentityService(
     /**
      * Resolves the actor's current membership again; a support view stays a support view. An API
      * app context rereads its credential and stays narrowed to the app's scopes; a revoked or
-     * expired credential is refused.
+     * expired credential is refused. A context this service returned less than
+     * `refreshReuseMs` ago is already current and is returned as is, so owners that recheck
+     * the context they were handed within one request do not read it again.
      */
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
-      if (context.apiApp) {
-        const credential = await repository.apiCredentials?.find(
-          context.tenantId,
-          context.apiApp.credentialId,
-        );
-        if (!credential || credential.userId !== context.actor.id)
-          throw apiTokenRefused();
+      const at = refreshed.get(context);
+      if (at !== undefined && Date.now() - at < refreshReuseMs) return context;
+      const fresh = await readContext(context);
+      refreshed.set(fresh, Date.now());
 
-        return resolveApiCredential(
-          credential,
-          context.tenantId,
-          context.requestId,
-        );
-      }
-
-      return resolveMember(
-        { userId: context.actor.id, sessionId: context.actor.sessionId },
-        context.tenantId,
-        context.requestId,
-        context.supportView,
-      );
+      return fresh;
     },
     /** Reports whether the credentials carry a support view token, valid or not. */
     hasSupportView(credentials: Credentials) {

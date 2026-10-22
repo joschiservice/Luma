@@ -144,12 +144,25 @@ export function decisionListQuery(
 }
 
 /**
- * Polls Needs you reads as a fallback while the live stream is not delivering. Screens without a
- * stream subscription leave `stream` unset and keep polling.
+ * How Needs you reads refresh for the workspace stream's state. While the stream is live, its
+ * change events invalidate the reads, so they neither poll, refetch on focus nor count as stale
+ * when another screen mounts them. Otherwise they poll every 30 seconds and refetch on focus.
+ * Screens without the stream state leave `stream` unset and keep polling.
  */
-export const decisionsPollInterval = (
+export const decisionsRefresh = (
   stream?: 'connecting' | 'live' | 'interrupted',
-) => (stream === 'live' ? false : 30_000);
+) =>
+  stream === 'live'
+    ? {
+        refetchInterval: false as const,
+        refetchOnWindowFocus: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      }
+    : {
+        refetchInterval: 30_000,
+        refetchOnWindowFocus: 'always' as const,
+        staleTime: 0,
+      };
 
 /** Caches every Needs you read for one workspace so decisions anywhere can refresh them. */
 export const decisionsKey = (organizationId: string) =>
@@ -157,9 +170,9 @@ export const decisionsKey = (organizationId: string) =>
 
 /**
  * Loads a page of decisions that need a person, or every group's first decisions. It polls
- * while visible as a fallback for the live stream (screens with a live stream override
- * `refetchInterval` with `decisionsPollInterval`) and refetches on focus and reconnect. Its
- * view counts cover the whole queue, as Home and the sidebar show it.
+ * while visible as a fallback for the live stream (screens that know the stream state override
+ * it with `decisionsRefresh`) and refetches on focus and reconnect. Its view counts cover the
+ * whole queue, as Home and the sidebar show it.
  */
 export function decisionsOptions(
   organizationId: string,
@@ -171,8 +184,7 @@ export function decisionsOptions(
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...decisionsKey(organizationId), request],
-    refetchInterval: decisionsPollInterval(),
-    refetchOnWindowFocus: 'always',
+    ...decisionsRefresh(),
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>
       api.decisions.list(
@@ -181,6 +193,13 @@ export function decisionsOptions(
       ),
   });
 }
+
+/**
+ * The sidebar count and Home's attention module read the same request, so Home shows the
+ * sidebar's cached read instead of building the queue again.
+ */
+export const attentionOptions = (organizationId: string) =>
+  decisionsOptions(organizationId, {}, 5);
 
 /** Takes, hands over or releases a decision at the assignment revision the reader saw. */
 export async function assignDecision(

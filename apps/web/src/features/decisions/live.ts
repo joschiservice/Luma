@@ -1,5 +1,5 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 import {
   changesAny,
@@ -80,4 +80,22 @@ export function useDecisionUpdates(organizationId: string): DecisionUpdates {
   );
 
   return state.organizationId === organizationId ? state.value : 'connecting';
+}
+
+const DecisionUpdatesState = createContext<DecisionUpdates | undefined>(
+  undefined,
+);
+
+/**
+ * Shares the workspace shell's single Needs you subscription with the sidebar, Home and the
+ * queue, so each screen stops polling while the stream is live without opening its own.
+ */
+export const DecisionUpdatesProvider = DecisionUpdatesState.Provider;
+
+/**
+ * The shell's Needs you stream state. Outside the shell it is unknown, and reads keep polling
+ * through `decisionsRefresh`.
+ */
+export function useDecisionUpdatesState() {
+  return useContext(DecisionUpdatesState);
 }

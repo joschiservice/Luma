@@ -26,7 +26,12 @@ import {
   AssistantToggle,
   useAssistantShortcut,
 } from '../features/assistant/toggle';
-import { decisionsOptions } from '../features/decisions/data';
+import { attentionOptions, decisionsRefresh } from '../features/decisions/data';
+import {
+  DecisionUpdatesProvider,
+  useDecisionUpdates,
+  useDecisionUpdatesState,
+} from '../features/decisions/live';
 import { ContextHelp } from '../features/help/context-help';
 import { RecordMessages } from '../features/inbox/record-messages';
 import { Failure, Pending } from '../kit/identity/common';
@@ -113,7 +118,8 @@ function Navigation({
   const current = destinationFor(pathname);
   const recordPath = current.group === 'records' ? current.path : null;
   const waiting = useQuery({
-    ...decisionsOptions(organizationId, {}, 1),
+    ...attentionOptions(organizationId),
+    ...decisionsRefresh(useDecisionUpdatesState()),
     select: (list) => list.counts.views.all,
   });
   const { can } = usePermissions(organizationId);
@@ -234,6 +240,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const supportView = session?.supportView ?? null;
   const { end: endView } = useEndSupportView();
   const assistantOpen = useAssistantOpen();
+  const decisionUpdates = useDecisionUpdates(organizationId);
   useGoShortcuts(organizationId);
   useAssistantShortcut();
   if (access.isError)
@@ -252,126 +259,130 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   );
 
   return (
-    <WorkspaceLayout
-      workspaceSwitcher={
-        <WorkspaceSwitcher
-          workspace={
-            organization?.name ?? m.identity_shell_workspace_fallback()
-          }
-          workspaceId={organizationId}
-          workspaces={organizations.data.map((org) => ({
-            id: org.id,
-            name: org.name,
-            ...(org.status === 'closed'
-              ? { status: m.identity_workspaces_closed() }
-              : org.membershipStatus === 'suspended'
-                ? { status: m.identity_workspaces_suspended() }
-                : {}),
-            link: (
-              <Link
-                to="/app/$organizationId/home"
-                params={{ organizationId: org.id }}
-              />
-            ),
-          }))}
-          createLink={
-            supportView ? undefined : <Link to="/app/workspaces/new" />
-          }
-        />
-      }
-      banner={
-        supportView ? (
+    <DecisionUpdatesProvider value={decisionUpdates}>
+      <WorkspaceLayout
+        workspaceSwitcher={
+          <WorkspaceSwitcher
+            workspace={
+              organization?.name ?? m.identity_shell_workspace_fallback()
+            }
+            workspaceId={organizationId}
+            workspaces={organizations.data.map((org) => ({
+              id: org.id,
+              name: org.name,
+              ...(org.status === 'closed'
+                ? { status: m.identity_workspaces_closed() }
+                : org.membershipStatus === 'suspended'
+                  ? { status: m.identity_workspaces_suspended() }
+                  : {}),
+              link: (
+                <Link
+                  to="/app/$organizationId/home"
+                  params={{ organizationId: org.id }}
+                />
+              ),
+            }))}
+            createLink={
+              supportView ? undefined : <Link to="/app/workspaces/new" />
+            }
+          />
+        }
+        banner={
+          supportView ? (
+            <WorkspaceTimezone
+              value={
+                personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'
+              }
+            >
+              <SupportViewBanner view={supportView} />
+            </WorkspaceTimezone>
+          ) : null
+        }
+        search={<WorkspaceSearch organizationId={organizationId} />}
+        navigation={(close) => (
+          <Navigation organizationId={organizationId} close={close} />
+        )}
+        context={
+          <Link
+            to={`/app/$organizationId/${page.path}`}
+            params={{ organizationId }}
+            className="breadcrumb-root"
+          >
+            {page.domain ? (
+              <DomainIcon domain={page.domain} size="xs" />
+            ) : (
+              <page.Icon size={15} aria-hidden="true" />
+            )}
+            <span>{page.label}</span>
+          </Link>
+        }
+        help={
+          <>
+            <PinCurrentPage organizationId={organizationId} />
+            <ContextHelp />
+            <AssistantToggle />
+          </>
+        }
+        assistantOpen={assistantOpen}
+        assistant={
           <WorkspaceTimezone
             value={
               personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'
             }
           >
-            <SupportViewBanner view={supportView} />
+            <AssistantPanel
+              organizationId={organizationId}
+              open={assistantOpen}
+            />
           </WorkspaceTimezone>
-        ) : null
-      }
-      search={<WorkspaceSearch organizationId={organizationId} />}
-      navigation={(close) => (
-        <Navigation organizationId={organizationId} close={close} />
-      )}
-      context={
-        <Link
-          to={`/app/$organizationId/${page.path}`}
-          params={{ organizationId }}
-          className="breadcrumb-root"
-        >
-          {page.domain ? (
-            <DomainIcon domain={page.domain} size="xs" />
-          ) : (
-            <page.Icon size={15} aria-hidden="true" />
-          )}
-          <span>{page.label}</span>
-        </Link>
-      }
-      help={
-        <>
-          <PinCurrentPage organizationId={organizationId} />
-          <ContextHelp />
-          <AssistantToggle />
-        </>
-      }
-      assistantOpen={assistantOpen}
-      assistant={
+        }
+        accountMenu={
+          <WorkspaceAccountMenu
+            name={session?.user.name ?? m.identity_shell_account_fallback()}
+            email={session?.user.email}
+            theme={theme}
+            onThemeChange={setThemePreference}
+            settingsLink={
+              <Link
+                to="/app/$organizationId/settings"
+                params={{ organizationId }}
+              />
+            }
+            docsLink={<a href="/docs" target="_blank" rel="noreferrer" />}
+            exit={
+              supportView
+                ? {
+                    label: m.identity_support_view_end(),
+                    onSelect: () => void endView(),
+                  }
+                : undefined
+            }
+          />
+        }
+      >
         <WorkspaceTimezone
           value={personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'}
         >
-          <AssistantPanel
-            organizationId={organizationId}
-            open={assistantOpen}
-          />
-        </WorkspaceTimezone>
-      }
-      accountMenu={
-        <WorkspaceAccountMenu
-          name={session?.user.name ?? m.identity_shell_account_fallback()}
-          email={session?.user.email}
-          theme={theme}
-          onThemeChange={setThemePreference}
-          settingsLink={
-            <Link
-              to="/app/$organizationId/settings"
-              params={{ organizationId }}
+          {settings.isError ? (
+            <Alert tone="warning" role="status" className="desk-alert">
+              {settings.data
+                ? m.identity_shell_timezone_stale()
+                : m.identity_shell_timezone_unavailable()}
+            </Alert>
+          ) : null}
+          {page.permission && !permissions.can(page.permission) ? (
+            <NoAccess
+              organizationId={organizationId}
+              area={page.area ?? page.label}
+              permission={page.permission}
             />
-          }
-          docsLink={<a href="/docs" target="_blank" rel="noreferrer" />}
-          exit={
-            supportView
-              ? {
-                  label: m.identity_support_view_end(),
-                  onSelect: () => void endView(),
-                }
-              : undefined
-          }
-        />
-      }
-    >
-      <WorkspaceTimezone
-        value={personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'}
-      >
-        {settings.isError ? (
-          <Alert tone="warning" role="status" className="desk-alert">
-            {settings.data
-              ? m.identity_shell_timezone_stale()
-              : m.identity_shell_timezone_unavailable()}
-          </Alert>
-        ) : null}
-        {page.permission && !permissions.can(page.permission) ? (
-          <NoAccess
-            organizationId={organizationId}
-            area={page.area ?? page.label}
-            permission={page.permission}
-          />
-        ) : (
-          <RecordMessagesProvider value={recordMessages}>
-            <Outlet />
-          </RecordMessagesProvider>
-        )}
-      </WorkspaceTimezone>
-    </WorkspaceLayout>
+          ) : (
+            <RecordMessagesProvider value={recordMessages}>
+              <Outlet />
+            </RecordMessagesProvider>
+          )}
+        </WorkspaceTimezone>
+      </WorkspaceLayout>
+    </DecisionUpdatesProvider>
   );
 }

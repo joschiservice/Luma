@@ -165,6 +165,13 @@ can show work that needs a new owner.
 
 The context carries an audit identity: user, initiating user, session, membership, role reference, tenant, region and server request ID, plus the role's effective permissions, resolved in the same membership statement. There is no long-lived permission cache. It never contains passwords or session tokens. It is evidence metadata, not an audit log; each audit producer writes its own evidence through the audit package.
 
+Owners call `refreshContext` on the context they are given before they act. A context that
+`refreshContext` itself returned less than two seconds ago is returned unchanged, so one request
+that fans out to many owners, such as the [Needs you queue](needs-you.md), reads the membership
+once rather than once per owner. Only objects that `refreshContext` returned are reused. A
+context from the request guard, a worker or an earlier request is always read again. The window
+bounds how long work already admitted in one request may continue after a membership change.
+
 The identity role has DML grants on auth tables and narrowly scoped grants on organization tables. It owns no tables and has no commerce grants. Organizations, memberships, invitations, workspace roles and role permissions force RLS; a member can read their own role before a tenant is selected, so context resolution needs no extra round trip. Bootstrap reads expose only the verified user's memberships and organizations. Provisioning uses a server-generated organization UUID. Tenant context is installed with transaction-local `set_config` only after membership, state and placement checks, so it does not survive rollback or pooled reuse. Runtime grants prohibit changing tenant ownership, placement or organization status.
 
 Better Auth's `invitations` table remains because its organization plugin requires it; Luma uses `workspace_invitations`.

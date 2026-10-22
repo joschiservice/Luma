@@ -72,6 +72,7 @@ async function evaluate(
       delivered: async () => {},
       saveDecision: save,
       findDecision: async () => null,
+      findDecisions: async () => [],
       findApproval: async () => direct,
       saveApproval: async (value) => value,
     },
