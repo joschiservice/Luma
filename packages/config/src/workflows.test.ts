@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { readWorkflowConfig } from './workflows.js';
+import { readTemporalConfig, readWorkflowConfig } from './workflows.js';
 
 const env = {
   WORKFLOW_DATABASE_URL: 'postgresql://worker:fixture@localhost/luma',
@@ -32,6 +32,16 @@ it('defaults the local worker to AU and requires matching placement', () => {
       TEMPORAL_DATA_REGION: 'EU',
     }).temporal.dataRegion,
   ).toBe('EU');
+});
+
+it('reads the Temporal client without a worker database login', () => {
+  expect(readTemporalConfig({ TEMPORAL_DATA_REGION: 'AU' })).toMatchObject({
+    address: '127.0.0.1:7233',
+    dataRegion: 'AU',
+  });
+  expect(() => readTemporalConfig({ TEMPORAL_DATA_REGION: 'EU' })).toThrow(
+    'must equal',
+  );
 });
 
 it('requires TLS for production and API keys', () => {

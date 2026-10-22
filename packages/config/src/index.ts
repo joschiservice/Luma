@@ -239,7 +239,7 @@ export { readModelGatewayConfig } from './model-gateway.js';
 
 export type { ModelGatewayConfig } from './model-gateway.js';
 
-export { readWorkflowConfig } from './workflows.js';
+export { readTemporalConfig, readWorkflowConfig } from './workflows.js';
 
 export type { WorkflowConfig } from './workflows.js';
 
@@ -255,4 +255,4 @@ export { readRequestAdmissionConfig } from './request-admission.js';
 
 export { readRegionConfig } from './regions.js';
 
-export type { DataRegion } from './regions.js';
+export type { DataRegion, RegionConfig } from './regions.js';
