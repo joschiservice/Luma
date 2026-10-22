@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 
 import {
   createInstallationVerifier,
@@ -34,6 +34,7 @@ import {
   createOrderEditProvider,
 } from '../../packages/apps/shopify/dist/infrastructure/order-edit-provider.js';
 import {
+  calculateQueryCost,
   createClient,
   createReadBudget,
 } from '../../packages/connectors/shopify/dist/index.js';
@@ -138,6 +139,14 @@ const tracking = (number) => ({
 });
 
 /**
+ * Documents whose cost Luma's admission calculates differently from the cost the simulated
+ * Shopify requests. Admission uses the calculated cost until Shopify reports one, so every
+ * document the suite sends must match.
+ */
+const costMismatches = [];
+after(() => assert.deepEqual(costMismatches, []));
+
+/**
  * Creates a simulated shop behind a fetch transport that applies Shopify's rate limit as the
  * simulator host does: admission by requested cost, then a refund down to the actual cost.
  */
@@ -173,6 +182,17 @@ function createShop(clock = Date.now) {
     },
     fetch: createTransport(async (request) => {
       const cost = rateLimit.cost(request);
+      if (cost > 0) {
+        const { query, variables = {} } = JSON.parse(request.body);
+        const calculated = calculateQueryCost(query, variables);
+        if (calculated !== cost)
+          costMismatches.push({
+            query,
+            variables,
+            calculated,
+            requested: cost,
+          });
+      }
       shop.requests++;
       shop.maxCost = Math.max(shop.maxCost, cost);
       if (!charge(rateLimit, bucket, cost, clock())) {

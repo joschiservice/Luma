@@ -2,22 +2,15 @@
 import { processWorkflowId } from '@luma/workflow-temporal';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 test('reviews replenishment scope, recovers a lost response, approves and opens the verified order', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const contextFor = async (cookie) => {
     const context = await t.newContext({
       baseURL: origin,
@@ -73,10 +66,6 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
       'Someone else who can approve changes approves every purchase-order draft before Luma acts.',
     )
     .waitFor();
-  await page.screenshot({
-    path: '/tmp/luma76-setup-preview.png',
-    fullPage: false,
-  });
   await page.route(
     '**/replenishment/activations/batch',
     async (route) => {
@@ -93,10 +82,6 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await dialog.waitFor({ state: 'hidden' });
   await page.getByText('On', { exact: true }).first().waitFor();
   await page.getByText('Watching', { exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma71-replenishment-desktop.png',
-    fullPage: true,
-  });
   await page.getByRole('button', { name: 'Check stock now' }).click();
   await page.getByText('Stock checked.', { exact: false }).waitFor();
   const run = (await f.request('/runs')).items[0];
@@ -181,10 +166,6 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await review.getByText('Draft verified', { exact: true }).waitFor();
   await review.getByText('Approved', { exact: true }).waitFor();
   await review.getByLabel('Recorded stock context').waitFor();
-  await review.screenshot({
-    path: '/tmp/luma74-run-desktop.png',
-    fullPage: true,
-  });
   await review.setViewportSize({ width: 375, height: 812 });
   expect(
     await review
@@ -196,10 +177,6 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await review
     .getByText('Draft verified', { exact: true })
     .scrollIntoViewIfNeeded();
-  await review.screenshot({
-    path: '/tmp/luma74-run-mobile.png',
-    fullPage: true,
-  });
   expect(
     await review.evaluate(
       () =>
@@ -227,19 +204,11 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   const coverage = page.getByRole('region', { name: 'Replenishment' });
   await coverage.getByText('Running', { exact: true }).waitFor();
   await coverage.getByText('Northstar Supply', { exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma76-stock-record.png',
-    fullPage: true,
-  });
   await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**${path}*`);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole('tab', { name: 'Stock rules' }).click();
   await page.getByText('Watching', { exact: true }).first().waitFor();
-  await page.screenshot({
-    path: '/tmp/luma71-replenishment-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -252,9 +221,9 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
 
 test('keeps selections across stock pages and server search in narrow and dark layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
   const setup = await f.request('/replenishment');
   const first = setup.positions[0];
@@ -262,13 +231,7 @@ test('keeps selections across stock pages and server search in narrow and dark l
     (p) => p.positionId !== first.positionId && p.sku !== first.sku,
   );
   expect(second).toBeTruthy();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 390, height: 844 },
@@ -323,9 +286,7 @@ test('keeps selections across stock pages and server search in narrow and dark l
   await expect(
     dialog.getByRole('button', { name: 'Previous', exact: true }),
   ).toBeDisabled();
-  await page.screenshot({ path: '/tmp/luma-replenishment-paging-narrow.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path: '/tmp/luma-replenishment-paging-dark.png' });
   await dialog.getByRole('combobox', { name: 'Supplier', exact: true }).click();
   await page.getByRole('option', { name: 'Northstar Supply' }).click();
   await dialog.getByRole('button', { name: 'Preview 2 rules' }).click();

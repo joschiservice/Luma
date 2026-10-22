@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+import { createConnectionCoverage } from '@luma/connections/composition';
+import { createCaseMetricReader } from '@luma/exceptions/composition';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { createTenantDatabase } from '@luma/platform/composition';
+import { createProcurementMetricReader } from '@luma/procurement/composition';
+import { createOperationalSummary } from '@luma/read-models/composition';
+
 /** Seeds compact cross-domain records with deterministic identities for metric reconciliation. */
 export async function seedOperationalMetrics(f, count = 1) {
   const tenant = f.org.id;
@@ -185,3 +192,55 @@ export const operationalRequest = {
 
 export const operationalEndpoint = (f) =>
   `/v2/organizations/${f.org.id}/metrics/query`;
+
+/**
+ * Runs the cross-domain operational summary once as the workspace owner and returns the SELECT
+ * and WITH statements it sent. With `explain`, each statement also records its
+ * `EXPLAIN (ANALYZE, BUFFERS)` plan, which executes the statement a second time.
+ */
+export async function summaryStatements(f, { explain = false } = {}) {
+  const statements = [];
+  const db = createTenantDatabase(f.db.owner);
+  const recorded = {
+    transaction: (tenant, operation, options) =>
+      db.transaction(
+        tenant,
+        (tx) =>
+          operation({
+            query: async (sql, values) => {
+              if (/^\s*(SELECT|WITH)/i.test(sql))
+                statements.push({
+                  sql,
+                  ...(explain && {
+                    plan: (
+                      await tx.query(
+                        `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ${sql}`,
+                        values,
+                      )
+                    ).rows[0]['QUERY PLAN'],
+                  }),
+                });
+
+              return tx.query(sql, values);
+            },
+          }),
+        options,
+      ),
+  };
+  const actor = makeTenantContext(
+    { userId: f.owner.id, sessionId: 'fixture' },
+    { ...f.org, status: 'active', dataRegion: 'AU' },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
+    randomUUID(),
+  );
+  await createOperationalSummary(recorded, {
+    cases: createCaseMetricReader,
+    procurement: createProcurementMetricReader,
+    coverage: createConnectionCoverage,
+  })(actor, operationalRequest);
+
+  return statements;
+}

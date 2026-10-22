@@ -16,29 +16,18 @@ import {
 import { Pool } from 'pg';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('answers a human handoff in Needs you with keyboard use and narrow light and dark layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const api = await startApi(t, db, origin);
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(api.origin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -167,10 +156,6 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-a667004c-human-desktop-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -181,10 +166,6 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .not.toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-a667004c-human-mobile-light.png',
-    fullPage: true,
-  });
   await page.getByLabel('Answer', { exact: true }).focus();
   await page.keyboard.press('Enter');
   await page.getByRole('option', { name: 'Started', exact: true }).click();

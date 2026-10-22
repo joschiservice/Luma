@@ -28,6 +28,8 @@ import { createStarshipitUpdates } from './updates.js';
 
 export { createStarshipitConnector };
 
+export { createUpdateStore } from './infrastructure/update-store.js';
+
 /** Fixed-host shipping provider with refreshed tenant credentials and conservative confirmed grants. */
 export function createStarshipitProvider(
   context: Pick<AppFactoryContext, 'simulation' | 'featureEnabled'>,

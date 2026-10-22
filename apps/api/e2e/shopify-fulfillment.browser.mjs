@@ -1,24 +1,17 @@
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { recoveryFixture } from './shopify-fulfillment-fixture.mjs';
 
 test('reviews a held fulfillment, obtains separate approval and verifies progress', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const { f, admin, installed, fulfillment, mutations } = await recoveryFixture(
     t,
     origin,
   );
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
@@ -99,22 +92,13 @@ test('reviews a held fulfillment, obtains separate approval and verifies progres
     page.getByText('Progress not verified', { exact: true }),
   ).toBeVisible();
   expect(mutations).toHaveLength(1);
-  await page.screenshot({
-    path: '/tmp/luma-105-recovery-light.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ colorScheme: 'dark' });
   await expect(
     page.getByRole('button', { name: 'Check fulfillment progress' }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Check fulfillment progress' }),
   ).toBeEnabled();
-  await page.screenshot({
-    path: '/tmp/luma-105-recovery-dark-mobile.png',
-    fullPage: true,
-  });
   fulfillment.lineItems.nodes[0].remainingQuantity = 1;
   await page
     .getByRole('button', { name: 'Check fulfillment progress' })

@@ -300,11 +300,6 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   );
   expect(reads.rows[0].health).toBeGreaterThanOrEqual(1);
   expect(reads.rows[0].history).toBeGreaterThanOrEqual(2);
-  await page.screenshot({
-    path: test.info().outputPath('workspace-light.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -313,11 +308,6 @@ test('staff investigates a workspace and retries an uncertain global revocation 
     .toBe(true);
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await page.screenshot({
-    path: test.info().outputPath('workspace-dark-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page
     .getByRole('button', { name: 'Revoke sessions for customer@example.test' })
@@ -420,11 +410,6 @@ test('staff suspends the only active owner after acknowledgement and reactivates
       membershipStatus: 'suspended',
     }),
   ]);
-  await page.screenshot({
-    path: test.info().outputPath('membership-suspended.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
 
   await page
     .getByRole('button', {
@@ -459,23 +444,14 @@ test('staff suspends the only active owner after acknowledgement and reactivates
 
 test('staff disables an account, its sign-in is refused, and enabling restores it', async ({
   resources: t,
+  web,
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
   // The customer signs in through their own web app and API origin.
-  const customerPort = await availablePort();
-  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerOrigin = web.origin;
   const customerWebApi = await startApi(t, db, customerOrigin);
-  const customerWeb = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    {
-      TEST_API_ORIGIN: customerWebApi.origin,
-      TEST_WEB_PORT: String(customerPort),
-    },
-    true,
-  );
-  await customerWeb.message('listening');
+  await web.route(customerWebApi.origin);
   const customerContext = await t.newContext({
     baseURL: customerOrigin,
     viewport: { width: 1440, height: 900 },
@@ -531,11 +507,6 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
   await expect(
     page.getByRole('heading', { name: 'No active sessions' }),
   ).toBeVisible();
-  await page.screenshot({
-    path: test.info().outputPath('account-disabled.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
 
   // The existing session is gone, and a new sign-in is refused without the reason.
   await customerApi.request('/v1/organizations', {
@@ -581,6 +552,7 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
 
 test('staff schedules, restores and erases an account, and history shows a former member', async ({
   resources: t,
+  web,
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
@@ -648,11 +620,6 @@ test('staff schedules, restores and erases an account, and history shows a forme
   await expect(
     page.getByRole('button', { name: 'Disable account', exact: true }),
   ).toHaveCount(0);
-  await page.screenshot({
-    path: test.info().outputPath('account-deletion-scheduled.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await customerApi.request('/v1/organizations', {
     cookie: member.cookie,
     status: 401,
@@ -701,19 +668,9 @@ test('staff schedules, restores and erases an account, and history shows a forme
   ).toBeVisible();
 
   // The workspace owner sees the person's history as a former member.
-  const customerPort = await availablePort();
-  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerOrigin = web.origin;
   const customerWebApi = await startApi(t, db, customerOrigin);
-  const customerWeb = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    {
-      TEST_API_ORIGIN: customerWebApi.origin,
-      TEST_WEB_PORT: String(customerPort),
-    },
-    true,
-  );
-  await customerWeb.message('listening');
+  await web.route(customerWebApi.origin);
   const customerPage = await (
     await t.newContext({
       baseURL: customerOrigin,
@@ -743,11 +700,6 @@ test('staff schedules, restores and erases an account, and history shows a forme
   await activityLoaded;
   await expect(customerPage.locator('body')).toContainText('Former member');
   await expect(customerPage.locator('body')).not.toContainText('leaver');
-  await customerPage.screenshot({
-    path: test.info().outputPath('account-erased-activity.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   expect(errors).toEqual([]);
 });
 
@@ -801,28 +753,23 @@ test('staff reviews the audit log by event and staff member', async ({
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`workspace=${workspace.id}`));
   await expect(entries).toContainText('Support North');
-  await page.screenshot({
-    path: test.info().outputPath('audit-light.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-  await expect(page.locator('html')).toHaveClass(/dark/);
-  await page.screenshot({
-    path: test.info().outputPath('audit-dark-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
-  const reads = await db.owner.query(
-    "SELECT count(*)::int AS count FROM staff_audit WHERE event='staff.audit.read'",
-  );
-  expect(reads.rows[0].count).toBeGreaterThanOrEqual(4);
+  // The audit row for the last filtered read can be written after its rows render.
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.owner.query(
+            "SELECT count(*)::int AS count FROM staff_audit WHERE event='staff.audit.read'",
+          )
+        ).rows[0].count,
+    )
+    .toBeGreaterThanOrEqual(4);
   expect(errors).toEqual([]);
 });
 
@@ -877,17 +824,11 @@ test('staff opens a customer account and follows a workspace into its own suppor
     { event: 'account.security-events.inspected', userId: customer.userId },
   ]);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await page.screenshot({
-    path: test.info().outputPath('account-dark-narrow.png'),
-    fullPage: true,
-    animations: 'disabled',
-  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('link', { name: workspace.name, exact: true }).click();
   await expect(

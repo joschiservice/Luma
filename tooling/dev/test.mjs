@@ -32,6 +32,35 @@ function capabilities(env) {
     .join(',');
 }
 
+/**
+ * Runs independent pnpm commands at once, streaming each output line behind the command's
+ * name. Waits for every command, then fails if any of them failed.
+ * @param {string[][]} group
+ * @param {NodeJS.ProcessEnv} env
+ */
+async function runTogether(group, env) {
+  const results = await Promise.allSettled(
+    group.map((args) => {
+      const name =
+        args.find((arg) => !arg.startsWith('-') && !arg.startsWith('@')) ??
+        args[0];
+      console.log(`$ pnpm ${args.join(' ')}`);
+
+      return run('pnpm', args, { env, prefix: `[${name}]` });
+    }),
+  );
+  const failed = results.flatMap((result, index) =>
+    result.status === 'rejected' ? [{ args: group[index], ...result }] : [],
+  );
+  for (const { args } of failed)
+    console.error(`Failed: pnpm ${args.join(' ')}`);
+  if (failed.length)
+    throw Object.assign(
+      new Error(`${failed.length} of ${group.length} commands failed`),
+      { exitCode: failed[0].reason?.exitCode ?? 1 },
+    );
+}
+
 try {
   const [suite, ...args] = process.argv.slice(2);
   const journeys =
@@ -94,6 +123,17 @@ try {
   env.LUMA_TEST_CAPABILITIES = capabilities(env);
   env.LUMA_VALIDATION_OWNER = validation.owner;
   for (const args of commands) {
+    if (!Array.isArray(args)) {
+      if (!journeySlot && args.parallel.some(runsJourneys))
+        journeySlot = await acquireJourneySlot(root, {
+          onWait: (holders) =>
+            console.log(
+              `Journeys are running from ${holders.join(', ')}; waiting for a free journey slot.`,
+            ),
+        });
+      await runTogether(args.parallel, env);
+      continue;
+    }
     // Held from the first journey command to the end of the run, so one run's backend and
     // browser journeys are not interleaved with another checkout's.
     if (!journeySlot && runsJourneys(args))

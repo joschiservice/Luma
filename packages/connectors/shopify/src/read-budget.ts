@@ -29,13 +29,18 @@ export interface ReadBudget extends BudgetFeedback {
       purpose?: RequestPurpose;
       /** Serializes mutation admission while preserving capacity for fresh precondition reads. */
       mutation?: boolean;
+      /** Cost calculated from the document; a cost Shopify reported for the shape takes precedence. */
+      cost?: number | undefined;
       signal?: AbortSignal;
     },
   ): Promise<T>;
   nextDelay(): number;
 }
 
-/** Uses Shopify's refunded balance and restore rate; unknown query shapes reserve 1,000 points. */
+/**
+ * Uses Shopify's refunded balance and restore rate. A shape without a reported cost waits for its
+ * calculated cost, or for 1,000 points when the caller supplies none.
+ */
 export function createReadBudget(
   options: { now?: () => number; sleep?: (ms: number) => Promise<void> } = {},
 ): ReadBudget {
@@ -62,7 +67,7 @@ export function createReadBudget(
     );
 
   return {
-    async run(shape, send) {
+    async run(shape, send, admission) {
       const previous = tail;
       let release!: () => void;
       tail = new Promise<void>((resolve) => {
@@ -70,7 +75,7 @@ export function createReadBudget(
       });
       await previous;
       try {
-        const wait = waitFor(costs.get(shape) ?? 1000);
+        const wait = waitFor(costs.get(shape) ?? admission?.cost ?? 1000);
         if (wait) await sleep(wait);
 
         return await send(this);

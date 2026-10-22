@@ -144,6 +144,40 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
       .toBe(true);
   }, 30_000);
 
+  it('admits an action at its calculated cost before Shopify has reported a cost for it', async () => {
+    await spend(store, key, 525);
+    const action = (cost?: number) =>
+      createSharedReadBudget({ store, key }).run(
+        'release-hold',
+        async () => 'sent',
+        { mutation: true, ...(cost === undefined ? {} : { cost }) },
+      );
+    // Without a cost, the single-query maximum needs more restore than the two-second limit.
+    await expect(action()).rejects.toMatchObject({
+      failure: { providerCode: 'ADMISSION_DEFERRED' },
+    });
+    await expect(action(10)).resolves.toBe('sent');
+  });
+
+  it('keeps one single-query maximum for foreground work when background shapes have a calculated cost', async () => {
+    await spend(store, key, 1500);
+    const page = (cost?: number) =>
+      createSharedReadBudget({
+        store,
+        key,
+        purpose: 'history',
+        maxWaitMs: 0,
+      }).run('page', async () => 'page', cost === undefined ? {} : { cost });
+    await expect(page(400)).resolves.toBe('page');
+    await expect(page(600)).rejects.toMatchObject({
+      failure: { providerCode: 'ADMISSION_DEFERRED' },
+    });
+    // An uncosted probe assumes the maximum and borrows one second of restore from the reserve.
+    await expect(page()).rejects.toMatchObject({
+      failure: { providerCode: 'ADMISSION_DEFERRED' },
+    });
+  });
+
   it('recovers a dead process concurrency slot without refunding its unknown effect', async () => {
     const importer = child('history', true, 250);
     await expect
@@ -330,6 +364,17 @@ async function seed(store: AtomicStore, key: string) {
     'probe',
     async (feedback) => {
       feedback.observe('probe', 0, 2000, 100, 0, 2000);
+    },
+  );
+}
+
+/** Leaves `available` points after an isolated request whose fresh snapshot Shopify reported. */
+async function spend(store: AtomicStore, key: string, available: number) {
+  await createSharedReadBudget({ store, key }).run(
+    'spent',
+    async (feedback) => {
+      await feedback.beforeSend?.();
+      feedback.observe('spent', 1, available, 100, 1, 2000);
     },
   );
 }

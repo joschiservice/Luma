@@ -2,22 +2,15 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settlementFixture } from './return-settlement-fixture.mjs';
 
 test('configures deadlines by keyboard and follows independently verified native payment in narrow light and dark layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`,
+  const origin = web.origin,
     f = await settlementFixture(t, { origin });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 390, height: 844 },
@@ -109,15 +102,7 @@ test('configures deadlines by keyboard and follows independently verified native
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma216-waiting-narrow-light.png',
-    fullPage: true,
-  });
   await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma216-waiting-narrow-dark.png',
-    fullPage: true,
-  });
   await f.command({ kind: 'refund-settle', order: f.providerOrderId });
   await waiting
     .getByRole('button', { name: 'Check progress', exact: true })

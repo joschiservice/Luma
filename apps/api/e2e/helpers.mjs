@@ -94,8 +94,28 @@ export function startProcess(t, script, env = {}, ipc = false) {
   };
 }
 
-/** Creates an isolated database and restricted login; the context must register teardown callbacks. */
-export async function database(t) {
+/** Shared runtime roles that `database(t).grantRuntime()` grants a journey's login. */
+export const runtimeRoles = [
+  'luma_identity',
+  'luma_case_reader',
+  'luma_desk',
+  'luma_policies',
+  'luma_execution',
+  'luma_audit',
+  'luma_connectors',
+  'luma_commerce_sync',
+  'luma_sales',
+  'luma_adaptive',
+];
+
+/**
+ * Creates an isolated database and restricted login; the context must register teardown
+ * callbacks. The database is a copy of the run's migrated template when one exists, so
+ * `migrate()` with the default script has nothing left to do. Pass `empty: true` for a test
+ * that migrates the database itself, or `template` to copy another migrated database, such
+ * as an imported scenario snapshot, that nobody is connected to.
+ */
+export async function database(t, { empty = false, template: source } = {}) {
   assert.ok(
     process.env.TEST_DATABASE_URL,
     'TEST_DATABASE_URL is required for backend E2E tests',
@@ -112,7 +132,13 @@ export async function database(t) {
       await admin.end();
     }
   });
-  await admin.query(`CREATE DATABASE "${id}"`);
+  const template = empty
+    ? undefined
+    : (source ?? process.env.LUMA_E2E_TEMPLATE_DATABASE);
+  await admin.query(
+    `CREATE DATABASE "${id}"${template ? ` TEMPLATE "${template}"` : ''}`,
+  );
+  const migrated = Boolean(template);
   const url = new URL(process.env.TEST_DATABASE_URL);
   url.pathname = `/${id}`;
   const ownerUrl = url.toString();
@@ -132,6 +158,13 @@ export async function database(t) {
       script = `${runtimeDirectory}/scripts/migrate.mjs`,
       expectedCode = 0,
     ) {
+      // A copy of the template is already migrated and provisioned for the run's region.
+      if (
+        migrated &&
+        script === `${runtimeDirectory}/scripts/migrate.mjs` &&
+        expectedCode === 0
+      )
+        return '';
       // Shared runtime roles are cluster-wide, including across integration suites.
       const lock = await admin.connect();
       try {
@@ -161,9 +194,7 @@ export async function database(t) {
       }
     },
     async grantRuntime() {
-      await admin.query(
-        `GRANT luma_identity,luma_case_reader,luma_desk,luma_policies,luma_execution,luma_audit,luma_connectors,luma_commerce_sync,luma_sales,luma_adaptive TO "${id}"`,
-      );
+      await admin.query(`GRANT ${runtimeRoles.join(',')} TO "${id}"`);
     },
   };
 }

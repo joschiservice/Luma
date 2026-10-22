@@ -1,15 +1,14 @@
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('authors reviewed live views and business fields with search, history and responsive keyboard access', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -37,13 +36,7 @@ test('authors reviewed live views and business fields with search, history and r
     ],
   });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -153,15 +146,7 @@ test('authors reviewed live views and business fields with search, history and r
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-light.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByRole('link', { name: '#ADAPTIVE', exact: true }),
@@ -171,10 +156,6 @@ test('authors reviewed live views and business fields with search, history and r
   await page.keyboard.press('Tab');
   await expect(menu).not.toBeFocused();
   await expect(page.locator(':focus')).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-adaptive-view-narrow.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 
   // Shared metadata never grants writes or cross-tenant record access.

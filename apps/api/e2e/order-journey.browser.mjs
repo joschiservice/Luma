@@ -1,14 +1,13 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('journey checks and evidence remain readable in both themes, narrow layouts and keyboard navigation', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin),
     records = await fulfillmentFixture(t, f);
   const order = await records.order({
@@ -29,13 +28,7 @@ test('journey checks and evidence remain readable in both themes, narrow layouts
     facts: { kind: 'shipment' },
   });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

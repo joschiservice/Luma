@@ -417,7 +417,7 @@ async function login(f, email) {
 }
 
 it('creates an approved return in JTL-Wawi once and verifies it with an independent read', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const org = f.manifest.organizationId;
   const jtl = f.manifest.connections.jtl;
   const requester = await login(f, 'pilot-operator@example.test');
@@ -649,7 +649,7 @@ it('creates an approved return in JTL-Wawi once and verifies it with an independ
 });
 
 it('creates and approves Shopify returns through policy, links imported units once and reconciles independently', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const org = f.manifest.organizationId,
     connectionId = f.manifest.connections.shopify;
   const requester = await login(f, 'pilot-operator@example.test');

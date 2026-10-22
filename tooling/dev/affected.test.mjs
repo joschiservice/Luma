@@ -81,7 +81,9 @@ test('adds boot journeys to mapped changes without treating them as coverage', (
 });
 
 test('follows relative imports into tooling modules', () => {
-  const imports = relativeImports('apps/api/e2e/orders.browser.mjs');
+  const imports = relativeImports(
+    'apps/api/e2e/order-journey.performance.e2e.mjs',
+  );
   assert.ok(imports.has('apps/api/e2e/helpers.mjs'));
   assert.ok(imports.has('tooling/performance/report.mjs'));
 });

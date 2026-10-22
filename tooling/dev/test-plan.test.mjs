@@ -10,19 +10,34 @@ const manifest = JSON.parse(
   await readFile(new URL('../../package.json', import.meta.url)),
 );
 
+/** Lists a suite's commands, including those that run together. */
+const commandsOf = (suite) =>
+  testCommands(suite).flatMap((step) =>
+    Array.isArray(step) ? [step] : step.parallel,
+  );
+
 function leaves(command) {
   return command.split(' && ').flatMap((part) => {
+    // Full runs journeys directly after its single build.
+    const journey = part.match(
+      /^pnpm --filter @luma\/api (test:(?:e2e|browser)(?::performance)?)(?: .*)?$/,
+    );
+    if (journey) return [journey[1]];
     const match = part.match(/^pnpm (?:run )?([\w:-]+)(?: .*)?$/);
     if (match && manifest.scripts[match[1]]) {
       if (match[1] === 'check')
-        return testCommands('check').flatMap((args) =>
+        return commandsOf('check').flatMap((args) =>
           leaves(`pnpm ${args.join(' ')}`),
         );
       if (['test', 'test:local'].includes(match[1]))
-        return testCommands('local').flatMap((args) =>
+        return commandsOf('local').flatMap((args) =>
           leaves(`pnpm ${args.join(' ')}`),
         );
       if (['test:e2e', 'test:browser'].includes(match[1])) return [match[1]];
+      if (match[1] === 'test:performance')
+        return commandsOf('performance')
+          .slice(1)
+          .flatMap((args) => leaves(`pnpm ${args.join(' ')}`));
 
       return leaves(manifest.scripts[match[1]]);
     }
@@ -42,7 +57,7 @@ test('full validation covers every CI matrix command', async () => {
     ),
   );
   const full = new Set(
-    testCommands('full').flatMap((args) => leaves(`pnpm ${args.join(' ')}`)),
+    commandsOf('full').flatMap((args) => leaves(`pnpm ${args.join(' ')}`)),
   );
   for (const job of ci.jobs.checks.strategy.matrix.include) {
     for (const command of leaves(job.command))
@@ -109,6 +124,24 @@ test('affected suite builds once and skips empty journey suites', () => {
     '@luma/api',
     'test:browser',
   ]);
+});
+
+test('performance filters reach both scenario suites and reject options', () => {
+  const [, e2e, browser] = testCommands('performance', ['metric-live']);
+  assert.deepEqual(e2e.slice(2), [
+    'test:e2e:performance',
+    'metric-live',
+    '--passWithNoTests',
+  ]);
+  assert.deepEqual(browser.slice(2), [
+    'test:browser:performance',
+    'metric-live',
+    '--pass-with-no-tests',
+  ]);
+  assert.throws(
+    () => testCommands('performance', ['--workers=2']),
+    /name filters/,
+  );
 });
 
 test('component tests keep forwarded story filters', () => {

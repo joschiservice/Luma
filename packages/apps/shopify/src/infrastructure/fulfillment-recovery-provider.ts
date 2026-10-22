@@ -20,6 +20,7 @@ import {
 } from '../domain/fulfillment-recovery.js';
 import {
   acceptanceProvenance,
+  beforeDispatch,
   type ReadProvenance,
   settledDispatch,
   sourceTime,
@@ -240,7 +241,9 @@ export function createFulfillmentProvider(
           ...(input.holdId ? { holdId: input.holdId } : {}),
           ...(input.locationId ? { locationId: input.locationId } : {}),
         });
-        const current = await read(input.orderId, input.fulfillmentOrderId);
+        const current = await beforeDispatch(() =>
+          read(input.orderId, input.fulfillmentOrderId),
+        );
         if (
           current.revision !== input.expectedRevision ||
           recoveryBlocker(current, choice, [capability])

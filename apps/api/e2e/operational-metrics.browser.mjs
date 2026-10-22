@@ -1,63 +1,34 @@
 /* global document, window */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 
-import { buildRuntimeApp } from '@luma/application-runtime';
-import { createConnectionCoverage } from '@luma/connections/composition';
-import { createCaseMetricReader } from '@luma/exceptions/composition';
-import { builtInMembership, makeTenantContext } from '@luma/identity';
-import { createTenantDatabase } from '@luma/platform/composition';
-import { createProcurementMetricReader } from '@luma/procurement/composition';
-import { createOperationalSummary } from '@luma/read-models/composition';
-
-import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
+import { liveInsights } from './live-insights-fixture.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import {
   operationalEndpoint,
   operationalRequest,
   seedOperationalMetrics,
+  summaryStatements,
 } from './operational-metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-test('keeps cross-domain cohorts live, recovers races and measures committed changes with concurrent readers', async ({
+test('keeps cross-domain cohorts live and recovers races with concurrent readers', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
-  const f = await settingsFixture(t, origin);
+  const f = await settingsFixture(t, web.origin);
   const seed = await seedOperationalMetrics(f, 200);
   for (let i = 0; i < 40; i++) await seed.createOrder(seed.rows[i].sku);
-  const api = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const second = await buildRuntimeApp(f.config);
-  t.onTestFinished(() => second.close());
-  const other = await second.listen({ host: '127.0.0.1', port: 0 });
-  const streams = await Promise.all(
-    Array.from({ length: 5 }, (_, i) =>
-      metricStream(t, i < 2 ? api : other, f, f.member, true, {
+  const { subscriptions: streams, context } = await liveInsights(
+    t,
+    web,
+    f,
+    { width: 1440, height: 1100 },
+    (origin) =>
+      metricStream(t, origin, f, f.member, true, {
         path: operationalEndpoint(f),
         body: operationalRequest,
       }),
-    ),
-  );
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
-  const context = await t.newContext({
-    baseURL: origin,
-    viewport: { width: 1440, height: 1100 },
-  });
-  await context.addCookies(
-    f.owner.cookie.split('; ').map((value) => {
-      const [name, ...rest] = value.split('=');
-
-      return { name, value: rest.join('='), url: origin };
-    }),
   );
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
@@ -121,48 +92,40 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await count('cases.attention', 199);
   release();
   await count('cases.attention', 199);
-  const durations = [];
-  for (let i = 0; i < 20; i++) {
-    const created = await seed.createOrder(seed.rows[40 + i].sku);
-    const committed = performance.now();
-    await count('procurement.purchase_orders.draft', 41 + i);
-    durations.push(performance.now() - committed);
-    if (i === 0) {
-      await section.locator('[data-metric="inventory.below_minimum"]').click();
-      await dialog.getByText('Already ordered · 41').waitFor();
-      await dialog
-        .getByRole('link', { name: /Purchase order/ })
-        .first()
-        .waitFor();
-      await page.keyboard.press('Escape');
-      await f.request(
-        f.owner,
-        `${f.base}/procurement/purchase-orders/${created.order.id}/transitions`,
-        'POST',
-        {
-          id: randomUUID(),
-          expectedRevision: 1,
-          status: 'open',
-          reason: 'Reviewed',
-        },
-      );
-      await count('procurement.purchase_orders.open', 1);
-      await f.request(
-        f.owner,
-        `${f.base}/procurement/purchase-orders/${created.order.id}/transitions`,
-        'POST',
-        {
-          id: randomUUID(),
-          expectedRevision: 2,
-          status: 'cancelled',
-          reason: 'Cancelled',
-        },
-      );
-      // Add a replacement so each iteration still increases drafts by one.
-      await seed.createOrder(seed.rows[40 + i].sku);
-      await count('procurement.purchase_orders.draft', 41);
-    }
-  }
+  const created = await seed.createOrder(seed.rows[40].sku);
+  await count('procurement.purchase_orders.draft', 41);
+  await section.locator('[data-metric="inventory.below_minimum"]').click();
+  await dialog.getByText('Already ordered · 41').waitFor();
+  await dialog
+    .getByRole('link', { name: /Purchase order/ })
+    .first()
+    .waitFor();
+  await page.keyboard.press('Escape');
+  await f.request(
+    f.owner,
+    `${f.base}/procurement/purchase-orders/${created.order.id}/transitions`,
+    'POST',
+    {
+      id: randomUUID(),
+      expectedRevision: 1,
+      status: 'open',
+      reason: 'Reviewed',
+    },
+  );
+  await count('procurement.purchase_orders.open', 1);
+  await f.request(
+    f.owner,
+    `${f.base}/procurement/purchase-orders/${created.order.id}/transitions`,
+    'POST',
+    {
+      id: randomUUID(),
+      expectedRevision: 2,
+      status: 'cancelled',
+      reason: 'Cancelled',
+    },
+  );
+  await seed.createOrder(seed.rows[40].sku);
+  await count('procurement.purchase_orders.draft', 41);
   await f.db.owner.query(
     'UPDATE replenishment_activations SET active=false WHERE id=$1',
     [seed.rows[199].ruleId],
@@ -187,9 +150,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     .waitFor();
   await context.setOffline(false);
   await count('inventory.replenishment_unknown', 2);
-  await mkdir('/tmp/luma87-ui', { recursive: true });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma87-ui/desktop.png', fullPage: true });
   await section
     .locator('[data-metric="inventory.replenishment_unknown"]')
     .click();
@@ -197,85 +158,16 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({ path: '/tmp/luma87-ui/cohort.png', fullPage: true });
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma87-ui/mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  const plans = [];
-  const db = createTenantDatabase(f.db.owner);
-  const measured = {
-    transaction: (tenant, operation, options) =>
-      db.transaction(
-        tenant,
-        (tx) =>
-          operation({
-            query: async (sql, values) => {
-              if (/^\s*(SELECT|WITH)/i.test(sql))
-                plans.push({
-                  sql,
-                  plan: (
-                    await tx.query(
-                      `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ${sql}`,
-                      values,
-                    )
-                  ).rows[0]['QUERY PLAN'],
-                });
-
-              return tx.query(sql, values);
-            },
-          }),
-        options,
-      ),
-  };
-  const actor = makeTenantContext(
-    { userId: f.owner.id, sessionId: 'fixture' },
-    { ...f.org, status: 'active', dataRegion: 'AU' },
-    builtInMembership(
-      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
-      'owner',
-    ),
-    randomUUID(),
-  );
-  await createOperationalSummary(measured, {
-    cases: createCaseMetricReader,
-    procurement: createProcurementMetricReader,
-    coverage: createConnectionCoverage,
-  })(actor, operationalRequest);
-  const ordered = [...durations].sort((a, b) => a - b);
-  const report = {
-    dataset: {
-      cases: 200,
-      positions: 200,
-      activeRules: 199,
-      purchaseOrders: 61,
-      connections: 1,
-    },
-    subscribers: 6,
-    crossDomainReaders: 6,
-    changes: durations.length,
-    p50Ms: ordered[Math.floor(ordered.length * 0.5)],
-    p95Ms: ordered[Math.ceil(ordered.length * 0.95) - 1],
-    maxMs: ordered.at(-1),
-    durations,
-    readCosts: streams.flatMap((s) => s.readCosts),
-    plans,
-    queryCount: plans.length,
-  };
-  await performanceReport('operational-metrics', report, { queryCount: 12 });
-  console.log(
-    'LUMA-87 latency',
-    JSON.stringify({
-      p50Ms: report.p50Ms,
-      p95Ms: report.p95Ms,
-      maxMs: report.maxMs,
-    }),
-  );
+  // One summary read across its six domain readers stays within its statement budget.
+  expect((await summaryStatements(f)).length).toBeLessThanOrEqual(12);
   expect(streams.flatMap((s) => s.readErrors)).toEqual([]);
   expect(errors).toEqual([]);
   // Access loss hides all previously visible private records.

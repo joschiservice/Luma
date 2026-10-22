@@ -105,3 +105,39 @@ export async function testSimulatorDatabase(t) {
 
   return url;
 }
+
+/**
+ * Copies a prepared simulator database for one test on `TEST_DATABASE_URL` and drops the copy
+ * when the test finishes. The copy keeps the template's grants, so it is reached through the
+ * template's runtime role; that role must outlive every copy. Nobody may be connected to the
+ * template while it is copied.
+ * @param {{ onTestFinished?: (callback: () => Promise<void>) => void; after?: (callback: () => Promise<void>) => void }} t
+ * @param {{ template: string; role: string; password: string }} source
+ */
+export async function copySimulatorDatabase(t, { template, role, password }) {
+  const adminUrl = process.env.TEST_DATABASE_URL;
+  if (!adminUrl)
+    throw new Error(
+      'TEST_DATABASE_URL is required for simulator database tests',
+    );
+  for (const name of [template, role])
+    if (!/^[a-z_][a-z0-9_]{0,62}$/.test(name))
+      throw new Error('Invalid simulator database or role name');
+  const name = `sim_${randomUUID().replaceAll('-', '')}`;
+  const admin = new Pool({ connectionString: adminUrl, max: 1 });
+  (t.onTestFinished ?? t.after).call(t, async () => {
+    try {
+      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    } finally {
+      await admin.end();
+    }
+  });
+  await admin.query(`CREATE DATABASE ${name} TEMPLATE ${template}`);
+  await admin.query(`GRANT CONNECT ON DATABASE ${name} TO ${role}`);
+  const runtime = new URL(adminUrl);
+  runtime.pathname = `/${name}`;
+  runtime.username = role;
+  runtime.password = password;
+
+  return runtime.toString();
+}

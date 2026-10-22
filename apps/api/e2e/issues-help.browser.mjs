@@ -10,19 +10,13 @@ import {
 } from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  database,
-  startApi,
-  startProcess,
-  verifyEmail,
-} from './helpers.mjs';
+import { database, startApi, verifyEmail } from './helpers.mjs';
 
 test('opens contextual issue guides and preserves the investigation across help navigation', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -30,13 +24,7 @@ test('opens contextual issue guides and preserves the investigation across help 
     `GRANT luma_connectors,luma_exceptions TO "${new URL(db.runtimeUrl).username}"`,
   );
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -201,10 +189,6 @@ test('opens contextual issue guides and preserves the investigation across help 
     width: 560,
     height: 1000,
   });
-  await page.screenshot({
-    path: '/tmp/luma-help-drawer-desktop.png',
-    fullPage: true,
-  });
   await page.keyboard.press('Escape');
   await help.waitFor({ state: 'hidden' });
   expect(page.url()).toBe(selectedUrl);
@@ -218,20 +202,12 @@ test('opens contextual issue guides and preserves the investigation across help 
   await page.keyboard.press('Escape');
   await help.waitFor({ state: 'hidden' });
   expect(page.url()).toBe(fullUrl);
-  await page.screenshot({
-    path: '/tmp/luma-help-issue-header.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-help-issue-header-mobile.png',
-    fullPage: true,
-  });
   await helpButton.click();
   await help
     .getByRole('heading', { name: 'Investigate an issue', exact: true })
@@ -240,18 +216,10 @@ test('opens contextual issue guides and preserves the investigation across help 
   await expect
     .poll(() => help.evaluate((element) => getComputedStyle(element).opacity))
     .toBe('1');
-  await page.screenshot({
-    path: '/tmp/luma-help-drawer-mobile.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-help-drawer-dark.png',
-    fullPage: true,
-  });
   await help.getByRole('button', { name: 'Close', exact: true }).click();
   await help.waitFor({ state: 'hidden' });
   expect(page.url()).toBe(fullUrl);

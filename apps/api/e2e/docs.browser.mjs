@@ -1,19 +1,12 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 
 test('serves searchable, sectioned guides without a session on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: 'http://127.0.0.1:1', TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  const origin = web.origin;
+  await web.route('http://127.0.0.1:1');
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -39,10 +32,6 @@ test('serves searchable, sectioned guides without a session on desktop and mobil
   expect(await page.title()).toBe('Find and prioritize issues · Luma');
   expect(new URL(page.url()).pathname).toBe('/docs/issues');
   expect(await page.locator('vite-error-overlay').count()).toBe(0);
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-desktop.png',
-    fullPage: true,
-  });
   await page
     .getByRole('searchbox', { name: 'Search documentation' })
     .fill('reverse');
@@ -88,18 +77,10 @@ test('serves searchable, sectioned guides without a session on desktop and mobil
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-mobile.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() => page.locator('html').getAttribute('class'))
     .toContain('dark');
-  await page.screenshot({
-    path: '/tmp/luma-help-portal-dark.png',
-    fullPage: true,
-  });
   const missing = await page.goto('/docs/unknown-guide');
   await page.getByRole('heading', { name: 'Guide not found' }).waitFor();
   expect(missing.status()).toBe(404);

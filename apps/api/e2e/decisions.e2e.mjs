@@ -17,7 +17,7 @@ import { database, secret } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 it('lists replenishment approvals in Needs you and follows decisions made on the workflow run', async (t) => {
-  const f = await replenishmentFixture(t);
+  const f = await replenishmentFixture(t, undefined, { imported: true });
   const organization = `/v1/organizations/${f.manifest.organizationId}`;
   const queue = async (
     query = '',

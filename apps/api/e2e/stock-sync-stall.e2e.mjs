@@ -8,15 +8,16 @@ import { setupSimulator } from './simulator-fixture.mjs';
 
 /**
  * The fixed test world links one product, so one unfollowed change counts as a stall, and a
- * change counts as unfollowed after one second instead of fifteen minutes.
+ * change counts as unfollowed after one second instead of fifteen minutes. As in production, a
+ * gap becomes a mismatch only after the stall window, so the stall is always found first.
  */
 const configuration = {
   ...defaultConfiguration,
   version: `${defaultConfiguration.version}-stall-journey`,
   thresholds: {
     ...defaultConfiguration.thresholds,
-    propagationSeconds: 1,
-    oversellPropagationSeconds: 1,
+    propagationSeconds: 3,
+    oversellPropagationSeconds: 3,
     stallSeconds: 1,
     stallMinPositions: 1,
   },
@@ -25,7 +26,10 @@ const configuration = {
 test('a store that stops following stock changes opens one verified, scored and recurring stall case', async (t) => {
   // The test world never pushes stock to the shop on its own; ERP changes stay unfollowed until
   // the journey writes the shop, as a restarted stock sync would.
-  const f = await setupSimulator(t, { detection: { configuration } });
+  const f = await setupSimulator(t, {
+    imported: true,
+    detection: { configuration },
+  });
   const actor = await f.pilot.operator();
   const { jtl, shopify } = f.manifest.connections;
   const command = (instance, body) =>
@@ -82,6 +86,7 @@ test('a store that stops following stock changes opens one verified, scored and 
     }),
   ).toMatchObject({ id: incidentId, status: 'active', instance: 'shopify' });
   // A restock reaches the ERP, but not the shop.
+  const restockedAt = Date.now();
   await restock(400);
   const opened = await until(async () => {
     await pass();
@@ -108,7 +113,14 @@ test('a store that stops following stock changes opens one verified, scored and 
   expect(
     evidence.filter((item) => item.source).map((item) => item.source.provider),
   ).toEqual(expect.arrayContaining(['jtl', 'shopify']));
-  // The product's own gap waits for the stalled sync instead of opening a second case.
+  // Once the gap is old enough to be a mismatch, it waits for the stalled sync instead of
+  // opening a second case.
+  await until(
+    () =>
+      Date.now() - restockedAt >
+      configuration.thresholds.propagationSeconds * 1000,
+    'the gap passes the propagation window',
+  );
   await pass();
   expect(await cases('inventory_mismatch')).toEqual([]);
   expect(

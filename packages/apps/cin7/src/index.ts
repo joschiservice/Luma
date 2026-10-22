@@ -36,6 +36,12 @@ export function createCin7Provider(
       ((tenantId: string) => Promise<boolean>) | undefined;
     fetch?: typeof globalThis.fetch | undefined;
     simulation?: SimulationTransport | undefined;
+    /**
+     * Minimum milliseconds between request admissions of one connection. Defaults to Cin7's
+     * per-application limit; only compositions against a provider that does not throttle,
+     * such as a simulator run without rate limits, should lower it.
+     */
+    requestIntervalMs?: number | undefined;
   } = {},
 ): ConnectionProvider {
   const shared = new Map<
@@ -47,7 +53,11 @@ export function createCin7Provider(
     let state = shared.get(key);
     if (!state) {
       state = {
-        pacer: createRequestPacer(),
+        pacer: createRequestPacer(
+          options.requestIntervalMs === undefined
+            ? {}
+            : { intervalMs: options.requestIntervalMs },
+        ),
         units: createProductUnits(),
         sales: createSaleCache(),
       };

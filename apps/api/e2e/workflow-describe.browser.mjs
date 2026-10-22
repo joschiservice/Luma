@@ -1,22 +1,13 @@
 /* global document, innerWidth */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
-
-const screenshots = '/tmp/luma88-browser';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('drafts a workflow from a description and applies a reviewed change', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -25,12 +16,7 @@ test('drafts a workflow from a description and applies a reviewed change', async
   );
   // Only Bedrock's HTTPS endpoints are intercepted; the route, checks and storage are real.
   const api = await startApi(t, db, origin, 'e2e/authoring-server.mjs');
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(api.origin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -38,7 +24,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
   page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await mkdir(screenshots, { recursive: true });
 
   await createAccount(page, db, {
     name: 'Grace',
@@ -81,10 +66,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
   await page
     .getByText(/^When below minimum is yes, read current stock/)
     .waitFor();
-  await page.screenshot({
-    path: `${screenshots}/described-desktop.png`,
-    fullPage: true,
-  });
 
   // A follow-up instruction becomes a step-level proposal; nothing changes until it's accepted.
   await page.getByText('All changes saved').waitFor();
@@ -100,10 +81,6 @@ test('drafts a workflow from a description and applies a reviewed change', async
       .getByText('Wait 10 minute(s).')
       .count(),
   ).toBe(0);
-  await page.screenshot({
-    path: `${screenshots}/proposal-desktop.png`,
-    fullPage: true,
-  });
   await proposal.getByRole('button', { name: 'Accept change' }).click();
   await page
     .getByRole('list', { name: 'Workflow steps' })
@@ -116,9 +93,5 @@ test('drafts a workflow from a description and applies a reviewed change', async
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: `${screenshots}/described-mobile.png`,
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

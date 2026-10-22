@@ -163,9 +163,22 @@ interface PlacementDirectory {
   regionForTenant(tenantId: string): Promise<DataRegion | null>;
 }
 
+/** What resolving a user's tenant context reads, all from one transaction. */
+interface MemberLookup {
+  member: Membership | null;
+  organization: Organization | null;
+  /** Whether the user's account was erased, so background work can pause instead of fail. */
+  erased: boolean;
+}
+
 export interface IdentityRepository {
   /** Local placement metadata; no customer names or operational data are returned. */
   placement?: PlacementDirectory;
+  /**
+   * Reads, as the user, the user's membership, the organization and whether the account was
+   * erased, in one transaction. Check placement first: another cell's tenant is never read.
+   */
+  memberOf(userId: string, organizationId: string): Promise<MemberLookup>;
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
   /** Support view credentials; see ADR-011. */
   supportViews: SupportViewCredentials;
@@ -218,6 +231,33 @@ export function createIdentityService(
       throw new ServiceError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
     return session;
+  }
+
+  /**
+   * Resolves the user's current context in a tenant from fresh reads, checking placement
+   * before any tenant state is read. Unknown tenants and missing memberships are not found;
+   * an erased account throws `AccountErasedError`.
+   */
+  async function resolveMember(
+    session: SessionIdentity,
+    organizationId: string,
+    requestId: string,
+    supportView?: SupportView,
+  ) {
+    await requirePlacement(organizationId);
+    const found = await repository.memberOf(session.userId, organizationId);
+    if (!found.member && found.erased) throw new AccountErasedError();
+    if (!found.member || !found.organization)
+      throw notFound('Organization not found');
+
+    return makeTenantContext(
+      session,
+      found.organization,
+      found.member,
+      requestId,
+      supportView,
+      settings.region,
+    );
   }
 
   async function resolve(
@@ -281,17 +321,10 @@ export function createIdentityService(
     if (credential.status !== 'active') throw apiTokenRefused();
     if (credential.tenantId !== organizationId)
       throw notFound('Organization not found');
-    await requirePlacement(organizationId);
-    const context = await repository.withUser(credential.userId, (tx) =>
-      resolve(
-        tx,
-        {
-          userId: credential.userId,
-          sessionId: credential.id,
-        },
-        organizationId,
-        requestId,
-      ),
+    const context = await resolveMember(
+      { userId: credential.userId, sessionId: credential.id },
+      organizationId,
+      requestId,
     );
 
     return apiAppContext(context, {
@@ -447,15 +480,10 @@ export function createIdentityService(
       tenantId: string,
       requestId: string,
     ) {
-      await requirePlacement(tenantId);
-
-      return repository.withUser(userId, (tx) =>
-        resolve(
-          tx,
-          { userId, sessionId: `workflow:${requestId}` },
-          tenantId,
-          requestId,
-        ),
+      return resolveMember(
+        { userId, sessionId: `workflow:${requestId}` },
+        tenantId,
+        requestId,
       );
     },
     /**
@@ -479,16 +507,12 @@ export function createIdentityService(
           context.requestId,
         );
       }
-      await requirePlacement(context.tenantId);
 
-      return repository.withUser(context.actor.id, (tx) =>
-        resolve(
-          tx,
-          { userId: context.actor.id, sessionId: context.actor.sessionId },
-          context.tenantId,
-          context.requestId,
-          context.supportView,
-        ),
+      return resolveMember(
+        { userId: context.actor.id, sessionId: context.actor.sessionId },
+        context.tenantId,
+        context.requestId,
+        context.supportView,
       );
     },
     /** Reports whether the credentials carry a support view token, valid or not. */
@@ -727,26 +751,20 @@ export function createIdentityService(
           requestId,
         );
 
-        return repository.withUser(view.userId, (tx) =>
-          resolve(
-            tx,
-            { userId: view.userId, sessionId: view.id },
-            organizationId,
-            requestId,
-            {
-              id: view.id,
-              mode: view.mode,
-              expiresAt: new Date(view.expiresAt).toISOString(),
-            },
-          ),
+        return resolveMember(
+          { userId: view.userId, sessionId: view.id },
+          organizationId,
+          requestId,
+          {
+            id: view.id,
+            mode: view.mode,
+            expiresAt: new Date(view.expiresAt).toISOString(),
+          },
         );
       }
       const session = await authenticate(credentials);
-      await requirePlacement(organizationId);
 
-      return repository.withUser(session.userId, (tx) =>
-        resolve(tx, session, organizationId, requestId),
-      );
+      return resolveMember(session, organizationId, requestId);
     },
     /**
      * Resolves a personal API app's access to a workspace from a bearer token: the credential

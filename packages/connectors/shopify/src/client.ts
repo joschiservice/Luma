@@ -14,6 +14,7 @@ import {
 import { createAdminApiClient } from '@shopify/admin-api-client';
 import { z } from 'zod';
 
+import { calculateQueryCost } from './query-cost.js';
 import {
   type BudgetFeedback,
   createReadBudget,
@@ -259,6 +260,7 @@ export function createClient(options: ShopifyTransportOptions): {
           {
             ...(options.purpose ? { purpose: options.purpose } : {}),
             mutation: !queryDocument.test(query),
+            cost: calculateQueryCost(query, variables),
             ...(options.signal ? { signal: options.signal } : {}),
           },
         );

@@ -16,11 +16,10 @@ import {
 const password = 'support-view-browser-password-long';
 
 /** Starts the customer app and API, the staff console and API, and a workspace with two people. */
-async function fixture(t) {
-  const webPort = await availablePort();
+async function fixture(t, web) {
   const staffWebPort = await availablePort();
   const staffApiPort = await availablePort();
-  const customerOrigin = `http://localhost:${webPort}`;
+  const customerOrigin = web.origin.replace('127.0.0.1', 'localhost');
   const staffOrigin = `http://127.0.0.1:${staffWebPort}`;
   const db = await database(t);
   await db.migrate();
@@ -35,13 +34,7 @@ async function fixture(t) {
     status: 201,
   });
   await addMembership(db.owner, workspace.id, member.userId, 'member');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(webPort) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
 
   const login = `support_view_${randomUUID().replaceAll('-', '')}`;
   const url = new URL(db.ownerUrl);
@@ -154,8 +147,9 @@ async function staffPage(t, f, errors) {
 
 test('staff view a consenting workspace as a member, read-only, until the owner revokes access', async ({
   resources: t,
+  web,
 }) => {
-  const f = await fixture(t);
+  const f = await fixture(t, web);
   const errors = [];
 
   // The owner allows support access from Settings.
@@ -234,10 +228,6 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     new RegExp(`/app/${f.workspace.id}/home(\\?|$)`),
   );
   expect(new URL(view.url()).hash).toBe('');
-  await view.screenshot({
-    path: test.info().outputPath('support-view-light.png'),
-    animations: 'disabled',
-  });
   await view.goto(
     `${f.customerOrigin}/app/${f.workspace.id}/settings/notifications`,
   );
@@ -253,17 +243,12 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
     ),
   ).toBeVisible();
   await view.setViewportSize({ width: 390, height: 844 });
-  await view.emulateMedia({ colorScheme: 'dark' });
   await expect(banner).toBeVisible();
   await expect
     .poll(() =>
       view.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await view.screenshot({
-    path: test.info().outputPath('support-view-dark-narrow.png'),
-    animations: 'disabled',
-  });
   const preferences = await f.db.owner.query(
     'SELECT count(*)::int AS count FROM notification_preferences WHERE tenant_id=$1',
     [f.workspace.id],
@@ -312,8 +297,9 @@ test('staff view a consenting workspace as a member, read-only, until the owner 
 
 test('a person approves account inspection in Settings › Security and can end it early', async ({
   resources: t,
+  web,
 }) => {
-  const f = await fixture(t);
+  const f = await fixture(t, web);
   const errors = [];
 
   // Staff ask to inspect the member's account.
@@ -341,16 +327,11 @@ test('a person approves account inspection in Settings › Security and can end 
     member.getByText('Member cannot sign in with their passkey'),
   ).toBeVisible();
   await member.setViewportSize({ width: 390, height: 844 });
-  await member.emulateMedia({ colorScheme: 'dark' });
   await expect
     .poll(() =>
       member.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     )
     .toBe(true);
-  await member.screenshot({
-    path: test.info().outputPath('account-inspection-request-dark-narrow.png'),
-    animations: 'disabled',
-  });
   const approve = member.getByRole('button', { name: 'Approve', exact: true });
   await approve.focus();
   await member.keyboard.press('Enter');

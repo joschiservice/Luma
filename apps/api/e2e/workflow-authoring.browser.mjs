@@ -1,22 +1,13 @@
 /* global document, innerWidth */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
-
-const screenshots = '/tmp/luma88-browser';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('creates workflows from templates and from scratch, then publishes without activating', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -24,12 +15,7 @@ test('creates workflows from templates and from scratch, then publishes without 
     `GRANT luma_connectors TO "${new URL(db.runtimeUrl).username}"`,
   );
   const api = await startApi(t, db, origin);
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(api.origin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -37,7 +23,6 @@ test('creates workflows from templates and from scratch, then publishes without 
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await mkdir(screenshots, { recursive: true });
 
   await createAccount(page, db, {
     name: 'Ada',
@@ -59,10 +44,6 @@ test('creates workflows from templates and from scratch, then publishes without 
   await expect(
     page.getByRole('link', { name: 'Add a supplier' }).isVisible(),
   ).resolves.toBe(true);
-  await page.screenshot({
-    path: `${screenshots}/gallery-desktop.png`,
-    fullPage: true,
-  });
   // Without an AU zero-retention model route, describing a workflow says why it's unavailable.
   await page.getByRole('button', { name: 'Describe a workflow' }).click();
   const describe = page.getByRole('dialog', { name: 'Describe a workflow' });
@@ -91,10 +72,6 @@ test('creates workflows from templates and from scratch, then publishes without 
     .getByText(/can’t run in this workspace yet/)
     .first()
     .waitFor();
-  await page.screenshot({
-    path: `${screenshots}/customized-desktop.png`,
-    fullPage: true,
-  });
 
   // Test the copy with a simulator scenario; nothing reaches a connected system.
   await page.getByRole('tab', { name: 'Test' }).click();
@@ -116,10 +93,6 @@ test('creates workflows from templates and from scratch, then publishes without 
     .getByRole('list', { name: 'Saved tests' })
     .getByText('Passed', { exact: true })
     .waitFor();
-  await page.screenshot({
-    path: `${screenshots}/test-desktop.png`,
-    fullPage: true,
-  });
   await page.getByRole('tab', { name: 'Build' }).click();
 
   // Build from scratch with the keyboard, then publish.
@@ -200,7 +173,6 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page
     .getByRole('heading', { name: 'Steps', level: 2, exact: true })
     .evaluate((node) => node.scrollIntoView({ block: 'start' }));
-  await page.screenshot({ path: `${screenshots}/builder-desktop.png` });
 
   // The code view shows the same draft and reports problems on their line.
   await page.getByRole('tab', { name: 'Code' }).click();
@@ -232,10 +204,6 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page
     .getByRole('tab', { name: 'How it works', selected: true })
     .waitFor();
-  await page.screenshot({
-    path: `${screenshots}/published-desktop.png`,
-    fullPage: true,
-  });
 
   // Editing a published workflow starts a new draft and version; the published one stays.
   await page.getByRole('button', { name: 'Edit as new draft' }).click();
@@ -256,10 +224,6 @@ test('creates workflows from templates and from scratch, then publishes without 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: `${screenshots}/gallery-mobile.png`,
-    fullPage: true,
-  });
   await page.goto(`/app/${tenantId}/workflows`);
   await page
     .getByRole('link', { name: /Replenish low stock \(custom\)/ })
@@ -269,16 +233,8 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page.getByRole('button', { name: 'Add a step after step 1' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add a step' });
   await sheet.getByText('The step is added after step 1.').waitFor();
-  await page.screenshot({
-    path: `${screenshots}/builder-sheet-mobile.png`,
-    animations: 'disabled',
-  });
   await page.keyboard.press('Escape');
   await sheet.waitFor({ state: 'hidden' });
-  await page.screenshot({
-    path: `${screenshots}/builder-mobile.png`,
-    fullPage: true,
-  });
   await page.getByRole('tab', { name: 'Code' }).click();
   await page
     .getByText(
@@ -290,9 +246,5 @@ test('creates workflows from templates and from scratch, then publishes without 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: `${screenshots}/code-mobile.png`,
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

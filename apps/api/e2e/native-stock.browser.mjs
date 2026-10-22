@@ -2,14 +2,13 @@
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { nativeStockFixture } from './native-stock-fixture.mjs';
 
 test('allocates and releases native stock through operator controls in light, dark and narrow layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -18,13 +17,7 @@ test('allocates and releases native stock through operator controls in light, da
   });
   const f = await nativeStockFixture(t, { origin, observability });
   const apiOrigin = await f.f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

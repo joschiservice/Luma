@@ -96,7 +96,15 @@ sequenceDiagram
 The provider documents neither atomic revision preconditions nor idempotency keys for
 updates. Preflight is not atomic. Controlled targets and a durable per-order claim with
 a fence written before dispatch prevent duplicate starts, restarts and retries from
-sending again. Changed authority, expired reviews, labels and removed permission withhold.
+sending again. Starts of one update take a lease on its row and run one after another: a
+start's own eligibility reads change what another start would judge, so a second start waits
+and then reports the first one's outcome instead of withholding or closing the review. The
+lease is a renewed row claim, not a held lock, because a start makes provider calls and opens
+further transactions; holding a pooled connection for it let a few starts exhaust the pool. A
+lease left by a crash expires within 30 seconds, and a start that cannot take it within a
+minute is refused as still being sent. Once the fence is written, the review counts as sent
+with an unknown outcome until it is verified.
+Changed authority, expired reviews, labels and removed permission withhold.
 An unfinished or failed authoritative refresh withholds approval and dispatch without
 discarding the saved review. A later complete read can restore its eligibility only
 when the exact reviewed source state still matches.

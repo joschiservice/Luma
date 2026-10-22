@@ -1,16 +1,14 @@
 /* global document, window */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('explains unknown order totals, opens accessible cohorts and recovers from errors on desktop and mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const endpoint = `${f.base}/metrics/query`;
   const empty = await f.request(f.member, endpoint, 'POST', {});
@@ -21,13 +19,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await f.request(f.outsider, endpoint, 'POST', {}, 404);
   await f.request(null, endpoint, 'POST', {}, 401);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
@@ -63,11 +55,9 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
       .getByRole('button', { name: 'Next', exact: true })
       .isDisabled(),
   ).toBe(true);
-  await mkdir('/tmp/luma84-ui', { recursive: true });
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({ path: '/tmp/luma84-ui/desktop.png', fullPage: true });
   await page.keyboard.press('Escape');
   await expect
     .poll(() =>
@@ -78,7 +68,6 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     .toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma84-ui/mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -138,10 +127,6 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({
-    path: '/tmp/luma84-ui/mobile-cohort.png',
-    fullPage: true,
-  });
   // A live change keeps the page in place until the person asks for the latest records.
   await seed(26);
   await dialog.getByText('The matching orders changed').waitFor();
@@ -151,11 +136,5 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   expect(await dialog.getByText('The matching orders changed').count()).toBe(0);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await section.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma84-ui/populated.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

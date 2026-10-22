@@ -3,15 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('accepts and edits a Luma order with explicit authority in both themes and narrow layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -50,13 +49,7 @@ test('accepts and edits a Luma order with explicit authority in both themes and 
     404,
   );
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
@@ -135,19 +128,7 @@ test('accepts and edits a Luma order with explicit authority in both themes and 
   await expect(
     page.getByText('Pending propagation', { exact: true }).first(),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma176-sales-light.png',
-    fullPage: true,
-  });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma176-sales-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(form.getByRole('button', { name: 'Save order' })).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma176-sales-narrow.png',
-    fullPage: true,
-  });
 });

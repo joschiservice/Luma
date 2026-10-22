@@ -129,12 +129,23 @@ Operation control and governed actions all use it; download URLs are outside Sho
 GraphQL cost bucket. Keys contain opaque hashes, query-shape hashes, costs and expiring
 reservations. Credentials and provider records never enter Valkey.
 
-Foreground work has two reserved transport slots and up to 1,000 cost points of
-headroom; incremental reads precede history work. A first background query may borrow
-one second of restore capacity so it can learn its cost without waiting for a completely
-full bucket. Unknown query shapes reserve the
-single-query maximum. Requested and actual costs reconcile atomically against the
-provider balance, including refunds and a shared throttle cooldown. Foreground admission
+Admission charges each request the cost Shopify last requested for the same document and
+page size in that shop. Before Shopify has reported one, the client calculates it from the
+document with Shopify's published rules: objects cost one point, connections two plus their
+page size times each node, scalars nothing and mutations ten. A first action therefore
+needs only its own cost, not the 1,000-point single-query maximum, which still applies to a
+document the client cannot parse. See [query cost check](#query-cost-check) for how the
+calculation is checked.
+
+Foreground work has two reserved transport slots and 1,000 cost points of headroom;
+incremental reads precede history work. The headroom is one single-query maximum: the
+largest read Luma makes while preparing an action, plus the action's mutation, stays
+below it, so an action rarely waits behind an import. The reserve delays only an import's
+initial burst; sustained import throughput is bounded by Shopify's restore rate. A first
+background query of a shape without a calculated cost may borrow one second of restore
+capacity so it can learn its cost without waiting for a completely full bucket.
+Requested and actual costs reconcile atomically against the provider balance, including
+refunds and a shared throttle cooldown. Foreground admission
 waits at most two seconds; background pages release their durable lease and resume later
 when capacity is unavailable. A compound background read that already fetched parent
 records waits up to ten seconds per continuation request, preserving that progress while
@@ -291,7 +302,8 @@ grants are missing, so a degraded connection can be repaired by reconnecting.
 ### Query cost check
 
 The Shopify contract test keeps collection read queries under Shopify's 1,000-point query limit using
-the simulator's cost model. `pnpm shopify:cost-check` checks that model against a real store: it
+the simulator's cost model, and fails when the client's calculated admission cost for any
+document it sends differs from that model. `pnpm shopify:cost-check` checks that model against a real store: it
 verifies the account and token scopes, reads each authorized collection capability at the largest sync page, and lists, per query, the
 requested cost Shopify reports beside the simulator's estimate. It fails when a read fails or
 the simulator estimates less than Shopify charges; then correct the model in

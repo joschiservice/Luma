@@ -1,17 +1,15 @@
 /* global document, window */
 import { createObservability } from '@luma/platform/composition';
 
-import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, rememberedView, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('finds an order by number or SKU, explains it, pages a historical import and keeps list views', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const observability = createObservability({
     environment: 'test',
     release: 'test',
@@ -102,14 +100,9 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     `${fixture.base}/orders?limit=50`,
   );
   expect(orderPage.items).toHaveLength(50);
-  await performanceReport(
-    'orders-page',
-    {
-      datasetOrders: 153,
-      pageItems: orderPage.items.length,
-      payloadBytes: Buffer.byteLength(JSON.stringify(orderPage)),
-    },
-    { pageItems: 50, payloadBytes: 128 * 1024 },
+  // A full page of the 153 orders stays within the list payload budget.
+  expect(Buffer.byteLength(JSON.stringify(orderPage))).toBeLessThanOrEqual(
+    128 * 1024,
   );
 
   const listed = await fixture.request(
@@ -134,13 +127,7 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   );
 
   const apiOrigin = await fixture.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
@@ -185,9 +172,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
   await expect(orderRange).toHaveText('1–50');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(orderRange).toHaveText('51–100');
-  await page
-    .getByRole('navigation', { name: 'Order pages' })
-    .screenshot({ path: '/tmp/luma116-order-pagination.png' });
   expect(new URL(page.url()).searchParams.get('page')).toBe('2');
   await page.getByRole('button', { name: 'Previous' }).click();
   await expect(orderRange).toHaveText('1–50');
@@ -250,17 +234,9 @@ test('finds an order by number or SKU, explains it, pages a historical import an
         .nth(comparisonHeaders.indexOf(source) - 1),
     ).toHaveText(quantity);
   const detailUrl = page.url();
-  await page.screenshot({
-    path: '/tmp/luma98-order-desktop.png',
-    fullPage: true,
-  });
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await page.screenshot({
-    path: '/tmp/luma170-order-dark.png',
-    fullPage: true,
-  });
 
   // Deep links reload into the same order and filters.
   await page.reload();
@@ -272,10 +248,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma98-order-mobile.png',
-    fullPage: true,
-  });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Orders' })
@@ -312,7 +284,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
       .getAttribute('aria-sort'),
   ).toBe('ascending');
   await page.getByRole('link', { name: '#2001' }).waitFor();
-  await page.screenshot({ path: '/tmp/luma98-orders-desktop.png' });
 
   // Filter with the condition builder, sort, and keep it as a personal view.
   await page.goto(`/app/${fixture.org.id}/orders?view=all`);
@@ -350,7 +321,6 @@ test('finds an order by number or SKU, explains it, pages a historical import an
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await page.screenshot({ path: '/tmp/luma286-orders-saved-view.png' });
 
   // Opening Orders without a view returns to the remembered one.
   expect(await remembered).toBe(viewId);

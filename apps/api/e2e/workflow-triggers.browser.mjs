@@ -1,6 +1,5 @@
 /* global document, innerWidth */
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 
 import { shippingMethodPlaybook } from '@luma/resolution';
 import { resolutionWorkflow } from '@luma/workflows';
@@ -11,20 +10,14 @@ import {
 } from '@luma/workflows/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 
 test('starts a scoped native workflow, preserves uncertain retries and withholds unavailable scheduled starts on mobile', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -32,13 +25,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     `GRANT luma_connectors TO "${new URL(db.runtimeUrl).username}"`,
   );
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
@@ -119,9 +106,7 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
     await form.getByRole('combobox', { name: field }).click();
     await page.getByRole('option', { name: 'True', exact: true }).click();
   }
-  await mkdir('/tmp/luma67-browser', { recursive: true });
   await form.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/luma67-browser/triggers-desktop.png' });
   // Simulate a lost response after the server commits; retry must use the same body.
   let dropped = false;
   await page.route('**/workflows/*/starts', async (route) => {
@@ -172,7 +157,6 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
   await expect(
     form.getByRole('button', { name: 'Schedule start', exact: true }),
   ).toHaveCount(0);
-  await page.screenshot({ path: '/tmp/luma67-browser/triggers-mobile.png' });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -321,13 +305,10 @@ test('starts a scoped native workflow, preserves uncertain retries and withholds
   // Steps read by their business title, not their ID.
   await timeline.getByText('Refresh context', { exact: true }).waitFor();
   expect(await timeline.getByRole('listitem').count()).toBe(3);
-  await page.screenshot({ path: '/tmp/luma67-browser/process-mobile.png' });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.setViewportSize({ width: 1440, height: 1100 });
-  await page.screenshot({ path: '/tmp/luma67-browser/process-desktop.png' });
   expect(errors).toEqual([]);
 });

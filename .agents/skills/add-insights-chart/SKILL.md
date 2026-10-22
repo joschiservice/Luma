@@ -23,7 +23,7 @@ by the same rule, so their totals agree. Read
    see [topics](../../../docs/operational-metrics.md#topics).
 5. **Reconcile.** Extend the point-to-records reconciliation check in
    `apps/api/e2e/insights.e2e.mjs`. For a heavy read, measure with
-   `LUMA_INSIGHTS_BENCHMARK=<order count>` on that suite.
+   `LUMA_INSIGHTS_BENCHMARK=<order count> pnpm test:performance insights`.
 6. **Document the rule** in the chart table of the Insights guide.
 
 Finish with the [verify-change](../verify-change/SKILL.md) skill.

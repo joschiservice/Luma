@@ -80,6 +80,7 @@
     "@luma/simulator-core": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",
     "@luma/app-cin7": "workspace:*",
-    "@luma/app-jtl": "workspace:*"
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-starshipit": "workspace:*"
   }
 }

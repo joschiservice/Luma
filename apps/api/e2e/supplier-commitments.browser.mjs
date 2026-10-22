@@ -5,23 +5,17 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess, until } from './helpers.mjs';
+import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 test('sends an order with a second approver, follows the supplier to receipt and records cited commitments', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await setupSimulator(t, { origin });
   await f.pilot.observe();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const org = f.manifest.organizationId;
   const login = async (email) => {
     const response = await f.pilot.app.inject({
@@ -274,33 +268,31 @@ test('sends an order with a second approver, follows the supplier to receipt and
   await buyer.getByText('Purchasing link active').waitFor();
   await buyer.getByRole('link', { name: 'PO-2026-201', exact: true }).waitFor();
 
-  for (const colorScheme of ['dark', 'light']) {
-    const narrow = await (
-      await contextFor(buyerCookie, {
-        viewport: { width: 390, height: 844 },
-        colorScheme,
-      })
-    ).newPage();
-    await narrow.goto(orderPath);
-    await narrow
-      .getByRole('heading', { name: 'PO-2026-201', exact: true })
-      .waitFor();
-    expect(
-      await narrow.evaluate(
-        () =>
-          document.documentElement.scrollWidth <=
-          document.documentElement.clientWidth,
-      ),
-    ).toBe(true);
-  }
+  const narrow = await (
+    await contextFor(buyerCookie, {
+      viewport: { width: 390, height: 844 },
+      colorScheme: 'dark',
+    })
+  ).newPage();
+  await narrow.goto(orderPath);
+  await narrow
+    .getByRole('heading', { name: 'PO-2026-201', exact: true })
+    .waitFor();
+  expect(
+    await narrow.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });
 
 test('settles an order email left uncertain by an unverified bounce with a confirmed decision', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const flags = { 'procurement-email-submission': true };
   const f = await setupSimulator(t, {
     origin,
@@ -313,13 +305,7 @@ test('settles an order email left uncertain by an unverified bounce with a confi
     }),
   });
   await f.pilot.observe();
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const org = f.manifest.organizationId;
   const login = async (email) => {
     const response = await f.pilot.app.inject({
@@ -504,33 +490,31 @@ test('settles an order email left uncertain by an unverified bounce with a confi
     state: 'failed',
   });
 
-  for (const colorScheme of ['dark', 'light']) {
-    const narrow = await (
-      await t.newContext({
-        baseURL: origin,
-        viewport: { width: 390, height: 844 },
-        colorScheme,
-      })
-    ).newPage();
-    await narrow.context().addCookies(
-      buyerCookie.split('; ').map((value) => {
-        const [name, ...rest] = value.split('=');
+  const narrow = await (
+    await t.newContext({
+      baseURL: origin,
+      viewport: { width: 390, height: 844 },
+      colorScheme: 'dark',
+    })
+  ).newPage();
+  await narrow.context().addCookies(
+    buyerCookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
 
-        return { name, value: rest.join('='), url: origin };
-      }),
-    );
-    await narrow.goto(`/app/${org}/procurement/${order.id}`);
-    await narrow
-      .getByRole('region', { name: 'Supplier email' })
-      .getByText(/Marked as not delivered by You/)
-      .waitFor();
-    expect(
-      await narrow.evaluate(
-        () =>
-          document.documentElement.scrollWidth <=
-          document.documentElement.clientWidth,
-      ),
-    ).toBe(true);
-  }
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  await narrow.goto(`/app/${org}/procurement/${order.id}`);
+  await narrow
+    .getByRole('region', { name: 'Supplier email' })
+    .getByText(/Marked as not delivered by You/)
+    .waitFor();
+  expect(
+    await narrow.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });

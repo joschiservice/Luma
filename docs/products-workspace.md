@@ -101,4 +101,4 @@ groups, stayed around 200 ms or less at 20,000 SKUs listed in two sources on a d
 laptop. The read turns JIT compilation off: the comparison's cost estimate crosses the JIT
 threshold, and compiling the plan took several times longer than running it. Catalogs well beyond 20,000 SKUs need a maintained per-SKU comparison
 projection, as `orders_list` is for orders. Re-measure with
-`LUMA_PRODUCT_BENCHMARK=<SKU count>` on `products.e2e.mjs`.
+`LUMA_PRODUCT_BENCHMARK=<SKU count> pnpm test:performance products`.

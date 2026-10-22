@@ -26,7 +26,7 @@ async function login(f, email) {
 }
 
 it('places an approved order once, follows supplier confirmation and receipt, and keeps evidence', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   await f.pilot.observe();
   const org = f.manifest.organizationId;
   const root = `/v1/organizations/${org}/procurement`;

@@ -104,7 +104,7 @@ Every list read counts all views over the tenant's current fulfillments, so its 
 with that number. Reads stayed around 200 ms or less at 100,000 rows on a development laptop.
 Grouped reads seek each group's first rows in the evaluated set, so they cost more than a page.
 Tenants well beyond 100,000 current fulfillments need maintained view counts or archiving of
-finished work. Re-measure with `LUMA_FULFILLMENT_BENCHMARK=<row count>` on
-`fulfillment.e2e.mjs`.
+finished work. Re-measure with
+`LUMA_FULFILLMENT_BENCHMARK=<row count> pnpm test:performance fulfillment`.
 
 Without a source filter, lists and charts select one source view per linked order and work kind: Starshipit for shipments, otherwise Shopify, then another source. Split shipments within that view remain separate. This is display selection, not identity merging or authority for an action. Choose a source to inspect its own records; detail retains the other views. Unlinked orders remain distinct until evidence establishes their identity.

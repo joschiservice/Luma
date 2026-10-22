@@ -1,19 +1,11 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { starshipitOperationsFixture } from './starshipit-operations-fixture.mjs';
 
-async function browserFixture(t, options) {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+async function browserFixture(t, web, options) {
+  const origin = web.origin;
   const f = await starshipitOperationsFixture(t, origin, options);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const errors = [];
   const page = async (actor = 'operator') => {
     const context = await t.newContext({
@@ -73,8 +65,9 @@ async function openLiveStarshipit(page) {
 
 test('confirms source order and line identities, reviews the exact shipping correction, approves independently and verifies one provider write', async ({
   resources: t,
+  web,
 }) => {
-  const f = await browserFixture(t);
+  const f = await browserFixture(t, web);
   await f.separateShippingOrder();
   await f.setAuthority();
   const page = await f.page();
@@ -246,10 +239,6 @@ test('confirms source order and line identities, reviews the exact shipping corr
         ).length,
     )
     .toBe(1);
-  await correction.screenshot({
-    path: '/tmp/luma-starshipit-correction-desktop.png',
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
   await correction.scrollIntoViewIfNeeded();
   expect(
@@ -259,9 +248,6 @@ test('confirms source order and line identities, reviews the exact shipping corr
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await correction.screenshot({
-    path: '/tmp/luma-starshipit-correction-mobile-dark.png',
-  });
   const observer = await f.page('warehouse');
   await observer.goto(orderUrl);
   await expect(
@@ -279,8 +265,9 @@ test('confirms source order and line identities, reviews the exact shipping corr
 
 test('shows a disabled shipping action release without offering an executable correction', async ({
   resources: t,
+  web,
 }) => {
-  const f = await browserFixture(t, {
+  const f = await browserFixture(t, web, {
     featureFlagOverrides: { 'starshipit-actions': false },
   });
   const page = await f.page();
@@ -309,8 +296,9 @@ test('shows a disabled shipping action release without offering an executable co
 
 test('shows a generated webhook secret once, replaces it on request and records each generation', async ({
   resources: t,
+  web,
 }) => {
-  const f = await browserFixture(t);
+  const f = await browserFixture(t, web);
   const id = f.manifest.connections.starshipit;
   const page = await f.page();
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);

@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { starshipitOperationsFixture } from './starshipit-operations-fixture.mjs';
 
 test('explicit line links require a shared order, persist across fresh reads and can be safely retried or undone', async (t) => {
-  const f = await starshipitOperationsFixture(t);
+  const f = await starshipitOperationsFixture(t, undefined, { imported: true });
   const shopify = f.manifest.connections.shopify;
   const starshipit = f.manifest.connections.starshipit;
   const shipping = await f.separateShippingOrder();

@@ -180,8 +180,8 @@ return; value and pending refund order by currency, then amount, and returns wit
 come last in both directions. Search matches names, order numbers, reasons and source IDs as substrings, so it
 scans the tenant's returns (about 150 ms at 20,000); much larger volumes need a maintained
 search index like the order list's. Customer matches scan the tenant's customer profiles once
-per search. Re-measure with `LUMA_RETURN_BENCHMARK=<return count>` on
-`returns.e2e.mjs`. The benchmark copies one return, so its detail reads are larger than for a
+per search. Re-measure with
+`LUMA_RETURN_BENCHMARK=<return count> pnpm test:performance returns`. The benchmark copies one return, so its detail reads are larger than for a
 real order.
 
 ### Service review

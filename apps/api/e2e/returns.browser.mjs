@@ -4,15 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, rememberedView, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('opens a return from its order, tells pending work from money returned and filters by stage', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   // Saved views are behind a release flag.
   const observability = createObservability({
     environment: 'test',
@@ -63,13 +62,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await r.refund('2001', 1002, true, [{ status: 'failed' }], now);
   await r.refund('2002', 1002, true, [{ status: 'pending' }], now);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -87,20 +80,6 @@ test('opens a return from its order, tells pending work from money returned and 
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const screenshot = async (name) => {
-    await page.screenshot({
-      path: `/tmp/luma103-${name}-light.png`,
-      fullPage: true,
-    });
-    await page.evaluate(() => document.documentElement.classList.add('dark'));
-    await page.screenshot({
-      path: `/tmp/luma103-${name}-dark.png`,
-      fullPage: true,
-    });
-    await page.evaluate(() =>
-      document.documentElement.classList.remove('dark'),
-    );
-  };
 
   // The order lists its returns; the pending refund is not money returned.
   await page.goto(`/app/${f.org.id}/orders/${r.orders[1002]}`);
@@ -122,12 +101,7 @@ test('opens a return from its order, tells pending work from money returned and 
     .getByText('Failed', { exact: true })
     .first()
     .waitFor();
-  await screenshot('detail');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma103-detail-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -147,12 +121,7 @@ test('opens a return from its order, tells pending work from money returned and 
   expect(
     await page.getByRole('link', { name: '#1003-R1', exact: true }).count(),
   ).toBe(0);
-  await screenshot('list');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma103-list-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>
@@ -271,7 +240,6 @@ test('opens a return from its order, tells pending work from money returned and 
     /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
   );
   const viewId = new URL(page.url()).searchParams.get('view');
-  await screenshot('board');
   expect(await remembered).toBe(viewId);
   await page.goto(`/app/${f.org.id}/returns`);
   await page.waitForURL((url) => url.searchParams.get('view') === viewId);
@@ -305,12 +273,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await expect(timeline).toContainText('Warehouse received both items');
   await expect(timeline).toContainText('Refund payment pending');
   await expect(timeline).toContainText('Luma decision');
-  await screenshot('service');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma193-service-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

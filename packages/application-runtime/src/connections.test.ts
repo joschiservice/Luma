@@ -182,7 +182,8 @@ describe('capability construction budget', () => {
     if (!first.ok) throw new Error(JSON.stringify(first.error));
     expect(first).toMatchObject({ ok: true });
     expect(build).toHaveBeenCalledOnce();
-    expect(credential).toHaveBeenCalledTimes(5);
+    // The build authorizes once for the provider too; the read rechecks before each request.
+    expect(credential).toHaveBeenCalledTimes(4);
     expect(fetch).toHaveBeenCalledTimes(2);
     await f.service.rotate(f.ctx, connection.id, 2, { token: 'rotated' });
     await f.service.check(f.ctx, connection.id, 3);

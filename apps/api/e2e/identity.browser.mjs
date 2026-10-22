@@ -1,12 +1,10 @@
 /* global document, window, innerWidth, requestAnimationFrame */
 import { expect, test } from './browser-fixtures.mjs';
 import {
-  availablePort,
   confirmAndSignIn,
   createAccount,
   database,
   startApi,
-  startProcess,
   verifyEmail,
 } from './helpers.mjs';
 
@@ -14,20 +12,13 @@ let origin;
 
 const password = 'browser-test-password-123';
 
-async function fixture(t) {
-  const port = await availablePort();
-  origin = `http://127.0.0.1:${port}`;
+async function fixture(t, web) {
+  origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const api = await startApi(t, db, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -75,8 +66,9 @@ async function signIn(page, email = 'ada@example.test') {
 
 test('registers, creates AU workspaces, restores links, switches tabs and revokes sessions', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page, context, errors } = await fixture(t);
+  const { db, page, context, errors } = await fixture(t, web);
   await page.goto('/');
   expect(await page.title()).toBe('Luma');
   await page.getByRole('link', { name: 'Create account' }).waitFor();
@@ -87,7 +79,6 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     [first],
   );
   expect(row.rows[0].data_region).toBe('AU');
-  await page.screenshot({ path: '/tmp/luma-30-desktop.png', fullPage: true });
   await page.goto('/app');
   await page.waitForURL(`**/app/${first}/home*`);
   await page.goto('/sign-out');
@@ -175,7 +166,6 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
     .getByRole('link', { name: 'Manage apps' })
     .click();
   await heading(page, 'Manage apps');
-  await page.screenshot({ path: '/tmp/luma-30-mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -196,8 +186,9 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
 
 test('keeps failures recoverable and hides inaccessible tenant content', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page, errors } = await fixture(t);
+  const { db, page, errors } = await fixture(t, web);
   await page.goto('/sign-up');
   await page.getByRole('radio', { name: /Australia/ }).check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -298,8 +289,9 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
 
 test('handles missing sessions, uncertain registration, conflicts and permission failures', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page, context } = await fixture(t);
+  const { db, page, context } = await fixture(t, web);
   let registrations = 0;
   await page.route('**/api/auth/sign-up/email', async (route) => {
     registrations++;
@@ -438,8 +430,9 @@ test('handles missing sessions, uncertain registration, conflicts and permission
 
 test('preserves workspace drafts during session revalidation and clears them on session loss', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page } = await fixture(t);
+  const { db, page } = await fixture(t, web);
   await register(page, db);
   const name = page.getByLabel('Workspace name');
   await name.fill('Draft workspace');
@@ -482,8 +475,9 @@ test('preserves workspace drafts during session revalidation and clears them on 
 
 test('shows a suspended membership as Access suspended until it is reactivated', async ({
   resources: t,
+  web,
 }) => {
-  const { db, page, errors } = await fixture(t);
+  const { db, page, errors } = await fixture(t, web);
   await register(page, db);
   const kept = await createWorkspace(page, 'Kept access');
   await page.goto('/app/workspaces/new');
@@ -531,8 +525,9 @@ test('shows a suspended membership as Access suspended until it is reactivated',
 
 test('requires regional confirmation before account creation and keeps it visible in onboarding', async ({
   resources: t,
+  web,
 }) => {
-  const { page, db, errors } = await fixture(t);
+  const { page, db, errors } = await fixture(t, web);
   await page.goto('/sign-up');
   await heading(page, 'Choose your data region');
   await expect(page.getByLabel('Name', { exact: true })).toHaveCount(0);

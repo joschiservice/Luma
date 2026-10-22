@@ -1,13 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 import { seedResolutionMeasurement } from './resolution-measurement-fixture.mjs';
 
 /** Retains synthetic learning history with the same immutable bindings as the runtime owners. */
@@ -116,9 +110,9 @@ async function retainRun(f, issue) {
 
 test('discovers evidence explicitly, compares an immutable candidate and rejects without changing the draft', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -128,12 +122,7 @@ test('discovers evidence explicitly, compares an immutable candidate and rejects
     origin,
     'e2e/workflow-improvements-server.mjs',
   );
-  await startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  ).message('listening');
+  await web.route(api.origin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },

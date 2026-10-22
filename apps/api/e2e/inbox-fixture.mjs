@@ -10,9 +10,18 @@ export const mailboxAddress = 'einkauf@luma-goods.example';
  * A simulator workspace whose demo setup added the inbox rules: the demo supplier's order
  * address linked to its Procurement supplier and catch-alls for supplier and customer mail.
  * The pilot operator (admin) works the inbox; the workspace owner is the second admin.
+ * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
  */
-export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
-  const f = await setupSimulator(t, { origin, demo: { workflows: true } });
+export async function inboxFixture(
+  t,
+  origin = 'http://127.0.0.1:3000',
+  { imported = false } = {},
+) {
+  const f = await setupSimulator(t, {
+    imported,
+    origin,
+    demo: { workflows: true },
+  });
   const org = f.manifest.organizationId;
   const base = `/v1/organizations/${org}`;
   const mailboxId = f.manifest.connections.gmail;

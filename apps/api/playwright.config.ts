@@ -10,6 +10,10 @@ const artifacts = fileURLToPath(
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.browser.mjs',
+  // Timing scenarios run alone in playwright.performance.config.ts.
+  testIgnore: '**/*.performance.browser.mjs',
+  // Migrates one template database; each journey copies it instead of migrating.
+  globalSetup: './e2e/template-database.mjs',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,

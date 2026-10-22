@@ -1,14 +1,13 @@
 /* global document, window */
 import { expect, test } from './browser-fixtures.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('opens the exact records behind a chart point and returns to them', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const work = await fulfillmentFixture(t, f);
   await work.issue();
@@ -22,13 +21,7 @@ test('opens the exact records behind a chart point and returns to them', async (
     lines: [{ external: 'line-405', quantity: '1' }],
   });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -103,7 +96,6 @@ test('opens the exact records behind a chart point and returns to them', async (
   await expect(sheet).toContainText('matches the chart');
   const total = Number(/: (\d+) orders?/.exec(names[day])[1]);
   expect(await sheet.getByRole('listitem').count()).toBe(total);
-  await page.screenshot({ path: '/tmp/luma107-sheet-light.png' });
 
   // A record opens with a way back to these records.
   const drill = page.url();
@@ -151,11 +143,8 @@ test('opens the exact records behind a chart point and returns to them', async (
     .getByRole('heading', { name: /No progress · 2–7 days$/ })
     .waitFor();
   await expect(sheet.getByRole('link', { name: /^#201/ })).toBeVisible();
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({ path: '/tmp/luma107-sheet-dark.png' });
   await page.keyboard.press('Escape');
   await checkScroll();
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   // The command menu opens a view directly.
   await page.keyboard.press('Control+k');
@@ -176,7 +165,6 @@ test('opens the exact records behind a chart point and returns to them', async (
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: '/tmp/luma107-narrow.png', fullPage: true });
 
   // The previous stretch opens its records like any chart point. Orders filter by whole
   // days, so no Orders link is offered for a stretch that ends at a time of day.
@@ -198,18 +186,12 @@ test('opens the exact records behind a chart point and returns to them', async (
 
 test('keeps a 503 chart stable during live import events and supports explicit recovery', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({ baseURL: origin });
   await context.addCookies(
     f.member.cookie.split('; ').map((value) => {

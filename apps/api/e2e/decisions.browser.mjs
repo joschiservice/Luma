@@ -4,22 +4,15 @@ import { randomUUID } from 'node:crypto';
 import { processWorkflowId } from '@luma/workflow-temporal';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 test('finds a replenishment approval in Needs you, decides it once and updates every surface', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await replenishmentFixture(t, origin);
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const contextFor = async (cookie) => {
     const context = await t.newContext({
       baseURL: origin,
@@ -103,10 +96,6 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     .waitFor();
   await inspector.getByRole('button', { name: 'Take it' }).click();
   await inspector.getByRole('button', { name: 'Unassign me' }).waitFor();
-  await approver.screenshot({
-    path: '/tmp/luma78-needs-you-desktop.png',
-    fullPage: true,
-  });
 
   // A reload restores the selected decision from the URL.
   await approver.reload();
@@ -166,10 +155,6 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   expect(
     (await requester.locator('.decisions-toolbar').boundingBox()).height,
   ).toBeLessThan(280);
-  await requester.screenshot({
-    path: '/tmp/luma78-needs-you-mobile.png',
-    fullPage: true,
-  });
   expect(
     await requester.evaluate(
       () =>

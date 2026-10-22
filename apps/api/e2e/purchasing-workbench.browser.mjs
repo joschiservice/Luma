@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import { createObservability } from '@luma/platform/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 const flags = {
@@ -147,19 +146,13 @@ async function purchasingFixture(t, origin) {
 
 test('reviews grouped purchasing evidence and independently approved drafts across themes and narrow layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const { f, org, api, buyer, approver, skuId, supplierId, alternativeId } =
     await purchasingFixture(t, origin);
   const apiOrigin = f.apiOrigin;
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },

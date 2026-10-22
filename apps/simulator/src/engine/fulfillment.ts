@@ -44,15 +44,21 @@ export async function pickOrders(world: World, minutes: number) {
     let capacity = staffed
       ? carry + (warehouse.picksPerHour / 60) * minutes
       : 0;
-    const picks = await store.page<Pick>({
-      kind: 'pick',
-      key: warehouse.id,
-      order: 'updated',
-      updatedBefore: world.now + 1,
-      limit: Math.max(1, Math.floor(capacity)),
-    });
+    // Without a whole pick of capacity, nothing is picked this minute.
+    const picks =
+      capacity < 1
+        ? []
+        : (
+            await store.page<Pick>({
+              kind: 'pick',
+              key: warehouse.id,
+              order: 'updated',
+              updatedBefore: world.now + 1,
+              limit: Math.floor(capacity),
+            })
+          ).items;
     backlog += await store.count({ kind: 'pick', key: warehouse.id });
-    for (const pick of picks.items) {
+    for (const pick of picks) {
       if (capacity < 1) break;
       capacity -= 1;
       await pickOne(world, pick.id, pick.data, warehouse.id);

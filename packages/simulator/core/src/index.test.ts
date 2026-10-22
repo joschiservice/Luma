@@ -8,6 +8,7 @@ import {
   createTransport,
   decide,
   decideWebhook,
+  encodeCursor,
   type FaultRule,
   json,
   matchFault,
@@ -249,6 +250,24 @@ describe('memory record store', () => {
         (item) => item.id,
       ),
     ).toEqual(['4', '5']);
+    for (const query of [
+      { kind: 'Order', order: 'updated' as const },
+      { kind: 'Order', order: 'updated' as const, reverse: true },
+      { kind: 'Order', key: 'even' },
+      { kind: 'Order', key: 'missing' },
+    ]) {
+      const single = await store.page({ ...query, limit: 1 });
+      const sorted = await store.page({ ...query, limit: 10 });
+      expect(single.items).toEqual(sorted.items.slice(0, 1));
+      expect(single.next).toBe(
+        sorted.items.length > 1
+          ? encodeCursor(sorted.items[0]!, query.order ?? 'created')
+          : null,
+      );
+    }
+    expect(
+      (await store.page({ kind: 'Order', order: 'updated', limit: 1 })).next,
+    ).toBe('u95.5');
     expect(await store.count({ kind: 'Order', key: 'even' })).toBe(2);
     await store.put('Order', '1', { index: 9 }, { updatedAt: 200 });
     expect(await store.get('Order', '1')).toMatchObject({

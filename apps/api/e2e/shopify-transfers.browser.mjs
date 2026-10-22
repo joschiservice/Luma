@@ -1,22 +1,15 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { transfersFixture } from './shopify-transfers-fixture.mjs';
 
 test('investigates exact transfer and receiving evidence in light, dark and narrow layouts', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const { f, item, mutations } = await transfersFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
@@ -51,10 +44,6 @@ test('investigates exact transfer and receiving evidence in light, dark and narr
       'Live location identity unavailable. The historical name does not establish a stock pool.',
     ),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-218-transfer-light.png',
-    fullPage: true,
-  });
   await page
     .getByRole('link', { name: 'Receiving shipment', exact: true })
     .click();
@@ -86,10 +75,6 @@ test('investigates exact transfer and receiving evidence in light, dark and narr
   await expect(
     page.getByRole('table', { name: 'Observed history' }),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-218-shipment-dark-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

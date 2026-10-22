@@ -1,14 +1,13 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('reviews imported order sources, links them, follows an old URL and unlinks', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const records = await ordersFixture(t, f);
   const a = await records.order({
@@ -49,13 +48,7 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     ],
   });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -114,10 +107,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
   ).toBeVisible();
   const listed = await f.request(f.owner, `${f.base}/orders?q=SO-10`);
   expect(listed.items.map((item) => item.id)).toEqual([a]);
-  await page.screenshot({
-    path: '/tmp/luma117-order-linked-light.png',
-    fullPage: true,
-  });
   await page.goto(`/app/${f.org.id}/orders/${b}`);
   await expect(page).toHaveURL(new RegExp(`/orders/${a}`));
   await expect(
@@ -125,7 +114,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
       exact: false,
     }),
   ).toBeVisible();
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -135,7 +123,6 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     ),
   ).toBe(true);
   await openLinks();
-  await panel.screenshot({ path: '/tmp/luma117-order-linked-dark-mobile.png' });
   await panel
     .locator('li')
     .filter({ has: page.getByText('JTL-Wawi', { exact: true }) })

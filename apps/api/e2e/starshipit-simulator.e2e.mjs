@@ -8,6 +8,7 @@ import { setupSimulator } from './simulator-fixture.mjs';
 
 test('Starshipit outage is detected through real sync and resolved only by a fresh complete scan', async (t) => {
   const f = await setupSimulator(t, {
+    imported: true,
     detection: {
       configuration: {
         ...defaultConfiguration,
@@ -120,7 +121,7 @@ test('Starshipit outage is detected through real sync and resolved only by a fre
 });
 
 test('Starshipit webhooks wake real reads and duplicates or old notifications cannot regress current tracking', async (t) => {
-  const f = await setupSimulator(t);
+  const f = await setupSimulator(t, { imported: true });
   const actor = await f.pilot.operator();
   const connectionId = f.manifest.connections.starshipit;
   const capabilities = await f.pilot.capabilities.discover(actor, connectionId);

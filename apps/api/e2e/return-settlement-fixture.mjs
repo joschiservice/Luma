@@ -6,7 +6,10 @@ import { expect } from 'vitest';
 import { setupSimulator } from './simulator-fixture.mjs';
 import { expectStoredWriteReceipts } from './write-receipts-fixture.mjs';
 
-/** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
+/**
+ * Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit.
+ * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
+ */
 export async function settlementFixture(
   t,
   {
@@ -16,9 +19,10 @@ export async function settlementFixture(
     resellable = 1,
     fulfillment = 'manual',
     environment,
+    imported = false,
   } = {},
 ) {
-  const f = environment ?? (await setupSimulator(t, { origin }));
+  const f = environment ?? (await setupSimulator(t, { origin, imported }));
   const org = f.manifest.organizationId,
     connectionId = f.manifest.connections.shopify;
   const root = `/v1/organizations/${org}`;

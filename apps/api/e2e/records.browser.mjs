@@ -1,14 +1,13 @@
 /* global document, window */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('searches scoped records and returns from a metric to the same cohort', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const fixture = await settingsFixture(t, origin);
   const seed = await seedMetricOrders(t, fixture);
   await seed(0);
@@ -47,13 +46,7 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   );
 
   const apiOrigin = await fixture.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1200, height: 900 },
@@ -76,20 +69,12 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   await page.getByRole('link', { name: /#1000/ }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
   await page.getByRole('heading', { name: 'Data from sources' }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma97-record-desktop.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma97-record-mobile.png',
-    fullPage: true,
-  });
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'All records' })

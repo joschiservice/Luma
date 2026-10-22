@@ -337,7 +337,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     const capability = recordCapabilities[claimed.recordType];
     try {
       const descriptor = (
-        await deps.reader.discover(tenant, claimed.connectionId)
+        await deps.reader.discover(tenant, claimed.connectionId, capability)
       ).find((item) => item.capability === capability);
       // Grants are checked when streams are prepared; an unusable connection is retried.
       if (!descriptor) {

@@ -12,7 +12,10 @@ import {
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
 
-/** Composes every adapter for local simulator fixtures, in the order of `factories`. */
+/**
+ * Composes every adapter for local simulator fixtures, in the order of `factories`.
+ * `cin7RequestIntervalMs` lowers Cin7 request pacing for a simulator that does not throttle.
+ */
 function fixtureProviders(options) {
   return [
     createJtlProvider({
@@ -32,6 +35,7 @@ function fixtureProviders(options) {
     createShopifyProvider(options),
     createCin7Provider({
       ...options,
+      requestIntervalMs: options.cin7RequestIntervalMs,
       purchasingTermsEnabled:
         options.purchasingTermsEnabled ??
         ((tenantId) =>

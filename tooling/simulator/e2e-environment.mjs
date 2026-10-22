@@ -1,3 +1,6 @@
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { createApp } from '../../apps/simulator/dist/app.js';
 import { createPilot } from '../pilot/runtime.mjs';
 import { seedPilot } from '../pilot/seed.mjs';
@@ -14,6 +17,11 @@ import { createOperationsClient } from './platform-client.mjs';
  * bridge and sync runner as the local stack. The run uses the deterministic `test` profile on
  * the profile's ERP with `calm` failures unless options choose otherwise; its clock only moves
  * when tests advance it. `observability` evaluates workspace releases such as Luma orders.
+ *
+ * `databaseUrl` serves an existing simulator database instead of a disposable one for `t`.
+ * With `manifest`, that database already holds the ready `operations` run and Luma's database
+ * the seeded workspace the manifest describes, for example copies of an imported scenario: the
+ * run and workspace are reused instead of created, and the manifest is pointed at this host.
  */
 export async function createSimulatorEnvironment({
   t,
@@ -30,6 +38,8 @@ export async function createSimulatorEnvironment({
   observability,
   modelGateway,
   supplierExtraction,
+  databaseUrl: existingDatabaseUrl,
+  manifest: existingManifest,
 }) {
   env = {
     FEATURE_FLAG_OVERRIDES:
@@ -37,7 +47,7 @@ export async function createSimulatorEnvironment({
     ...env,
   };
   const token = 'operational-simulator-test-token';
-  const databaseUrl = await testSimulatorDatabase(t);
+  const databaseUrl = existingDatabaseUrl ?? (await testSimulatorDatabase(t));
   let client;
   const simulator = await createApp({
     databaseUrl,
@@ -67,23 +77,32 @@ export async function createSimulatorEnvironment({
 
       return result;
     };
-    await call('runs', {
-      id: 'operations',
-      profile,
-      ...(erp ? { erp } : {}),
-      ...(historyDays === undefined ? {} : { historyDays }),
-      chaos,
-      seed: 44,
-      running: false,
-    });
+    if (!existingManifest)
+      await call('runs', {
+        id: 'operations',
+        profile,
+        ...(erp ? { erp } : {}),
+        ...(historyDays === undefined ? {} : { historyDays }),
+        chaos,
+        seed: 44,
+        running: false,
+      });
     const run = await waitForRun(call, 'operations');
-    const manifest = await seedPilot(saved, env, directory, 'healthy', false, {
-      endpoint: simulatorOrigin,
-      token,
-      runId: 'operations',
-      ...simulatorInstances(run),
-      ...(demo ? { demo } : {}),
-    });
+    const manifest = existingManifest
+      ? await useManifest(directory, existingManifest, simulatorOrigin)
+      : await seedPilot(saved, env, directory, 'healthy', false, {
+          endpoint: simulatorOrigin,
+          token,
+          runId: 'operations',
+          ...simulatorInstances(run),
+          ...(demo ? { demo } : {}),
+          // Cin7 pacing only spaces requests below a provider rate limit. Without simulated
+          // limits it would make journeys wait about a second per request without testing
+          // anything.
+          ...(run.chaosProfile.transport.rateLimits
+            ? {}
+            : { cin7RequestIntervalMs: 0 }),
+        });
     pilot = await createPilot(env, directory, manifest, temporal, {
       ...(modelGateway ? { modelGateway } : {}),
       ...(supplierExtraction ? { supplierExtraction } : {}),
@@ -154,4 +173,19 @@ export async function createSimulatorEnvironment({
     await simulator.close();
     throw error;
   }
+}
+
+/** Points a seeded workspace's manifest at the simulator host now serving its run. */
+async function useManifest(directory, manifest, endpoint) {
+  const current = {
+    ...manifest,
+    simulator: { ...manifest.simulator, endpoint },
+  };
+  await writeFile(
+    join(directory, 'pilot.json'),
+    `${JSON.stringify(current, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+
+  return current;
 }

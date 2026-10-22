@@ -1,22 +1,15 @@
 /* global document */
 import { automaticLinksFixture } from './automatic-links-fixture.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 
 test('previews and enables SKU and order rules, disables linking and keeps narrow layouts accessible', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await automaticLinksFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -47,10 +40,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
     page.getByText('1 match can be linked', { exact: true }),
   ).toBeVisible();
   await expect(page.getByText('auto-1', { exact: true })).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-light.png',
-    fullPage: true,
-  });
   await page.getByRole('button', { name: 'Enable automatic linking' }).click();
   await expect(
     page.getByText('Unique SKU code', { exact: true }),
@@ -71,10 +60,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
     page.getByText('Waiting for both connections', { exact: false }),
   ).toBeVisible();
   await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Preview matches' }).focus();
   await page.keyboard.press('Tab');
@@ -86,10 +71,6 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
       .getByRole('dialog')
       .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma140-auto-link-preview-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(
       () =>

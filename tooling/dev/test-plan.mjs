@@ -13,13 +13,23 @@ const build = [
   '--filter=@luma/staff-web',
 ];
 
-/** @type {Record<string, string[][]>} */
+// Timing scenarios, backend then browser, each with one worker: they measure Luma's speed, so
+// they must not compete with each other or with other journeys.
+const performanceScenarios = [
+  ['--filter', '@luma/api', 'test:e2e:performance'],
+  ['--filter', '@luma/api', 'test:browser:performance'],
+];
+
+/**
+ * A pnpm command, or a group of independent pnpm commands that run concurrently.
+ * @typedef {string[] | { parallel: string[][] }} Step
+ */
+
+/** @type {Record<string, Step[]>} */
 const suites = {
   check: [
-    ['format:check'],
-    ['lint'],
-    ['knip:check'],
-    ['typecheck'],
+    // Static checks read only sources, so they run together; tests and the build follow.
+    { parallel: [['format:check'], ['lint'], ['knip:check'], ['typecheck']] },
     ['test'],
     ['build'],
   ],
@@ -34,16 +44,27 @@ const suites = {
   ui: [['--filter', '@luma/ui', 'test']],
   e2e: [build, ['--filter', '@luma/api', 'test:e2e']],
   browser: [build, ['--filter', '@luma/api', 'test:browser']],
+  performance: [build, ...performanceScenarios],
   full: [
     ['setup:code'],
+    // Includes the build every later step uses; Turbo leaves cached outputs untouched.
     ['check'],
-    ['test:region-eu'],
-    ['test:e2e'],
-    ['test:browser'],
-    ['test:simulator'],
-    ['test:evaluation'],
-    ['evaluate:playbook'],
-    ['evaluate:code'],
+    // The shorter suites fit alongside backend journeys. Both journey suites at once saturate
+    // a 14-core machine, and journeys with tight time limits then fail. A journey that fails
+    // once under load is retried and reported as flaky; failing twice still fails the run.
+    {
+      parallel: [
+        ['--filter', '@luma/api', 'test:e2e', '--retry=1'],
+        ['test:region-eu'],
+        ['test:simulator'],
+        ['test:evaluation'],
+        ['evaluate:playbook'],
+        ['evaluate:code'],
+      ],
+    },
+    ['--filter', '@luma/api', 'test:browser', '--retries=1'],
+    // Last and on their own, so a busy machine does not distort the measurements.
+    ...performanceScenarios,
   ],
   workflows: [
     [
@@ -80,6 +101,9 @@ const suites = {
       '@luma/api',
       'test:e2e',
       'purchasing-cycle.e2e.mjs',
+      'purchasing-cycle-email.e2e.mjs',
+      'purchasing-cycle-availability.e2e.mjs',
+      'purchasing-cycle-bounce.e2e.mjs',
       'purchasing-native-receipt.e2e.mjs',
       'native-purchase-incoming.e2e.mjs',
       'purchase-order-changes.e2e.mjs',
@@ -135,13 +159,27 @@ const suites = {
       '@luma/api',
       'test:e2e',
       'simulator.e2e.mjs',
+      'simulator-records.e2e.mjs',
+      'simulator-detection.e2e.mjs',
       'stock-sync-stall.e2e.mjs',
       'starshipit-simulator.e2e.mjs',
       'starshipit-updates.e2e.mjs',
+      'starshipit-updates-refresh.e2e.mjs',
+      'starshipit-updates-restart.e2e.mjs',
+      'starshipit-updates-withheld.e2e.mjs',
       'shopify-shipment-publishing.e2e.mjs',
+      'shopify-shipment-publishing-lost-response.e2e.mjs',
+      'shopify-shipment-publishing-withheld.e2e.mjs',
       'order-line-links.e2e.mjs',
       'case-workflows.e2e.mjs',
+      'case-workflows-connections.e2e.mjs',
+      'case-workflows-demo.e2e.mjs',
+      'case-workflows-follow-ups.e2e.mjs',
+      'case-workflows-hold-release.e2e.mjs',
+      'case-workflows-stock-guards.e2e.mjs',
       'order-quantity-change.e2e.mjs',
+      'order-quantity-change-lost-response.e2e.mjs',
+      'order-quantity-change-warehouse.e2e.mjs',
       'inbox.e2e.mjs',
     ],
     [
@@ -174,22 +212,26 @@ const journeyFilters = {
 };
 
 /**
- * Returns isolated command arguments for a suite; rejects unsupported forwarding.
+ * Returns isolated command arguments for a suite; rejects unsupported forwarding. The
+ * performance suite accepts only name filters, which it passes to its backend and browser runs.
  * With `--affected`, unit tests run for affected Turbo tasks and journey suites run only the
  * selected journeys; a suite with no selected journeys returns no commands.
  * @param {string} suite
  * @param {string[]} extraArgs
  * @param {{ e2e: string[], browser: string[] }} [journeys] affected journey selection
+ * @returns {Step[]}
  */
 export function testCommands(suite, extraArgs = [], journeys) {
   if (suite === 'affected') {
     if (extraArgs.length)
       throw new Error('Test arguments are not supported for affected');
 
-    /** @type {string[][]} */
-    const e2e = testCommands('e2e', ['--affected'], journeys);
-    /** @type {string[][]} */
-    const browser = testCommands('browser', ['--affected'], journeys);
+    const e2e = /** @type {string[][]} */ (
+      testCommands('e2e', ['--affected'], journeys)
+    );
+    const browser = /** @type {string[][]} */ (
+      testCommands('browser', ['--affected'], journeys)
+    );
 
     // Both journey suites share one build.
     return [
@@ -200,10 +242,20 @@ export function testCommands(suite, extraArgs = [], journeys) {
     ];
   }
   const commands = Object.hasOwn(suites, suite)
-    ? suites[suite].map((args) => [...args])
+    ? structuredClone(suites[suite])
     : undefined;
   if (!commands) throw new Error(`Unknown test suite: ${suite}`);
   if (!extraArgs.length) return commands;
+  if (suite === 'performance') {
+    if (extraArgs.some((arg) => arg.startsWith('-')))
+      throw new Error('Performance arguments must be scenario name filters');
+    // Both suites receive each filter; a suite without matching scenarios passes.
+    const [, e2e, browser] = /** @type {string[][]} */ (commands);
+    e2e.push(...extraArgs, '--passWithNoTests');
+    browser.push(...extraArgs, '--pass-with-no-tests');
+
+    return commands;
+  }
   if (!['local', 'test', 'ui', 'e2e', 'browser'].includes(suite))
     throw new Error(
       'Test arguments are supported only for local, test, ui, e2e and browser',
@@ -217,7 +269,10 @@ export function testCommands(suite, extraArgs = [], journeys) {
       ...journeyFilters[suite](journeys[suite]),
     ];
   }
-  commands[commands.length - 1].push(...args);
+  const last = commands.at(-1);
+  if (!Array.isArray(last))
+    throw new Error('Test arguments need a single final command');
+  last.push(...args);
 
   return commands;
 }

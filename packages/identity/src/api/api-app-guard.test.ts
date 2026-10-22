@@ -90,6 +90,11 @@ function fixture() {
     listSecurityEvents: async () => [],
     setLanguage: async () => undefined,
     withUser: async (_userId, operation) => operation(tx),
+    memberOf: async (_userId, organizationId) => ({
+      member: await tx.findMembership(organizationId),
+      organization: await tx.findOrganization(organizationId),
+      erased: false,
+    }),
     apiCredentials,
   });
   const app = Fastify();

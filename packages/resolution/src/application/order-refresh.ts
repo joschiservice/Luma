@@ -176,7 +176,11 @@ export function createOrderRefresh(deps: {
     await record('orders.read', false);
     if (source.fulfillments) await record('fulfillment.read', false);
     const descriptor = (
-      await deps.capabilities.discover(context, source.connectionId)
+      await deps.capabilities.discover(
+        context,
+        source.connectionId,
+        'orders.read',
+      )
     ).find((item) => item.capability === 'orders.read');
     if (!descriptor?.filters?.includes('order')) return false;
     const order = await readOrder(context, source);

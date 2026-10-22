@@ -43,7 +43,9 @@ jobs:
             command: pnpm test:simulator
           - name: Playbook release evaluation
             cache: evaluation
-            command: pnpm test:evaluation && pnpm evaluate:playbook && pnpm evaluate:code
+            # Timing scenarios share this light job so no journey shard competes with them.
+            browser: '@luma/api'
+            command: pnpm test:evaluation && pnpm evaluate:playbook && pnpm evaluate:code && pnpm test:performance
           - name: Backend E2E (1/2)
             cache: e2e-1
             command: pnpm test:e2e $AFFECTED --shard=1/2
@@ -91,12 +93,12 @@ jobs:
         run: pnpm setup:code
       - run: ${{ matrix.command }}
       - name: Summarize performance budgets
-        if: always() && (startsWith(matrix.cache, 'browser-') || startsWith(matrix.cache, 'e2e-'))
+        if: always() && matrix.cache == 'evaluation'
         run: node tooling/performance/summary.mjs
       - uses: actions/upload-artifact@v4
-        if: always() && (startsWith(matrix.cache, 'browser-') || startsWith(matrix.cache, 'e2e-'))
+        if: always() && matrix.cache == 'evaluation'
         with:
-          name: performance-${{ matrix.cache }}
+          name: performance
           path: .luma/performance/
           include-hidden-files: true
           retention-days: 14
@@ -109,7 +111,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always() && startsWith(matrix.cache, 'browser-')
+        if: always() && (startsWith(matrix.cache, 'browser-') || matrix.cache == 'evaluation')
         with:
           name: playwright-${{ matrix.cache }}
           path: .luma/playwright/

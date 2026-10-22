@@ -8,16 +8,24 @@ export const root = fileURLToPath(new URL('../../', import.meta.url));
  * output or rejects with the child exit code. A repeated interrupt, or a graceful stop that
  * takes over ten seconds, kills the child; exiting this process kills it too. Pass logFd to
  * stream both outputs to a caller-owned file descriptor instead of the terminal; it overrides
- * capture. Aborting `signal` stops the child as SIGTERM would.
+ * capture. Pass `prefix` to stream each output line to this process's output behind that label,
+ * so concurrent commands stay readable. Aborting `signal` stops the child as SIGTERM would.
  * @param {string} command
  * @param {string[]} args
- * @param {{ env?: NodeJS.ProcessEnv, capture?: boolean, cwd?: string, logFd?: number, signal?: AbortSignal }} options
+ * @param {{ env?: NodeJS.ProcessEnv, capture?: boolean, cwd?: string, logFd?: number, signal?: AbortSignal, prefix?: string }} options
  * @returns {Promise<string>}
  */
 export function run(
   command,
   args,
-  { env = process.env, capture = false, cwd = root, logFd, signal } = {},
+  {
+    env = process.env,
+    capture = false,
+    cwd = root,
+    logFd,
+    signal,
+    prefix,
+  } = {},
 ) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -27,7 +35,7 @@ export function run(
       stdio:
         logFd !== undefined
           ? ['ignore', logFd, logFd]
-          : capture
+          : capture || prefix !== undefined
             ? ['ignore', 'pipe', 'pipe']
             : 'inherit',
     });
@@ -78,11 +86,38 @@ export function run(
     process.on('exit', orphan);
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
+    /**
+     * Writes complete lines behind the prefix and keeps a trailing partial line for later.
+     * @param {NodeJS.WriteStream} target
+     */
+    const lines = (target) => {
+      let pending = '';
+
+      return {
+        /**
+         * Adds output and writes every line it completes.
+         * @param {Buffer | string} chunk
+         */
+        write(chunk) {
+          const parts = (pending + chunk).split('\n');
+          pending = parts.pop() ?? '';
+          for (const line of parts) target.write(`${prefix} ${line}\n`);
+        },
+        flush() {
+          if (pending) target.write(`${prefix} ${pending}\n`);
+          pending = '';
+        },
+      };
+    };
+    const out = prefix === undefined ? undefined : lines(process.stdout);
+    const err = prefix === undefined ? undefined : lines(process.stderr);
     child.stdout?.on('data', (chunk) => {
-      output += chunk;
+      if (capture) output += chunk;
+      out?.write(chunk);
     });
     child.stderr?.on('data', (chunk) => {
-      output += chunk;
+      if (capture) output += chunk;
+      err?.write(chunk);
     });
     const clean = () => {
       clearTimeout(timer);
@@ -98,6 +133,8 @@ export function run(
     });
     child.once('close', (code, exitSignal) => {
       clean();
+      out?.flush();
+      err?.flush();
       if (code === 0 && !stopped) resolve(output.trim());
       else
         reject(

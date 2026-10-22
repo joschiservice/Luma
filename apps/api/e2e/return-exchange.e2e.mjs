@@ -32,7 +32,10 @@ async function expectStoredReads(f, operationId, { accepted = false } = {}) {
 }
 
 it('tracks an even exchange through lost responses without a second replacement fulfillment', async (t) => {
-  const f = await settlementFixture(t, { resolution: 'exchange' }),
+  const f = await settlementFixture(t, {
+      imported: true,
+      resolution: 'exchange',
+    }),
     { request, path, requester, approver } = f;
   const initial = await request(`${path}/exchange`);
   expect(initial.choiceStatus).toBe('ready');
@@ -148,7 +151,10 @@ it('tracks an even exchange through lost responses without a second replacement 
 });
 
 it('keeps a price difference unpaid and held until actual merchant payment and independently approved release', async (t) => {
-  const f = await settlementFixture(t, { resolution: 'exchange' }),
+  const f = await settlementFixture(t, {
+      imported: true,
+      resolution: 'exchange',
+    }),
     { request, path, approver, requester } = f;
   const choices = (await request(`${path}/exchange`)).choices,
     replacement = choices[0];
@@ -228,7 +234,10 @@ it('keeps a price difference unpaid and held until actual merchant payment and i
 });
 
 it('verifies a cheaper replacement refund only after actual money settlement and does not restock through Shopify', async (t) => {
-  const f = await settlementFixture(t, { resolution: 'exchange' });
+  const f = await settlementFixture(t, {
+    imported: true,
+    resolution: 'exchange',
+  });
   const { request, path, approver } = f;
   const replacement = (await request(`${path}/exchange`)).choices[0];
   const variant = (
@@ -301,7 +310,10 @@ it('verifies a cheaper replacement refund only after actual money settlement and
 });
 
 it('owns an unavailable replacement and hands off to refund only after governed cancellation without changing resale stock', async (t) => {
-  const f = await settlementFixture(t, { resolution: 'exchange' }),
+  const f = await settlementFixture(t, {
+      imported: true,
+      resolution: 'exchange',
+    }),
     { request, path, approver, requester } = f;
   const target = (await request(`${path}/settlements`)).targets.find(
     (t) => t.warehouse.externalId !== 'all-warehouses',

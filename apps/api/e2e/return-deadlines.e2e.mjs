@@ -19,7 +19,10 @@ const policy = () => ({
 });
 
 it('anchors owned overdue waits to actual partial receipt and inspection, deduplicates checks and retains policy history', async (t) => {
-  const environment = await caseWorkflowFixture(t, { timeSkipping: true });
+  const environment = await caseWorkflowFixture(t, {
+    imported: true,
+    timeSkipping: true,
+  });
   const f = await settlementFixture(t, { prepare: 'opened', environment });
   const input = policy();
   await f.request('/return-deadlines', input);
@@ -128,7 +131,7 @@ it('anchors owned overdue waits to actual partial receipt and inspection, dedupl
 });
 
 it('keeps native pending refunds overdue, verifies late actual payment and preserves a new owned evidence outage without another refund', async (t) => {
-  const f = await settlementFixture(t);
+  const f = await settlementFixture(t, { imported: true });
   await f.request('/return-deadlines', policy());
   const refund = await f.request(`${f.path}/settlements`, {
     id: randomUUID(),

@@ -118,6 +118,8 @@ async function createEnvironment() {
     accessToken: async () => 'ya29.synthetic-only',
     fetch,
     now: () => new Date(clock.now),
+    // Quota spacing is covered by the client tests; here it would only add real waiting.
+    pacer: { run: (_units, send) => send(), cooldown: () => {} },
   });
   const runtime = createCapabilityRuntime({
     resolve: async () => connector,
@@ -268,7 +270,7 @@ test('thread and attachment reads return the conversation and exact bytes', asyn
   assert.match(bytes.toString('latin1'), /^%PDF-1\.4/);
 });
 
-test('messages.send replies in the thread once, even after a lost response', async () => {
+test('messages.send replies in the thread once and never resends after a lost response', async () => {
   const environment = await createEnvironment();
   const thread = { externalId: environment.answer.threadId, scopeKey: '' };
   const reply = (outboundId) => ({
@@ -295,15 +297,29 @@ test('messages.send replies in the thread once, even after a lost response', asy
   assert.equal(sent.rfcMessageId, outboundMessageId('out-1', address));
   assert.equal(page.items.length, 3);
 
-  // Repeating the send finds the message instead of sending it again.
-  assert.deepEqual(await environment.send(reply('out-1'), 'send-2'), receipt);
+  // A repeated send finds the Message-ID and refuses; a search hit is not acceptance evidence.
+  const refused = {
+    failure: { code: 'conflict', effect: 'none', retry: 'never' },
+  };
+  await assert.rejects(environment.send(reply('out-1'), 'send-2'), refused);
   assert.equal(await environment.sentCount('out-1'), 1);
 
+  // After a lost response only a thread read can establish acceptance.
   environment.control.loseNextSend = true;
-  await assert.rejects(environment.send(reply('out-2')));
-  const retried = await environment.send(reply('out-2'), 'send-3');
-  assert.equal(retried.status, 'accepted');
+  await assert.rejects(
+    environment.send(reply('out-2')),
+    (error) => error.failure.effect === 'unknown',
+  );
+  await assert.rejects(environment.send(reply('out-2'), 'send-3'), refused);
   assert.equal(await environment.sentCount('out-2'), 1);
+  const verified = await environment.read('message-threads.read', {
+    thread,
+    limit: 100,
+  });
+  assert.equal(
+    verified.items.at(-1).data.rfcMessageId,
+    outboundMessageId('out-2', address),
+  );
 });
 
 test('rejected credentials fail reads without results', async () => {

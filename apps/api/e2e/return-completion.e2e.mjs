@@ -6,7 +6,7 @@ import { completionFixture } from './return-completion-fixture.mjs';
 import { citedReturnReads } from './return-settlement-fixture.mjs';
 
 it('independently completes stock, one reserved replacement and a settled net refund across Shopify and Wawi after lost write responses', async (t) => {
-  const f = await completionFixture(t);
+  const f = await completionFixture(t, { imported: true });
   const { request, path } = f;
   await request('/return-deadlines', {
     commandId: randomUUID(),

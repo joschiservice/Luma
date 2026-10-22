@@ -1,13 +1,12 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { syncFixture } from './sync-fixture.mjs';
 
 test('follows history import coverage, explains waits and pauses a sync', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await syncFixture(t, origin);
   await f.db.owner.query(
     `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,full_scan,started_at,outcome,pages,records,changed)
@@ -15,13 +14,7 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     [f.org.id, f.stream],
   );
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -64,7 +57,6 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     .getByText(/^Not part of this connection: /)
     .first()
     .waitFor();
-  await page.screenshot({ path: '/tmp/luma96-sync-light.png', fullPage: true });
 
   await f.db.owner.query(
     `UPDATE commerce_sync_streams SET lease_until=NULL,lease_token=NULL,
@@ -142,15 +134,6 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   await expect(
     page.getByText('50 of 120 orders', { exact: true }),
   ).toBeVisible();
-  await page.screenshot({
-    path: '/tmp/luma-sync-delayed-light.png',
-    fullPage: true,
-  });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma-sync-delayed-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -159,12 +142,7 @@ test('follows history import coverage, explains waits and pauses a sync', async 
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma-sync-delayed-mobile.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await f.db.owner.query(
     `UPDATE commerce_sync_streams SET lease_token=$2,lease_until=now()+interval '5 minutes'
       WHERE tenant_id=$1 AND id=$2`,
@@ -191,10 +169,6 @@ test('follows history import coverage, explains waits and pauses a sync', async 
   expect(await progress.getAttribute('aria-valuetext')).toBe(
     'The source is preparing an export',
   );
-  await page.screenshot({
-    path: '/tmp/luma122-sync-recent-light.png',
-    fullPage: true,
-  });
 
   await detail.getByRole('button', { name: 'Pause', exact: true }).click();
   // The outcome shows next to the sync it changed.
@@ -243,11 +217,6 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     ).rows,
   ).toEqual([{ paused: false }]);
 
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({
-    path: '/tmp/luma122-sync-recent-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -260,9 +229,5 @@ test('follows history import coverage, explains waits and pauses a sync', async 
     .getByText(/recent history complete/)
     .first()
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma122-sync-recent-mobile.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
 });

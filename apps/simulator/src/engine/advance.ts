@@ -246,6 +246,13 @@ async function everyMinute(world: World) {
 
 async function dueEvents(world: World, before: number) {
   const store = world.store(worldInstance);
+  // Checking the earliest event first lets a store that remembers reads skip idle minutes.
+  const next = await store.page<EngineEvent>({
+    kind: 'event',
+    order: 'updated',
+    limit: 1,
+  });
+  if (!next.items.some((record) => record.updatedAt < before)) return [];
   const page = await store.page<EngineEvent>({
     kind: 'event',
     order: 'updated',

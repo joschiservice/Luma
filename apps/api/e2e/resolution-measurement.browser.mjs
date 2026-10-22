@@ -1,16 +1,14 @@
 /* global document, window */
-import { mkdir } from 'node:fs/promises';
 
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import { seedResolutionMeasurement } from './resolution-measurement-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 test('explains measured and unknown outcomes, exposes evidence, and recovers from failure and access loss', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort(),
-    origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const a = await seedResolutionMeasurement(f);
   const human = await seedResolutionMeasurement(f);
@@ -24,13 +22,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
   await seedResolutionMeasurement(f, { verified: false });
   await seedResolutionMeasurement(f, { synthetic: true });
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
@@ -102,17 +94,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
     .getByRole('option', { name: 'Live operations', exact: true })
     .click();
   await expect(value('verified')).toHaveText('2');
-  await mkdir('/tmp/luma80-ui', { recursive: true });
   await section.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma80-ui/desktop-light.png',
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({
-    path: '/tmp/luma80-ui/desktop-dark.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   await section.scrollIntoViewIfNeeded();
   expect(
@@ -120,19 +102,11 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma80-ui/mobile-dark.png',
-    fullPage: true,
-  });
   await section.locator('[data-metric="resolution.human"]').click();
   await dialog.getByText('A person helped', { exact: true }).waitFor();
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
-  await page.screenshot({
-    path: '/tmp/luma80-ui/mobile-cohort.png',
-    fullPage: true,
-  });
   await page.keyboard.press('Escape');
   // A failed read hides prior claims; retry loads authoritative facts again.
   // Only the resolution part of the page's metric summary fails.

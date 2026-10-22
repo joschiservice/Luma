@@ -9,13 +9,13 @@ import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { createPilot } from '../../../tooling/pilot/runtime.mjs';
 import { seedPilot } from '../../../tooling/pilot/seed.mjs';
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, database, secret, startProcess } from './helpers.mjs';
+import { database, secret } from './helpers.mjs';
 
 test('refreshes an expired proposal automatically, preserves the review, and executes one approved change', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -83,13 +83,7 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
     { available: true, minimumRisk: 'high' },
   );
   const apiOrigin = await pilot.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -120,10 +114,6 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   ).toBe(0);
   const reason = page.getByLabel('Reason for your decision (required)');
   await reason.fill('Apply the checked shipping correction');
-  await page.screenshot({
-    path: '/tmp/luma-approval-ready.png',
-    fullPage: true,
-  });
   const providerPath = join(directory, `provider-${manifest.runId}.json`);
   const originalState = await pilot.provider();
   await writeFile(
@@ -203,13 +193,4 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   }
   expect((await pilot.provider()).patchRequests).toBe(1);
   expect(errors).toEqual([]);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByText('Confirmed by a fresh check', { exact: true })
-    .first()
-    .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: '/tmp/luma-approval-mobile.png',
-    fullPage: true,
-  });
 });

@@ -1,22 +1,16 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess, until } from './helpers.mjs';
+import { until } from './helpers.mjs';
 import { invitationProof, settingsFixture } from './settings-fixture.mjs';
 
 test('manages workspace preferences and the complete invitation journey on desktop and narrow screens', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -96,10 +90,6 @@ test('manages workspace preferences and the complete invitation journey on deskt
   expect(await page.getByLabel('Workspace name').inputValue()).toBe(
     'Northstar Japan',
   );
-  await page.screenshot({
-    path: '/tmp/luma63-workspace-desktop.png',
-    fullPage: true,
-  });
   const overview = await context.newPage();
   await overview.goto(`/app/${f.org.id}/home`);
   // Workspace times leave the zone out and name it in the title, such as "… 15:39:02 GMT+9".
@@ -162,10 +152,6 @@ test('manages workspace preferences and the complete invitation journey on deskt
     page.getByRole('button', { name: 'Save changes', exact: true }),
   ).toBeDisabled();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: '/tmp/luma63-approvals-mobile.png',
-    fullPage: true,
-  });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= 390),
   ).toBe(true);
@@ -222,10 +208,6 @@ test('manages workspace preferences and the complete invitation journey on deskt
     .getByRole('heading', { name: 'Workspace unavailable' })
     .waitFor();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({
-    path: '/tmp/luma63-team-desktop.png',
-    fullPage: true,
-  });
   await f.request(
     f.owner,
     `${f.base}/members/${f.membership.id}`,
@@ -253,18 +235,12 @@ test('manages workspace preferences and the complete invitation journey on deskt
 
 test('stores the language picked in the browser on the account for email', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await settingsFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(apiOrigin);
   const context = await t.newContext({ baseURL: origin });
   await context.addCookies([
     ...f.member.cookie.split('; ').map((value) => {

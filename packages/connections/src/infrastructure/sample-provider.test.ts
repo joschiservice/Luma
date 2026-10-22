@@ -96,6 +96,13 @@ describe.each(['api', 'deterministic_browser'] as const)(
         schemaVersion: 1,
       });
     });
+    it('discovers one capability by resolving only that capability', async () => {
+      const { runtime, resolve } = fixture(mechanism);
+      await runtime.discover(context, 'connection-a', 'inventory.read');
+      expect(resolve).toHaveBeenCalledWith(context, 'connection-a', {
+        capability: 'inventory.read',
+      });
+    });
     it('bridges an action to execution without provider or mechanism branches', async () => {
       const { runtime } = fixture(mechanism);
       const intent: EffectIntent = {

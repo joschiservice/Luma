@@ -46,7 +46,7 @@ the shared rules for values, dates, groups and cursors described for
 
 Each read scans the tenant's profiles. 50,000 profiles stayed under 100 ms locally; larger
 tenants need a maintained search projection like the Orders list. Re-measure with
-`LUMA_CUSTOMER_BENCHMARK=<profile count>` on `customers.e2e.mjs`.
+`LUMA_CUSTOMER_BENCHMARK=<profile count> pnpm test:performance customers`.
 
 Search text can contain names and email addresses, so the page keeps it in page state only:
 never in the URL, saved views, remembered list state or browser storage, and paging trails are

@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import {
   acceptanceProvenance,
+  beforeDispatch,
   type ReadProvenance,
   settledDispatch,
   sourceTime,
@@ -282,7 +283,9 @@ export function createInventoryCorrectionProvider(
           retry: 'never',
           dispatch: 'not_dispatched',
         });
-      const current = await read(input.inventoryItemId, input.locationId);
+      const current = await beforeDispatch(() =>
+        read(input.inventoryItemId, input.locationId),
+      );
       if (
         !current.complete ||
         !current.tracked ||

@@ -1,6 +1,5 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
 import {
   quantityChangeFixture,
   workflow,
@@ -8,22 +7,16 @@ import {
 
 test('shows the operator what each system reports and lets the warehouse answer the dispatch task in Needs you', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const f = await quantityChangeFixture(t, { origin });
   await f.activate(workflow);
   await f.changeQuantity('1');
   const opened = await f.caseOpened();
   const run = await f.run();
   await f.waitFor(workflow, run.id, 'waiting');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(f.apiOrigin);
   const signedIn = async (cookie) => {
     const context = await t.newContext({
       baseURL: origin,

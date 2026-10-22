@@ -36,13 +36,15 @@ end
 if op == 'acquire' then
   local existing = redis.call('HGET', key, 'r:' .. id)
   if existing then local r = cjson.decode(existing); save(); return {1, r.cost, r.untilAt} end
-  local cost = n('c:' .. shape, 1000)
+  -- Shopify's reported cost for this shape wins; a cost calculated from the document is used until then.
+  local learned, calculated = tonumber(redis.call('HGET', key, 'c:' .. shape)), tonumber(ARGV[8])
+  local cost = learned or calculated or 1000
   local known = n('known', 0) == 1
   local reserve = 0
   if purpose ~= 'foreground' and known then
-    -- A first background probe may borrow one second of restore; requiring a completely full bucket would starve cost discovery.
-    local measured = redis.call('HEXISTS', key, 'c:' .. shape) == 1
-    reserve = math.min(measured and 1000 or math.max(0, 1000 - rate), math.max(0, capacity - cost))
+    -- Background work leaves one single-query maximum: the largest foreground read plus its pending mutation fits.
+    -- A first background probe of an uncosted shape may borrow one second of restore; requiring a completely full bucket would starve cost discovery.
+    reserve = math.min((learned or calculated) and 1000 or math.max(0, 1000 - rate), math.max(0, capacity - cost))
   end
   local mutation = ARGV[7] == '1'
   local wait = math.max(0, cooldown - now)

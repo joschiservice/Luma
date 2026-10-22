@@ -107,7 +107,14 @@ export async function acquireValidation(root, { owner, signal, onWait } = {}) {
 export function runsJourneys(args) {
   return (
     args.includes('@luma/api') &&
-    (args.includes('test:e2e') || args.includes('test:browser'))
+    args.some((arg) =>
+      [
+        'test:e2e',
+        'test:browser',
+        'test:e2e:performance',
+        'test:browser:performance',
+      ].includes(arg),
+    )
   );
 }
 

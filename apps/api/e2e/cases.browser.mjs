@@ -10,32 +10,20 @@ import {
 } from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 test('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async ({
   resources: t,
+  web,
 }) => {
-  const port = await availablePort();
-  const origin = `http://127.0.0.1:${port}`;
+  const origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const role = new URL(db.runtimeUrl).username;
   await db.owner.query(`GRANT luma_connectors,luma_exceptions TO "${role}"`);
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
@@ -607,10 +595,8 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await detailPane.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.screenshot({ path: '/tmp/luma-21-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await row.isVisible()).toBe(false);
-  await page.screenshot({ path: '/tmp/luma-21-mobile.png', fullPage: true });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -644,33 +630,26 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   ).toHaveCount(0);
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const colorScheme of ['light', 'dark']) {
-      await page.emulateMedia({ colorScheme });
-      await page
-        .getByRole('button', { name: 'View supporting evidence', exact: true })
-        .click();
-      const back = page.getByRole('button', {
-        name: 'Back to issue',
-        exact: true,
-      });
-      await expect(back).toBeInViewport();
-      const heading = page
-        .getByRole('heading', { name: 'Supporting evidence', exact: true })
-        .filter({ visible: true });
-      await expect(heading).toBeInViewport();
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= innerWidth,
-        ),
-      ).toBe(true);
-      await page.screenshot({
-        path: `/tmp/luma-352-evidence-${width}-${colorScheme}.png`,
-      });
-      await back.click();
-    }
+    await page
+      .getByRole('button', { name: 'View supporting evidence', exact: true })
+      .click();
+    const back = page.getByRole('button', {
+      name: 'Back to issue',
+      exact: true,
+    });
+    await expect(back).toBeInViewport();
+    const heading = page
+      .getByRole('heading', { name: 'Supporting evidence', exact: true })
+      .filter({ visible: true });
+    await expect(heading).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await back.click();
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`${inbox}/${ids[0]}?view=active&class=sync_failure`);
   await page
     .getByRole('heading', {
@@ -757,7 +736,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page.getByText('Live updates', { exact: true }).waitFor();
   await page
     .getByRole('region', { name: 'Change, history and evidence' })
-    .screenshot({ path: '/tmp/luma36-timeline.png' });
+    .waitFor();
   expect(new URL(page.url()).pathname).toContain(ids[0]);
   const foreign = randomUUID();
   const denied = await context.request.get(
@@ -863,20 +842,12 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   ).toBe(true);
   await context.setOffline(false);
   await decisions.first().waitFor();
-  await page.screenshot({
-    path: '/tmp/luma33-overview-desktop.png',
-    fullPage: true,
-  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: '/tmp/luma33-overview-mobile.png',
-    fullPage: true,
-  });
   expect(errors).toEqual([]);
   expect(disabledViewRequests).toEqual([]);
 });

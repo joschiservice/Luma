@@ -11,7 +11,7 @@ import {
 } from './return-settlement-fixture.mjs';
 
 it('separately verifies resale stock and a lost-response refund without restocking damaged units or duplicating money', async (t) => {
-  const f = await settlementFixture(t);
+  const f = await settlementFixture(t, { imported: true });
   const {
     root,
     requester,

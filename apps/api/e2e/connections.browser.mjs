@@ -2,13 +2,7 @@
 import { readdirSync } from 'node:fs';
 
 import { expect, test } from './browser-fixtures.mjs';
-import {
-  availablePort,
-  createAccount,
-  database,
-  startApi,
-  startProcess,
-} from './helpers.mjs';
+import { createAccount, database, startApi } from './helpers.mjs';
 
 let origin;
 // The web build names each workspace app's lazy UI chunk after the app.
@@ -16,22 +10,15 @@ const appChunk = new RegExp(
   `/assets/app-(${readdirSync(new URL('../../../packages/apps/', import.meta.url)).join('|')})-`,
 );
 
-async function fixture(t) {
-  const port = await availablePort();
-  origin = `http://127.0.0.1:${port}`;
+async function fixture(t, web) {
+  origin = web.origin;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const role = new URL(db.runtimeUrl).username;
   await db.owner.query(`GRANT luma_connectors TO "${role}"`);
   const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
-  const web = startProcess(
-    t,
-    'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
-    true,
-  );
-  await web.message('listening');
+  await web.route(api.origin);
   const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
@@ -100,9 +87,10 @@ async function save(page, label) {
 
 test('connects JTL targets, validates, replaces invalid credentials and disconnects', async ({
   resources: t,
+  web,
 }) => {
   const { page, context, db, errors, organizationId, appModules } =
-    await fixture(t);
+    await fixture(t, web);
   expect(await page.title()).toBe('Luma');
   await setup(page, 'JTL Cloud', 'Main shop', 'invalid-test-token');
   expect(appModules).toContain('jtl');
@@ -159,11 +147,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     .getByRole('listitem')
     .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
   await jtlSummary.getByText('2 connections', { exact: true }).waitFor();
-  await page.screenshot({
-    path: '/tmp/luma-apps-overview.png',
-    fullPage: true,
-    animations: 'disabled',
-  });
   expect(
     await page.getByRole('article', { name: 'Main shop', exact: true }).count(),
   ).toBe(0);
@@ -198,11 +181,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   ).toBe('page');
   await shop.getByText('Importing', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Refresh list' }).focus();
-  await page.screenshot({
-    path: '/tmp/luma-34-desktop.png',
-    fullPage: true,
-    animations: 'disabled',
-  });
   const listed = await context.request.get(
     `/api/v1/organizations/${organizationId}/connections`,
   );
@@ -240,11 +218,6 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   const dialogBox = await page.getByRole('dialog').boundingBox();
   expect(dialogBox.y).toBeGreaterThanOrEqual(0);
   expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(844);
-  await page.screenshot({
-    path: '/tmp/luma-34-mobile.png',
-    fullPage: false,
-    animations: 'disabled',
-  });
   await page.getByRole('button', { name: 'Confirm disconnect' }).click();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
   expect(
@@ -346,8 +319,9 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
 
 test('preserves non-secret input on errors, handles stale versions and unavailable service', async ({
   resources: t,
+  web,
 }) => {
-  const { page, context, organizationId } = await fixture(t);
+  const { page, context, organizationId } = await fixture(t, web);
   await setup(page, 'JTL Cloud', 'Keep this name');
   await page
     .getByLabel('JTL Cloud tenant ID')
@@ -418,8 +392,9 @@ test('preserves non-secret input on errors, handles stale versions and unavailab
 
 test('starts Shopify authorization without token fields and reports callback outcomes', async ({
   resources: t,
+  web,
 }) => {
-  const { page, errors } = await fixture(t);
+  const { page, errors } = await fixture(t, web);
   await page.route('**/apps/shopify/access', (route) =>
     route.fulfill({
       status: 200,
@@ -485,8 +460,9 @@ test('starts Shopify authorization without token fields and reports callback out
 
 test('keeps basic Wawi access independent of an explicitly requested exchange reservation read', async ({
   resources: t,
+  web,
 }) => {
-  const { page, context, organizationId } = await fixture(t);
+  const { page, context, organizationId } = await fixture(t, web);
   await setup(page, 'JTL Cloud', 'Exchange read');
   await page
     .getByLabel('JTL Cloud tenant ID')
