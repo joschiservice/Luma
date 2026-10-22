@@ -73,6 +73,9 @@ this question. Resolved citations carry the record's source labels, `observedAt`
 | Deadline                   | 60 s              | 503, combined with client disconnects                  |
 | Tool result size           | 12,000 characters | Items dropped from the end with `omitted`              |
 
+Questions also count against the per-person request limit and the workspace's daily token
+budget shared by all model features; see [Model gateway](model-gateway.md#request-limits-and-daily-budgets).
+
 Model failures map to fixed 503 reasons. Nothing retries or falls back beyond gateway
 behavior; asking again is safe because nothing is written.
 

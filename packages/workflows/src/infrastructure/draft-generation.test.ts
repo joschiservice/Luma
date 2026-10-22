@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { builtInMembership, makeTenantContext } from '@luma/identity';
-import type { ModelGateway, ModelRequest } from '@luma/platform';
-import { ModelGatewayError } from '@luma/platform';
+import type {
+  ModelGateway,
+  ModelRequest,
+  ModelRequestLimit,
+} from '@luma/platform';
+import { ModelGatewayError, RateLimitedError } from '@luma/platform';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -281,6 +285,7 @@ function setup(
     timeoutMs?: number;
     improvementEvidence?: ImprovementEvidence;
     improvementsEnabled?: boolean;
+    requestLimit?: ModelRequestLimit;
   } = {},
 ) {
   const drafts = new Map<string, StoredWorkflowDraft>();
@@ -385,6 +390,7 @@ function setup(
     now: () => new Date('2026-09-28T10:00:00Z'),
     trace: (item) => ({ requestId: item.requestId, traceId: 't', spanId: 's' }),
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+    ...(options.requestLimit ? { requestLimit: options.requestLimit } : {}),
     improvements: {
       enabled: async () => options.improvementsEnabled ?? false,
       evidence: async () => {
@@ -779,6 +785,29 @@ describe('draft generation', () => {
         outcome: 'valid',
       }),
     ]);
+  });
+
+  it('applies the request limit to new requests only, before any model call', async () => {
+    const admitted: string[] = [];
+    let open = true;
+    const env = setup([{ output: answer(replenish) }], {
+      requestLimit: async (tenantId, actorId) => {
+        if (!open) throw new RateLimitedError('Too many requests.', 30);
+        admitted.push(`${tenantId}:${actorId}`);
+      },
+    });
+    const request = describeRequest();
+    const asker = context('admin');
+    await env.generation.describe(asker, request);
+    open = false;
+
+    // A retry of the same request replays its result without counting again.
+    await env.generation.describe(asker, request);
+    await expect(
+      env.generation.describe(asker, describeRequest()),
+    ).rejects.toMatchObject({ statusCode: 429, retryAfterSeconds: 30 });
+    expect(admitted).toEqual([`${asker.tenantId}:${asker.actor.id}`]);
+    expect(env.requests).toHaveLength(1);
   });
 
   it('proposes step-level changes and applies them only when accepted at the same revision', async () => {

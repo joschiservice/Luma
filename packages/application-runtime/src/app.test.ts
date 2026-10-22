@@ -649,6 +649,7 @@ it('composes model-backed work with routes selected by startup configuration', a
         'workflow.run',
         async (context) =>
           app.modelGateway!.generate(context, {
+            tenantId: 'tenant-1',
             profile: 'reasoning',
             dataPolicy: {
               classification: 'public',
@@ -728,6 +729,7 @@ it('composes the EU authoring route from startup configuration', async () => {
   );
   const root = observability.request(randomUUID());
   const result = await gateway.generate(root.context, {
+    tenantId: 'tenant-1',
     profile: authoringModelProfile,
     dataPolicy: {
       classification: 'sensitive',
@@ -752,6 +754,7 @@ it('composes the EU authoring route from startup configuration', async () => {
   );
   await expect(
     unconfigured.generate(root.context, {
+      tenantId: 'tenant-1',
       profile: authoringModelProfile,
       dataPolicy: {
         classification: 'sensitive',

@@ -2,7 +2,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 import type { CaseService } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import type { ModelGateway, Observability } from '@luma/platform';
+import type {
+  ModelGateway,
+  ModelRequestLimit,
+  Observability,
+} from '@luma/platform';
 import type {
   CustomerWorkspace,
   FulfillmentWorkspace,
@@ -47,6 +51,8 @@ export { assistantModelProfile } from './application/assistant.js';
  */
 export function createWorkspaceAssistant(deps: {
   gateway: ModelGateway | null;
+  /** Limits how often one person may ask; without it only the gateway's budgets apply. */
+  requestLimit?: ModelRequestLimit | undefined;
   availability: AssistantAvailability;
   reads: {
     orders: Pick<OrderWorkspace, 'list' | 'get'>;
@@ -70,6 +76,7 @@ export function createWorkspaceAssistant(deps: {
 }) {
   return createAssistant({
     gateway: deps.gateway,
+    requestLimit: deps.requestLimit,
     availability: deps.availability,
     contextualEnabled: deps.contextualEnabled,
     tools: createToolRegistry([

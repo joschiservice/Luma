@@ -53,6 +53,7 @@ import { createRoleIdentityReader } from '@luma/identity/composition';
 import type {
   FeatureFlag,
   ModelGateway,
+  ModelRequestLimit,
   Observability,
   TenantDatabase,
 } from '@luma/platform';
@@ -151,6 +152,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
   identity: Pick<IdentityService, 'refreshContext'>;
   observability?: Observability;
   model?: ModelGateway;
+  modelRequestLimit?: ModelRequestLimit;
   modelAvailable?: boolean;
   owners: {
     orders: OrderWorkspace;
@@ -806,7 +808,12 @@ export function createAdaptiveWorkspaceRuntime(options: {
         .slice(0, 16),
     }),
     ...(options.model && options.modelAvailable
-      ? { model: options.model }
+      ? {
+          model: options.model,
+          ...(options.modelRequestLimit
+            ? { requestLimit: options.modelRequestLimit }
+            : {}),
+        }
       : {}),
   };
   const views: AdaptiveViews = createAdaptiveViews(database, viewOptions);

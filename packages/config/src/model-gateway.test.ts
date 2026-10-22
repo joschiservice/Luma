@@ -26,7 +26,22 @@ const bedrockEnv = {
 it('disables model calls by default', () => {
   expect(
     readModelGatewayConfig({ LUMA_REGION: 'EU', LUMA_ENABLED_REGIONS: 'EU' }),
-  ).toEqual({ dataRegion: 'EU', routes: {}, timeoutMs: 30000 });
+  ).toEqual({
+    dataRegion: 'EU',
+    routes: {},
+    timeoutMs: 30000,
+    tenantDailyTokens: 5_000_000,
+  });
+});
+
+it('reads the daily token budget per tenant', () => {
+  expect(
+    readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
+      MODEL_TENANT_DAILY_TOKENS: '250000',
+    }).tenantDailyTokens,
+  ).toBe(250_000);
 });
 
 it('loads a provider-independent profile next to a Bedrock authoring route', () => {
@@ -54,6 +69,7 @@ it('loads Bedrock credentials for an EU region', () => {
     dataRegion: 'EU',
     routes: { authoring },
     timeoutMs: 30000,
+    tenantDailyTokens: 5_000_000,
     bedrock: {
       region: 'eu-central-1',
       credentials: {
@@ -122,6 +138,9 @@ it.each([
   { MODEL_GATEWAY_TIMEOUT_MS: '0' },
   { MODEL_GATEWAY_TIMEOUT_MS: '120001' },
   { MODEL_GATEWAY_TIMEOUT_MS: 'NaN' },
+  { MODEL_TENANT_DAILY_TOKENS: '999' },
+  { MODEL_TENANT_DAILY_TOKENS: '1000000001' },
+  { MODEL_TENANT_DAILY_TOKENS: 'off' },
 ])('rejects invalid or partial configuration', (env) => {
   expect(() => readModelGatewayConfig(env)).toThrow();
 });

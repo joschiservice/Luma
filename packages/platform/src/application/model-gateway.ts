@@ -45,6 +45,8 @@ export interface ModelDataPolicy {
 }
 
 export interface ModelRequest<T = string> {
+  /** The authorized tenant whose daily token budget the call counts against; never request input. */
+  readonly tenantId: string;
   readonly profile: string;
   readonly dataPolicy: ModelDataPolicy;
   readonly messages: readonly ModelMessage[];
@@ -122,8 +124,29 @@ export type ModelErrorCode =
   | 'invalid_output'
   | 'provider_error'
   | 'rate_limited'
+  | 'budget_exhausted'
   | 'timeout'
   | 'aborted';
+
+/**
+ * A tenant's daily model token allowance, shared by every process. The gateway checks it before
+ * each call and records the tokens each call used, so calls running together can overrun the
+ * allowance by their own usage. Implementations must not reject: an unavailable store weakens
+ * the budget instead of blocking model calls.
+ */
+export interface ModelTokenBudget {
+  exhausted(tenantId: string): Promise<boolean>;
+  spend(tenantId: string, tokens: number): Promise<void>;
+}
+
+/**
+ * Admits one model-backed request by a person in a tenant, before any model call. Throws a 429
+ * `RateLimitedError` with the seconds to wait when they sent too many recently.
+ */
+export type ModelRequestLimit = (
+  tenantId: string,
+  actorId: string,
+) => Promise<void>;
 
 export class ModelGatewayError extends Error {
   constructor(readonly code: ModelErrorCode) {
@@ -134,7 +157,8 @@ export class ModelGatewayError extends Error {
 
 /**
  * Routes model requests through approved profiles, enforcing input policy, structured output
- * validation, and telemetry boundaries.
+ * validation, and telemetry boundaries. With a `budget`, a tenant that used its daily tokens
+ * gets `budget_exhausted` before its request reaches a provider.
  */
 export function createRoutedModelGateway(
   routes: Readonly<Record<string, ModelRoute>>,
@@ -142,6 +166,7 @@ export function createRoutedModelGateway(
   observability: Observability,
   now: () => number,
   policy: ModelRoutingPolicy = (request) => request.profile,
+  budget?: ModelTokenBudget,
 ): ModelGateway {
   // Snapshot trusted configuration so a policy callback cannot relax later requests.
   const configured = Object.freeze(
@@ -167,6 +192,7 @@ export function createRoutedModelGateway(
         async (_context, observation) => {
           if (request.signal?.aborted) throw new ModelGatewayError('aborted');
           if (
+            !request.tenantId ||
             !request.messages.length ||
             !Number.isSafeInteger(request.maxOutputTokens) ||
             request.maxOutputTokens < 1 ||
@@ -211,6 +237,8 @@ export function createRoutedModelGateway(
           )
             throw new ModelGatewayError('invalid_request');
           validateToolHistory(request.messages, tools);
+          if (await budget?.exhausted(request.tenantId))
+            throw new ModelGatewayError('budget_exhausted');
           const started = now();
           try {
             const result = await adapter.generate(route, request);
@@ -225,6 +253,11 @@ export function createRoutedModelGateway(
                   result.usage.costUsd < 0))
             )
               throw new ModelGatewayError('invalid_output');
+            // Unreadable output still used the provider's tokens.
+            await budget?.spend(
+              request.tenantId,
+              result.usage.inputTokens + result.usage.outputTokens,
+            );
             observation.generation({
               model: route.model,
               ...result.usage,

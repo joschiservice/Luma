@@ -40,6 +40,7 @@ export type {
   ModelGateway,
   ModelMessage,
   ModelRequest,
+  ModelRequestLimit,
   ModelSchema,
   ModelTool,
   ModelUsage,
@@ -53,5 +54,10 @@ export type {
 } from './domain/metric.js';
 
 export type { AtomicStore } from './application/atomic-store.js';
+
+export {
+  createRequestCounter,
+  type RequestCounter,
+} from './application/request-counter.js';
 
 export type { DataRegion } from './application/model-gateway.js';

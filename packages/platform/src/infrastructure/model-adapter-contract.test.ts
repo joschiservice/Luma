@@ -336,6 +336,7 @@ describe.each([vercel, bedrock])('$name model adapter contract', (fixture) => {
     const request = <T = string>(
       overrides: Partial<ModelRequest<T>> = {},
     ): ModelRequest<T> => ({
+      tenantId: 'tenant-1',
       profile: 'contract',
       dataPolicy: fixture.dataPolicy,
       messages: [

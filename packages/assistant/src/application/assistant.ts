@@ -10,6 +10,7 @@ import type {
   ModelErrorCode,
   ModelGateway,
   ModelMessage,
+  ModelRequestLimit,
   Observability,
   TraceContext,
 } from '@luma/platform';
@@ -143,6 +144,8 @@ function failureReason(code: ModelErrorCode) {
       return 'The question was cancelled.';
     case 'rate_limited':
       return 'The model is busy. Try again in a minute.';
+    case 'budget_exhausted':
+      return 'This workspace used today’s allowance for model features. Try again tomorrow.';
     case 'route_denied':
     case 'adapter_unavailable':
       return 'The regional model route isn’t available right now. Whoever runs this Luma server needs to check the assistant route.';
@@ -163,6 +166,8 @@ function failureReason(code: ModelErrorCode) {
 export function createAssistant(deps: {
   gateway: ModelGateway | null;
   availability: AssistantAvailability;
+  /** Throws 429 when the person sent too many model-backed requests recently. */
+  requestLimit?: ModelRequestLimit | undefined;
   tools: ToolRegistry;
   contextualEnabled?:
     ((context: TenantContext) => Promise<boolean>) | undefined;
@@ -261,8 +266,8 @@ export function createAssistant(deps: {
 
     /**
      * Answers one question; requires `assistant.use`. Throws 503 with a reason, without calling
-     * a model, when the assistant is unavailable, and 503 when the model fails, times out or is
-     * cancelled. Access is checked again before every model call and batch of reads: the model
+     * a model, when the assistant is unavailable, 429 when the person asked too often, and 503
+     * when the model fails, times out, is cancelled or the workspace used its daily tokens. Access is checked again before every model call and batch of reads: the model
      * is offered only tools the person may use, and a removed member gets no further data.
      */
     async ask(
@@ -280,6 +285,7 @@ export function createAssistant(deps: {
         throw forbidden(
           'Contextual assistance is not enabled for this workspace.',
         );
+      await deps.requestLimit?.(current.tenantId, current.actor.id);
       const gateway = deps.gateway;
       const timeout = AbortSignal.timeout(limits.timeoutMs);
       const signal = options.signal
@@ -383,6 +389,7 @@ export function createAssistant(deps: {
               const tools = deps.tools.declarations(current);
               const result = await untilAborted(
                 gateway.generate(trace, {
+                  tenantId: context.tenantId,
                   profile: assistantModelProfile,
                   dataPolicy: { ...dataPolicy, region: context.dataRegion },
                   messages,

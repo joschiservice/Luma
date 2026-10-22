@@ -36,6 +36,7 @@ import {
   createDatabasePool,
   createModelGateway,
   createTenantDatabase,
+  createValkeyStore,
 } from '@luma/platform/composition';
 import {
   createPurchasingTermsImporter,
@@ -225,10 +226,20 @@ export async function createDefaultCommerceSyncWorker(
   const resources = createResourceScope();
   const log = createFailureLog(observability);
   try {
+    // Mailbox reading counts against the same tenant token budgets as the API.
+    const budgetStore = identitySettings.rateLimit?.store
+      ? createValkeyStore(
+          identitySettings.rateLimit.store.url,
+          identitySettings.rateLimit.store.cluster,
+        )
+      : undefined;
+    if (budgetStore) resources.add(() => budgetStore.close());
     const model =
       modelSettings && observability
         ? {
-            gateway: createModelGateway(modelSettings, observability),
+            gateway: createModelGateway(modelSettings, observability, {
+              ...(budgetStore ? { budgetStore } : {}),
+            }),
             settings: modelSettings,
           }
         : undefined;

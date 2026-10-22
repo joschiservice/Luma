@@ -57,11 +57,11 @@ export const workflowGenerationContract = {
       path: `${authoring}/describe`,
       summary: 'Start a draft from a description',
       description:
-        'Requires `workflows.author`. Describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Reuse the same ID and body after an uncertain response.',
+        'Requires `workflows.author`. Describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.',
     })
     .meta({
       access: requires('workflows.author'),
-      errors: [401, 403, 404, 409, 503],
+      errors: [401, 403, 404, 409, 429, 503],
     })
     .input(
       z.object({
@@ -76,11 +76,11 @@ export const workflowGenerationContract = {
       path: `${drafts}/proposals`,
       summary: 'Propose a change from an instruction',
       description:
-        'Requires `workflows.author`. Describe a change to the revision you loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.',
+        'Requires `workflows.author`. Describe a change to the revision you loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.',
     })
     .meta({
       access: requires('workflows.author'),
-      errors: [401, 403, 404, 409, 503],
+      errors: [401, 403, 404, 409, 429, 503],
     })
     .input(z.object({ params: draftParams, body: refineWorkflowDraftSchema }))
     .output(draftProposalSchema),
@@ -118,11 +118,11 @@ export const workflowGenerationContract = {
       path: `${drafts}/code-step-suggestions`,
       summary: 'Suggest a Code Step from a description',
       description:
-        'Requires `workflows.author`. Describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.',
+        'Requires `workflows.author`. Describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.',
     })
     .meta({
       access: requires('workflows.author'),
-      errors: [401, 403, 404, 409, 503],
+      errors: [401, 403, 404, 409, 429, 503],
     })
     .input(
       z.object({ params: draftParams, body: codeStepSuggestionRequestSchema }),

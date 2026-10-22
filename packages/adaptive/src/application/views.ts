@@ -4,7 +4,12 @@ import {
   requireChangesAllowed,
   requireTenant,
 } from '@luma/identity';
-import type { ModelGateway, ModelSchema, TraceContext } from '@luma/platform';
+import type {
+  ModelGateway,
+  ModelRequestLimit,
+  ModelSchema,
+  TraceContext,
+} from '@luma/platform';
 import {
   authoringModelProfile,
   canonicalJson,
@@ -176,6 +181,8 @@ export interface ViewsDependencies {
     complete: boolean;
   }>;
   model?: ModelGateway;
+  /** Throws 429 when the person sent too many model-backed requests recently. */
+  requestLimit?: ModelRequestLimit;
   trace(context: TenantContext): TraceContext;
   id(): string;
   now(): Date;
@@ -689,6 +696,7 @@ export function createViewsService(deps: ViewsDependencies) {
           warnings: [],
           preview: null,
         };
+      await deps.requestLimit?.(fresh.tenantId, fresh.actor.id);
       const identities = (await deps.identities?.(fresh)) ?? {
         items: [],
         complete: false,
@@ -700,6 +708,7 @@ export function createViewsService(deps: ViewsDependencies) {
         const result = await deps.model.generate<
           Omit<AdaptiveViewDraft, 'preview'>
         >(deps.trace(fresh), {
+          tenantId: fresh.tenantId,
           profile: authoringModelProfile,
           dataPolicy: {
             classification: 'sensitive',
@@ -799,7 +808,10 @@ export function createViewsService(deps: ViewsDependencies) {
           status: 'unavailable',
           query: null,
           explanation:
-            'View generation could not produce a validated query. You can build a view manually.',
+            error instanceof ModelGatewayError &&
+            error.code === 'budget_exhausted'
+              ? 'This workspace used today’s allowance for model features. You can build a view manually, or generate one tomorrow.'
+              : 'View generation could not produce a validated query. You can build a view manually.',
           warnings: [],
           preview: null,
         };

@@ -20,7 +20,7 @@ import type { DataRegion } from '../domain/context.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect } from './access.js';
 import { apiTokenRegion, hashApiToken } from './api-tokens.js';
-import { createRequestCounter } from './rate-limit.js';
+import { createAuthRequestCounter } from './rate-limit.js';
 import { workspaceTransaction } from './settings.js';
 
 type CredentialJson = Omit<ApiCredential, 'status'> & { status: string };
@@ -49,7 +49,7 @@ export function createApiCredentials(
   region: DataRegion,
   limits: { enabled: boolean; store?: AtomicStore },
 ): ApiCredentials {
-  const count = createRequestCounter(limits.store);
+  const count = createAuthRequestCounter(limits.store);
 
   return {
     async resolve(token) {

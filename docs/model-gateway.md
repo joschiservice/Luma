@@ -15,7 +15,9 @@ flowchart TD
   adapter -->|no| unavailable["adapter_unavailable"]
   adapter -->|yes| data{"Region and retention fit the data policy?"}
   data -->|no| denied
-  data -->|yes| account{"Bedrock account: no retention, no payload logging?"}
+  data -->|yes| budget{"Tenant within its daily tokens?"}
+  budget -->|no| exhausted["budget_exhausted"]
+  budget -->|yes| account{"Bedrock account: no retention, no payload logging?"}
   account -->|no| unavailable
   account -->|yes| destinations{"Every profile destination in the jurisdiction?"}
   destinations -->|no| denied
@@ -56,6 +58,7 @@ retention and invocation logging in each profile destination, before enabling te
 | `MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY` | Required for `bedrock` routes; server-only secret                                                      |
 | `MODEL_GATEWAY_BEDROCK_SESSION_TOKEN`     | Set only with temporary AWS credentials; server-only secret                                            |
 | `MODEL_GATEWAY_TIMEOUT_MS`                | Request timeout, including Bedrock account checks and reading the response; 1–120000 ms, default 30000 |
+| `MODEL_TENANT_DAILY_TOKENS`               | Input and output tokens each tenant may use per UTC day; 1000–1000000000, default 5000000              |
 
 `apps/api/.env.example` has route examples for every profile. Unknown profiles, empty
 provider lists, partial credentials and invalid route settings fail closed, and route
@@ -125,6 +128,7 @@ zero-retention requests.
 | Throttled by Bedrock                                                                         | `rate_limited`                                                         |
 | Other Bedrock errors                                                                         | `provider_error`                                                       |
 | Deadline reached or caller cancelled                                                         | `timeout` or `aborted`                                                 |
+| Tenant used its daily tokens                                                                 | `budget_exhausted`, before the prompt is sent                          |
 | Truncated, filtered, refused or malformed output                                             | `invalid_output`                                                       |
 
 ### Workflow authoring profile
@@ -162,6 +166,28 @@ their table facts.
 
 `assistant` ([Ask Luma](assistant.md)) sends questions, earlier turns and read results. The
 model must support tool use.
+
+## Request limits and daily budgets
+
+Model calls are expensive and share the cell's regional provider quota, so one person or
+workspace must not be able to use it up for everyone. Two limits apply:
+
+| Limit                 | Scope                                         | Applies to                                                                  | On reaching it                                             |
+| --------------------- | --------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Ten requests a minute | One person in one tenant, across all features | Ask Luma questions, workflow describe, refine and Code Step, view drafting  | 429 `TOO_MANY_REQUESTS` with `Retry-After`; no model call  |
+| Daily tokens          | One tenant, per UTC day                       | Every gateway call, including mailbox document and supplier message reading | `budget_exhausted`; each feature reports it as unavailable |
+
+Services check the request limit after authorization and availability and before building
+model input; replays of a stored workflow result do not count. The gateway checks the daily
+budget before each call and adds the call's input and output tokens afterwards, including
+calls whose output is unreadable. Calls already running can therefore overrun the budget by
+their own usage. Every `ModelRequest` carries the authorized `tenantId` for this; never take
+it from request input.
+
+Both counters live in the Valkey named by `AUTH_RATE_LIMIT_URL`, shared by the API and the
+sync process, with keys holding hashes rather than tenant or person IDs. Without that setting,
+or while Valkey is unreachable, each process counts in its own memory, so limits weaken to
+per-process ones instead of blocking model features.
 
 ## Bedrock regional adapter
 
@@ -207,6 +233,7 @@ return `provider_error` without reading the body. Bedrock reports tokens but not
 
 ## Requests and outputs
 
+- `tenantId` is required and counts the call against that tenant's daily budget.
 - `maxOutputTokens` is required (1–32768). An optional `AbortSignal` cancels a call.
 - Structured output takes a `ModelSchema` with a stable name, JSON Schema and matching
   parser. The gateway parses and validates the response locally for every adapter; keep

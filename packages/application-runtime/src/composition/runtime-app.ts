@@ -21,6 +21,7 @@ import { createFailureLog, type Observability } from '@luma/platform';
 import {
   createDatabasePool,
   createModelGateway,
+  createModelRequestLimit,
   createTenantDatabase,
   createValkeyStore,
 } from '@luma/platform/composition';
@@ -77,14 +78,10 @@ export async function buildRuntimeApp(
     };
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');
-  const modelGateway =
-    modelSettings && observability
-      ? createModelGateway(modelSettings, observability)
-      : undefined;
   const resources = createResourceScope();
   const log = createFailureLog(observability);
   try {
-    // Auth rate limits share counters with every API instance when a store is configured.
+    // Auth and model limits share counters with every API instance when a store is configured.
     const rateLimitStore =
       settings.rateLimitStore ??
       (settings.rateLimit?.store
@@ -95,6 +92,12 @@ export async function buildRuntimeApp(
         : undefined);
     if (rateLimitStore && !settings.rateLimitStore)
       resources.add(() => rateLimitStore.close());
+    const modelGateway =
+      modelSettings && observability
+        ? createModelGateway(modelSettings, observability, {
+            ...(rateLimitStore ? { budgetStore: rateLimitStore } : {}),
+          })
+        : undefined;
     const identity = createIdentity({
       ...settings,
       ...(rateLimitStore ? { rateLimitStore } : {}),
@@ -224,7 +227,13 @@ export async function buildRuntimeApp(
         // Without connection settings, purchase orders, returns and mailboxes stay local.
         providerRuntimes: !!connections,
         ...(modelGateway && modelSettings
-          ? { model: { gateway: modelGateway, settings: modelSettings } }
+          ? {
+              model: {
+                gateway: modelGateway,
+                settings: modelSettings,
+                requestLimit: createModelRequestLimit(rateLimitStore),
+              },
+            }
           : {}),
         ...(observability ? { observability } : {}),
       },

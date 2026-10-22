@@ -29,6 +29,7 @@ import type {
 import { notFound } from '@luma/platform';
 import {
   createModelGateway,
+  createModelRequestLimit,
   createObservability,
 } from '@luma/platform/composition';
 import { describe, expect, it, vi } from 'vitest';
@@ -110,6 +111,8 @@ function setup(
     ) => Promise<ReturnType<typeof makeTenantContext>>;
     limits?: Parameters<typeof createWorkspaceAssistant>[0]['limits'];
     items?: ReturnType<typeof orderItem>[];
+    requestLimit?: boolean;
+    tenantDailyTokens?: number;
   } = {},
 ) {
   const requests: ModelRequest<unknown>[] = [];
@@ -154,6 +157,9 @@ function setup(
         },
       },
       timeoutMs: 30_000,
+      ...(options.tenantDailyTokens
+        ? { tenantDailyTokens: options.tenantDailyTokens }
+        : {}),
     },
     observability,
     { bedrock: adapter },
@@ -174,6 +180,9 @@ function setup(
   const spans: Operation[] = [];
   const assistant = createWorkspaceAssistant({
     gateway,
+    ...(options.requestLimit
+      ? { requestLimit: createModelRequestLimit() }
+      : {}),
     contextualEnabled: async () => options.contextual ?? false,
     availability:
       options.available === false
@@ -340,6 +349,41 @@ describe('workspace assistant', () => {
       message: 'Configure the assistant route.',
     });
     expect(requests).toHaveLength(0);
+  });
+
+  it('rejects the 11th assistant question within a minute with 429', async () => {
+    const { assistant, requests } = setup(Array(11).fill('No open orders.'), {
+      requestLimit: true,
+    });
+    for (let index = 0; index < 10; index++)
+      await assistant.ask(context(), question);
+
+    await expect(assistant.ask(context(), question)).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'TOO_MANY_REQUESTS',
+      retryAfterSeconds: 60,
+    });
+    expect(requests).toHaveLength(10);
+    // The limit is per person: a colleague can still ask.
+    await expect(
+      assistant.ask(context('colleague-id'), question),
+    ).resolves.toMatchObject({ outcome: 'answered' });
+  });
+
+  it('stops answering once the workspace used its daily tokens', async () => {
+    // Each model call in this setup uses 120 tokens.
+    const { assistant, requests } = setup(Array(3).fill('No open orders.'), {
+      tenantDailyTokens: 200,
+    });
+    await assistant.ask(context(), question);
+    await assistant.ask(context('colleague-id'), question);
+
+    await expect(assistant.ask(context(), question)).rejects.toMatchObject({
+      statusCode: 503,
+      message:
+        'This workspace used today’s allowance for model features. Try again tomorrow.',
+    });
+    expect(requests).toHaveLength(2);
   });
 
   it('gives nothing to someone who is no longer a member', async () => {

@@ -6,7 +6,11 @@ import {
   createInstalledReturnRuntime,
   createInstalledRuntime,
 } from '@luma/connections/composition';
-import type { ModelGateway, Observability } from '@luma/platform';
+import type {
+  ModelGateway,
+  ModelRequestLimit,
+  Observability,
+} from '@luma/platform';
 
 import type { ApplicationOptions } from './application.js';
 import {
@@ -39,6 +43,7 @@ export type HostApplicationOptions = Pick<
   | 'returns'
   | 'messaging'
   | 'modelGateway'
+  | 'modelRequestLimit'
   | 'authoring'
   | 'supplierExtraction'
   | 'assistant'
@@ -56,13 +61,18 @@ export type HostApplicationOptions = Pick<
  * Provider runtimes record no telemetry: owners keep the observations they use as evidence.
  * Without `providerRuntimes`, purchase orders, returns and mailboxes stay local; the API uses
  * that when it runs without connection settings. Without `model`, every model-backed feature
- * reports that model routes aren't configured.
+ * reports that model routes aren't configured; `model.requestLimit` limits how often each person
+ * may ask, where people send model-backed requests.
  */
 export function applicationOptionsFor(
   host: AppHost,
   settings: {
     providerRuntimes?: boolean;
-    model?: { gateway: ModelGateway; settings: ModelGatewayConfig };
+    model?: {
+      gateway: ModelGateway;
+      settings: ModelGatewayConfig;
+      requestLimit?: ModelRequestLimit;
+    };
     observability?: Observability;
   } = {},
 ): HostApplicationOptions {
@@ -103,6 +113,7 @@ export function applicationOptionsFor(
           },
         }),
     ...(model ? { modelGateway: model.gateway } : {}),
+    ...(model?.requestLimit ? { modelRequestLimit: model.requestLimit } : {}),
     authoring: authoringAvailability(model?.settings, !!model),
     supplierExtraction: supplierExtractionAvailability(
       model?.settings,

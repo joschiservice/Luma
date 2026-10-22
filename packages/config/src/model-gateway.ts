@@ -22,6 +22,11 @@ export interface ModelGatewayConfig {
     };
   };
   timeoutMs: number;
+  /**
+   * Input and output tokens each tenant may use per UTC day, across all model features. The
+   * reader always sets it; without it, tenants have no daily budget.
+   */
+  tenantDailyTokens?: number;
 }
 
 /**
@@ -37,6 +42,15 @@ export function readModelGatewayConfig(
   const timeout = env.MODEL_GATEWAY_TIMEOUT_MS ?? '30000';
   if (!/^\d+$/.test(timeout) || Number(timeout) < 1 || Number(timeout) > 120000)
     throw new Error('MODEL_GATEWAY_TIMEOUT_MS must be between 1 and 120000');
+  const dailyTokens = env.MODEL_TENANT_DAILY_TOKENS ?? '5000000';
+  if (
+    !/^\d+$/.test(dailyTokens) ||
+    Number(dailyTokens) < 1000 ||
+    Number(dailyTokens) > 1_000_000_000
+  )
+    throw new Error(
+      'MODEL_TENANT_DAILY_TOKENS must be between 1000 and 1000000000',
+    );
   let raw: unknown;
   try {
     raw = JSON.parse(env.MODEL_GATEWAY_ROUTES ?? '{}');
@@ -104,6 +118,7 @@ export function readModelGatewayConfig(
     dataRegion,
     routes,
     timeoutMs: Number(timeout),
+    tenantDailyTokens: Number(dailyTokens),
     ...(apiKey ? { apiKey } : {}),
     ...(bedrock ? { bedrock } : {}),
   };

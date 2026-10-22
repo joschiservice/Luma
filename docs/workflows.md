@@ -374,6 +374,9 @@ one. Generation never publishes, activates, approves or starts anything.
   Examples use only values in scope, and grants only the steps directly after the Code Step.
 - **Retries:** every command takes a request ID. The same ID and body return the stored
   result; another body returns 409. Failed requests are recorded, so resending is safe.
+- **Limits:** new describe, refine and Code Step requests count against the
+  [per-person request limit](model-gateway.md#request-limits-and-daily-budgets); replays
+  of a stored result do not.
 
 **Server checks.** The output schema lists only the workspace's installed vocabulary, but
 the server does not rely on it. Every answer goes through draft validation; errors go back

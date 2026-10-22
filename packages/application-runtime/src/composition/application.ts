@@ -49,6 +49,7 @@ import {
 } from '@luma/orders/composition';
 import type {
   ModelGateway,
+  ModelRequestLimit,
   Observability,
   TenantDatabase,
 } from '@luma/platform';
@@ -294,6 +295,8 @@ export interface ApplicationOptions {
   desk?: Parameters<typeof createDeskServices>[3];
   /** Generates workflow drafts from descriptions. Without it, describing workflows is unavailable. */
   modelGateway?: ModelGateway;
+  /** Limits how often one person may send requests that call a model. Without it, only budgets apply. */
+  modelRequestLimit?: ModelRequestLimit;
   /** Whether the gateway has a regional zero-retention route for authoring, and why not. */
   authoring?: { available: boolean; reason: string | null };
   /** Trusted isolated admission and committed recovery evaluation; absent means unavailable. */
@@ -1014,6 +1017,7 @@ export function createApplicationServices(
       replenishment,
       release: purchasingRelease,
       modelGateway: options.modelGateway,
+      modelRequestLimit: options.modelRequestLimit,
       availability: options.authoring,
       improvementControls: options.workflowImprovementControls,
     },
@@ -1107,6 +1111,7 @@ export function createApplicationServices(
     contextualEnabled: (context) =>
       purchasingRelease(context.tenantId, 'contextual-record-assistance'),
     gateway: options.modelGateway ?? null,
+    requestLimit: options.modelRequestLimit,
     availability: options.assistant ?? { available: false, reason: null },
     reads: {
       orders,
@@ -1127,6 +1132,9 @@ export function createApplicationServices(
     identity,
     ...(options.observability ? { observability: options.observability } : {}),
     ...(options.modelGateway ? { model: options.modelGateway } : {}),
+    ...(options.modelRequestLimit
+      ? { modelRequestLimit: options.modelRequestLimit }
+      : {}),
     modelAvailable: options.authoring?.available ?? false,
     owners: {
       orders,

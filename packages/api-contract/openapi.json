@@ -16002,7 +16002,7 @@
       "post": {
         "operationId": "adaptiveViews.generate",
         "summary": "Draft a view from a description",
-        "description": "Proposes a constrained query in format 2 and its preview. Saving requires explicit review. Ambiguous identities and unsupported requests need clarification.",
+        "description": "Proposes a constrained query in format 2 and its preview. Saving requires explicit review. Ambiguous identities and unsupported requests need clarification. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`.",
         "tags": ["adaptiveViews"],
         "parameters": [
           {
@@ -16944,6 +16944,16 @@
           },
           "422": {
             "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
             "content": {
               "application/json": {
                 "schema": {
@@ -22868,7 +22878,7 @@
       "post": {
         "operationId": "assistant.ask",
         "summary": "Ask a question about your workspace",
-        "description": "Answers a question from the orders, issues, stock, fulfillment, customer profiles and returns you can see in this workspace. Luma reads current records for every question, with your access, and never changes anything. Citation markers in `content` link to the records the answer used, with their source and observation time. Send earlier turns in `history` for follow-up questions; Luma does not store conversations. Optional context rereads a selected record or exact chart filters before answering; it requires contextual assistance to be enabled for this workspace. Each answer is limited in reads, length and time; when a limit is reached, `outcome` is `incomplete`. Returns 503 with a reason when the assistant is unavailable here or the model fails, times out or returns nothing usable.",
+        "description": "Answers a question from the orders, issues, stock, fulfillment, customer profiles and returns you can see in this workspace. Luma reads current records for every question, with your access, and never changes anything. Citation markers in `content` link to the records the answer used, with their source and observation time. Send earlier turns in `history` for follow-up questions; Luma does not store conversations. Optional context rereads a selected record or exact chart filters before answering; it requires contextual assistance to be enabled for this workspace. Each answer is limited in reads, length and time; when a limit is reached, `outcome` is `incomplete`. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Returns 503 with a reason when the assistant is unavailable here, the workspace used its daily allowance for model features, or the model fails, times out or returns nothing usable.",
         "tags": ["assistant"],
         "parameters": [
           {
@@ -23301,6 +23311,16 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
             "content": {
               "application/json": {
                 "schema": {
@@ -191424,7 +191444,7 @@
       "post": {
         "operationId": "workflowGeneration.describe",
         "summary": "Start a draft from a description",
-        "description": "Requires `workflows.author`. Describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.",
         "tags": ["workflowGeneration"],
         "parameters": [
           {
@@ -192799,6 +192819,16 @@
               }
             }
           },
+          "429": {
+            "description": "429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "500",
             "content": {
@@ -192826,7 +192856,7 @@
       "post": {
         "operationId": "workflowGeneration.refine",
         "summary": "Propose a change from an instruction",
-        "description": "Requires `workflows.author`. Describe a change to the revision you loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe a change to the revision you loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.",
         "tags": ["workflowGeneration"],
         "parameters": [
           {
@@ -196550,6 +196580,16 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
             "content": {
               "application/json": {
                 "schema": {
@@ -205119,7 +205159,7 @@
       "post": {
         "operationId": "workflowGeneration.codeStep",
         "summary": "Suggest a Code Step from a description",
-        "description": "Requires `workflows.author`. Describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Each person may send ten requests a minute to model-backed features; more return 429 with `Retry-After`. Reuse the same ID and body after an uncertain response.",
         "tags": ["workflowGeneration"],
         "parameters": [
           {
@@ -205584,6 +205624,16 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
             "content": {
               "application/json": {
                 "schema": {

@@ -103,6 +103,7 @@ const answer: ModelSchema<{ answer: string }> = {
 };
 
 const request: ModelRequest<unknown> = {
+  tenantId: 'tenant-1',
   profile: authoringModelProfile,
   dataPolicy: {
     classification: 'sensitive',

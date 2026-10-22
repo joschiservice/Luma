@@ -1,7 +1,11 @@
 import { createAuditLog } from '@luma/audit/composition';
 import { createPlaybookGrantReader } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
-import type { ModelGateway, TenantDatabase } from '@luma/platform';
+import type {
+  ModelGateway,
+  ModelRequestLimit,
+  TenantDatabase,
+} from '@luma/platform';
 import { createReplenishmentScenarios } from '@luma/procurement';
 import {
   createShippingMethodTemplate,
@@ -52,6 +56,7 @@ export function createWorkflowAuthoring(options: {
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
   release: ReturnType<typeof createTenantFeatureRelease>;
   modelGateway?: ModelGateway | undefined;
+  modelRequestLimit?: ModelRequestLimit | undefined;
   availability?: { available: boolean; reason: string | null } | undefined;
   improvementControls?: WorkflowImprovementControls | undefined;
 }): WorkflowAuthoring {
@@ -136,6 +141,7 @@ export function createWorkflowAuthoring(options: {
       options.improvementControls,
     ),
     gateway: options.modelGateway ?? null,
+    requestLimit: options.modelRequestLimit,
     availability: options.availability ?? {
       available: false,
       reason: 'Describing workflows isn’t set up on this server.',

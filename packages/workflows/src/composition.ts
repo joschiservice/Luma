@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import type {
   ModelGateway,
+  ModelRequestLimit,
   TenantDatabase,
   TraceContext,
 } from '@luma/platform';
@@ -452,6 +453,7 @@ export function createDraftGenerations(
     drafts: WorkflowDrafts;
     gateway: ModelGateway | null;
     availability: GenerationAvailability;
+    requestLimit?: ModelRequestLimit | undefined;
     refreshContext(context: TenantContext): Promise<TenantContext>;
     improvements?: Parameters<typeof createDraftGeneration>[0]['improvements'];
   },
@@ -459,6 +461,7 @@ export function createDraftGenerations(
   return createDraftGeneration({
     gateway: deps.gateway,
     availability: deps.availability,
+    ...(deps.requestLimit ? { requestLimit: deps.requestLimit } : {}),
     drafts: deps.drafts,
     store: createGenerationStore(db),
     outputs: { draft: draftOutput, codeStep: codeStepOutput },
@@ -579,6 +582,7 @@ export function createAuthoringHarness(deps: {
       const draftId = randomUUID();
 
       return generateDraft({
+        tenantId: 'authoring-evaluation',
         dataRegion: deps.dataRegion,
         gateway: deps.gateway,
         trace: generationTrace({ requestId: draftId }),
