@@ -379,7 +379,18 @@ export async function purchasingCycleFixture(
     await api(`/messaging/mailboxes/${f.manifest.connections.gmail}/sync`, {});
     await f.pilot.messaging.sync({ passes: 5 });
   };
+  /**
+   * Lets `milliseconds` pass after now and moves Luma's clock to the simulator's. A paused
+   * simulator clock lags the real time Luma recorded earlier steps with, so the first advance
+   * first catches up; later advances start from the simulator time Luma already uses.
+   */
   const advance = async (milliseconds) => {
+    const lag = Date.now() - (await f.call('runs/operations')).clock.now;
+    if (lag > 0)
+      await f.call('runs/operations/control', {
+        action: 'advance',
+        milliseconds: lag,
+      });
     const run = await f.call('runs/operations/control', {
       action: 'advance',
       milliseconds,
