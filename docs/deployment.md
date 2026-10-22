@@ -81,6 +81,12 @@ With `luma:<stage>:domain`, the stack creates a hosted zone and an `au.app.<doma
 delegate the domain to the name servers in the stack output, then redeploy. Changing the
 host changes every origin: sessions end and provider OAuth callbacks must be updated.
 
+The passkey relying-party ID is the stage domain (or the `sslip.io` name without one), not
+the `au.app.` host, so every regional cell shares it as ADR-003 requires; set
+`luma:production:domain` to `luma.ai`. Set the domain before customers register passkeys:
+changing it, including adding a domain to a stage that ran on `sslip.io`, invalidates every
+registered passkey.
+
 The staff console runs only after `host/TAILNET`, `host/TS_AUTHKEY` and the `staff/`
 settings exist. The tailnet needs MagicDNS and HTTPS certificates, and the auth key should
 be reusable, pre-approved and tagged. The console is

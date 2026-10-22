@@ -89,6 +89,8 @@ render_environment() {
   # au.app.203-0-113-10.sslip.io, so Caddy can still obtain a public certificate.
   [[ -n $domain ]] || domain="$(imds public-ipv4 | tr . -).sslip.io"
   app_host="au.app.$domain"
+  # Passkeys bind to the stage domain, not the cell host, as ADR-003 requires. Changing it later
+  # invalidates every registered passkey.
   tailnet=$(parameter host/TAILNET)
   staff_node="luma-$LUMA_STAGE-staff"
   staff_api_node="luma-$LUMA_STAGE-au-staff-api"
@@ -130,6 +132,7 @@ WORKFLOW_DATABASE_URL=postgresql://luma_worker:$(parameter generated/WORKER_DATA
 BETTER_AUTH_SECRET=$(parameter generated/BETTER_AUTH_SECRET)
 BETTER_AUTH_URL=https://$app_host
 AUTH_TRUSTED_ORIGINS=https://$app_host
+AUTH_PASSKEY_RP_ID=$domain
 AUTH_CLIENT_IP_HEADER=x-forwarded-for
 AUTH_RATE_LIMIT_URL=$valkey
 SHOPIFY_ADMISSION_URL=$valkey
