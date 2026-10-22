@@ -151,10 +151,13 @@ EOF
 
   # Each runtime login and the auth secret reach only the containers that use them. The API is
   # a Temporal client; the workers read members through their own login.
+  # Passkeys bind to the stage domain, not the cell host, as ADR-003 requires. Changing it later
+  # invalidates every registered passkey.
   cat >"$env/api.env" <<EOF
 IDENTITY_DATABASE_URL=postgresql://luma_api:$(parameter generated/API_DATABASE_PASSWORD)@postgres:5432/luma
 BETTER_AUTH_SECRET=$(parameter generated/BETTER_AUTH_SECRET)
 AUTH_TRUSTED_ORIGINS=https://$app_host
+AUTH_PASSKEY_RP_ID=$domain
 AUTH_CLIENT_IP_HEADER=x-forwarded-for
 AUTH_RATE_LIMIT_URL=$valkey
 EOF
