@@ -111,6 +111,25 @@ renews it 30 days before expiry and restarts Temporal.
 Changing the instance image or type through CDK replaces the instance. The new host waits
 until the old one releases the data volume, then restores the last deployment.
 
+## Capacity
+
+PostgreSQL allows 150 connections. Luma's pools can open 84 (sync's share grows with
+`COMMERCE_SYNC_CONCURRENCY` and `COMMERCE_SYNC_WORKSPACE_CONCURRENCY`) and Temporal's 32;
+the rest covers superuser slots, migrations, backups and operator sessions. Check the
+budget in `compose.yaml` before raising a pool or the sync concurrency, and compare it with
+`pg_stat_activity` under load.
+
+Each deploy divides the host's memory among the containers by share, with a floor per
+service, and sizes PostgreSQL's buffers and Valkey's `maxmemory` from the same plan. On the
+8 GiB production host the limits leave about a fifth of memory unassigned; on the 4 GiB
+staging host they add up to about all of its memory, so they only cap a runaway service. A container that
+exceeds its limit is killed and restarted. Node heaps take a percentage of their container
+limit; the worker keeps half of its limit for Code Step processes.
+
+Valkey keeps `noeviction` because Shopify admission state must not disappear. Every key
+expires, so usage follows traffic. When Valkey is full, its writes fail and Shopify
+admission fails conservatively until keys expire.
+
 ## Operations
 
 - Open a shell with SSM Session Manager; no SSH port exists. Run host commands with
