@@ -35,10 +35,10 @@
     "@orpc/server": "catalog:",
     "@orpc/standard-server-fastify": "catalog:",
     "better-auth": "catalog:",
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "0.45.4",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "resend": "6.32.1",
+    "resend": "6.34.1",
     "@luma/platform": "workspace:*"
   },
   "devDependencies": {

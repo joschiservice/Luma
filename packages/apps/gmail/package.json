@@ -25,7 +25,7 @@
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "catalog:",
     "fastify": "catalog:",
-    "jose": "6.2.12",
+    "jose": "6.2.13",
     "react": "catalog:",
     "zod": "catalog:",
     "@luma/config": "workspace:*"

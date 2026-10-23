@@ -23,7 +23,7 @@
   "dependencies": {
     "@langfuse/otel": "5.11.1",
     "@opentelemetry/api": "catalog:",
-    "@opentelemetry/api-logs": "0.222.0",
+    "@opentelemetry/api-logs": "0.223.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.222.0",
     "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
@@ -36,12 +36,12 @@
     "@opentelemetry/sdk-metrics": "2.11.0",
     "@opentelemetry/sdk-node": "0.222.0",
     "@opentelemetry/sdk-trace-node": "catalog:",
-    "@pyroscope/nodejs": "0.6.3",
+    "@pyroscope/nodejs": "0.6.5",
     "@sentry/node": "10.75.0",
     "@sentry/opentelemetry": "10.75.0",
     "@valkey/valkey-glide": "2.5.3",
     "pg": "catalog:pg-8-20-0",
-    "posthog-node": "5.52.4",
+    "posthog-node": "5.56.2",
     "zod": "catalog:"
   },
   "devDependencies": {
