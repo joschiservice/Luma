@@ -35,3 +35,21 @@ Use oRPC 1.x, pinned, and one Zod 4 version across the workspace.
 - Fastify answers `HEAD` with the `GET` route; the bridge passes such requests to oRPC as `GET`.
 
 Reversal cost: medium. Contracts and handlers use oRPC builders across the contract package and about 30 route files, but URLs, payloads and errors stayed the same, so clients outside the web app are unaffected.
+
+## Revisited: deriving the contract from server routers
+
+Reviewed 2026-10-23; the decision stands.
+
+oRPC can derive the client contract from a server router. A build-time macro (`unplugin-macros` for Vite) calls `minifyRouterContract(await unlazyRouter(router))` and inlines the result as JSON, and the client is typed through `import type` of the router. Routes would be declared once, next to their handlers, without a separate contract or server code in the browser bundle.
+
+The minified contract keeps only methods, paths, error maps and metadata; schemas are stripped. The client would lose response validation, which needs the Zod schemas at runtime. Adding validation ourselves was considered:
+
+- **Inline JSON Schema and validate in the browser.** The web CSP forbids `unsafe-eval`, so Ajv could not compile at runtime; a custom build plugin would have to generate standalone validators. The OpenAPI document is several megabytes, so validators would need per-route splitting. JSON Schema does not express Zod refinements and transforms exactly, so client and server could disagree on the same response.
+- **Move schemas into server-free modules shared by router and client.** Validation keeps working, but those modules are the contract without method and path. The macro would save a few lines per route.
+- **Drop client response validation.** The server already validates handler output and returns a sanitized `500`. The client check additionally catches version skew between a loaded web bundle and a newer API, and responses altered by proxies.
+
+Other costs apply regardless of validation. The web typecheck would resolve every domain package's route and service types. The web build would import and construct the backend router in Node, so import-time side effects in backend packages could break it, and backend sources would become web build inputs. Runtime values shared with clients, such as collection catalogs and stream event schemas, still need a server-free package.
+
+The documented macro setup targets oRPC 2.0, which is still a beta. Its breaking changes remove `status` from errors and move routing into OpenAPI metadata, both of which the Fastify bridge, the error path and the client rely on. Upgrading stays a separate migration once 2.0 is stable.
+
+Contracts stay in `@luma/api-contract`. A smaller alternative, if the separate package becomes a burden, is for each domain package to own its contract in a server-free subpath that `@luma/api-contract` assembles. That would need its own decision because it changes package ownership in [ADR-005](005-domain-packages-and-runtimes.md).
