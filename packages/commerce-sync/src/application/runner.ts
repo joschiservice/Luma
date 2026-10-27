@@ -16,6 +16,7 @@ import { requirePermission, WorkspaceInactiveError } from '@luma/identity';
 import { ServiceError } from '@luma/platform';
 
 import {
+  cursorRejection,
   failureMessage,
   nextDueAt,
   planScan,
@@ -103,6 +104,12 @@ export interface SyncRunnerDependencies {
 
 const principalMessage =
   'The person this sync runs as no longer manages this workspace. Resume it to continue with your access.';
+
+const cursorMessage =
+  'The source repeatedly rejected the position of this import. Luma retries automatically; choose Re-import history to start over. Records already imported stay available.';
+
+/** The page's lease passed to another runner; the page stops without further writes. */
+class LeaseLost extends Error {}
 
 /**
  * Advances imports and syncs for one tenant at a time: creates streams for newly active
@@ -285,6 +292,92 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     return outcomes;
   }
 
+  /**
+   * Looks up records that a full scan no longer returned, at most once a day each. Only a
+   * complete lookup that confirms deletion, with its tombstone stored, retires a record. A
+   * failed, deferred, partial or unexpected lookup stops the checks for this scan and leaves the
+   * record missing; it is checked again at a later scan.
+   */
+  async function confirmMissing(
+    tenant: TenantContext,
+    stream: SyncStream,
+    hold: () => Promise<void>,
+  ) {
+    const capability = recordCapabilities[stream.recordType];
+    const candidates = await deps.store.confirmationCandidates(
+      tenant.tenantId,
+      stream.connectionId,
+      stream.recordType,
+      new Date(+now() - syncPolicy.confirmationRecheckMs).toISOString(),
+      syncPolicy.confirmationLimit,
+    );
+    for (const candidate of candidates) {
+      const confirmation = await deps.reader.read(tenant, {
+        connectionId: stream.connectionId,
+        capability,
+        version: '0',
+        input: {
+          limit: 1,
+          confirmMissing: {
+            externalId: candidate.externalId,
+            scopeKey: candidate.scopeKey,
+            createdAt: candidate.createdAt
+              ? new Date(candidate.createdAt).toISOString()
+              : null,
+          },
+        },
+      });
+      if (!confirmation.ok) {
+        if (confirmation.error.providerCode !== 'ADMISSION_DEFERRED')
+          log(`Sync deletion check failed (${confirmation.error.code})`);
+
+        return;
+      }
+      if (
+        confirmation.value.completeness !== 'complete' ||
+        !confirmation.value.confirmation
+      ) {
+        log('Sync deletion check was incomplete');
+
+        return;
+      }
+      if (confirmation.value.confirmation === 'deleted') {
+        if (
+          confirmation.value.items.length !== 1 ||
+          confirmation.value.items[0]?.kind !== 'tombstone' ||
+          itemKey(key(confirmation.value.items[0])) !== itemKey(candidate)
+        ) {
+          log('Sync deletion check returned an unexpected record');
+
+          return;
+        }
+        await hold();
+        const outcomes = await importRecords(
+          tenant,
+          stream.recordType,
+          confirmation.value.items,
+        );
+        if (
+          outcomes.some(
+            (outcome) =>
+              !outcome || outcome.status !== 'current' || outcome.retained,
+          )
+        ) {
+          log('Sync deletion check could not store the deletion');
+
+          return;
+        }
+      }
+      await deps.store.recordConfirmation(
+        tenant.tenantId,
+        stream.connectionId,
+        stream.recordType,
+        candidate,
+        confirmation.value.confirmation,
+      );
+    }
+  }
+
   /** Runs one page of the next due stream; returns false when nothing was due. */
   async function runPage(tenantId: string) {
     const token = id();
@@ -306,6 +399,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         block?: SyncStream['blocked'];
         delayMs?: number;
         message?: string;
+        failing?: boolean;
       } = {},
     ) =>
       deps.store.failPage(tenantId, claimed.id, token, {
@@ -318,7 +412,20 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         ).toISOString(),
         restart: options.restart ?? false,
         block: options.block ?? null,
+        failing: options.failing ?? false,
       });
+    // Extends the lease before each write that the page commit does not fence by its token.
+    const hold = async () => {
+      if (
+        !(await deps.store.renewLease(
+          tenantId,
+          claimed.id,
+          token,
+          syncPolicy.leaseMs,
+        ))
+      )
+        throw new LeaseLost();
+    };
     let tenant: TenantContext;
     try {
       tenant = await context(claimed, tenantId);
@@ -345,77 +452,15 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
 
         return true;
       }
-      if (descriptor.filters?.includes('confirmMissing')) {
-        const candidates = await deps.store.confirmationCandidates(
-          tenantId,
-          claimed.connectionId,
-          claimed.recordType,
-          10,
-        );
-        for (const candidate of candidates) {
-          const confirmation = await deps.reader.read(tenant, {
-            connectionId: claimed.connectionId,
-            capability,
-            version: '0',
-            input: {
-              limit: 1,
-              confirmMissing: {
-                externalId: candidate.externalId,
-                scopeKey: candidate.scopeKey,
-                createdAt: candidate.createdAt
-                  ? new Date(candidate.createdAt).toISOString()
-                  : null,
-              },
-            },
-          });
-          if (!confirmation.ok) {
-            await fail(confirmation.error.code);
-
-            return true;
-          }
-          if (
-            confirmation.value.completeness !== 'complete' ||
-            !confirmation.value.confirmation
-          ) {
-            await fail('invalid_response');
-
-            return true;
-          }
-          if (confirmation.value.confirmation === 'deleted') {
-            if (
-              confirmation.value.items.length !== 1 ||
-              confirmation.value.items[0]?.kind !== 'tombstone' ||
-              itemKey(key(confirmation.value.items[0])) !== itemKey(candidate)
-            ) {
-              await fail('invalid_response');
-
-              return true;
-            }
-            const outcomes = await importRecords(
-              tenant,
-              claimed.recordType,
-              confirmation.value.items,
-            );
-            if (
-              outcomes.some(
-                (outcome) =>
-                  !outcome || outcome.status !== 'current' || outcome.retained,
-              )
-            ) {
-              await fail('invalid_response');
-
-              return true;
-            }
-          }
-          await deps.store.recordConfirmation(
-            tenantId,
-            claimed.connectionId,
-            claimed.recordType,
-            candidate,
-            confirmation.value.confirmation,
-          );
+      // Deletion checks run once per scan, before its first page, and never fail the page.
+      if (!claimed.scan && descriptor.filters?.includes('confirmMissing'))
+        try {
+          await confirmMissing(tenant, claimed, hold);
+        } catch (error) {
+          if (error instanceof LeaseLost || error instanceof ServiceError)
+            throw error;
+          log('Sync deletion check failed; records stay missing', error);
         }
-      }
       const supportsSince =
         descriptor.filters?.includes('updatedSince') ?? false;
       let stream: SyncStream | null = claimed;
@@ -534,16 +579,29 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
                 ),
             ).toISOString(),
           );
-        const restart = result.error.code === 'invalid_input' && !!scan.cursor;
+        if (result.error.code === 'invalid_input' && scan.cursor) {
+          const rejection = cursorRejection(
+            scan.restarts ?? 0,
+            claimed.attempts,
+            result.error.retryAfterMs,
+            claimed.id,
+          );
+          await fail(result.error.code, {
+            restart: rejection.restart,
+            delayMs: rejection.delayMs,
+            ...(rejection.failing
+              ? { failing: true, message: cursorMessage }
+              : {}),
+          });
+
+          return true;
+        }
         await fail(result.error.code, {
-          restart,
-          delayMs: restart
-            ? 0
-            : retryDelayMs(
-                claimed.attempts + 1,
-                result.error.retryAfterMs,
-                claimed.id,
-              ),
+          delayMs: retryDelayMs(
+            claimed.attempts + 1,
+            result.error.retryAfterMs,
+            claimed.id,
+          ),
         });
 
         return true;
@@ -551,12 +609,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       const page = result.value;
       if (page.completeness !== 'complete') {
         // Returned purchasing evidence remains useful, but an incomplete scan never establishes absence.
-        if (claimed.recordType === 'products' && deps.recordPurchasingTerms)
+        if (claimed.recordType === 'products' && deps.recordPurchasingTerms) {
+          await hold();
           await deps.recordPurchasingTerms(
             tenant,
             page.items as Observation<ProductSnapshot>[],
             false,
           );
+        }
         await fail('invalid_response');
 
         return true;
@@ -603,12 +663,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         }
         changed.push({ observation, digest });
       }
+      if (changed.length) await hold();
       const outcomes = await importRecords(
         tenant,
         claimed.recordType,
         changed.map((item) => item.observation),
       );
       if (claimed.recordType === 'products' && deps.recordPurchasingTerms) {
+        await hold();
         await deps.recordPurchasingTerms(
           tenant,
           page.items as Observation<ProductSnapshot>[],
@@ -616,6 +678,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         );
       }
       if (claimed.recordType === 'orders') {
+        await hold();
         await deps.customers.recordOrders(
           tenant,
           claimed.connectionId,
@@ -627,14 +690,16 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           changed.flatMap(({ observation }) => orderAddresses(observation)),
         );
       }
-      const forget =
+      const removesMissing =
         claimed.recordType === 'customers' &&
         !page.nextCursor &&
         !page.deferred &&
         !scan.since &&
-        !scan.createdSince
-          ? await removeMissingCustomers(tenant, claimed.connectionId, keys)
-          : [];
+        !scan.createdSince;
+      if (removesMissing) await hold();
+      const forget = removesMissing
+        ? await removeMissingCustomers(tenant, claimed.connectionId, keys)
+        : [];
       for (const [index, { observation, digest }] of changed.entries()) {
         const outcome = outcomes[index];
         if (!outcome) {
@@ -678,6 +743,12 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           : {}),
       });
     } catch (error) {
+      // Another runner now holds the stream and continues from its committed checkpoint.
+      if (error instanceof LeaseLost) {
+        log('Sync page stopped because its lease passed to another runner');
+
+        return true;
+      }
       log('Sync page failed', error);
       await fail(
         error instanceof ServiceError ? 'principal_unavailable' : 'internal',

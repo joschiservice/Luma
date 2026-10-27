@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cursorRejection,
   historyWindow,
   planScan,
   recordTypeFor,
@@ -112,6 +113,30 @@ describe('retryDelayMs', () => {
     const capped = retryDelayMs(30, undefined, 'stream-1');
     expect(capped).toBeGreaterThanOrEqual(syncPolicy.maxRetryDelayMs / 2);
     expect(capped).toBeLessThanOrEqual(syncPolicy.maxRetryDelayMs);
+  });
+});
+
+describe('cursorRejection', () => {
+  it('restarts at once, then backs off, then keeps the cursor and reports failing', () => {
+    expect(cursorRejection(0, 0)).toEqual({
+      restart: true,
+      failing: false,
+      delayMs: 0,
+    });
+    expect(cursorRejection(1, 0)).toEqual({
+      restart: true,
+      failing: false,
+      delayMs: retryDelayMs(2),
+    });
+    expect(cursorRejection(2, 0).delayMs).toBe(retryDelayMs(3));
+    expect(cursorRejection(syncPolicy.maxScanRestarts, 0)).toEqual({
+      restart: false,
+      failing: true,
+      delayMs: retryDelayMs(1),
+    });
+    expect(
+      cursorRejection(syncPolicy.maxScanRestarts, 6, 5_000, 'stream').delayMs,
+    ).toBe(retryDelayMs(7, 5_000, 'stream'));
   });
 });
 

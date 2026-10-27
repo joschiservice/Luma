@@ -68,6 +68,8 @@ export interface SyncStream {
     pages: number;
     records: number;
     total: number | null;
+    /** Times this scan started over after the source rejected its cursor. */
+    restarts?: number;
   } | null;
   /** Independent history checkpoint retained while an incremental scan runs. */
   suspendedScan?: SyncStream['scan'];
@@ -132,6 +134,16 @@ export const syncPolicy = {
   maxRetryDelayMs: 60 * 60_000,
   /** Consecutive failures after which a retrying stream is reported as failing. */
   failingAfterAttempts: 5,
+  /**
+   * Restarts a scan may make after the source rejects its cursor. Further rejections keep
+   * the cursor, back off and report the stream failing, so a cursor the source rejects on
+   * every pass cannot restart the scan forever.
+   */
+  maxScanRestarts: 3,
+  /** Missing records whose deletion was checked within this window are not looked up again. */
+  confirmationRecheckMs: 24 * 60 * 60_000,
+  /** Missing records looked up at the start of each scan. */
+  confirmationLimit: 10,
 } as const;
 
 export interface ScanPlan {
@@ -236,6 +248,35 @@ export function retryDelayMs(
         Math.floor((exponential / 2) * unitHash(`${jitterKey}:${attempts}`));
 
   return Math.min(syncPolicy.maxRetryDelayMs, Math.max(spread, advisedMs ?? 0));
+}
+
+/**
+ * How a page responds when the source rejects its scan's cursor, given the scan's earlier
+ * restarts and the stream's consecutive failures. The first rejection restarts the scan at
+ * once; later ones restart after a backoff. Once the scan has used its restarts, the cursor is
+ * kept, the page backs off like any failure and the stream is reported failing.
+ */
+export function cursorRejection(
+  restarts: number,
+  attempts: number,
+  advisedMs?: number,
+  jitterKey?: string,
+) {
+  if (restarts >= syncPolicy.maxScanRestarts)
+    return {
+      restart: false,
+      failing: true,
+      delayMs: retryDelayMs(attempts + 1, advisedMs, jitterKey),
+    };
+
+  return {
+    restart: true,
+    failing: false,
+    delayMs:
+      restarts === 0
+        ? 0
+        : retryDelayMs(Math.max(attempts, restarts) + 1, advisedMs, jitterKey),
+  };
 }
 
 /** Maps a string to a stable value in [0, 1) with 32-bit FNV-1a. */

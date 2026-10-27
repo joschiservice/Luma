@@ -69,6 +69,7 @@ export function createCommitmentLists({
       supplier: Supplier | null;
       verified: Set<string>;
       now?: Date;
+      timeZone: string;
     },
   ): OrderSummary {
     const { progress, submission } = progressFor(order, data);
@@ -123,6 +124,7 @@ export function createCommitmentLists({
     const commitments = group(await tx.commitments(ids));
     const followUps = group(await tx.followUps(ids));
     const suppliers = await suppliersOf(tx, orders);
+    const timeZone = await tx.timeZone();
 
     return new Map(
       orders.map((order) => [
@@ -135,6 +137,7 @@ export function createCommitmentLists({
           // Draft verification only explains the drafted milestone, not the summary.
           verified: new Set(),
           now,
+          timeZone,
         }),
       ]),
     );

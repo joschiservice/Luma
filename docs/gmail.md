@@ -131,7 +131,11 @@ lost response after dispatch is an unknown effect.
 Gmail allows 250 quota units per user per second (list and get 5, thread 10, send and watch
 100). Each mailbox's requests share a pacer at 200 units per second in each process, which
 leaves room for the person's own clients. 429 and rate-limit 403 responses become
-`rate_limited` with Gmail's delay (an hour for daily limits) and pause the pacer. 401 is
+`rate_limited` with Gmail's delay (an hour for daily limits) and pause the pacer. The pacer
+waits in place for at most five seconds; while it is paused for longer, requests fail at once
+with `rate_limited`, the remaining delay and no effect, and sync retries later. A send
+rechecks execution's authority after the pacer admits it and immediately before the request,
+so a send never leaves after its approval or policy stopped applying. 401 is
 `authentication`; other 403 responses are `permission_denied`; 404 `not_found`; 5xx
 `unavailable`. Reads retry short transient failures in place; sends are never repeated.
 

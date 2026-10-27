@@ -102,16 +102,22 @@ export async function buildRuntimeApp(
             ...(rateLimitStore ? { budgetStore: rateLimitStore } : {}),
           })
         : undefined;
-    const identity = createIdentity({
-      ...settings,
-      ...(rateLimitStore ? { rateLimitStore } : {}),
-      readOnly: requestIsReadOnly,
-      morningBriefEnabled: (tenantId) =>
-        createTenantFeatureRelease(observability)(
-          tenantId,
-          'operational-morning-brief',
-        ),
-    });
+    const identity = createIdentity(
+      {
+        ...settings,
+        ...(rateLimitStore ? { rateLimitStore } : {}),
+        readOnly: requestIsReadOnly,
+        morningBriefEnabled: (tenantId) =>
+          createTenantFeatureRelease(observability)(
+            tenantId,
+            'operational-morning-brief',
+          ),
+      },
+      {
+        onDatabaseError: (error) =>
+          log('Identity database connection failed', error),
+      },
+    );
     resources.add(identity.close);
     const casePool = createDatabasePool({
       connectionString: settings.databaseUrl,
@@ -216,7 +222,7 @@ export async function buildRuntimeApp(
       : undefined;
     if (deskWorkflow) resources.add(deskWorkflow.close);
     const processClient = workflowSettings
-      ? await createProcessClient(
+      ? createProcessClient(
           {
             ...workflowSettings.temporal,
             taskQueue: `${workflowSettings.temporal.taskQueue}-procurement`,

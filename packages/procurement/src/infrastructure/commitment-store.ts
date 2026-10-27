@@ -32,6 +32,7 @@ import {
   insertPurchasingWriteReceipt,
 } from './purchasing-reads.js';
 import { readPurchasingActionTimeline } from './purchasing-timeline.js';
+import { readWorkspaceTimeZone } from './workspace-time-zone.js';
 
 const live = ['approved', 'submitting', 'uncertain', 'submitted'];
 
@@ -475,6 +476,7 @@ export function createCommitmentStore(
             );
           },
           audit: (entry) => log.append(entry),
+          timeZone: () => readWorkspaceTimeZone(tx, tenantId),
           skuIdentities: async (connectionId, skus) => {
             // Exact canonical IDs and keys win; a SKU code counts only when one SKU has it.
             const rows = (

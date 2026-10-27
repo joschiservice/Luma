@@ -4,14 +4,17 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import { requirePermission, requireTenant } from '@luma/identity';
 import type {
   ProcessActivities,
+  ProcessExecutionClosure,
   ProcessProgress,
   ProcessRun,
+  ProcessStart,
   ProcessWorkflowVersion,
 } from '@luma/workflows';
 import {
   Client,
   Connection,
   WorkflowExecutionAlreadyStartedError,
+  type WorkflowExecutionStatusName,
 } from '@temporalio/client';
 import { WorkflowIdReusePolicy } from '@temporalio/common';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -34,6 +37,16 @@ export const processWorkflowId = (tenantId: string, runId: string) =>
   `process-v2:${createHash('sha256')
     .update(JSON.stringify([tenantId, runId]))
     .digest('hex')}`;
+
+const closure: Partial<
+  Record<WorkflowExecutionStatusName, ProcessExecutionClosure>
+> = {
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+  TERMINATED: 'terminated',
+  TIMED_OUT: 'timed_out',
+};
 
 /** Starts and queries exact published versions; callers must persist the run before starting it. */
 function createProcessCommands(
@@ -85,12 +98,17 @@ function createProcessCommands(
           throw error;
       }
     },
+    /**
+     * Starts a committed run under its stable ID. When an execution with that ID already
+     * exists, reports whether it has closed so the caller can settle a run that never
+     * recorded its final step.
+     */
     async start(
       context: TenantContext,
       run: ProcessRun,
       source: ProcessWorkflowVersion,
       timeoutMs?: number,
-    ) {
+    ): Promise<ProcessStart> {
       const id = await scope(context, run);
       const version = source;
       if (
@@ -118,9 +136,16 @@ function createProcessCommands(
       } catch (error) {
         if (!(error instanceof WorkflowExecutionAlreadyStartedError))
           throw error;
+        // The ID is never reused, so an execution that closed reports how it ended.
+        const describe = () => client.workflow.getHandle(id).describe();
+        const { status } = await (timeoutMs === undefined
+          ? describe()
+          : client.connection.withDeadline(Date.now() + timeoutMs, describe));
+
+        return { workflowId: id, closed: closure[status.name] ?? null };
       }
 
-      return id;
+      return { workflowId: id, closed: null };
     },
     async progress(
       context: TenantContext,
@@ -203,14 +228,18 @@ export async function createProcessWorker(
   }
 }
 
-/** Connects a process client; the returned close method releases its connection. */
-export async function createProcessClient(
+/**
+ * Creates a process client without contacting Temporal. The connection opens on the first
+ * command, so callers start while Temporal is unreachable and each command fails until it is
+ * reachable again. The returned close method releases the connection.
+ */
+export function createProcessClient(
   settings: TemporalSettings,
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   validateSettings(settings);
   const data = temporalDataConverter(settings);
-  const connection = await Connection.connect({
+  const connection = Connection.lazy({
     connectTimeout: '2 seconds',
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),

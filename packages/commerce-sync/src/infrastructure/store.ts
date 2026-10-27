@@ -15,6 +15,7 @@ import { itemKey } from '../application/ports.js';
 import {
   recordCapabilities,
   type RecordType,
+  syncPolicy,
   type SyncStream,
 } from '../domain/streams.js';
 
@@ -37,6 +38,7 @@ type StreamRow = {
   scan_pages: number;
   scan_records: number;
   scan_total: number | null;
+  scan_restarts: number;
   scan_created_since: Date | null;
   scan_waiting: boolean;
   recent_history_from: Date | null;
@@ -140,6 +142,7 @@ function stream(row: StreamRow): SyncStream {
             pages: row.scan_pages,
             records: row.scan_records,
             total: row.scan_total,
+            restarts: row.scan_restarts,
           }
         : null,
     suspendedScan: row.suspended_scan,
@@ -474,6 +477,19 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         return stream(row);
       });
     },
+    async renewLease(tenantId, streamId, token, leaseMs) {
+      return db.transaction(
+        tenantId,
+        async (tx) =>
+          ((
+            await tx.query(
+              `UPDATE commerce_sync_streams SET lease_until=now()+($4::integer*interval '1 millisecond')
+              WHERE tenant_id=$1 AND id=$2 AND lease_token=$3`,
+              [tenantId, streamId, token, leaseMs],
+            )
+          ).rowCount ?? 0) > 0,
+      );
+    },
     async deferConnection(tenantId, connectionId, dueAt) {
       await db.transaction(tenantId, async (tx) => {
         await tx.query(
@@ -488,7 +504,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         const row = (
           await tx.query<StreamRow>(
             `UPDATE commerce_sync_streams SET scan=$4,scan_id=$5,cursor=NULL,scan_started_at=$6,scan_since=$7,
-              scan_pages=0,scan_records=0,scan_total=NULL,
+              scan_pages=0,scan_records=0,scan_total=NULL,scan_restarts=0,
               full_requested=CASE WHEN $8 THEN false ELSE full_requested END,
               scan_created_since=$9,scan_waiting=false,live_enabled=$10,
               recent_history_from=COALESCE(recent_history_from,$9::timestamptz),
@@ -588,7 +604,13 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           ).rows,
       );
     },
-    async confirmationCandidates(tenantId, connectionId, recordType, limit) {
+    async confirmationCandidates(
+      tenantId,
+      connectionId,
+      recordType,
+      checkedBefore,
+      limit,
+    ) {
       return db.transaction(
         tenantId,
         async (tx) =>
@@ -596,8 +618,9 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             await tx.query<ItemKey & { createdAt: string | null }>(
               `SELECT resource,scope_key AS "scopeKey",external_id AS "externalId",source_created_at::text AS "createdAt"
          FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND missing_since IS NOT NULL AND status<>'retired'
-         ORDER BY COALESCE(confirmation_checked_at,missing_since),external_id LIMIT $4`,
-              [tenantId, connectionId, recordType, limit],
+           AND (confirmation_checked_at IS NULL OR confirmation_checked_at < $4)
+         ORDER BY COALESCE(confirmation_checked_at,missing_since),external_id LIMIT $5`,
+              [tenantId, connectionId, recordType, checkedBefore, limit],
             )
           ).rows,
       );
@@ -804,7 +827,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           const saved = current.suspended_scan;
           await tx.query(
             `UPDATE commerce_sync_streams SET scan=$4,scan_id=$5,cursor=$6,scan_started_at=$7,scan_since=$8,
-            scan_created_since=$9,scan_waiting=$16,scan_pages=$10,scan_records=$11,scan_total=$12,suspended_scan=NULL,
+            scan_created_since=$9,scan_waiting=$16,scan_pages=$10,scan_records=$11,scan_total=$12,scan_restarts=$17,suspended_scan=NULL,
             watermark=$13,last_complete_at=$14,live_due_at=$15,due_at=now() WHERE tenant_id=$1 AND id=$2 AND scan_id=$3`,
             [
               tenantId,
@@ -823,6 +846,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               page.now,
               page.complete.nextDueAt,
               saved.waitingForExport ?? false,
+              saved.restarts ?? 0,
             ],
           );
 
@@ -867,11 +891,12 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         const current = await lockStream(tx, tenantId, streamId, token);
         if (!current) return;
         await tx.query(
-          `UPDATE commerce_sync_streams SET attempts=attempts+1,error_code=$4,error_message=$5,error_at=now(),
+          `UPDATE commerce_sync_streams SET attempts=GREATEST(attempts+1,$9),error_code=$4,error_message=$5,error_at=now(),
             failing_since=COALESCE(failing_since,now()),
             due_at=$6,lease_token=NULL,lease_until=NULL,blocked=COALESCE($8,blocked),
             cursor=CASE WHEN $7 THEN NULL ELSE cursor END,scan_pages=CASE WHEN $7 THEN 0 ELSE scan_pages END,
-            scan_records=CASE WHEN $7 THEN 0 ELSE scan_records END,version=version+1,updated_at=now()
+            scan_records=CASE WHEN $7 THEN 0 ELSE scan_records END,
+            scan_restarts=CASE WHEN $7 THEN scan_restarts+1 ELSE scan_restarts END,version=version+1,updated_at=now()
           WHERE tenant_id=$1 AND id=$2 AND lease_token=$3`,
           [
             tenantId,
@@ -882,6 +907,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             failure.dueAt,
             failure.restart,
             failure.block,
+            failure.failing ? syncPolicy.failingAfterAttempts : 0,
           ],
         );
         if (current.scan_id)

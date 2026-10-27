@@ -14,6 +14,7 @@ import {
   supplierIncoming,
 } from '../domain/incoming.js';
 import type { PurchaseOrder } from '../domain/procurement.js';
+import { readWorkspaceTimeZone } from './workspace-time-zone.js';
 
 type TransferDocument = {
   observedAt: string;
@@ -107,6 +108,7 @@ export function createIncomingStockReader(
               [context.tenantId, ids],
             )
           : { rows: [] };
+        const timeZone = await readWorkspaceTimeZone(tx, context.tenantId);
         const items: IncomingItem[] = orders.slice(0, 1000).flatMap((order) =>
           supplierIncoming({
             order,
@@ -124,6 +126,7 @@ export function createIncomingStockReader(
             locations,
             ownedLocations,
             now: asOf,
+            timeZone,
           }),
         );
         const shipments = (

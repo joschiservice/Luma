@@ -54,14 +54,17 @@ describe.skipIf(!databaseUrl)('account security mail outbox', () => {
     }`;
     url.username = login;
     url.password = password;
-    identity = createIdentity({
-      databaseUrl: url.toString(),
-      secret: 'outbox-test-secret-at-least-32-characters',
-      baseURL: origin,
-      trustedOrigins: [origin],
-      rateLimit: { enabled: false },
-      mailProvider: { async send() {} },
-    });
+    identity = createIdentity(
+      {
+        databaseUrl: url.toString(),
+        secret: 'outbox-test-secret-at-least-32-characters',
+        baseURL: origin,
+        trustedOrigins: [origin],
+        rateLimit: { enabled: false },
+        mailProvider: { async send() {} },
+      },
+      { onDatabaseError: () => undefined },
+    );
   }, 60000);
 
   afterAll(async () => {

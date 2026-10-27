@@ -61,6 +61,7 @@ export function createCommitmentRecords(
       return {
         order,
         supplier,
+        timeZone: await tx.timeZone(),
         history: await tx.history(orderId),
         timelineEntries:
           (await tx.timeline?.(
@@ -84,13 +85,15 @@ export function createCommitmentRecords(
       context = await authorize(context);
       const data = await record(context, orderId);
       const verifiedRuns = await verified(context, [data.order]);
+      // The time zone only sets the progress day; it is not part of the order view.
+      const { timelineEntries, timeZone, ...recordData } = data;
       const { progress, submission } = progressFor(data.order, {
-        ...data,
+        ...recordData,
+        timeZone,
         verified: verifiedRuns,
       });
       const canManage = hasPermission(context, 'procurement.manage');
 
-      const { timelineEntries, ...recordData } = data;
       const timeline = purchasingTimeline({
         ...recordData,
         extra: [
@@ -194,6 +197,7 @@ export function createCommitmentRecords(
             commitments,
             followUps: await tx.followUps(orders.map((o) => o.id)),
             suppliers: await suppliersOf(tx, orders),
+            timeZone: await tx.timeZone(),
           };
         },
       );
@@ -280,6 +284,7 @@ export function createCommitmentRecords(
             commitments: ids.length ? await tx.commitments(ids) : [],
             followUps: ids.length ? await tx.followUps(ids) : [],
             communications: await tx.communications({ supplierId, limit: 20 }),
+            timeZone: await tx.timeZone(),
           };
         },
       );

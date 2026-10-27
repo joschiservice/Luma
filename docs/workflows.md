@@ -126,6 +126,13 @@ admission still applies policy approval to every action.
   authority.
 - Step outputs are append-only, keyed by run, step and state. A conflicting activity replay
   is rejected.
+- Every run settles. Reads, decisions, verification and step records retry with backoff for
+  up to ten minutes; actions and Code Steps keep five attempts within 15 minutes. When
+  retries run out, or a step returns output that breaks its declared contract, the run
+  records `escalated` with reason `process_failed` at the step it was on, in a
+  non-cancellable scope, and ends. That settlement may be recorded on any step kind and
+  carries no values. If even that record fails, the Temporal execution fails; a run bound to
+  another version fails without retrying the workflow task.
 - A suspended or closed workspace pauses its runs at the next activity, with the same
   bounded waits as [exception workflows](exception-workflows.md#authority-retries-and-recovery).
   Background starts and monitors skip the workspace until it is active again.
@@ -281,7 +288,12 @@ refund and payment follow-ups only reread and hand over.
 - **Starts:** the worker recovers committed runs, then records at most one run per case and
   version for open cases detected within the version's `maxAgeSeconds`; older cases wait
   for detection to confirm them again. At most 20 runs per workflow are unfinished. The run
-  persists before Temporal starts it under its stable ID. Manual starts return 409.
+  persists before Temporal starts it under its stable ID. Manual starts return 409. When a
+  recovered run's execution has already closed without completing (failed, cancelled,
+  terminated or timed out) and without a final step, the pass records `escalated` with reason
+  `process_execution_closed`, so the run stops counting as unfinished and stops holding its
+  replenishment rule. A completed execution recorded its final step first, so a run that still
+  looks unfinished was read before that record and is left alone.
 - **Actions:** the Shopify adapters call the app's correction and recovery services as the
   run's principal: persisted preview, approval with `decisions.respond` under the [workspace rules](workspace-settings.md#approval-preference),
   execution by the requester, claims, compare-and-set or hold identity, and

@@ -94,6 +94,7 @@ function incoming(
     locations: new Map([['location', 'Warehouse']]),
     ownedLocations: new Set(),
     now,
+    timeZone: 'UTC',
     ...patch,
   });
 }

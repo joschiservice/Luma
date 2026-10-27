@@ -693,7 +693,7 @@ async function exercise(
   };
   let worker: Awaited<ReturnType<typeof createProcessWorker>> | undefined,
     running: Promise<void> | undefined;
-  const client = await createProcessClient(fixture.temporal, {
+  const client = createProcessClient(fixture.temporal, {
     refreshContext: async (c) => scope(c),
   });
   const before = dispatches;

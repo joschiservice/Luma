@@ -191,7 +191,7 @@ describe.skipIf(!databaseUrl)(
         },
         adminUrl,
       );
-      staff = createStaff(settings);
+      staff = createStaff(settings, { onDatabaseError: () => undefined });
       app = Fastify();
       registerStaffHttp(app, staff);
       await app.ready();
@@ -216,18 +216,21 @@ describe.skipIf(!databaseUrl)(
       customer.password = password;
       customerUrl = customer.toString();
       customerDb = new Pool({ connectionString: customerUrl });
-      identity = createIdentity({
-        databaseUrl: customerUrl,
-        secret: 'separate-customer-secret-at-least-32-characters',
-        baseURL: customerOrigin,
-        trustedOrigins: [customerOrigin],
-        cookiePrefix: 'deletion-customer',
-        mailProvider: {
-          async send(message) {
-            sent.push(message);
+      identity = createIdentity(
+        {
+          databaseUrl: customerUrl,
+          secret: 'separate-customer-secret-at-least-32-characters',
+          baseURL: customerOrigin,
+          trustedOrigins: [customerOrigin],
+          cookiePrefix: 'deletion-customer',
+          mailProvider: {
+            async send(message) {
+              sent.push(message);
+            },
           },
         },
-      });
+        { onDatabaseError: () => undefined },
+      );
       await db.query(
         "INSERT INTO users(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Workspace Owner','owner@example.test',true,now(),now())",
         [owner],

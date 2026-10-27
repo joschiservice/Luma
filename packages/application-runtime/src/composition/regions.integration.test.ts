@@ -54,15 +54,18 @@ describe.skipIf(!databaseUrl)(
               other,
             ]),
           ).rejects.toMatchObject({ code: '55000' });
-          identity = createIdentity({
-            databaseUrl: connection.toString(),
-            secret: 'regional-identity-test-secret-at-least-32-characters',
-            baseURL: origin,
-            trustedOrigins: [origin],
-            passkeyRpId: 'app.example.test',
-            region,
-            enabledRegions: [region],
-          });
+          identity = createIdentity(
+            {
+              databaseUrl: connection.toString(),
+              secret: 'regional-identity-test-secret-at-least-32-characters',
+              baseURL: origin,
+              trustedOrigins: [origin],
+              passkeyRpId: 'app.example.test',
+              region,
+              enabledRegions: [region],
+            },
+            { onDatabaseError: () => undefined },
+          );
           const signup = (dataRegion: string | undefined) =>
             identity!.handler(
               new Request(`${origin}/auth/sign-up/email`, {

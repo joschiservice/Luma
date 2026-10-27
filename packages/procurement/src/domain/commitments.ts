@@ -252,9 +252,29 @@ export interface OrderProgress {
   nextCheckAt: string | null;
   attention: Attention[];
   next: NextAction;
+  /** The workspace calendar day (`YYYY-MM-DD`) progress was evaluated on. */
+  today: string;
 }
 
-const dateOnly = (iso: string) => iso.slice(0, 10);
+/**
+ * The `YYYY-MM-DD` day `instant` falls on in a workspace `timeZone`. An unknown zone, such as
+ * one removed from the time zone database, falls back to UTC rather than failing reads.
+ */
+export function workspaceDay(instant: Date, timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(instant);
+    const part = (type: string) => parts.find((p) => p.type === type)?.value;
+
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  } catch {
+    return instant.toISOString().slice(0, 10);
+  }
+}
 
 const plural = (count: number, word: string) =>
   `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -344,7 +364,8 @@ export function isMaterialChange(
 
 /**
  * Derives each line's progress, the four milestones, overdue work and the next owner from
- * persisted records. Receipt comes only from purchasing-system observations.
+ * persisted records. Receipt comes only from purchasing-system observations. Delivery dates
+ * are workspace calendar days; confirmation deadlines are instants.
  */
 export function orderProgress(input: {
   order: PurchaseOrder;
@@ -357,9 +378,16 @@ export function orderProgress(input: {
   /** Whether the supplier is linked to a purchasing system. */
   supplierLinked: boolean;
   now: Date;
+  /**
+   * The workspace IANA time zone. Delivery dates and moved check dates are calendar days in
+   * it: a line is overdue once its day has passed there, not in UTC.
+   */
+  timeZone: string;
 }): OrderProgress {
   const { order, submission, commitments, followUps, now } = input;
-  const today = dateOnly(now.toISOString());
+  const day = (instant: string) =>
+    workspaceDay(new Date(instant), input.timeZone);
+  const today = day(now.toISOString());
   const submitted = submission?.state === 'submitted';
   const cancelled = order.status === 'cancelled';
   const requestedDate = submission?.requestedDeliveryDate ?? null;
@@ -416,6 +444,7 @@ export function orderProgress(input: {
       responded,
       `delivery_overdue:${order.id}:${line.id}:${expectedDate}`,
       expectedDate,
+      day,
     );
 
     return {
@@ -488,6 +517,7 @@ export function orderProgress(input: {
         responded,
         `confirmation_overdue:${order.id}:${confirmationDueAt}`,
         confirmationDueAt,
+        day,
       )!,
     ) < now.getTime();
 
@@ -555,10 +585,10 @@ export function orderProgress(input: {
     for (const c of latestByLineKind.values()) {
       if (c.kind === 'shortage' || c.kind === 'damaged') {
         const base = `receipt_difference:${c.id}`;
-        const due = followUpDate(responded, base, c.recordedAt)!;
+        const due = followUpDate(responded, base, c.recordedAt, day)!;
         const answer = latestResponse(responded, base);
         if ((c.quantity ?? 0) > 0)
-          checks.push(scheduledCheck(responded, base, c.recordedAt));
+          checks.push(scheduledCheck(responded, base, c.recordedAt, day));
         if (
           (c.quantity ?? 0) > 0 &&
           (!answer ||
@@ -581,13 +611,14 @@ export function orderProgress(input: {
       if (progress?.stage === 'received') continue;
       const key = `commitment_changed:${c.id}`;
       const answer = latestResponse(responded, key);
-      const due = followUpDate(responded, key, c.recordedAt)!;
+      const due = followUpDate(responded, key, c.recordedAt, day)!;
       const material = isMaterialChange(
         c,
         line,
         line?.requestedDeliveryDate ?? requestedDate,
       );
-      if (material) checks.push(scheduledCheck(responded, key, c.recordedAt));
+      if (material)
+        checks.push(scheduledCheck(responded, key, c.recordedAt, day));
       if (
         !material ||
         (answer &&
@@ -621,6 +652,7 @@ export function orderProgress(input: {
           responded,
           `confirmation_overdue:${order.id}:${confirmationDueAt}`,
           confirmationDueAt,
+          day,
         ),
       );
     for (const line of lines)
@@ -630,11 +662,12 @@ export function orderProgress(input: {
             responded,
             `delivery_overdue:${order.id}:${line.lineId}:${line.expectedDate}`,
             line.expectedDate,
+            day,
           ),
         );
     if (confirmationOverdue)
       attention.push({
-        key: `confirmation_overdue:${order.id}:${followUpDate(responded, `confirmation_overdue:${order.id}:${confirmationDueAt}`, confirmationDueAt)}`,
+        key: `confirmation_overdue:${order.id}:${followUpDate(responded, `confirmation_overdue:${order.id}:${confirmationDueAt}`, confirmationDueAt, day)}`,
         kind: 'confirmation_overdue',
         lineId: null,
         commitmentId: null,
@@ -644,7 +677,7 @@ export function orderProgress(input: {
       });
     for (const line of lines.filter((l) => l.overdue)) {
       const base = `delivery_overdue:${order.id}:${line.lineId}:${line.expectedDate}`;
-      const due = followUpDate(responded, base, line.expectedDate)!;
+      const due = followUpDate(responded, base, line.expectedDate, day)!;
       attention.push({
         key: due === line.expectedDate ? base : `${base}:${due}`,
         kind: 'delivery_overdue',
@@ -827,6 +860,7 @@ export function orderProgress(input: {
       expectedDate,
       confirmationDueAt,
     }),
+    today,
   };
 }
 
@@ -850,11 +884,12 @@ function scheduledCheck(
   responded: Map<string, FollowUp>,
   key: string,
   due: string,
+  day: (instant: string) => string,
 ): string | null {
   let response = responded.get(key);
   for (let i = 0; response?.nextCheckAt && i < 20; i++) {
     const next = responded.get(
-      `${key}:${due.length === 10 ? dateOnly(response.nextCheckAt) : response.nextCheckAt}`,
+      `${key}:${due.length === 10 ? day(response.nextCheckAt) : response.nextCheckAt}`,
     );
     if (!next) break;
     response = next;
@@ -869,6 +904,7 @@ function followUpDate(
   responded: Map<string, FollowUp>,
   key: string,
   due: string | null,
+  day: (instant: string) => string,
 ): string | null {
   let current = due;
   let response = responded.get(key);
@@ -876,7 +912,7 @@ function followUpDate(
   for (let i = 0; response?.nextCheckAt && i < 20; i++) {
     current =
       due && due.length === 10
-        ? dateOnly(response.nextCheckAt)
+        ? day(response.nextCheckAt)
         : response.nextCheckAt;
     response = responded.get(`${key}:${current}`);
   }

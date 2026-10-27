@@ -32,6 +32,8 @@ export function supplierIncoming(input: {
   locations: Map<string, string>;
   ownedLocations: Set<string>;
   now: Date;
+  /** The workspace IANA time zone, which sets the calendar day for overdue dates. */
+  timeZone: string;
 }): IncomingItem[] {
   if (
     input.order.status !== 'open' ||

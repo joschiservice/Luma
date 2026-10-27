@@ -36,6 +36,7 @@ import type {
   ProcessWorkflowVersion,
 } from '../domain/process.js';
 import { presentProcessVersion } from '../domain/process-presentation.js';
+import { closedExecutionSettlement } from '../domain/process-settlement.js';
 import {
   type ApprovalBehavior,
   assessReadiness,
@@ -200,8 +201,24 @@ export interface WorkflowHandover {
   signal: WorkflowSignal;
 }
 
+/** How a run's durable execution ended. */
+export type ProcessExecutionClosure =
+  'completed' | 'failed' | 'cancelled' | 'terminated' | 'timed_out';
+
+/** The outcome of starting a committed run. */
+export interface ProcessStart {
+  workflowId: string;
+  /** Set when an execution with this ID already ran and has closed; null while it is open. */
+  closed: ProcessExecutionClosure | null;
+}
+
 /** Starts a committed run with a stable Temporal workflow ID. */
 export interface CaseRunTransport {
+  /**
+   * Starts the run, or leaves its existing execution running. A transport that resolves a
+   * `ProcessStart` with `closed` set lets an unfinished run whose execution closed settle as
+   * escalated; any other result leaves the run open.
+   */
   start(
     context: TenantContext,
     run: ProcessRun,
@@ -1132,20 +1149,38 @@ export function createCaseWorkflows(deps: {
           context,
           pending.map((run) => run.id),
         );
+        let unfinished = pending.length;
         for (const run of pending) {
           if (run.actor.id !== context.actor.id) continue;
-          const state = presentTriggerRun(
+          const outputs = evidence.get(run.id) ?? [];
+          const state = presentTriggerRun(run, outputs).processState;
+          if (state && !openStates.has(state)) continue;
+          const started = await deps.transport!.start(
+            context,
             run,
-            evidence.get(run.id),
-          ).processState;
-          if (!state || openStates.has(state))
-            await deps.transport!.start(context, run, found.version);
+            found.version,
+          );
+          // The execution ended without a final step, so the run would count as open forever.
+          const output = closedExecutionSettlement(
+            started,
+            run,
+            found.version,
+            outputs,
+            deps.now().toISOString(),
+          );
+          if (!output) continue;
+          try {
+            await activities.record(run, output);
+            unfinished--;
+          } catch (error) {
+            failures.push(error);
+          }
         }
         const activation = activations.find(
           (item) => item.definitionId === id && item.active,
         );
         if (!activation) return;
-        let capacity = maxOpenRuns - pending.length;
+        let capacity = maxOpenRuns - unfinished;
         if (capacity <= 0) return;
         const signals = found.signals
           ? await found.signals.open(context)

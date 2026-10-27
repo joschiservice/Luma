@@ -11,6 +11,7 @@ import type {
   ProcessStepOutput,
   ProcessWorkflowVersion,
 } from '../domain/process.js';
+import { processSettlement } from '../domain/process-settlement.js';
 
 export type ProcessActionResult =
   | { state: 'accepted'; proposalId: string; receiptId: string }
@@ -97,6 +98,14 @@ export interface ProcessClock {
   patched?(id: string): boolean;
   /** Rolls over durable history at an open coordination boundary without replaying earlier effects. */
   checkpoint?(checkpoint: ProcessCheckpoint): Promise<void>;
+  /**
+   * Records the final escalated step after a failure the run cannot recover from, such as
+   * exhausted activity retries or an invalid step output, so the run settles instead of staying
+   * open. Resolves false when the failure must propagate unchanged, such as a continue-as-new
+   * request. A failing `record` rejects with its own error. Absent means every failure
+   * propagates to the caller.
+   */
+  settle?(error: unknown, record: () => Promise<void>): Promise<boolean>;
 }
 
 /** Durable continuation state preserves the open wait's deadline and preceding immutable outputs. */
@@ -112,7 +121,11 @@ export interface ProcessProgress {
   reason?: string;
 }
 
-/** Runs one immutable linear version; every effect and observation is recorded by an activity. */
+/**
+ * Runs one immutable linear version; every effect and observation is recorded by an activity.
+ * Rejects a run bound to another version. When the clock can settle, any later failure ends
+ * the run as escalated at the step it was on; otherwise the failure propagates.
+ */
 export async function runProcess(
   run: ProcessRun,
   version: ProcessWorkflowVersion,
@@ -129,6 +142,59 @@ export async function runProcess(
     throw new Error('Run is not bound to this workflow version');
   if (run.subject.kind !== version.applicability.subjectKind)
     throw new Error('Run subject does not match the workflow');
+  const recorded: ProcessStepOutput[] = checkpoint
+    ? [...checkpoint.outputs]
+    : [];
+  const recording: ProcessActivities = {
+    ...activities,
+    async record(target, output) {
+      await activities.record(target, output);
+      recorded.push(output);
+    },
+  };
+  try {
+    return await interpret(
+      run,
+      version,
+      recording,
+      clock,
+      onProgress,
+      checkpoint,
+    );
+  } catch (error) {
+    // A failure the run can't recover from still ends it, at the step it was on.
+    const output = processSettlement(
+      run,
+      version,
+      recorded,
+      'process_failed',
+      clock.now(),
+    );
+    if (
+      !output ||
+      !clock.settle ||
+      !(await clock.settle(error, () => activities.record(run, output)))
+    )
+      throw error;
+    const progress: ProcessProgress = {
+      state: 'escalated',
+      stepId: output.stepId,
+      reason: 'process_failed',
+    };
+    onProgress(progress);
+
+    return progress;
+  }
+}
+
+async function interpret(
+  run: ProcessRun,
+  version: ProcessWorkflowVersion,
+  activities: ProcessActivities,
+  clock: ProcessClock,
+  onProgress: (progress: ProcessProgress) => void,
+  checkpoint?: ProcessCheckpoint,
+): Promise<ProcessProgress> {
   const set = (next: ProcessProgress) => {
     onProgress(next);
 
@@ -169,9 +235,14 @@ export async function runProcess(
     switch (step.kind) {
       case 'code': {
         if (!activities.code) throw new Error('Code execution is unavailable');
-        const deadline = Date.parse(clock.now()) + 86_400_000;
-        let result = await activities.code(run, version, step, outputs);
-        let waiting = false;
+        const startedAt =
+          checkpoint?.stepId === step.id ? checkpoint.startedAt : clock.now();
+        const deadline = Date.parse(startedAt) + 86_400_000;
+        const prior = outputs.filter((output) => output.stepId !== step.id);
+        let result = await activities.code(run, version, step, prior);
+        let waiting = outputs.some(
+          (output) => output.stepId === step.id && output.state === 'waiting',
+        );
         while (result.state === 'awaiting_approval') {
           set({
             state: 'awaiting_decision',
@@ -203,13 +274,32 @@ export async function runProcess(
               reason: 'policy_decision_expired',
             });
           }
-          await clock.decisionChanged(30_000);
-          result = await activities.code(
-            run,
-            version,
-            step,
-            outputs.filter((output) => output.stepId !== step.id),
-          );
+          const changed = await clock.decisionChanged(30_000);
+          // Running the code again would rerun the sandbox and record a policy decision on
+          // every poll, so a long wait only rereads the pending decision.
+          await clock.checkpoint?.({ stepId: step.id, startedAt, outputs });
+          const approval = result.approval;
+          const action = approval
+            ? version.steps.find(
+                (item) =>
+                  item.id === approval.stepId && item.kind === 'capability',
+              )
+            : undefined;
+          if (
+            !changed &&
+            approval &&
+            action?.kind === 'capability' &&
+            activities.actionApprovalPending &&
+            Date.parse(clock.now()) < deadline &&
+            (await activities.actionApprovalPending(
+              run,
+              action,
+              approval.proposalId,
+              approval.decisionId,
+            ))
+          )
+            continue;
+          result = await activities.code(run, version, step, prior);
         }
         if (result.state === 'not_executed') {
           await record(

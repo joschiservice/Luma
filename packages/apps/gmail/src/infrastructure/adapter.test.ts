@@ -413,6 +413,32 @@ describe('messages.send', () => {
     });
   });
 
+  it('refuses a send during a long quota cooldown before searching or sending', async () => {
+    const gmail = fakeGmail({});
+    const pacer = createQuotaPacer({ sleep: async () => {} });
+    pacer.cooldown(3_600_000);
+    const adapter = createGmailConnector({
+      tenantId,
+      connectionId,
+      emailAddress: mailbox,
+      accessToken: async () => 'access-token',
+      fetch: gmail.fetch,
+      pacer,
+      now: () => new Date('2026-10-03T00:00:00Z'),
+    });
+    await expect(
+      run(adapter, 'messages.send', outbound, 'v0:action'),
+    ).rejects.toMatchObject({
+      failure: {
+        code: 'rate_limited',
+        effect: 'none',
+        retry: 'after_delay',
+        dispatch: 'not_dispatched',
+      },
+    });
+    expect(gmail.calls).toHaveLength(0);
+  });
+
   it('treats an existing ID as a conflict without accepting or sending it', async () => {
     const gmail = fakeGmail({
       messages: () => ({ messages: [{ id: 'earlier', threadId: 't1' }] }),

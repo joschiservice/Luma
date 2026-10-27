@@ -1,5 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { ConnectorError } from '@luma/connector-core';
+
 /**
  * Gmail quota units per method. Gmail allows 250 units per user per second; see
  * https://developers.google.com/workspace/gmail/api/reference/quota.
@@ -23,7 +25,11 @@ export type GmailMethod = keyof typeof quotaUnits;
  * serialized and spaced by each request's cost; admitted requests may run concurrently.
  */
 export interface QuotaPacer {
-  /** Waits until `units` fit the rate, then sends. */
+  /**
+   * Waits until `units` fit the rate, then sends. When admission is further away than
+   * `maxAdmissionWaitMs`, for example during a cooldown, nothing is sent and the call fails
+   * with `rate_limited` carrying the remaining delay.
+   */
   run<T>(units: number, send: () => Promise<T>): Promise<T>;
   /** Admits nothing for at least this long, for example after Gmail throttled the mailbox. */
   cooldown(milliseconds: number): void;
@@ -35,7 +41,15 @@ export interface QuotaPacer {
  */
 const defaultUnitsPerSecond = 200;
 
-/** Creates a pacer that spaces request admissions by their quota cost. */
+/**
+ * Longest admission wait spent in place. Ordinary pacing waits at most one request's cost
+ * (half a second for a send); longer waits come from cooldowns after Gmail throttled. Those are
+ * returned to the caller instead, so a send never leaves long after execution's last authority
+ * check and a sync run does not hold a worker for the quota window.
+ */
+export const maxAdmissionWaitMs = 5000;
+
+/** Creates a pacer that spaces request admissions by their quota cost and caps in-place waits. */
 export function createQuotaPacer(
   options: {
     unitsPerSecond?: number;
@@ -59,6 +73,13 @@ export function createQuotaPacer(
       try {
         await previous;
         const wait = Math.max(0, notBefore - now());
+        if (wait > maxAdmissionWaitMs)
+          throw new ConnectorError({
+            code: 'rate_limited',
+            effect: 'none',
+            retry: 'after_delay',
+            retryAfterMs: Math.ceil(wait),
+          });
         if (wait) await sleep(wait);
         notBefore = Math.max(notBefore, now()) + units * msPerUnit;
       } finally {

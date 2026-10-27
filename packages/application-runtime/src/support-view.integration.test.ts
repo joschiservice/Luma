@@ -130,7 +130,7 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$3,$4,'owner',now()),($2,$3,$5,'member',now())",
       [randomUUID(), randomUUID(), tenant, owner, member],
     );
-    staff = createStaff(settings);
+    staff = createStaff(settings, { onDatabaseError: () => undefined });
     staffApp = Fastify();
     registerStaffHttp(staffApp, staff);
     await staffApp.ready();
@@ -149,14 +149,17 @@ describe.skipIf(!databaseUrl)('read-only support views', () => {
       .filter((value): value is string => typeof value === 'string')
       .map((value) => value.split(';')[0])
       .join('; ');
-    identity = createIdentity({
-      databaseUrl: as(customerLogin),
-      secret: 'support-view-customer-secret-at-least-32-chars',
-      baseURL: customerOrigin,
-      trustedOrigins: [customerOrigin],
-      cookiePrefix: 'support-view-customer',
-      readOnly: requestIsReadOnly,
-    });
+    identity = createIdentity(
+      {
+        databaseUrl: as(customerLogin),
+        secret: 'support-view-customer-secret-at-least-32-chars',
+        baseURL: customerOrigin,
+        trustedOrigins: [customerOrigin],
+        cookiePrefix: 'support-view-customer',
+        readOnly: requestIsReadOnly,
+      },
+      { onDatabaseError: () => undefined },
+    );
     customerApp = Fastify();
     registerIdentityGuards(customerApp, identity.service, [customerOrigin]);
     customerApp.setErrorHandler(

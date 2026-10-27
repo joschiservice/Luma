@@ -54,7 +54,10 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
     await admin.query(`GRANT luma_workflow_identity TO "${login}"`);
     url.username = login;
     url.password = password;
-    identity = createWorkflowIdentity({ databaseUrl: url.toString() });
+    identity = createWorkflowIdentity(
+      { databaseUrl: url.toString() },
+      { onDatabaseError: () => undefined },
+    );
     await owner.query(
       "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Suspension test','suspension-test','active','AU',now())",
       [tenantId],

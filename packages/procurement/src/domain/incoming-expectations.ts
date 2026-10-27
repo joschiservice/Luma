@@ -52,6 +52,8 @@ export function incomingLineExpectations(input: {
     draftVerified: false,
     supplierLinked: false,
     now: input.now,
+    // Expectations ignore overdue flags and check dates, the outputs that depend on the zone.
+    timeZone: 'UTC',
   });
   const expectations = new Map<string, IncomingLineExpectation>();
   for (const line of order.lines) {

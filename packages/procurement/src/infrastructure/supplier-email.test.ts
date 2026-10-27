@@ -122,6 +122,7 @@ function fixture() {
             draftVerified: false,
             supplierLinked: false,
             now: new Date('2026-10-13T00:00:00Z'),
+            timeZone: 'UTC',
           }),
         };
       },
@@ -218,6 +219,7 @@ function fixture() {
         draftVerified: false,
         supplierLinked: false,
         now: new Date('2026-10-13T00:00:00Z'),
+        timeZone: 'UTC',
       });
     },
     active: (value: boolean) => {

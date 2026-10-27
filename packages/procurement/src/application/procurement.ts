@@ -526,6 +526,8 @@ export function createProcurementService(deps: {
               draftVerified: false,
               supplierLinked: false,
               now: deps.now(),
+              // Difference decisions do not depend on the calendar day, unlike overdue dates.
+              timeZone: 'UTC',
             });
             if (
               !progress.attention.some(

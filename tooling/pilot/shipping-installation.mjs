@@ -28,7 +28,10 @@ export async function ensureShippingInstallation(
     !(await featureEnabled(manifest.organizationId, 'starshipit-fulfillment'))
   )
     return manifest;
-  const identity = createIdentity(identitySettings(env));
+  const identity = createIdentity(identitySettings(env), {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
   let connections;
   try {

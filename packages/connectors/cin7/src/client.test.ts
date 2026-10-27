@@ -2,6 +2,7 @@ import { ConnectorError } from '@luma/connector-core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createClient, createRequestPacer } from './index.js';
+import { maxAdmissionWaitMs } from './pacer.js';
 import { decimal, timestamp } from './schemas.js';
 
 const connection = {
@@ -120,6 +121,32 @@ describe('Cin7 request pacer', () => {
     );
     expect(order).toEqual([1, 2, 3]);
     expect(waits).toEqual([1000, 1000]);
+  });
+
+  it('returns a throttle cooldown to the caller instead of waiting it out', async () => {
+    let now = 0;
+    const waits: number[] = [];
+    const pacer = createRequestPacer({
+      now: () => now,
+      sleep: async (ms) => {
+        waits.push(ms);
+        now += ms;
+      },
+    });
+    pacer.cooldown(60_000);
+    const send = vi.fn(async () => 'read');
+    await expect(pacer.run(send)).rejects.toMatchObject({
+      failure: {
+        code: 'rate_limited',
+        effect: 'none',
+        retry: 'after_delay',
+        retryAfterMs: 60_000,
+      },
+    });
+    expect(send).not.toHaveBeenCalled();
+    now = 60_000 - maxAdmissionWaitMs;
+    await expect(pacer.run(send)).resolves.toBe('read');
+    expect(waits).toEqual([maxAdmissionWaitMs]);
   });
 });
 

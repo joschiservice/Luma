@@ -117,7 +117,7 @@ describe.skipIf(!databaseUrl)(
         ],
       );
       runtime = new Pool({ connectionString: url.toString() });
-      staff = createStaff(settings);
+      staff = createStaff(settings, { onDatabaseError: () => undefined });
       app = Fastify();
       registerStaffHttp(app, staff);
       await app.ready();
@@ -141,13 +141,16 @@ describe.skipIf(!databaseUrl)(
       customerUrl.username = customerLogin;
       customerUrl.password = password;
       const customerOrigin = 'http://localhost:3209';
-      identity = createIdentity({
-        databaseUrl: customerUrl.toString(),
-        secret: 'separate-customer-secret-at-least-32-characters',
-        baseURL: customerOrigin,
-        trustedOrigins: [customerOrigin],
-        cookiePrefix: 'integration-customer',
-      });
+      identity = createIdentity(
+        {
+          databaseUrl: customerUrl.toString(),
+          secret: 'separate-customer-secret-at-least-32-characters',
+          baseURL: customerOrigin,
+          trustedOrigins: [customerOrigin],
+          cookiePrefix: 'integration-customer',
+        },
+        { onDatabaseError: () => undefined },
+      );
       const customerResponse = await identity.handler(
         new Request(`${customerOrigin}/auth/sign-up/email`, {
           method: 'POST',
@@ -2561,15 +2564,18 @@ describe.skipIf(!databaseUrl)(
       let googleApp: ReturnType<typeof Fastify> | undefined;
       try {
         await provision(beforeSubject);
-        google = createStaff({
-          ...settings,
-          mode: 'google',
-          publicOrigin: origin,
-          googleClientId: clientId,
-          googleClientSecret: 'synthetic-google-client-secret',
-          googleHostedDomain: 'example.test',
-          cookiePrefix: 'google-rebind',
-        });
+        google = createStaff(
+          {
+            ...settings,
+            mode: 'google',
+            publicOrigin: origin,
+            googleClientId: clientId,
+            googleClientSecret: 'synthetic-google-client-secret',
+            googleHostedDomain: 'example.test',
+            cookiePrefix: 'google-rebind',
+          },
+          { onDatabaseError: () => undefined },
+        );
         googleApp = Fastify();
         registerStaffHttp(googleApp, google);
         await googleApp.ready();

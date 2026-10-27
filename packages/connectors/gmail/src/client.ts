@@ -1,5 +1,10 @@
 import { ConnectorError, type ConnectorErrorCode } from '@luma/connector-core';
 import {
+  assertDispatchAllowed,
+  markDispatchPreparing,
+  markDispatchStarted,
+} from '@luma/connector-core/dispatch';
+import {
   fail,
   parse,
   type ReadRetry,
@@ -114,7 +119,9 @@ export function gmailFailure(
 /**
  * Creates a paced, authenticated Gmail client for one mailbox. Requests reject redirects, time
  * out after 15 seconds by default, retry short transient read failures in place and map
- * provider failures to connector codes without their text. Sends are never repeated.
+ * provider failures to connector codes without their text. Sends are never repeated; inside an
+ * execution's dispatch guard, a send rechecks authority after pacer admission, and a pacer
+ * refusal or denial fails with `effect: 'none'` and `dispatch: 'not_dispatched'`.
  */
 export function createClient(options: GmailTransportOptions) {
   const timeoutMs = options.timeoutMs ?? 15000;
@@ -149,7 +156,13 @@ export function createClient(options: GmailTransportOptions) {
     let signal: AbortSignal | undefined;
     let dispatched = false;
     try {
-      const response = await pacer.run(quotaUnits[method], () => {
+      if (write) markDispatchPreparing();
+      const response = await pacer.run(quotaUnits[method], async () => {
+        // Execution rechecks authority after the pacer wait, immediately before the send.
+        if (write) {
+          await assertDispatchAllowed();
+          markDispatchStarted();
+        }
         signal = AbortSignal.timeout(timeoutMs);
         dispatched = true;
 
@@ -190,6 +203,17 @@ export function createClient(options: GmailTransportOptions) {
 
       return body;
     } catch (error) {
+      // Pacer refusals and authority denials precede the send, so nothing was sent.
+      if (
+        error instanceof ConnectorError &&
+        write &&
+        !dispatched &&
+        error.failure.dispatch === undefined
+      )
+        throw new ConnectorError({
+          ...error.failure,
+          dispatch: 'not_dispatched',
+        });
       if (error instanceof ConnectorError) throw error;
       const timedOut =
         signal?.aborted ||

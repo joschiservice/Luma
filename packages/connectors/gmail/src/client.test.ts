@@ -1,4 +1,5 @@
 import { ConnectorError } from '@luma/connector-core';
+import { withDispatchGuard } from '@luma/connector-core/dispatch';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createClient, gmailFailure } from './client.js';
@@ -8,7 +9,7 @@ import {
   createOAuthClient,
   gmailScopes,
 } from './oauth.js';
-import { createQuotaPacer } from './pacer.js';
+import { createQuotaPacer, maxAdmissionWaitMs } from './pacer.js';
 
 const json = (
   status: number,
@@ -117,6 +118,78 @@ describe('createClient', () => {
     });
   });
 
+  it('refuses a send during a long cooldown without sending it', async () => {
+    let clock = 0;
+    const pacer = createQuotaPacer({
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+    });
+    pacer.cooldown(3_600_000);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const guard = vi.fn(async () => {});
+    const client = createClient({ accessToken: async () => 't', fetch, pacer });
+    expect(
+      await failureOf(
+        withDispatchGuard(guard, () => client.sendMessage('raw', null)),
+      ),
+    ).toEqual({
+      code: 'rate_limited',
+      effect: 'none',
+      retry: 'after_delay',
+      retryAfterMs: 3_600_000,
+      dispatch: 'not_dispatched',
+    });
+    expect(guard).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rechecks dispatch authority after pacer admission and before the send', async () => {
+    let clock = 0;
+    const events: string[] = [];
+    const pacer = createQuotaPacer({
+      now: () => clock,
+      sleep: async (ms) => {
+        events.push(`wait ${ms}`);
+        clock += ms;
+      },
+    });
+    pacer.cooldown(2000);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+      events.push('send');
+
+      return json(200, { id: 'm1', threadId: 't1' });
+    });
+    const client = createClient({ accessToken: async () => 't', fetch, pacer });
+    await withDispatchGuard(
+      async () => {
+        events.push('authority');
+      },
+      () => client.sendMessage('raw', null),
+    );
+    expect(events).toEqual(['wait 2000', 'authority', 'send']);
+
+    const denied = async () => {
+      throw new ConnectorError({
+        code: 'conflict',
+        effect: 'none',
+        retry: 'never',
+        dispatch: 'not_dispatched',
+      });
+    };
+    expect(
+      await failureOf(
+        withDispatchGuard(denied, () => client.sendMessage('raw', null)),
+      ),
+    ).toMatchObject({
+      code: 'conflict',
+      effect: 'none',
+      dispatch: 'not_dispatched',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects unsafe IDs before any request', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>();
     const client = createClient({ accessToken: async () => 't', fetch });
@@ -141,6 +214,32 @@ describe('createQuotaPacer', () => {
     await pacer.run(100, async () => {});
     await pacer.run(1, async () => {});
     expect(waits).toEqual([50, 1000]);
+  });
+
+  it('returns a cooldown longer than the in-place limit to the caller', async () => {
+    let clock = 0;
+    const waits: number[] = [];
+    const pacer = createQuotaPacer({
+      now: () => clock,
+      sleep: async (ms) => {
+        waits.push(ms);
+        clock += ms;
+      },
+    });
+    pacer.cooldown(maxAdmissionWaitMs + 1);
+    const send = vi.fn(async () => 'sent');
+    expect(await failureOf(pacer.run(5, send))).toEqual({
+      code: 'rate_limited',
+      effect: 'none',
+      retry: 'after_delay',
+      retryAfterMs: maxAdmissionWaitMs + 1,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(waits).toEqual([]);
+
+    clock += 1;
+    await expect(pacer.run(5, send)).resolves.toBe('sent');
+    expect(waits).toEqual([maxAdmissionWaitMs]);
   });
 });
 

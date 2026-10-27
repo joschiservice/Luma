@@ -1,8 +1,26 @@
-import { GlideClient, GlideClusterClient, Script } from '@valkey/valkey-glide';
+import {
+  ClosingError,
+  ConnectionError,
+  GlideClient,
+  GlideClusterClient,
+  Script,
+} from '@valkey/valkey-glide';
 
 import type { AtomicStore } from '../application/atomic-store.js';
 
-/** Opens a lazy, primary-only Valkey connection. Failed connections may recover on a later call. */
+/**
+ * Whether a command failed because the connection is unusable rather than because of the
+ * command itself. Script, reply and per-request timeout errors leave the shared connection,
+ * and the other commands in flight on it, intact.
+ */
+function connectionLost(error: unknown) {
+  return error instanceof ClosingError || error instanceof ConnectionError;
+}
+
+/**
+ * Opens a lazy, primary-only Valkey connection. A lost connection is closed and new commands
+ * fail for one second before it is reopened; command errors are rethrown without touching it.
+ */
 export function createValkeyStore(url: string, cluster = false): AtomicStore {
   const target = new URL(url);
   const scripts = new Map<string, Script>();
@@ -68,8 +86,10 @@ export function createValkeyStore(url: string, cluster = false): AtomicStore {
       try {
         return await command;
       } catch (error) {
-        unavailableUntil = performance.now() + 1000;
-        await disconnect();
+        if (connectionLost(error)) {
+          unavailableUntil = performance.now() + 1000;
+          await disconnect();
+        }
         throw error;
       } finally {
         pending.delete(command);

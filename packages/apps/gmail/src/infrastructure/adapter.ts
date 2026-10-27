@@ -450,11 +450,25 @@ export function createGmailConnector(
           if (!context.idempotencyKey?.trim()) fail('invalid_input');
           const messageId = outboundMessageId(input.outboundId, mailbox);
           // An existing ID prevents redispatch, but search hits alone prove no send outcome.
-          const existing = await client.listMessages({
-            q: `rfc822msgid:${messageId}`,
-            maxResults: 1,
-            includeSpamTrash: true,
-          });
+          const existing = await client
+            .listMessages({
+              q: `rfc822msgid:${messageId}`,
+              maxResults: 1,
+              includeSpamTrash: true,
+            })
+            .catch((error: unknown) => {
+              // A failed search, such as a quota cooldown, comes before the send: nothing left.
+              if (
+                error instanceof ConnectorError &&
+                error.failure.effect === 'none' &&
+                error.failure.dispatch === undefined
+              )
+                throw new ConnectorError({
+                  ...error.failure,
+                  dispatch: 'not_dispatched',
+                });
+              throw error;
+            });
           if (existing.messages?.length) fail('conflict');
           let raw: string;
           try {

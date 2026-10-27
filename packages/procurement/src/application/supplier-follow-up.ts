@@ -84,12 +84,12 @@ export function createSupplierFollowUp(deps: {
     if (target.kind === 'confirmation_overdue')
       return lines.every((l) => l.confirmed === null && l.received === 0);
     const line = lines.find((l) => l.lineId === target.lineId);
-    const today = now().toISOString().slice(0, 10);
 
+    // The order view's day is the workspace's calendar day, as for its overdue flags.
     return (
       !!line &&
       line.outstanding > 0 &&
-      (!line.expectedDate || line.expectedDate < today)
+      (!line.expectedDate || line.expectedDate < view.progress.today)
     );
   }
 

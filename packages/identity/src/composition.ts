@@ -35,8 +35,9 @@ import { createSettingsRepository } from './infrastructure/settings.js';
 import { createWorkflowIdentityRepository } from './infrastructure/workflow-identity.js';
 
 /**
- * Creates identity services, an authentication handler, and readiness checks. Call close to
- * release the owned database pool.
+ * Creates identity services, an authentication handler, and readiness checks. Errors from idle
+ * pool clients, such as a database restart, go to `onDatabaseError` instead of crashing the
+ * process. Call close to release the owned database pool.
  */
 export function createIdentity(
   settings: Omit<AuthSettings, 'rateLimit'> & {
@@ -66,6 +67,7 @@ export function createIdentity(
     /** Reports whether the current request may only read, as in a support view. */
     readOnly?: () => boolean;
   },
+  dependencies: { onDatabaseError: (error: Error) => void },
 ) {
   const pool = new Pool({
     connectionString: settings.databaseUrl,
@@ -74,6 +76,7 @@ export function createIdentity(
     statement_timeout: 5000,
     idle_in_transaction_session_timeout: 10000,
   });
+  pool.on('error', dependencies.onDatabaseError);
   const provider =
     settings.mailProvider ??
     (settings.mail ? createResendMail(settings.mail) : undefined);
@@ -180,10 +183,6 @@ export function createIdentity(
     handler: auth.handler,
     baseURL: settings.baseURL,
     clientIpHeader: settings.clientIpHeader,
-    /** Registers an idle database connection error handler without coupling identity to HTTP. */
-    onDatabaseError(handler: () => void) {
-      pool.on('error', handler);
-    },
     async checkReadiness() {
       const result = await pool.query<{ safe: boolean }>(`SELECT
         NOT r.rolsuper AND NOT r.rolbypassrls
@@ -212,14 +211,18 @@ export function createIdentity(
  * Creates the identity service background workers use, on a pool opened with `databaseUrl`, a
  * login with `luma_workflow_identity`. It resolves workflow contexts and reads the selected
  * workspace's members without names or emails. It needs no auth secret and has no session,
- * support view, credential or member change access; those methods throw. Call close to release
- * the owned database pool.
+ * support view, credential or member change access; those methods throw. Errors from idle pool
+ * clients go to `onDatabaseError` instead of crashing the process. Call close to release the
+ * owned database pool.
  */
-export function createWorkflowIdentity(settings: {
-  databaseUrl: string;
-  region?: DataRegion;
-  enabledRegions?: readonly DataRegion[];
-}) {
+export function createWorkflowIdentity(
+  settings: {
+    databaseUrl: string;
+    region?: DataRegion;
+    enabledRegions?: readonly DataRegion[];
+  },
+  dependencies: { onDatabaseError: (error: Error) => void },
+) {
   const pool = new Pool({
     connectionString: settings.databaseUrl,
     max: 10,
@@ -227,6 +230,7 @@ export function createWorkflowIdentity(settings: {
     statement_timeout: 5000,
     idle_in_transaction_session_timeout: 10000,
   });
+  pool.on('error', dependencies.onDatabaseError);
   const region = settings.region ?? 'AU';
 
   return {

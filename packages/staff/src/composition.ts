@@ -25,10 +25,17 @@ export { readStaffSettings } from './infrastructure/settings.js';
 
 export type { StaffSettings } from './infrastructure/settings.js';
 
-/** Owns isolated staff database resources, authentication and application services. */
+/**
+ * Owns isolated staff database resources, authentication and application services. Errors from
+ * idle pool clients, such as a database restart, go to `onDatabaseError` instead of crashing
+ * the process.
+ */
 export function createStaff(
   settings: StaffSettings,
-  dependencies: { release?: () => Promise<boolean> } = {},
+  dependencies: {
+    release?: () => Promise<boolean>;
+    onDatabaseError: (error: Error) => void;
+  },
 ) {
   settings = validateStaffSettings(settings);
   const pool = new Pool({
@@ -38,6 +45,7 @@ export function createStaff(
     statement_timeout: 5000,
     idle_in_transaction_session_timeout: 10000,
   });
+  pool.on('error', dependencies.onDatabaseError);
   const auth = createStaffAuth(pool, settings);
 
   return {

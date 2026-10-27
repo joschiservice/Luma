@@ -15,6 +15,7 @@ import type { WorkflowTriggerRun } from '../domain/workflow.js';
 import {
   type CaseWorkflowAdapter,
   createCaseWorkflows,
+  type ProcessExecutionClosure,
 } from './case-workflows.js';
 
 const tenantId = '00000000-0000-4000-8000-000000000001';
@@ -120,11 +121,14 @@ function fixture(
     /** Workspace members with their roles; the version then asks a Member and escalates to Admins. */
     members?: { userId: string; role: { id: string; name: string } }[];
     claim?: (id: string, userId: string) => Promise<unknown>;
+    /** Reports every existing execution as closed. */
+    closed?: ProcessExecutionClosure;
   } = {},
 ) {
   const activations: CaseActivation[] = [];
   const runs = new Map<string, WorkflowTriggerRun>();
   const started: string[] = [];
+  const recorded: ProcessStepOutput[] = [];
   const cases = options.cases ?? [];
   const signals = options.signals;
   const version = signals
@@ -265,7 +269,9 @@ function fixture(
       },
     },
     steps: {
-      record: async () => undefined,
+      record: async (_context, _runId, output) => {
+        recorded.push(output);
+      },
       list: async () => options.outputs ?? new Map(),
     },
     catalog: { publish: vi.fn(async () => undefined) },
@@ -318,7 +324,13 @@ function fixture(
       : {
           transport: {
             start: async (_context, run) => {
+              const repeated = started.includes(run.id);
               started.push(run.id);
+
+              return {
+                workflowId: run.id,
+                closed: repeated ? (options.closed ?? null) : null,
+              };
             },
           },
         }),
@@ -336,7 +348,7 @@ function fixture(
       policyVersion: 'policy-1',
     });
 
-  return { workflows, runs, started, adapter, activations, turnOn };
+  return { workflows, runs, started, recorded, adapter, activations, turnOn };
 }
 
 describe('case workflows', () => {
@@ -381,6 +393,32 @@ describe('case workflows', () => {
     await f.turnOn();
     await f.workflows.tick(context('operator'));
 
+    expect(f.runs.size).toBe(2);
+  });
+
+  it('settles a run whose execution closed without a final step and frees its place', async () => {
+    const f = fixture({
+      cases: [signal('a'), signal('b')],
+      maxOpenRuns: 1,
+      closed: 'failed',
+    });
+    await f.turnOn();
+    await f.workflows.tick(context('operator'));
+    expect(f.runs.size).toBe(1);
+
+    // The second pass finds the first run's execution failed before it recorded a step.
+    await f.workflows.tick(context('operator'));
+    expect(f.recorded).toEqual([
+      {
+        stepId: 'look',
+        kind: 'read',
+        state: 'escalated',
+        values: {},
+        evidenceRefs: ['temporal:run-1:look'],
+        recordedAt: now.toISOString(),
+        reason: 'process_execution_closed',
+      },
+    ]);
     expect(f.runs.size).toBe(2);
   });
 

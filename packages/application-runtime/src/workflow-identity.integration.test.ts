@@ -22,6 +22,7 @@ describe.skipIf(!databaseUrl)('the workers’ identity login', () => {
   let owner: Pool;
   let worker: Pool;
   let identity: ReturnType<typeof createWorkflowIdentity>;
+  const databaseErrors: Error[] = [];
 
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${database}"`);
@@ -51,7 +52,10 @@ describe.skipIf(!databaseUrl)('the workers’ identity login', () => {
     await admin.query(`GRANT luma_workflow_identity TO "${login}"`);
     url.username = login;
     url.password = password;
-    identity = createWorkflowIdentity({ databaseUrl: url.toString() });
+    identity = createWorkflowIdentity(
+      { databaseUrl: url.toString() },
+      { onDatabaseError: (error) => databaseErrors.push(error) },
+    );
     worker = new Pool({ connectionString: url.toString() });
 
     for (const [id, slug] of [
@@ -158,5 +162,26 @@ describe.skipIf(!databaseUrl)('the workers’ identity login', () => {
     await expect(identity.service.authenticate({})).rejects.toThrow(
       'Background workers can only read workspace members',
     );
+  });
+
+  it('reports a dropped idle connection and keeps serving', async () => {
+    await identity.service.resolveWorkflowContext(
+      buyer,
+      tenantId,
+      'workflow-identity-test',
+    );
+    worker.on('error', () => undefined);
+    await admin.query(
+      'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename=$1',
+      [login],
+    );
+
+    await expect.poll(() => databaseErrors.length).toBeGreaterThan(0);
+    const context = await identity.service.resolveWorkflowContext(
+      buyer,
+      tenantId,
+      'workflow-identity-test',
+    );
+    expect(context.tenantId).toBe(tenantId);
   });
 });

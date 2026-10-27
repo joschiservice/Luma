@@ -27,7 +27,10 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
     trustedOrigins: [env.BETTER_AUTH_URL],
   };
   const app = await buildRuntimeApp(settings);
-  const identity = createIdentity(settings);
+  const identity = createIdentity(settings, {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   const corpus = JSON.parse(
     await readFile(
       new URL(

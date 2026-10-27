@@ -3,6 +3,7 @@ import type { TenantDatabase } from '@luma/platform';
 
 import { processInstructions } from '../domain/code-grants.js';
 import type { ProcessStepOutput } from '../domain/process.js';
+import { isProcessSettlement } from '../domain/process-settlement.js';
 import { canonicalPlaybook } from './playbooks/schema.js';
 import { compileProcessWorkflow } from './process-schema.js';
 
@@ -28,13 +29,21 @@ function validateOutput(
     escalation: ['escalated'],
     end: ['completed'],
   };
+  // A run that failed or whose execution closed settles at any step, without step values.
+  const settlement = isProcessSettlement(output);
   if (
     output.kind !== step.kind ||
-    !allowed[step.kind].includes(output.state) ||
+    (!settlement && !allowed[step.kind].includes(output.state)) ||
     !output.evidenceRefs.length ||
     !Number.isFinite(Date.parse(output.recordedAt))
   )
     throw new Error('Step evidence does not match the published version');
+  if (settlement) {
+    if (Object.keys(output.values).length)
+      throw new Error('A settled step records no values');
+
+    return;
+  }
   if (
     step.kind === 'read' ||
     step.kind === 'verification' ||

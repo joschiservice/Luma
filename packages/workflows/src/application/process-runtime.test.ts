@@ -375,3 +375,156 @@ it('continues an open handoff after history rollover without repeating prior eff
     'completed',
   ]);
 });
+
+describe('unrecoverable failures', () => {
+  const settle = vi.fn(async (_error: unknown, record: () => Promise<void>) => {
+    await record();
+
+    return true;
+  });
+
+  it('settles the run as escalated at the step it was on', async () => {
+    const f = fixture();
+    vi.mocked(f.activities.verify).mockRejectedValue(
+      new Error('Activity retries exhausted'),
+    );
+    const result = await runProcess(run, version, f.activities, {
+      ...f.clock,
+      settle,
+    });
+    expect(result).toEqual({
+      state: 'escalated',
+      stepId: 'verify',
+      reason: 'process_failed',
+    });
+    expect(f.outputs.at(-1)).toMatchObject({
+      stepId: 'verify',
+      kind: 'verification',
+      state: 'escalated',
+      values: {},
+      evidenceRefs: ['temporal:run:verify'],
+      reason: 'process_failed',
+    });
+  });
+
+  it('settles an output that breaks its declared contract', async () => {
+    const f = fixture();
+    vi.mocked(f.activities.read).mockResolvedValue({
+      values: { unexpected: true },
+      evidenceRefs: ['read-1'],
+      observedAt: '2026-09-27T00:00:00Z',
+    });
+    const result = await runProcess(run, version, f.activities, {
+      ...f.clock,
+      settle,
+    });
+    expect(result).toMatchObject({ state: 'escalated', stepId: 'refresh' });
+    expect(f.outputs).toEqual([
+      expect.objectContaining({ stepId: 'refresh', state: 'escalated' }),
+    ]);
+  });
+
+  it('propagates the failure when the runtime cannot settle it', async () => {
+    const f = fixture();
+    vi.mocked(f.activities.read).mockRejectedValue(new Error('Unavailable'));
+    await expect(
+      runProcess(run, version, f.activities, f.clock),
+    ).rejects.toThrow('Unavailable');
+    await expect(
+      runProcess(run, version, f.activities, {
+        ...f.clock,
+        settle: async () => false,
+      }),
+    ).rejects.toThrow('Unavailable');
+    expect(f.outputs).toEqual([]);
+  });
+});
+
+it('rereads a Code Step’s pending approval instead of running the code on every poll', async () => {
+  const f = fixture();
+  let time = Date.parse(run.createdAt);
+  const codeVersion: typeof version = {
+    ...version,
+    steps: [
+      {
+        id: 'calculate',
+        kind: 'code' as const,
+        runtime: 'wasmtime-49.0.1/javy-9.1.0/typescript-5.9.3/1' as const,
+        artifactDigest: 'b'.repeat(64),
+        source: '',
+        fields: { reserved: 'boolean' as const },
+        grants: ['reserve'],
+        limits: {
+          fuel: 10000,
+          memoryBytes: 67108864,
+          wallTimeMs: 1000,
+          maxRequests: 1,
+        },
+      },
+      ...version.steps.filter(
+        (step) => step.id === 'reserve' || step.id === 'verify',
+      ),
+      { id: 'finish', kind: 'end' as const, outcome: 'reserved' },
+    ],
+  };
+  const telemetry = {
+    runtime: 'wasmtime-49.0.1/javy-9.1.0/typescript-5.9.3/1',
+    artifactDigest: 'b'.repeat(64),
+    inputDigest: 'c'.repeat(64),
+    requests: 1,
+    wallTimeMs: 1,
+  };
+  const code = vi
+    .fn<NonNullable<ProcessActivities['code']>>()
+    .mockResolvedValueOnce({
+      state: 'awaiting_approval',
+      values: {},
+      evidenceRefs: ['decision'],
+      approval: {
+        stepId: 'reserve',
+        proposalId: 'proposal',
+        decisionId: 'decision',
+      },
+      telemetry: { ...telemetry, outcome: 'capability_denied' },
+    })
+    .mockResolvedValue({
+      state: 'completed',
+      values: { reserved: true },
+      evidenceRefs: ['receipt'],
+      telemetry: { ...telemetry, outcome: 'completed', verifiedActions: 1 },
+    });
+  const actionApprovalPending = vi
+    .fn<NonNullable<ProcessActivities['actionApprovalPending']>>()
+    .mockResolvedValueOnce(true)
+    .mockResolvedValueOnce(true)
+    .mockResolvedValue(false);
+  const result = await runProcess(
+    run,
+    codeVersion,
+    { ...f.activities, code, actionApprovalPending },
+    {
+      ...f.clock,
+      now: () => new Date(time).toISOString(),
+      decisionChanged: async (ms) => {
+        time += ms;
+
+        return false;
+      },
+    },
+  );
+  expect(result.state).toBe('verified');
+  expect(actionApprovalPending).toHaveBeenCalledTimes(3);
+  expect(actionApprovalPending).toHaveBeenCalledWith(
+    run,
+    expect.objectContaining({ id: 'reserve', kind: 'capability' }),
+    'proposal',
+    'decision',
+  );
+  // Once when the step starts and once after the decision changed.
+  expect(code).toHaveBeenCalledTimes(2);
+  expect(f.outputs.map((output) => output.state)).toEqual([
+    'waiting',
+    'completed',
+    'completed',
+  ]);
+});
