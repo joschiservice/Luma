@@ -79,6 +79,7 @@ function provider(tenantId: string, erpId: string) {
     capability: string;
     cursor?: string;
     admission?: boolean;
+    code?: string;
   }[] = [];
   const requests: {
     connectionId: string;
@@ -148,7 +149,11 @@ function provider(tenantId: string, erpId: string) {
                 retry: 'after_delay',
                 retryAfterMs: 60000,
               }
-            : { code: 'transient', effect: 'none', retry: 'after_delay' },
+            : {
+                code: failed?.code ?? 'transient',
+                effect: 'none',
+                retry: 'after_delay',
+              },
         } as CapabilityResult<ReadCapability>;
       }
       const all = (
@@ -201,11 +206,17 @@ function provider(tenantId: string, erpId: string) {
     set(connectionId: string, capability: ReadCapability, items: Item[]) {
       collections.set(`${connectionId}:${capability}`, items);
     },
-    fail(connectionId: string, capability: string, cursor?: string) {
+    fail(
+      connectionId: string,
+      capability: string,
+      cursor?: string,
+      code?: string,
+    ) {
       failures.push({
         connectionId,
         capability,
         ...(cursor ? { cursor } : {}),
+        ...(code ? { code } : {}),
       });
     },
     defer(connectionId: string, capability: string, cursor?: string) {
@@ -445,6 +456,8 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         history_from: Date | null;
         watermark: Date | null;
         principal_id: string;
+        scan_restarts: number;
+        lease_token: string | null;
       }>(
         'SELECT * FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3',
         [tenant, connectionId, recordType],
@@ -791,7 +804,30 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     for (const type of ['orders', 'products', 'inventory'] as const)
       await service.command(context(), (await stream(type))!.id, 'reconcile');
     await drain();
-    // The full scan establishes missing; its next due page independently confirms it.
+    // The full scan establishes missing; the next scan independently confirms it, except for a
+    // record checked within the last day, which waits until that check is a day old.
+    const checked = (age: string) =>
+      owner.query(
+        `UPDATE commerce_sync_items SET confirmation_checked_at=now()-$3::interval
+        WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'`,
+        [tenant, shop, age],
+      );
+    await checked('1 hour');
+    await due();
+    await drain();
+    expect(
+      (
+        await owner.query(
+          'SELECT record_type,status FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 ORDER BY record_type',
+          [tenant, shop],
+        )
+      ).rows,
+    ).toEqual([
+      { record_type: 'inventory', status: 'retired' },
+      { record_type: 'orders', status: 'retired' },
+      { record_type: 'products', status: 'current' },
+    ]);
+    await checked('25 hours');
     await due();
     await drain();
     expect(await snapshots()).toEqual([
@@ -1492,6 +1528,77 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
         .map((r) => r.cursor ?? null),
     ).toEqual([null, '2', '2']);
+  }, 30000);
+
+  it('restarts a scan whose cursor the source keeps rejecting at most three times, then reports it failing', async () => {
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      order(shop, '2'),
+      order(shop, '3'),
+    ]);
+    for (let rejection = 0; rejection < 4; rejection++)
+      source.fail(shop, 'orders.read', '2', 'invalid_input');
+    // Each restart's first page succeeds and clears the attempts; the restart count remains.
+    for (let pass = 0; pass < 6; pass++) {
+      await due();
+      await drain();
+      if ((await stream('orders'))!.attempts >= 5) break;
+    }
+    expect(
+      source.requests
+        .filter(
+          (r) => r.connectionId === shop && r.capability === 'orders.read',
+        )
+        .map((r) => r.cursor ?? null),
+    ).toEqual([null, '2', null, '2', null, '2', null, '2']);
+    expect(await stream('orders')).toMatchObject({
+      phase: 'backfill',
+      cursor: '2',
+      scan_restarts: 3,
+      attempts: 5,
+      error_code: 'invalid_input',
+    });
+    expect(
+      (await service.overview(context())).connections
+        .find((item) => item.connectionId === shop)
+        ?.recordTypes.find((item) => item.recordType === 'orders')?.stream,
+    ).toMatchObject({ status: 'failing' });
+  }, 30000);
+
+  it('stops a page without writing when another runner takes over its stream', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    const stolen = randomUUID();
+    source.onRead(async (request) => {
+      if (request.connectionId !== shop || request.capability !== 'orders.read')
+        return;
+      source.onRead(undefined);
+      await owner.query(
+        `UPDATE commerce_sync_streams SET lease_token=$3 WHERE tenant_id=$1 AND connection_id=$2 AND record_type='orders'`,
+        [tenant, shop, stolen],
+      );
+    });
+    await drain();
+    expect(await stream('orders')).toMatchObject({
+      lease_token: stolen,
+      attempts: 0,
+      error_code: null,
+    });
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2',
+          [tenant, shop],
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
+    const store = createSyncStore(db);
+    const current = (await stream('orders'))!;
+    expect(
+      await store.renewLease(tenant, current.id, randomUUID(), 60_000),
+    ).toBe(false);
+    expect(await store.renewLease(tenant, current.id, stolen, 60_000)).toBe(
+      true,
+    );
   }, 30000);
 
   it('imports fulfillments after their orders and flags records a full check no longer finds', async () => {

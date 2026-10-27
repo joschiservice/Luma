@@ -189,6 +189,16 @@ export interface SyncStore {
     streamId: string,
     token: string,
   ): Promise<SyncStream | null>;
+  /**
+   * Extends a held page lease to `leaseMs` from now. Returns false when another runner holds
+   * the stream or the lease was released; the caller must then stop without further writes.
+   */
+  renewLease(
+    tenantId: string,
+    streamId: string,
+    token: string,
+    leaseMs: number,
+  ): Promise<boolean>;
   /** Defers all streams sharing a connection's provider budget. */
   deferConnection(
     tenantId: string,
@@ -224,11 +234,16 @@ export interface SyncStore {
     before: string,
     limit: number,
   ): Promise<ItemKey[]>;
-  /** Previously seen records absent from a full scan, excluding confirmed retirements. */
+  /**
+   * Previously seen records absent from a full scan, excluding confirmed retirements and
+   * records whose deletion was last checked at or after `checkedBefore`; least recently
+   * checked first, up to `limit`.
+   */
   confirmationCandidates(
     tenantId: string,
     connectionId: string,
     recordType: RecordType,
+    checkedBefore: string,
     limit: number,
   ): Promise<(ItemKey & { createdAt: string | null })[]>;
   /** Records the independent lookup outcome without changing scan coverage or source history. */
@@ -246,7 +261,10 @@ export interface SyncStore {
     token: string,
     page: PageCommit,
   ): Promise<boolean>;
-  /** Records a failed page and releases the lease; `restart` discards the scan cursor. */
+  /**
+   * Records a failed page and releases the lease. `restart` discards the scan cursor and
+   * counts a scan restart; `failing` reports the stream failing without further attempts.
+   */
   failPage(
     tenantId: string,
     streamId: string,
@@ -257,6 +275,7 @@ export interface SyncStore {
       dueAt: string;
       restart: boolean;
       block: BlockReason | null;
+      failing?: boolean;
     },
   ): Promise<void>;
   overview(tenantId: string): Promise<{

@@ -326,24 +326,19 @@ export async function createDefaultCommerceSyncWorker(
       log,
     });
 
+    const loops = [
+      worker,
+      followUp,
+      mailboxes,
+      returnFollowUp,
+      detection,
+      retention,
+    ];
+
     return {
-      run: async () => {
-        await Promise.all([
-          worker.run(),
-          followUp.run(),
-          mailboxes.run(),
-          returnFollowUp.run(),
-          detection.run(),
-          retention.run(),
-        ]);
-      },
+      run: () => runLoops(loops),
       shutdown: () => {
-        worker.shutdown();
-        followUp.shutdown();
-        mailboxes.shutdown();
-        returnFollowUp.shutdown();
-        detection.shutdown();
-        retention.shutdown();
+        for (const loop of loops) loop.shutdown();
       },
       close: resources.close,
     };
@@ -351,6 +346,29 @@ export async function createDefaultCommerceSyncWorker(
     await resources.close();
     throw error;
   }
+}
+
+/**
+ * Runs background loops until each resolves. When one loop rejects, every loop is told to shut
+ * down and all are awaited before the first failure is rethrown, so resources are never closed
+ * under a loop that is still running.
+ */
+export async function runLoops(
+  loops: readonly { run(): Promise<void>; shutdown(): void }[],
+) {
+  const stopAll = () => {
+    for (const loop of loops) loop.shutdown();
+  };
+  const results = await Promise.allSettled(
+    loops.map((loop) =>
+      loop.run().catch((error: unknown) => {
+        stopAll();
+        throw error;
+      }),
+    ),
+  );
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 /** Wires automatic remapping to the commerce owner in the candidate transaction. */

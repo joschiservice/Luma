@@ -35,7 +35,8 @@ flowchart TD
     Lease["Lease a due stream for 5 minutes"] --> Read["Read the next page through the capability"]
     Read -->|admission deferred| Defer["Release the lease, keep the cursor; not a failure"]
     Read -->|read failed or page incomplete| Fail["Keep the cursor, back off 30 s to 1 h"]
-    Read -->|cursor rejected| Restart["Restart the scan"]
+    Read -->|cursor rejected| Restart["Restart the scan; back off after the first restart"]
+    Restart -->|fourth rejection in one scan| Failing
     Read -->|complete page| Compare["Compare digests with the ledger"]
     Compare -->|unchanged| Commit
     Compare -->|changed| Import["Import changed records in one ingestion transaction"]
@@ -50,7 +51,13 @@ may return fewer (Shopify returns at most 25, or 5 for fulfillments and returns)
 imports the page's changed records in one ingestion transaction, then commits ledger
 entries, counters and the next cursor in one transaction. A restarted or second runner
 continues from the committed cursor; a lost lease discards the page's ledger write, and
-the next attempt re-imports idempotently.
+the next attempt re-imports idempotently. Imports, purchasing terms, customer writes and
+customer removal are not fenced by the lease token, so the runner renews the lease before
+each of them. When the renewal finds another runner holding the stream, the page stops
+without further writes and records no failure. A single step that outlasts the lease can
+still overlap the next runner; the import rules keep such overlap idempotent. Renewal
+happens between steps rather than on a timer, so a hung step still releases its stream
+when the lease expires.
 
 Transports first retry a transient read briefly (see
 [connectors](connectors.md#errors-retries-and-evidence)). A page failure keeps the cursor
@@ -58,7 +65,11 @@ and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. Each 
 waits a stable share of half to all of that delay, so streams do not retry in step after an
 outage. A page the
 adapter reports as incomplete fails the same way, because it cannot establish coverage. A
-rejected cursor restarts the scan. After five consecutive failures the stream is **failing**.
+rejected cursor restarts the scan, at once the first time and with backoff after that. A
+successful first page clears the failure attempts, so `scan_restarts` counts restarts per
+scan; a suspended history checkpoint keeps its count. After three restarts a further
+rejection keeps the cursor, backs off and reports the stream failing at once; **Re-import
+history** starts over. After five consecutive failures the stream is **failing**.
 `failing_since` marks when the current run of failures began and is cleared by a
 successful page; scheduled detection uses it for the sync-failure retry window
 ([exception detection](exception-detection.md#scheduled-detection)). Stored messages are
@@ -139,8 +150,10 @@ status, source creation and update times, first/last seen and the last scan that
 A record whose digest and status are unchanged is not projected again, so re-imports and
 duplicate notifications add no snapshots. Full scans set `missing_since` on records they
 no longer return, and any later read that returns the record clears it. Missing is not deletion.
-For Shopify orders, products and stock positions, the next due read checks up to ten missing
-records independently before reading its page. Current grants must permit the lookup; older
+For Shopify orders, products and stock positions, each scan checks up to ten missing records
+independently before its first page, skipping records checked within the last day. A failed,
+deferred or partial lookup stops the checks for that scan and is logged; the page still runs,
+and the record stays missing until a later scan checks it. Current grants must permit the lookup; older
 orders with unknown creation time or outside the 60-day window require `read_all_orders`.
 A complete, error-free null point lookup confirms deletion; a readable inventory item with
 no level at the previously observed location confirms disconnection. Failed, partial or
