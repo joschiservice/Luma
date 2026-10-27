@@ -1813,6 +1813,301 @@ describe.skipIf(!databaseUrl)(
       );
       expect(execute).not.toHaveBeenCalled();
     });
+
+    async function awaitingApproval(proposal: ProposedAction) {
+      const waiting = await safety.execution.execute(alice, proposal);
+      if (waiting.state !== 'approval_required')
+        throw new Error('Missing decision');
+
+      return waiting.decision;
+    }
+
+    async function stored(
+      table: 'policy_approvals' | 'executed_actions',
+      proposalId: string,
+    ) {
+      return (
+        await owner.query(
+          `SELECT document FROM ${table} WHERE tenant_id=$1 AND proposal_id=$2`,
+          [tenantId, proposalId],
+        )
+      ).rows.map((row) => row.document);
+    }
+
+    async function events(proposalId: string, eventType: string) {
+      return (await audit(proposalId)).filter(
+        (entry) => entry.eventType === eventType,
+      );
+    }
+
+    it('approve and reject racing persist one outcome', async () => {
+      // A second pool stands in for another API process holding its own connections.
+      const concurrent = startSafety();
+      try {
+        for (let round = 0; round < 8; round++) {
+          const proposal = action({ risk: 'high' });
+          const decision = await awaitingApproval(proposal);
+          const expiry = new Date(Date.now() + 60_000).toISOString();
+          const [first, second] =
+            round % 2 === 0
+              ? (['approved', 'rejected'] as const)
+              : (['rejected', 'approved'] as const);
+          // Later rounds hold the table until both responses wait inside the save, so the
+          // race is decided by the database rather than by call order.
+          const gate = round >= 4 ? await owner.connect() : null;
+          let responses: PromiseSettledResult<unknown>[];
+          try {
+            await gate?.query('BEGIN');
+            await gate?.query('LOCK TABLE policy_approvals IN EXCLUSIVE MODE');
+            const racing = Promise.allSettled([
+              safety.policies.respond(bob, decision.id, first, expiry),
+              concurrent.policies.respond(bob, decision.id, second, expiry),
+            ]);
+            if (gate) {
+              await expect
+                .poll(
+                  async () =>
+                    (
+                      await owner.query(
+                        "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname=$1 AND usename=$2 AND wait_event_type='Lock'",
+                        [database, login],
+                      )
+                    ).rows[0].waiting,
+                  { timeout: 5_000, interval: 10 },
+                )
+                .toBe(2);
+              await gate.query('COMMIT');
+            }
+            responses = await racing;
+          } finally {
+            // Never return a connection to the pool while it still holds the table.
+            await gate?.query('ROLLBACK');
+            gate?.release();
+          }
+          const approvals = await stored('policy_approvals', proposal.id);
+          expect(approvals).toHaveLength(1);
+          const [winner] = approvals;
+          // The first committed response wins; the other caller receives it, not its own.
+          expect(responses).toEqual([
+            { status: 'fulfilled', value: winner },
+            { status: 'fulfilled', value: winner },
+          ]);
+          expect(await events(proposal.id, 'approval.responded')).toEqual([
+            expect.objectContaining({
+              id: winner.id,
+              policyDecisionId: decision.id,
+              actor: { kind: 'user', id: bob.actor.id },
+              details: expect.objectContaining({ outcome: winner.outcome }),
+            }),
+          ]);
+          const result = await safety.execution.execute(alice, proposal);
+          const calls = execute.mock.calls.filter(
+            ([, key]) => key === `v0:${proposal.id}`,
+          );
+          if (winner.outcome === 'approved') {
+            expect(result.state).toBe('succeeded');
+            expect(calls).toHaveLength(1);
+          } else {
+            expect(result).toMatchObject({
+              state: 'denied',
+              decision: { reason: 'approval_rejected' },
+            });
+            expect(calls).toHaveLength(0);
+            expect(await stored('executed_actions', proposal.id)).toEqual([]);
+          }
+        }
+      } finally {
+        await concurrent.close();
+      }
+    });
+    it('approval racing expiry never dispatches', async () => {
+      const concurrent = startSafety();
+      const writes: string[] = [];
+      // The fake provider write happens only after the engine's dispatch guard passes.
+      execute.mockImplementation(async (_intent, key, beforeDispatch) => {
+        await beforeDispatch?.();
+        writes.push(key);
+
+        return { evidenceRefs: [observationId] };
+      });
+      const elapsed = async (deadline: number) => {
+        while (Date.now() <= deadline)
+          await new Promise((resolve) =>
+            setTimeout(resolve, deadline - Date.now() + 1),
+          );
+      };
+      try {
+        // The approval expires while execution is before policy evaluation (1), between the
+        // reservation and the dispatch recheck (2), or inside the dispatch guard (3). Round 0
+        // never expires and proves the same path dispatches.
+        for (const expiresDuring of [0, 1, 2, 3, 1, 2, 3]) {
+          const proposal = action({ risk: 'high' });
+          const decision = await awaitingApproval(proposal);
+          const expiresAt = Date.now() + (expiresDuring ? 750 : 60_000);
+          let checks = 0;
+          let approved!: () => void;
+          const responded = new Promise<void>((resolve) => {
+            approved = resolve;
+          });
+          checkPreconditions.mockImplementation(async () => {
+            checks += 1;
+            if (checks === 1) await responded;
+            if (checks === expiresDuring) await elapsed(expiresAt);
+
+            return true;
+          });
+          const [approval, result] = await Promise.all([
+            concurrent.policies
+              .respond(
+                bob,
+                decision.id,
+                'approved',
+                new Date(expiresAt).toISOString(),
+              )
+              .finally(approved),
+            safety.execution.execute(alice, proposal),
+          ]);
+          expect(approval.outcome).toBe('approved');
+          const records = await stored('executed_actions', proposal.id);
+          if (expiresDuring === 0) {
+            expect(result.state).toBe('succeeded');
+            expect(
+              writes.filter((key) => key === `v0:${proposal.id}`),
+            ).toHaveLength(1);
+            continue;
+          }
+          expect(writes.filter((key) => key === `v0:${proposal.id}`)).toEqual(
+            [],
+          );
+          if (expiresDuring === 1) {
+            expect(result.state).toBe('approval_required');
+            expect(records).toEqual([]);
+          } else {
+            expect(result).toMatchObject({
+              state: 'failed',
+              record: {
+                attempt: {
+                  dispatch: 'not_dispatched',
+                  approvalId: approval.id,
+                },
+              },
+            });
+            expect(records).toHaveLength(1);
+            const allowed = (
+              await owner.query(
+                'SELECT document FROM policy_decisions WHERE tenant_id=$1 AND id=$2',
+                [tenantId, records[0].attempt.policyDecisionId],
+              )
+            ).rows[0].document;
+            expect(Date.parse(allowed.validUntil)).toBeLessThanOrEqual(
+              Date.parse(approval.expiresAt),
+            );
+            if (expiresDuring === 2)
+              expect(await events(proposal.id, 'execution.withheld')).toEqual([
+                expect.objectContaining({
+                  details: expect.objectContaining({
+                    reason: 'decision_expired',
+                    dispatch: 'not_dispatched',
+                  }),
+                }),
+              ]);
+            else
+              expect(await events(proposal.id, 'execution.completed')).toEqual([
+                expect.objectContaining({
+                  details: expect.objectContaining({
+                    state: 'failed',
+                    dispatch: 'not_dispatched',
+                  }),
+                }),
+              ]);
+          }
+          // A later replay after expiry neither revives the approval nor redispatches.
+          checkPreconditions.mockResolvedValue(true);
+          const replay = await safety.execution.execute(alice, proposal);
+          expect(replay.state).toBe(
+            expiresDuring === 1 ? 'approval_required' : 'failed',
+          );
+          expect(writes.filter((key) => key === `v0:${proposal.id}`)).toEqual(
+            [],
+          );
+          expect(await stored('executed_actions', proposal.id)).toHaveLength(
+            records.length,
+          );
+        }
+      } finally {
+        await concurrent.close();
+      }
+    }, 30_000);
+    it('approve racing execute dispatches at most once', async () => {
+      const concurrent = startSafety();
+      const services = [safety, concurrent];
+      const writes: string[] = [];
+      execute.mockImplementation(async (_intent, key, beforeDispatch) => {
+        await beforeDispatch?.();
+        writes.push(key);
+        // Keep the reservation in flight while the other callers arrive.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        return { evidenceRefs: [observationId] };
+      });
+      try {
+        for (let round = 0; round < 8; round++) {
+          const proposal = action({ risk: 'high' });
+          const decision = await awaitingApproval(proposal);
+          const expiry = new Date(Date.now() + 60_000).toISOString();
+          const [responses, executions] = await Promise.all([
+            Promise.all(
+              services.map((service) =>
+                service.policies.respond(bob, decision.id, 'approved', expiry),
+              ),
+            ),
+            Promise.all(
+              Array.from({ length: 4 }, (_, index) =>
+                services[index % 2]!.execution.execute(alice, proposal),
+              ),
+            ),
+          ]);
+          const approvals = await stored('policy_approvals', proposal.id);
+          expect(approvals).toHaveLength(1);
+          expect(responses).toEqual([approvals[0], approvals[0]]);
+          for (const execution of executions)
+            expect([
+              'approval_required',
+              'succeeded',
+              'reconciliation_required',
+            ]).toContain(execution.state);
+          expect(
+            writes.filter((key) => key === `v0:${proposal.id}`).length,
+          ).toBeLessThanOrEqual(1);
+          expect((await safety.execution.execute(alice, proposal)).state).toBe(
+            'succeeded',
+          );
+          expect(writes.filter((key) => key === `v0:${proposal.id}`)).toEqual([
+            `v0:${proposal.id}`,
+          ]);
+          expect(await stored('executed_actions', proposal.id)).toEqual([
+            expect.objectContaining({
+              idempotencyKey: `v0:${proposal.id}`,
+              attempt: expect.objectContaining({
+                number: 1,
+                approvalId: approvals[0].id,
+              }),
+            }),
+          ]);
+          expect(await events(proposal.id, 'approval.responded')).toHaveLength(
+            1,
+          );
+          expect(await events(proposal.id, 'execution.prepared')).toHaveLength(
+            1,
+          );
+          expect(await events(proposal.id, 'execution.completed')).toHaveLength(
+            1,
+          );
+        }
+      } finally {
+        await concurrent.close();
+      }
+    }, 30_000);
     it('runs Temporal recovery against the persisted execution service without a second effect', async () => {
       const env = await TestWorkflowEnvironment.createLocal();
       const proposal = action();
