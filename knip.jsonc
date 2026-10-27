@@ -29,9 +29,11 @@
       "project": ["**/*.mjs"],
       // The app generator writes this import into another workspace. Observability loads the
       // OpenTelemetry hook from the API's dependencies, which the instrumented processes use.
+      // The k6 runtime provides the k6 modules its load scripts import.
       "ignoreDependencies": [
         "@luma/app-host",
         "@opentelemetry/instrumentation",
+        "k6",
       ],
     },
     "apps/api": {

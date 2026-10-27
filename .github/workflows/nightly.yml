@@ -1,0 +1,53 @@
+name: Nightly scale benchmarks
+on:
+  schedule:
+    # 02:30 UTC, after the European working day.
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scale:
+    name: Performance suite at scale
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TURBO_CONCURRENCY: '100%'
+      # Sizes for the opt-in size scenarios; see each workspace guide.
+      LUMA_CUSTOMER_BENCHMARK: '50000'
+      LUMA_FULFILLMENT_BENCHMARK: '100000'
+      LUMA_INSIGHTS_BENCHMARK: '20000'
+      LUMA_INVENTORY_BENCHMARK: '20000'
+      LUMA_PRODUCT_BENCHMARK: '20000'
+      LUMA_RETURN_BENCHMARK: '20000'
+      # Runs the HTTP load test of the request-pool scenario.
+      LUMA_K6: k6
+      LUMA_CAPTURE: ${{ github.workspace }}/.luma/capture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: grafana/setup-k6-action@v1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @luma/api exec playwright install --with-deps chromium
+      - run: pnpm setup:code
+      - run: pnpm test:performance
+      - name: Summarize performance budgets
+        if: always()
+        run: node tooling/performance/summary.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-performance
+          path: |
+            .luma/performance/
+            .luma/capture/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: warn
