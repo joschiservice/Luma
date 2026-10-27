@@ -223,7 +223,10 @@ with the merge base of `main` (override with `TURBO_SCM_BASE`). It runs:
 iterations small on a branch that already touches shared code. `pnpm test:e2e --affected`
 and `pnpm test:browser --affected` apply the same selection to one suite. Journeys are selected from [journey-areas.mjs](../apps/api/e2e/journey-areas.mjs):
 
-- A changed journey, or a module it imports by relative path, selects that journey.
+- A module the journey runner configs load, such as the template database setup, selects every
+  journey.
+- A changed journey, or a module it imports or starts by relative path (servers and workers
+  named as `e2e/*.mjs`), selects that journey.
 - Ignored paths select nothing.
 - A shared path selects every journey.
 - A path a journey declares selects that journey.

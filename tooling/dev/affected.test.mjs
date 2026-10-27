@@ -120,3 +120,74 @@ test('agent skills and directory instructions select no journeys', () => {
     { journeys: [] },
   );
 });
+
+test('journey selection metadata and hand-run API scripts select no journeys', () => {
+  assert.deepEqual(
+    selectJourneys(
+      [
+        'apps/api/e2e/journey-areas.mjs',
+        'apps/api/scripts/update-shopify-schema.mjs',
+      ],
+      journeyManifest(),
+    ),
+    { journeys: [] },
+  );
+});
+
+test('API entry points and journey runner modules select every journey', () => {
+  const real = journeyManifest();
+  const all = Object.keys(real.journeys);
+  for (const path of [
+    'apps/api/src/index.ts',
+    'apps/api/vitest.e2e.config.ts',
+    'apps/api/e2e/template-database.mjs',
+    'apps/api/e2e/flaky-reporter.mjs',
+  ])
+    assert.equal(
+      selectJourneys([path], real).journeys.length,
+      all.length,
+      path,
+    );
+  assert.deepEqual(
+    selectJourneys(['apps/api/e2e/scenario-snapshots.mjs'], real),
+    {
+      journeys: all,
+      reason: 'apps/api/e2e/scenario-snapshots.mjs is loaded by every journey',
+    },
+  );
+});
+
+test('follows servers and workers a journey starts by path', () => {
+  assert.ok(
+    relativeImports('apps/api/e2e/connections.browser.mjs').has(
+      'apps/api/e2e/connections-server.mjs',
+    ),
+  );
+  assert.ok(
+    relativeImports('apps/api/e2e/code-steps.e2e.mjs').has(
+      'apps/api/e2e/connections-server.mjs',
+    ),
+  );
+  const { journeys } = selectJourneys(
+    ['apps/api/e2e/staff-web-server.mjs'],
+    journeyManifest(),
+  );
+  assert.deepEqual(journeys, ['staff.browser.mjs', 'support-view.browser.mjs']);
+});
+
+test('every web app source file and journey module is mapped', () => {
+  const real = journeyManifest();
+  const tracked = execFileSync(
+    'git',
+    ['ls-files', 'apps/web/src', 'apps/api'],
+    { cwd: root, encoding: 'utf8' },
+  )
+    .split('\n')
+    .filter(Boolean);
+  const unmapped = tracked.filter(
+    (path) =>
+      selectJourneys([path], real).reason ===
+      `${path} is not mapped to a journey`,
+  );
+  assert.deepEqual(unmapped, []);
+});

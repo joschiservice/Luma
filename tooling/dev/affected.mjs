@@ -11,6 +11,13 @@ import { root } from './process.mjs';
 
 const journeyDirectory = 'apps/api/e2e';
 const suffixes = { e2e: '.e2e.mjs', browser: '.browser.mjs' };
+// Journey runners execute with apps/api as the working directory and load their setup and
+// reporter modules by path.
+const runnerDirectory = 'apps/api';
+const runnerConfigs = [
+  `${runnerDirectory}/playwright.config.ts`,
+  `${runnerDirectory}/vitest.e2e.config.ts`,
+];
 
 /**
  * Runs git in the repository root and returns non-empty output lines.
@@ -31,6 +38,8 @@ export function journeyFiles() {
 
 /**
  * Returns the repository files a module loads through relative imports, including itself.
+ * Also follows `.mjs` modules named by path, such as servers and workers a journey spawns
+ * (`'./worker.mjs'` from the module, or `'e2e/server.mjs'` from the runner directory).
  * Package imports are not followed: every journey runs the whole application, so the areas a
  * journey exercises come from its declared journeyAreas instead.
  * @param {string} file repository-relative module path
@@ -40,13 +49,13 @@ export function relativeImports(file, seen = new Set()) {
   if (seen.has(file) || !existsSync(join(root, file))) return seen;
   seen.add(file);
   const source = readFileSync(join(root, file), 'utf8');
-  for (const [, specifier] of source.matchAll(
-    /(?:from|import\s*\()\s*['"](\.{1,2}\/[^'"]+)['"]/g,
-  ))
-    relativeImports(
-      relative(root, resolve(root, dirname(file), specifier)),
-      seen,
-    );
+  const specifiers = [
+    ...source.matchAll(/(?:from|import\s*\()\s*['"](\.{1,2}\/[^'"]+)['"]/g),
+    ...source.matchAll(/['"](\.{1,2}\/[^'"\s]+\.mjs)['"]/g),
+  ].map(([, specifier]) => resolve(root, dirname(file), specifier));
+  for (const [, path] of source.matchAll(/['"](e2e\/[^'"\s]+\.mjs)['"]/g))
+    specifiers.push(resolve(root, runnerDirectory, path));
+  for (const path of specifiers) relativeImports(relative(root, path), seen);
 
   return seen;
 }
@@ -74,19 +83,24 @@ function changedFiles(base) {
 }
 
 /**
- * Chooses the journeys that exercise the changed files. A changed module selects the journeys
- * that import it; ignored paths select nothing; shared paths, and paths no journey declares,
- * select every journey so unmapped code is never left untested. Journeys declaring `**` boot the
- * whole system: they run with any declared change but do not count as coverage themselves.
+ * Chooses the journeys that exercise the changed files. A module the journey runners load
+ * selects every journey; any other changed module selects the journeys that import it; ignored
+ * paths select nothing; shared paths, and paths no journey declares, select every journey so
+ * unmapped code is never left untested. Journeys declaring `**` boot the whole system: they run
+ * with any declared change but do not count as coverage themselves.
  * @param {string[]} changed repository-relative paths
  * @param {{
  *   journeys: Record<string, { imports: Set<string>, areas: string[] }>,
+ *   runner?: Set<string>,
  *   shared: string[],
  *   ignored: string[],
  * }} manifest
  * @returns {{ journeys: string[], reason?: string }}
  */
-export function selectJourneys(changed, { journeys, shared, ignored }) {
+export function selectJourneys(
+  changed,
+  { journeys, runner = new Set(), shared, ignored },
+) {
   const names = Object.keys(journeys);
   const catchAll = names.filter((name) => journeys[name].areas.includes('**'));
   const selected = new Set();
@@ -97,6 +111,8 @@ export function selectJourneys(changed, { journeys, shared, ignored }) {
   const matches = (path, patterns) =>
     patterns.some((pattern) => pattern !== '**' && matchesGlob(path, pattern));
   for (const path of changed) {
+    if (runner.has(path))
+      return { journeys: names, reason: `${path} is loaded by every journey` };
     const importing = names.filter((name) => journeys[name].imports.has(path));
     if (importing.length) {
       importing.forEach((name) => selected.add(name));
@@ -131,7 +147,10 @@ export function journeyManifest() {
     };
   }
 
-  return { journeys, shared: sharedPaths, ignored: ignoredPaths };
+  const runner = new Set();
+  for (const config of runnerConfigs) relativeImports(config, runner);
+
+  return { journeys, runner, shared: sharedPaths, ignored: ignoredPaths };
 }
 
 /**
