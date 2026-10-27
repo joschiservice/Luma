@@ -1,3 +1,4 @@
+// @ts-check
 import { randomUUID } from 'node:crypto';
 import {
   appendFile,
@@ -21,7 +22,9 @@ import {
   startApi,
   startProcess,
 } from './helpers.mjs';
+import { expectStatus, httpClient } from './typed-client.mjs';
 
+/** @param {import('vitest').TestContext} t */
 async function temporaryDirectory(t) {
   // Keeping copies under the API package preserves the migration runner's pg resolution.
   const directory = await mkdtemp(join(apiDirectory, '.e2e-'));
@@ -30,6 +33,7 @@ async function temporaryDirectory(t) {
   return directory;
 }
 
+/** @param {import('vitest').TestContext} t */
 async function provision(t) {
   const db = await database(t);
   await db.migrate();
@@ -48,40 +52,33 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
     signal: null,
   });
   let api = first;
-  assert.deepStrictEqual((await api.request('/health')).body, { status: 'ok' });
-  await api.request('/v1/organizations', { status: 401 });
+  const anonymous = httpClient(api);
+  assert.deepStrictEqual(await anonymous.system.health(), { status: 'ok' });
+  await expectStatus(anonymous.identity.listOrganizations(), 401);
   const alice = await signup(api, 'alice');
-  const organization = (
-    await api.request('/v1/organizations', {
-      method: 'POST',
-      cookie: alice.cookie,
-      body: { name: 'E2E organization', slug: 'e2e-organization' },
-      status: 201,
-    })
-  ).body;
+  /** @param {string} cookie */
+  const as = (cookie) => httpClient({ origin: api.origin, cookie }).identity;
+  const organization = await as(alice.cookie).createOrganization({
+    body: { name: 'E2E organization', slug: 'e2e-organization' },
+  });
   assert.strictEqual(
     organization.dataRegion,
     globalThis.process.env.LUMA_REGION ?? 'AU',
   );
-  const contextPath = `/v1/organizations/${organization.id}/context`;
-  const context = (await api.request(contextPath, { cookie: alice.cookie }))
-    .body;
+  const params = { organizationId: organization.id };
+  const context = await as(alice.cookie).context({ params });
   assert.strictEqual(context.tenantId, organization.id);
   assert.strictEqual(context.actor.id, alice.userId);
   assert.strictEqual(context.actor.role.key, 'owner');
   const bob = await signup(api, 'bob');
-  assert.deepStrictEqual(
-    (await api.request('/v1/organizations', { cookie: bob.cookie })).body.items,
-    [],
-  );
-  await api.request(contextPath, { cookie: bob.cookie, status: 404 });
+  assert.deepStrictEqual((await as(bob.cookie).listOrganizations()).items, []);
+  await expectStatus(as(bob.cookie).context({ params }), 404);
 
   api.process.child.kill('SIGTERM');
   assert.deepStrictEqual(await api.process.wait(), { code: 0, signal: null });
   api = await startApi(t, db);
   assert.deepStrictEqual(
-    (await api.request('/v1/organizations', { cookie: alice.cookie })).body
-      .items,
+    (await as(alice.cookie).listOrganizations()).items,
     // The list adds the caller's membership status to each workspace; an open workspace has
     // no deletion date.
     [
@@ -93,17 +90,15 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
       },
     ],
   );
-  await api.request(contextPath, { cookie: alice.cookie });
+  await as(alice.cookie).context({ params });
+  // Authentication routes belong to Better Auth, not the typed contract.
   await api.request('/auth/sign-out', {
     method: 'POST',
     cookie: alice.cookie,
     body: {},
   });
-  await api.request(contextPath, { cookie: alice.cookie, status: 401 });
-  await api.request('/v1/organizations', {
-    cookie: alice.cookie,
-    status: 401,
-  });
+  await expectStatus(as(alice.cookie).context({ params }), 401);
+  await expectStatus(as(alice.cookie).listOrganizations(), 401);
   api.process.child.kill('SIGTERM');
   assert.deepStrictEqual(await api.process.wait(), { code: 0, signal: null });
 });
@@ -151,6 +146,7 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
     1,
   );
 
+  const changed = names[0] ?? assert.fail('No core migrations found');
   const directory = await temporaryDirectory(t);
   await mkdir(join(directory, 'scripts'));
   await cp(
@@ -170,11 +166,11 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
     'CREATE TABLE e2e_migration_probe (id integer);\n',
   );
   await appendFile(
-    join(directory, 'migrations', names[0]),
+    join(directory, 'migrations', changed),
     '\n-- Changed applied migration fixture.\n',
   );
   const failure = await db.migrate(join(directory, 'scripts/migrate.mjs'), 1);
-  assert.ok(failure.includes(`Applied migration changed: ${names[0]}`));
+  assert.ok(failure.includes(`Applied migration changed: ${changed}`));
   assert.deepStrictEqual(
     (await db.owner.query('SELECT * FROM identity_migrations ORDER BY name'))
       .rows,
@@ -203,27 +199,15 @@ test('SIGKILL after a committed effect recovers in a fresh worker without redeli
   const db = await provision(t);
   const api = await startApi(t, db);
   const actor = await signup(api, 'worker-owner');
-  const organization = (
-    await api.request('/v1/organizations', {
-      method: 'POST',
-      cookie: actor.cookie,
-      body: { name: 'Worker organization', slug: 'worker-organization' },
-      status: 201,
-    })
-  ).body;
+  const client = httpClient({ origin: api.origin, cookie: actor.cookie });
+  const organization = await client.identity.createOrganization({
+    body: { name: 'Worker organization', slug: 'worker-organization' },
+  });
   // This journey exercises a provider write; new workspaces otherwise stay observe-only.
-  await api.request(
-    `/v1/organizations/${organization.id}/settings/write-mode`,
-    {
-      method: 'PATCH',
-      cookie: actor.cookie,
-      body: {
-        commandId: randomUUID(),
-        revision: 0,
-        writeMode: 'writes_enabled',
-      },
-    },
-  );
+  await client.settings.updateWriteMode({
+    params: { organizationId: organization.id },
+    body: { commandId: randomUUID(), revision: 0, writeMode: 'writes_enabled' },
+  });
   const directory = await temporaryDirectory(t);
   const ledger = join(directory, 'provider-effects.jsonl');
   const action = {

@@ -1,21 +1,31 @@
+// @ts-check
 import { randomUUID } from 'node:crypto';
 
 import { expect, it } from 'vitest';
 
 import { automaticLinksFixture } from './automatic-links-fixture.mjs';
+import { expectStatus, injectClient } from './typed-client.mjs';
 
 it('previews unique SKU matches and applies audited rules with tenant and role boundaries', async (t) => {
   const f = await automaticLinksFixture(t);
-  const path = `${f.base}/sync/automatic-links`;
+  const origin = f.config.baseURL;
+  const owner = injectClient(f.app, { origin, cookie: f.owner.cookie }).sync;
+  const member = injectClient(f.app, { origin, cookie: f.member.cookie }).sync;
+  const outsider = injectClient(f.app, {
+    origin,
+    cookie: f.outsider.cookie,
+  }).sync;
+  const params = { organizationId: f.org.id };
+  /** @type {import('@luma/api-contract').AutoLinkPair} */
   const pair = {
     kind: 'sku',
     targetConnectionId: f.store,
     sourceConnectionId: f.erp,
   };
-  expect(await f.request(f.member, path)).toEqual([]);
-  await f.request(f.member, `${path}/preview`, 'POST', pair, 403);
-  await f.request(f.outsider, path, 'GET', undefined, 404);
-  const preview = await f.request(f.owner, `${path}/preview`, 'POST', pair);
+  expect(await member.autoLinkRules({ params })).toEqual([]);
+  await expectStatus(member.previewAutoLinks({ params, body: pair }), 403);
+  await expectStatus(outsider.autoLinkRules({ params }), 404);
+  const preview = await owner.previewAutoLinks({ params, body: pair });
   expect(preview).toMatchObject({
     ready: true,
     counts: { eligible: 1, stale: 1 },
@@ -24,53 +34,53 @@ it('previews unique SKU matches and applies audited rules with tenant and role b
     preview.candidates.find((candidate) => candidate.key === 'auto-1'),
   ).toMatchObject({ disposition: 'eligible' });
   const input = { ...pair, id: randomUUID(), revision: 0, enabled: true };
-  await f.request(f.member, path, 'PUT', input, 403);
-  const rule = await f.request(f.owner, path, 'PUT', input);
+  await expectStatus(member.saveAutoLinkRule({ params, body: input }), 403);
+  const rule = await owner.saveAutoLinkRule({ params, body: input });
   expect(rule).toMatchObject({ revision: 1, state: 'waiting', linked: 0 });
-  await f.request(f.owner, path, 'PUT', input, 409);
-  await f.request(
-    f.owner,
-    `${path}/preview`,
-    'POST',
-    { ...pair, sourceConnectionId: randomUUID() },
+  await expectStatus(owner.saveAutoLinkRule({ params, body: input }), 409);
+  await expectStatus(
+    owner.previewAutoLinks({
+      params,
+      body: { ...pair, sourceConnectionId: randomUUID() },
+    }),
     404,
   );
-  await f.request(
-    f.owner,
-    `${path}/preview`,
-    'POST',
-    { ...pair, sourceConnectionId: f.store },
+  await expectStatus(
+    owner.previewAutoLinks({
+      params,
+      body: { ...pair, sourceConnectionId: f.store },
+    }),
     422,
   );
-  await f.request(
-    f.owner,
-    `${path}/preview`,
-    'POST',
-    { ...pair, kind: 'location' },
+  await expectStatus(
+    owner.previewAutoLinks({
+      params,
+      // @ts-expect-error The contract rejects record types without automatic links.
+      body: { ...pair, kind: 'location' },
+    }),
     400,
   );
-  await f.request(
-    f.owner,
-    `${path}/preview`,
-    'POST',
-    {
-      ...pair,
-      kind: 'order',
-      targetConnectionId: f.erp,
-      sourceConnectionId: f.store,
-    },
+  await expectStatus(
+    owner.previewAutoLinks({
+      params,
+      body: {
+        ...pair,
+        kind: 'order',
+        targetConnectionId: f.erp,
+        sourceConnectionId: f.store,
+      },
+    }),
     422,
   );
   await f.automaticLinks.apply(f.context, rule.id);
-  expect(await f.request(f.member, path)).toMatchObject([
+  expect(await member.autoLinkRules({ params })).toMatchObject([
     { state: 'active', linked: 1 },
   ]);
-  const after = await f.request(f.owner, `${path}/preview`, 'POST', pair);
+  const after = await owner.previewAutoLinks({ params, body: pair });
   expect(after.counts.eligible).toBe(0);
-  const disabled = await f.request(f.owner, path, 'PUT', {
-    ...input,
-    revision: 1,
-    enabled: false,
+  const disabled = await owner.saveAutoLinkRule({
+    params,
+    body: { ...input, revision: 1, enabled: false },
   });
   expect(disabled).toMatchObject({ state: 'disabled', revision: 2, linked: 1 });
   expect(

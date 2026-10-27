@@ -164,6 +164,17 @@ suites cannot run. Report that limitation when relying on it.
   production timeout to speed up tests.
 - Use `pnpm run test --filter=<package>` (with `run`) so pnpm forwards the filter to the
   database runner.
+- Journeys call contract routes through the typed `@luma/api-contract` client in
+  `apps/api/e2e/typed-client.mjs`: `httpClient` for an API process from `startApi`,
+  `injectClient` for a runtime app built in process. Responses that drift from the contract
+  fail the journey. Authentication routes are not in the contract and keep `api.request`.
+- Journeys opt in to type checking with `// @ts-check` on their first line; the API
+  `typecheck` script checks those files with `tsconfig.e2e.json`, so `pnpm check` and CI fail
+  on their type errors. Unchecked modules they import are typed by inference. New journeys
+  and journeys you rewrite use the typed client and `// @ts-check`; annotate shared helpers
+  with JSDoc where inference falls short rather than checking them wholesale.
+  `pnpm test:architecture` fails on a new journey without the pragma; older journeys are
+  listed in `tooling/architecture/unchecked-journeys.json`, which may only shrink.
 
 The shared validation runner queues commands per checkout so overlapping runs do not compete for database,
 Chromium and build resources. Nested commands in `check` and `test:full` share the active

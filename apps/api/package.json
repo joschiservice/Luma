@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "vitest run --passWithNoTests",
     "dev": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/composition/bootstrap.ts",
     "start": "node --env-file-if-exists=.env dist/composition/bootstrap.js",
@@ -16,6 +16,7 @@
     "test:browser:performance": "playwright test --config playwright.performance.config.ts"
   },
   "devDependencies": {
+    "@luma/api-contract": "workspace:*",
     "@luma/app-catalog": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*",
