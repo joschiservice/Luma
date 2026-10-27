@@ -33,6 +33,7 @@ import type {
 } from '@luma/workflows';
 import {
   assessReadiness,
+  closedExecutionSettlement,
   createProcessActivities,
   describeApproval,
   draftFromVersion,
@@ -80,7 +81,10 @@ export const replenishmentSubjects = [
 ];
 
 export interface ReplenishmentTransport {
-  /** Starts the committed run with a stable Temporal workflow ID. */
+  /**
+   * Starts the committed run with a stable Temporal workflow ID. A `ProcessStart` result whose
+   * execution already closed lets the unfinished run settle as escalated.
+   */
   start(
     context: TenantContext,
     run: ProcessRun,
@@ -1849,17 +1853,33 @@ export function createReplenishmentService(deps: {
         context,
         existing.map((r) => r.id),
       );
+      const settled = new Set<string>();
       for (const run of existing) {
         if (run.actor.id !== context.actor.id) continue;
-        const state = presentTriggerRun(run, evidence.get(run.id)).processState;
+        const outputs = evidence.get(run.id) ?? [];
+        const state = presentTriggerRun(run, outputs).processState;
         if (
-          !state ||
-          ['running', 'awaiting_decision', 'waiting'].includes(state)
+          state &&
+          !['running', 'awaiting_decision', 'waiting'].includes(state)
         )
-          await deps.transport!.start(context, run, version);
+          continue;
+        const started = await deps.transport!.start(context, run, version);
+        // A run whose execution ended without a final step would hold its rule forever.
+        const output = closedExecutionSettlement(
+          started,
+          run,
+          version,
+          outputs,
+          new Date().toISOString(),
+        );
+        if (!output) continue;
+        await steps.record(context, run.id, output);
+        settled.add(run.id);
       }
       const waiting = new Set(
-        existing.map((run) => String(run.context.inputs.activationId)),
+        existing
+          .filter((run) => !settled.has(run.id))
+          .map((run) => String(run.context.inputs.activationId)),
       );
       const rules = (await store.list(context)).filter(
         (rule) =>

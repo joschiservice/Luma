@@ -55,6 +55,11 @@ export interface CodeCall {
 export interface CodeActivityResult extends CodeResult {
   state: 'completed' | 'awaiting_approval' | 'not_executed' | 'failed';
   evidenceRefs: string[];
+  /**
+   * The granted action waiting for policy approval, so the workflow can reread its decision
+   * without running the code again. Present only while awaiting approval.
+   */
+  approval?: { stepId: string; proposalId: string; decisionId: string };
 }
 
 /**

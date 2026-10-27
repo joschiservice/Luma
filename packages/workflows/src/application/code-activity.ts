@@ -69,6 +69,7 @@ export function createCodeActivity(deps: {
     const callOutputs = [...outputs];
     let index = 0;
     let waiting = false;
+    let approval: CodeActivityResult['approval'];
     let observeOnly = false;
     let verifiedActions = saved.filter((call) =>
       version.steps.some(
@@ -152,9 +153,21 @@ export function createCodeActivity(deps: {
               }
               if (action.state === 'awaiting_approval') {
                 waiting = true;
+                approval = {
+                  stepId: node.id,
+                  proposalId: action.proposalId,
+                  decisionId: action.decisionId,
+                };
                 evidence.add(action.decisionId);
                 throw new CodeRequestStopped('capability_denied');
               }
+              // An attempt that is still writing, or a write whose outcome is unknown, must
+              // not finish this step as denied: the activity fails and retries, and read-only
+              // reconciliation settles the receipt on a later attempt.
+              if (action.state === 'reconciliation_required')
+                throw new Error(
+                  'Code capability outcome is being reconciled; retry the activity',
+                );
               if (action.state !== 'accepted')
                 throw new CodeRequestStopped('capability_denied');
               const verification = version.steps.find(
@@ -240,7 +253,7 @@ export function createCodeActivity(deps: {
         waiting &&
         !['cancelled', 'resource_limit'].includes(result.telemetry.outcome)
       )
-        return outcome;
+        return approval ? { ...outcome, approval } : outcome;
       if (result.telemetry.outcome === 'completed' && index < saved.length)
         throw new Error('Code replay omitted a recorded request');
 

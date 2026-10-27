@@ -31,6 +31,8 @@ export type {
   ProcessWorkflowVersion,
 } from './domain/process.js';
 
+export { closedExecutionSettlement } from './domain/process-settlement.js';
+
 export type {
   ProcessActionResult,
   ProcessActivities,
@@ -120,6 +122,8 @@ export type {
   CaseRunTransport,
   CaseWorkflowAdapter,
   CaseWorkflows,
+  ProcessExecutionClosure,
+  ProcessStart,
 } from './application/case-workflows.js';
 
 export type { CodeProcessBusinessAdapter } from './application/process-business.js';

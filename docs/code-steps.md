@@ -96,11 +96,19 @@ replays saved replies and reuses the existing action identity. Inputs and replie
 canonical JSON key order, so equivalent inputs replay identically.
 
 Approval suspends the step and releases its sandbox; it resumes by deterministic replay.
+While approval is pending, the 30-second poll only rereads whether the granted action's
+decision is still pending. It runs the code again, and records a new policy evaluation, only
+after a decision signal or once the decision is no longer pending. A long wait rolls over
+history with its original 24-hour deadline.
 Cancellation and deadlines stop guest execution immediately and a stopped sandbox cannot
 send new requests. An in-flight host request still finishes verification and journaling,
 and already admitted actions keep their reconciliation path. Previously verified actions
 stay visible when code fails. Unexpected host failures retry the durable activity; expected
-capability denials are terminal.
+capability denials are terminal. An action whose attempt is still prepared or whose outcome
+is unknown is not a denial: the activity fails and retries, so read-only reconciliation
+settles the receipt on a later attempt instead of journaling a denied outcome. The code
+activity has the same five-minute attempt and 20-second heartbeat as an action, so a slow
+but live attempt is not retried while it is still writing.
 
 ## Evidence and evaluation
 

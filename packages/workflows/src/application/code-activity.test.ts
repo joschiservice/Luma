@@ -132,9 +132,14 @@ it('suspends approval without recording a terminal outcome or verifying an unacc
     proposalId: 'proposal',
     decisionId: 'decision',
   } as never);
-  expect((await f.execute(run, processVersion, step, [])).state).toBe(
-    'awaiting_approval',
-  );
+  expect(await f.execute(run, processVersion, step, [])).toMatchObject({
+    state: 'awaiting_approval',
+    approval: {
+      stepId: 'reserve',
+      proposalId: 'proposal',
+      decisionId: 'decision',
+    },
+  });
   expect(f.activities.verify).not.toHaveBeenCalled();
   expect(f.journal.finish).not.toHaveBeenCalled();
   expect((await f.execute(run, processVersion, step, [])).state).toBe(
@@ -190,6 +195,24 @@ it('retries transient host failures without storing a permanent denial', async (
     'completed',
   );
   expect(f.activities.action).toHaveBeenCalledTimes(2);
+});
+
+it('retries an action still being reconciled instead of finishing it as denied', async () => {
+  const f = fixture();
+  // A timed-out attempt's write is still prepared when the retry reaches admission.
+  f.activities.action.mockResolvedValueOnce({
+    state: 'reconciliation_required',
+    proposalId: 'proposal',
+    reason: 'reconciliation_required',
+  });
+  await expect(f.execute(run, processVersion, step, [])).rejects.toThrow(
+    'retry the activity',
+  );
+  expect(f.journal.finish).not.toHaveBeenCalled();
+  expect(f.journal.append).not.toHaveBeenCalled();
+  expect((await f.execute(run, processVersion, step, [])).state).toBe(
+    'completed',
+  );
 });
 
 it('reports verified actions even when the enclosing code later fails', async () => {

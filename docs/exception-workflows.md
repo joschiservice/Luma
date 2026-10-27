@@ -126,7 +126,7 @@ wake-up hint with no approval or actor claims, sent only for approve and reject,
 seconds and never failing the decision. A 30-second durable poll covers lost notifications. The poll only
 reads whether the decision is still pending: it records no policy decision and reads no
 provider. Execution runs again after a signal, a recorded response, a workspace policy
-change or a replaced proposal. Process capability steps wait the same way.
+change or a replaced proposal. Process capability steps and Code Steps wait the same way.
 
 Approval waits end at the proposal or evidence expiry, at most 24 hours after the first
 proposal, including renewals. When the
