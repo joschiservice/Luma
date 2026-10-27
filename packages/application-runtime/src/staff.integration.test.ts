@@ -2172,6 +2172,8 @@ describe.skipIf(!databaseUrl)(
           ).statusCode,
         ).toBe(403);
     });
+    // Seeding and deleting 100,000 audit rows sits outside the asserted read budget and can exceed
+    // the default test timeout while other suites load the same cluster.
     it('lets only audit readers page filtered staff audit entries, and never modify them', async () => {
       const denied = await app.inject({
         url: '/v1/staff/audit',
@@ -2301,7 +2303,7 @@ describe.skipIf(!databaseUrl)(
           "DELETE FROM staff_audit WHERE request_id LIKE 'seed-%'",
         );
       }
-    });
+    }, 60_000);
     it('expires passive polling while extending idle time only for activity before expiry', async () => {
       const session = await owner.query<{ id: string }>(
         'SELECT s.id FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email=$1',

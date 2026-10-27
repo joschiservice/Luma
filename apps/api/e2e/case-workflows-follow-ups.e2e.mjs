@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from 'vitest';
 
-import { caseWorkflowFixture } from './case-workflows-fixture.mjs';
+import {
+  caseWorkflowFixture,
+  workflowWait,
+} from './case-workflows-fixture.mjs';
 import { until } from './helpers.mjs';
 
 // Follow-up monitors only act on reads from the last five minutes, so these journeys import
@@ -39,10 +42,11 @@ test('a payment that stays pending goes to a person and leaves Needs you once it
   const incident = await scenario(f, 'payment-stuck');
   const label = incident.resources[0].label;
   await f.pilot.observe({ check: false });
-  await f.tick();
   let item;
+  // Like the scheduled worker, keep starting runs until the stuck payment has one.
   await until(
     async () => {
+      await f.tick();
       item = (await handovers(f, id)).find((entry) =>
         entry.title.endsWith(label),
       );
@@ -50,7 +54,7 @@ test('a payment that stays pending goes to a person and leaves Needs you once it
       return !!item;
     },
     'the stuck payment is handed to a person',
-    30_000,
+    workflowWait,
   );
   expect(item).toMatchObject({
     reason: 'manual_intervention',
@@ -93,7 +97,7 @@ test('a return that arrived without a refund goes to a person, and Luma never re
       return !!item;
     },
     'the waiting refund is handed to a person',
-    30_000,
+    workflowWait,
   );
   expect(item.subject.detail).toContain('no refund is recorded');
   expect(
