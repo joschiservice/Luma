@@ -50,6 +50,8 @@ import { createActivityStore } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { captureJson } from './test-support/capture.js';
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
 type OrderData = Extract<
@@ -2252,7 +2254,6 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     );
     await timed('detail', (workspace) => workspace.get(context(), a));
     if (process.env.LUMA_ORDER_BENCHMARK) {
-      const { writeFile } = await import('node:fs/promises');
       const storage = (
         await owner.query(`SELECT relname,pg_total_relation_size(oid)::text AS bytes FROM pg_class
         WHERE relnamespace='public'::regnamespace AND relkind='r' AND (relname LIKE 'orders_%' OR relname='connector_mapping_grams') ORDER BY relname`)
@@ -2302,14 +2303,13 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         normalizerVersion: 'benchmark/profile',
       });
       await profiled.close();
-      await writeFile(
-        `/tmp/luma116-order-queries-${count}.json`,
-        JSON.stringify(
-          { orders: count + 3, rebuildMs, storage, timings, plans },
-          null,
-          2,
-        ),
-      );
+      await captureJson(`order-queries-${count}.json`, {
+        orders: count + 3,
+        rebuildMs,
+        storage,
+        timings,
+        plans,
+      });
       expect(plans['first page, placed']).toMatch(
         /Index (?:Only )?Scan(?: Backward)? using orders_list_placed/,
       );

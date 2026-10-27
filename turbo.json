@@ -16,7 +16,13 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": [],
-      "env": ["LUMA_TEST_CAPABILITIES"],
+      "env": [
+        "LUMA_TEST_CAPABILITIES",
+        "LUMA_CAPTURE",
+        "LUMA_IMPORT_BENCHMARK",
+        "LUMA_METRIC_BENCHMARK",
+        "LUMA_ORDER_BENCHMARK"
+      ],
       "passThroughEnv": ["TEST_DATABASE_URL", "SHOPIFY_ADMISSION_URL"]
     },
     "dev": {

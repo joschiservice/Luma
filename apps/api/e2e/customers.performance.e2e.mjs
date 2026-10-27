@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { customersFixture } from './customers-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -85,9 +84,6 @@ it.skipIf(!process.env.LUMA_CUSTOMER_BENCHMARK)(
       'page within a group',
       `?group=country&groupKey=${encodeURIComponent(JSON.stringify(group.key))}&cursor=${group.nextCursor}`,
     );
-    await writeFile(
-      `/tmp/luma317-customers-${count}.json`,
-      JSON.stringify({ count, timings }, null, 2),
-    );
+    await captureJson(`customers-benchmark-${count}.json`, { count, timings });
   },
 );

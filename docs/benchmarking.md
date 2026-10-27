@@ -52,7 +52,9 @@ its report before changing a budget; never raise one just to silence a failure.
 Some scenarios take an opt-in size variable for larger synthetic datasets, such as
 `LUMA_RETURN_BENCHMARK=<return count> pnpm test:performance returns`, and skip without it.
 Package integration tests take others, such as `LUMA_ORDER_BENCHMARK`. The feature guides
-name them.
+name them. These size benchmarks write their timings and plans only when `LUMA_CAPTURE`
+names a directory (see [tests](development.md#tests)); without it they still run and assert,
+but keep no measurements.
 
 ## Whole-command benchmarks
 

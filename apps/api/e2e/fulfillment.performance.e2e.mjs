@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -99,9 +98,9 @@ it.skipIf(!process.env.LUMA_FULFILLMENT_BENCHMARK)(
       'page within a group',
       `?view=all&group=carrier&groupKey=${encodeURIComponent(JSON.stringify(group.key))}&cursor=${group.nextCursor}`,
     );
-    await writeFile(
-      `/tmp/luma102-fulfillment-${count}.json`,
-      JSON.stringify({ count, timings }, null, 2),
-    );
+    await captureJson(`fulfillment-benchmark-${count}.json`, {
+      count,
+      timings,
+    });
   },
 );

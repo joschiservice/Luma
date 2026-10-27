@@ -155,6 +155,10 @@ suites cannot run. Report that limitation when relying on it.
   `--headed` or `--shard=1/4`.
 - Browser failures keep traces and screenshots in `.luma/playwright`; open the report with
   `pnpm test:browser:report`.
+- Debug artefacts, such as benchmark timings, query plans and review screenshots, are written
+  only when `LUMA_CAPTURE` names a directory, resolved from the checkout root; for example
+  `LUMA_CAPTURE=.luma/capture`. Ordinary runs write none. The variable is part of the Turbo
+  `test` hash, so a capture run does not replay a cached result.
 - The pilot recovery test kills a worker after a provider write and waits out the
   20-second activity heartbeat timeout. Keep that real crash coverage; do not shorten the
   production timeout to speed up tests.

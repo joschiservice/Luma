@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { fulfillmentFixture } from './fulfillment-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -50,10 +49,7 @@ it.skipIf(!process.env.LUMA_INSIGHTS_BENCHMARK)(
       ),
       fulfillment: await fastest('/insights/fulfillment'),
     };
-    await writeFile(
-      `/tmp/luma107-insights-${count}.json`,
-      `${JSON.stringify(result, null, 2)}\n`,
-    );
+    await captureJson(`insights-benchmark-${count}.json`, result);
     expect(chart.total).toBeGreaterThan(count * 0.9);
   },
   300_000,
