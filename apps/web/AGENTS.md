@@ -18,7 +18,8 @@ product guides in `content/docs`. See the [README](README.md),
 - A new top-level page goes in `workspaceDestinations` in `src/shell/workspace-destinations.ts`.
   The sidebar, command menu, `G` shortcuts and the no-access explanation read it; a page
   missing there can't be reached by keyboard or search.
-- The `typecheck` script regenerates `src/routeTree.gen.ts`; commit it, never edit it.
+- The `typecheck` script regenerates `src/routeTree.gen.ts` with the Start plugin, as dev and
+  build do; commit it, never edit it. CI fails when the committed tree is stale.
 
 ## State and data
 

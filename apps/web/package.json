@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "start": "srvx serve --prod --entry dist/server/server.js --static ../client",
-    "typecheck": "tsr generate && tsc --noEmit",
+    "typecheck": "node scripts/generate-routes.mjs && tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
@@ -43,7 +43,6 @@
     "@luma/typescript-config": "workspace:*",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/vite": "catalog:",
-    "@tanstack/router-cli": "catalog:",
     "@types/mdx": "2.0.14",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
