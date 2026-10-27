@@ -31,7 +31,9 @@ through `packages/application-runtime/migrations` and must keep those grants.
 
 ## Tests
 
-This package has no unit tests of its own. The behavior is covered against PostgreSQL in
+Unit tests beside the application code run admission and the execution engine over in-memory
+ports with the real validators and policy evaluation: `pnpm --filter @luma/execution test`.
+Storage, grants and reservation behavior are covered against PostgreSQL in
 `packages/application-runtime/src/execution.integration.test.ts` and
 `reservation-fence.integration.test.ts` beside it. Run them with
 `pnpm run test --filter=@luma/application-runtime -- execution.integration.test.ts`, which

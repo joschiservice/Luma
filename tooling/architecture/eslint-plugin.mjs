@@ -216,6 +216,7 @@ export function violation(from, to) {
         'apps/api/src/messaging.integration.test.ts',
         'apps/api/src/messaging-replies.integration.test.ts',
         'apps/api/src/messaging-documents.integration.test.ts',
+        'apps/api/src/inventory-ledger.integration.test.ts',
         'apps/api/src/test-support/apps.ts',
         'apps/api/src/test-support/detection-fixtures.ts',
         'apps/api/src/test-support/safety-fixtures.ts',
