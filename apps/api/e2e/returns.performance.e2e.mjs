@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -100,9 +99,6 @@ it.skipIf(!process.env.LUMA_RETURN_BENCHMARK)(
       [f.org.id, r.store],
     );
     await time('search by customer name', '?view=all&q=Mira');
-    await writeFile(
-      `/tmp/luma103-returns-${count}.json`,
-      JSON.stringify({ count, timings }, null, 2),
-    );
+    await captureJson(`returns-benchmark-${count}.json`, { count, timings });
   },
 );

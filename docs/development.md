@@ -155,11 +155,26 @@ suites cannot run. Report that limitation when relying on it.
   `--headed` or `--shard=1/4`.
 - Browser failures keep traces and screenshots in `.luma/playwright`; open the report with
   `pnpm test:browser:report`.
+- Debug artefacts, such as benchmark timings, query plans and review screenshots, are written
+  only when `LUMA_CAPTURE` names a directory, resolved from the checkout root; for example
+  `LUMA_CAPTURE=.luma/capture`. Ordinary runs write none. The variable is part of the Turbo
+  `test` hash, so a capture run does not replay a cached result.
 - The pilot recovery test kills a worker after a provider write and waits out the
   20-second activity heartbeat timeout. Keep that real crash coverage; do not shorten the
   production timeout to speed up tests.
 - Use `pnpm run test --filter=<package>` (with `run`) so pnpm forwards the filter to the
   database runner.
+- Journeys call contract routes through the typed `@luma/api-contract` client in
+  `apps/api/e2e/typed-client.mjs`: `httpClient` for an API process from `startApi`,
+  `injectClient` for a runtime app built in process. Responses that drift from the contract
+  fail the journey. Authentication routes are not in the contract and keep `api.request`.
+- Journeys opt in to type checking with `// @ts-check` on their first line; the API
+  `typecheck` script checks those files with `tsconfig.e2e.json`, so `pnpm check` and CI fail
+  on their type errors. Unchecked modules they import are typed by inference. New journeys
+  and journeys you rewrite use the typed client and `// @ts-check`; annotate shared helpers
+  with JSDoc where inference falls short rather than checking them wholesale.
+  `pnpm test:architecture` fails on a new journey without the pragma; older journeys are
+  listed in `tooling/architecture/unchecked-journeys.json`, which may only shrink.
 
 The shared validation runner queues commands per checkout so overlapping runs do not compete for database,
 Chromium and build resources. Nested commands in `check` and `test:full` share the active
@@ -208,7 +223,10 @@ with the merge base of `main` (override with `TURBO_SCM_BASE`). It runs:
 iterations small on a branch that already touches shared code. `pnpm test:e2e --affected`
 and `pnpm test:browser --affected` apply the same selection to one suite. Journeys are selected from [journey-areas.mjs](../apps/api/e2e/journey-areas.mjs):
 
-- A changed journey, or a module it imports by relative path, selects that journey.
+- A module the journey runner configs load, such as the template database setup, selects every
+  journey.
+- A changed journey, or a module it imports or starts by relative path (servers and workers
+  named as `e2e/*.mjs`), selects that journey.
 - Ignored paths select nothing.
 - A shared path selects every journey.
 - A path a journey declares selects that journey.

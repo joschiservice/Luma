@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { productsFixture } from './products-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -98,9 +97,6 @@ it.skipIf(!process.env.LUMA_PRODUCT_BENCHMARK)(
     );
     await time('grouped by status', '?group=status');
     await time('grouped by differing field', '?group=differences');
-    await writeFile(
-      `/tmp/luma101-products-${count}.json`,
-      JSON.stringify({ count, timings }, null, 2),
-    );
+    await captureJson(`products-benchmark-${count}.json`, { count, timings });
   },
 );

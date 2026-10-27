@@ -59,6 +59,8 @@ import { shopify, type ShopifyConfig } from '@luma/simulator-shopify';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { captureJson } from './test-support/capture.js';
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
 const reads = [
@@ -3865,11 +3867,10 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         [tenant],
       );
       expect(failed.rows[0].count).toBe(0);
-      const { writeFile } = await import('node:fs/promises');
-      await writeFile(
-        `/tmp/luma-import-benchmark-${count}.json`,
-        JSON.stringify({ recordsPerSecond: measured, ms: results }, null, 2),
-      );
+      await captureJson(`import-benchmark-${count}.json`, {
+        recordsPerSecond: measured,
+        ms: results,
+      });
     },
     3_600_000,
   );

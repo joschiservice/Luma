@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { test } from 'vitest';
@@ -56,7 +62,11 @@ async function delayedProxy(t, target) {
 const percentile = (samples, share) =>
   [...samples].sort((a, b) => a - b)[Math.ceil(share * samples.length) - 1];
 
-test('serves concurrent Needs-you and order-list reads from one API without exhausting its pool', async (t) => {
+/**
+ * Seeds a workspace with orders and a full purchasing plan list, then builds an API whose
+ * database connection is delayed. Returns the fixture and the app.
+ */
+async function delayedWorkspace(t) {
   const f = await settingsFixture(t);
   await fulfillmentFixture(t, f);
   const supplierId = randomUUID();
@@ -129,6 +139,12 @@ test('serves concurrent Needs-you and order-list reads from one API without exha
     databaseUrl: url.toString(),
   });
   t.onTestFinished(() => app.close());
+
+  return { f, app };
+}
+
+test('serves concurrent Needs-you and order-list reads from one API without exhausting its pool', async (t) => {
+  const { f, app } = await delayedWorkspace(t);
   const read = async (path) => {
     const start = performance.now();
     const response = await app.inject({
@@ -177,3 +193,58 @@ test('serves concurrent Needs-you and order-list reads from one API without exha
   );
   assert.deepEqual(failures, []);
 });
+
+// k6 drives many members over real HTTP connections for half a minute, which the in-process
+// rounds above do not. Set LUMA_K6 to the k6 binary (for example `k6`) to run it.
+test.skipIf(!process.env.LUMA_K6)(
+  'serves Needs-you and order-list reads to concurrent HTTP clients without failures',
+  async (t) => {
+    const { f, app } = await delayedWorkspace(t);
+    const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const directory = await mkdtemp(join(tmpdir(), 'luma-k6-'));
+    t.onTestFinished(() => rm(directory, { recursive: true, force: true }));
+    const summary = join(directory, 'summary.json');
+    const k6 = spawn(
+      process.env.LUMA_K6,
+      [
+        'run',
+        '--quiet',
+        '--no-usage-report',
+        fileURLToPath(
+          new URL(
+            '../../../tooling/performance/request-pool.k6.js',
+            import.meta.url,
+          ),
+        ),
+      ],
+      {
+        env: {
+          ...process.env,
+          BASE_URL: `${origin}${f.base}`,
+          COOKIE: f.owner.cookie,
+          SUMMARY: summary,
+        },
+        stdio: ['ignore', 'inherit', 'inherit'],
+      },
+    );
+    const [code] = await once(k6, 'exit');
+    const { metrics } = JSON.parse(await readFile(summary, 'utf8'));
+    const p95 = (name) => Math.round(metrics[name]?.values['p(95)'] ?? -1);
+
+    await performanceReport(
+      'request-pool-http',
+      {
+        requests: metrics.http_reqs.values.count,
+        purchasingPlans: plans,
+        databaseDelayMs: delayMs,
+        failedRequests: metrics.http_req_failed.values.passes,
+        decisionsP95Ms: p95('http_req_duration{read:decisions}'),
+        ordersP95Ms: p95('http_req_duration{read:orders}'),
+      },
+      { failedRequests: 0, decisionsP95Ms: 2000, ordersP95Ms: 2000 },
+    );
+    // k6 exits 99 when a threshold fails; any other failure is a broken run.
+    assert.equal(code, 0, `k6 exited with ${code}`);
+  },
+  120_000,
+);

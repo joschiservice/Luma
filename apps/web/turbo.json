@@ -4,6 +4,9 @@
   "tasks": {
     "test": {
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/apps/*/src/**"]
+    },
+    "typecheck": {
+      "env": ["CI"]
     }
   }
 }

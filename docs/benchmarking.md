@@ -43,7 +43,10 @@ Performance suite ceilings:
 - Request pool: ten concurrent Needs-you reads and ten order-list reads, five rounds, with
   100 purchasing plans and a 5 ms delay on each direction of the database connection. No
   request may fail, and each read's p95 stays within two seconds. The delay makes connection
-  hold time, not local query speed, decide whether the pool keeps up.
+  hold time, not local query speed, decide whether the pool keeps up. With `LUMA_K6` naming
+  the [k6](https://k6.io) binary, the scenario also serves the API over HTTP and ramps 20
+  virtual members reading both lists for half a minute, with the same failure and p95
+  ceilings. This covers socket handling and sustained load that in-process requests skip.
 
 Operational-metric latency and metric listener recovery are recorded without a ceiling.
 These are regression ceilings, not production latency guarantees. Review the scenario and
@@ -52,7 +55,9 @@ its report before changing a budget; never raise one just to silence a failure.
 Some scenarios take an opt-in size variable for larger synthetic datasets, such as
 `LUMA_RETURN_BENCHMARK=<return count> pnpm test:performance returns`, and skip without it.
 Package integration tests take others, such as `LUMA_ORDER_BENCHMARK`. The feature guides
-name them.
+name them. These size benchmarks write their timings and plans only when `LUMA_CAPTURE`
+names a directory (see [tests](development.md#tests)); without it they still run and assert,
+but keep no measurements.
 
 ## Whole-command benchmarks
 
@@ -74,6 +79,10 @@ test logs. A failing run stops the benchmark. Each invocation writes `results.js
 
 For CI numbers, dispatch the **Test benchmarks** workflow. Hosted-runner variance makes
 small differences unreliable; it is not a PR gate.
+
+The **Nightly scale benchmarks** workflow runs the performance suite every night with the
+size scenarios at their documented sizes and the k6 load test, and uploads the reports and
+captured plans. A budget failure fails the nightly run, not a pull request.
 
 ## Comparing fairly
 

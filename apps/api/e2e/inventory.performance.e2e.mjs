@@ -1,7 +1,6 @@
-import { writeFile } from 'node:fs/promises';
-
 import { expect, it } from 'vitest';
 
+import { captureJson } from './capture.mjs';
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -86,9 +85,6 @@ it.skipIf(!process.env.LUMA_INVENTORY_BENCHMARK)(
     await time('grouped by SKU', '?group=sku');
     await time('grouped by source', '?group=source');
     await time('search', '?q=sku-bench-123');
-    await writeFile(
-      `/tmp/luma-inventory-${count}.json`,
-      JSON.stringify({ count, timings }, null, 2),
-    );
+    await captureJson(`inventory-benchmark-${count}.json`, { count, timings });
   },
 );

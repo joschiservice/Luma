@@ -33,7 +33,19 @@ export const ignoredPaths = [
   'infra/**',
   'Dockerfile',
   '.dockerignore',
-  '.github/workflows/deploy-lite.yml',
+  // Deployment, static analysis and scheduled benchmarks; none of them run journeys on PRs.
+  '.github/workflows/{codeql,deploy-lite,nightly}.yml',
+  // This selection manifest; tooling/dev/affected.test.mjs checks it.
+  'apps/api/e2e/journey-areas.mjs',
+  // Hand-run provider schema refreshes and the database studio.
+  'apps/api/scripts/**',
+  'apps/api/drizzle.studio.config.ts',
+  // Type checking of journey sources; journeys run the modules unchanged.
+  'apps/api/tsconfig.e2e.json',
+  // The performance suite; affected selection never runs it.
+  'apps/api/{playwright,vitest}.performance.config.ts',
+  // Route tree generation for the web typecheck; journeys use the build.
+  'apps/web/scripts/generate-routes.mjs',
   // Generated from mapped sources.
   'apps/web/src/routeTree.gen.ts',
   'packages/api-contract/openapi.json',
@@ -47,8 +59,11 @@ export const sharedPaths = [
   'turbo.json',
   '**/tsconfig*.json',
   '.github/**',
-  // Journey servers, the worker and the test runner.
-  'apps/api/**',
+  // The API and worker entry points, journey runners and the test runner. Journey modules
+  // under apps/api/e2e select the journeys that import them; tooling/dev/affected.mjs adds the
+  // modules the runner configs load.
+  'apps/api/src/**',
+  'apps/api/{playwright.config,vitest.e2e.config}.ts',
   'apps/worker/**',
   'tooling/dev/**',
   // Every request passes through these services and policies.
@@ -70,7 +85,7 @@ export const sharedPaths = [
   'packages/ui/**',
   'apps/web/src/lib/**',
   'apps/web/src/routes/{__root,app.$organizationId}.tsx',
-  'apps/web/src/{router.tsx,server.ts,styles.css,home.tsx}',
+  'apps/web/src/{router.tsx,server.ts,styles.css,home.tsx,global-entry.ts,security-headers.ts}',
   'apps/web/src/styles/**',
 ];
 
@@ -495,6 +510,7 @@ const webActivity = [
 const webApps = [
   'apps/web/src/features/apps/**',
   'apps/web/src/features/connections/**',
+  'apps/web/src/features/connector-providers/**',
   'apps/web/src/features/sync/{data.ts,presentation.ts}',
   'apps/web/src/routes/app.$organizationId.{apps.*,connections.tsx}',
   'packages/i18n/messages/*/{apps,catalog,connections,issues,settings,sync}.json',
@@ -547,6 +563,7 @@ const webInsights = [
   'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/overview/**',
   'apps/web/src/features/procurement/presentation.tsx',
+  'apps/web/src/shared/procurement/purchasing-outcomes.tsx',
   'apps/web/src/routes/app.$organizationId.insights.tsx',
   'packages/i18n/messages/*/{connections,fulfillment,insights,issues,metrics,orders,overview,procurement}.json',
 ];
@@ -555,6 +572,7 @@ const webInventory = [
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/inventory/**',
   'apps/web/src/shared/orders/presentation.ts',
+  'apps/web/src/shared/procurement/incoming-stock.{css,tsx}',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
@@ -590,7 +608,7 @@ const webProcurement = [
   'apps/web/src/features/fulfillment/data.ts',
   'apps/web/src/features/inventory/presentation.tsx',
   'apps/web/src/shared/orders/presentation.ts',
-  'apps/web/src/shared/procurement/suppliers.ts',
+  'apps/web/src/shared/procurement/**',
   'apps/web/src/features/procurement/**',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
   'apps/web/src/routes/app.$organizationId.procurement.*',
@@ -601,6 +619,7 @@ const webProducts = [
   'apps/web/src/features/inventory/presentation.tsx',
   'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/products/**',
+  'apps/web/src/shared/procurement/{incoming-stock,purchasing-outcomes,supplier-terms}.*',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.products.*',
@@ -648,6 +667,7 @@ const webWorkflows = [
   'apps/web/src/features/workflows/shadow/result.tsx',
   'apps/web/src/features/workflows/shadow/shadow.css',
   'apps/web/src/features/workflows/**',
+  'apps/web/src/shared/procurement/approval-context.tsx',
   'apps/web/src/routes/app.$organizationId.{workflows,playbooks}.*',
   'packages/i18n/messages/*/{authoring,issues,settings,shadow,vocabulary,workflows}.json',
 ];
@@ -658,7 +678,7 @@ const webDocs = [
   'packages/i18n/messages/*/{docs,help}.json',
 ];
 const webAuthRecovery = [
-  'apps/web/src/routes/{forgot-password,reset-password}.tsx',
+  'apps/web/src/routes/{forgot-password,reset-password,verify-email}.tsx',
 ];
 
 // Journeys split across files by topic share the areas of the flow they exercise.

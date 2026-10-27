@@ -218,9 +218,6 @@ catalogs:
     '@tanstack/react-router-ssr-query':
       specifier: 1.167.3
       version: 1.167.3
-    '@tanstack/router-cli':
-      specifier: 1.167.46
-      version: 1.167.46
     '@temporalio/testing':
       specifier: 1.24.0
       version: 1.24.0
@@ -377,6 +374,9 @@ importers:
         specifier: 'catalog:'
         version: 0.223.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
     devDependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../../packages/api-contract
       '@luma/app-catalog':
         specifier: workspace:*
         version: link:../../packages/app-catalog
@@ -715,9 +715,6 @@ importers:
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.3(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      '@tanstack/router-cli':
-        specifier: 'catalog:'
-        version: 1.167.46(supports-color@8.1.1)
       '@types/mdx':
         specifier: 2.0.14
         version: 2.0.14
@@ -1725,6 +1722,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/i18n:
     dependencies:
@@ -5748,11 +5748,6 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@tanstack/router-cli@1.167.46':
-    resolution: {integrity: sha512-jCeaoYeLctgwdGE4TzoEtzvN+jjQEB/q1N2EZoXKa5v8t5JQJOf+o3oJve/rUOB7NZnXEB6dCC+faWvXNKMSNQ==}
-    engines: {node: '>=20.19'}
-    hasBin: true
-
   '@tanstack/router-core@1.171.39':
     resolution: {integrity: sha512-qUhoJ0meuSUqGYQbHbcJYdASr06YtK+bulbj6vtrhKYFkLgkSsZ6tXmMyym7sFxiSJSPYgasgozrL01LyyR/6A==}
     engines: {node: '>=20.19'}
@@ -6662,10 +6657,6 @@ packages:
   byline@5.0.0:
     resolution: {integrity: sha512-s6webAy+R4SR8XVuJWt2V2rGvhnrhxN+9S15GNuTK3wKPOXFF6RNc+8ug2XhH+2s4f+uudG4kUVYmYOQWL2g0Q==}
     engines: {node: '>=0.10.0'}
-
-  cac@7.1.0:
-    resolution: {integrity: sha512-LMDU/U2yA4IPIY8KT0NsNPWEYZvAMkbgyspxJ6btJaYV+WMDOHAZCmB0lsTObiHaRS1V/ztKAl7+TSkTqXyeoA==}
-    engines: {node: '>=20.19.0'}
 
   cacheable@2.5.0:
     resolution: {integrity: sha512-60cyAOytib/OzBw1JNSoSV/boK1AtHryDIjvVBk7XbN4ugfkM3+Sry7fEjNgPMGgOjuaZPAp8ruZ0Cxafwyq9g==}
@@ -12476,14 +12467,6 @@ snapshots:
     transitivePeerDependencies:
       - react-dom
 
-  '@tanstack/router-cli@1.167.46(supports-color@8.1.1)':
-    dependencies:
-      '@tanstack/router-generator': 1.167.46(supports-color@8.1.1)
-      cac: 7.1.0
-      chokidar: 5.0.0
-    transitivePeerDependencies:
-      - supports-color
-
   '@tanstack/router-core@1.171.39':
     dependencies:
       '@tanstack/history': 1.162.5
@@ -13557,8 +13540,6 @@ snapshots:
       run-applescript: 7.1.0
 
   byline@5.0.0: {}
-
-  cac@7.1.0: {}
 
   cacheable@2.5.0:
     dependencies:

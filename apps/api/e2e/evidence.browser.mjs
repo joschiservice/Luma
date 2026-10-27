@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from './browser-fixtures.mjs';
+import { captureDirectory } from './capture.mjs';
 import { settlementFixture } from './return-settlement-fixture.mjs';
 
-const screenshots = globalThis.process.env.EVIDENCE_SCREENSHOTS;
+// Light, dark and narrow screenshots for design review, written only with LUMA_CAPTURE.
+const screenshots = captureDirectory();
 
 test('opens the stored reads and receipts behind a verified purchase-order submission and a return settlement', async ({
   resources: t,
@@ -143,9 +145,13 @@ test('opens the stored reads and receipts behind a verified purchase-order submi
   ).toBeVisible();
   if (screenshots) {
     await submissionEvidence.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${screenshots}/submission-light.png` });
+    await page.screenshot({
+      path: `${screenshots}/evidence-submission-light.png`,
+    });
     await page.evaluate(() => document.documentElement.classList.add('dark'));
-    await page.screenshot({ path: `${screenshots}/submission-dark.png` });
+    await page.screenshot({
+      path: `${screenshots}/evidence-submission-dark.png`,
+    });
     await page.evaluate(() =>
       document.documentElement.classList.remove('dark'),
     );
@@ -171,10 +177,12 @@ test('opens the stored reads and receipts behind a verified purchase-order submi
   await expect(settlementEvidence.getByText('Not found')).toHaveCount(0);
   if (screenshots) {
     await settlementEvidence.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `${screenshots}/settlement-narrow.png` });
+    await page.screenshot({
+      path: `${screenshots}/evidence-settlement-narrow.png`,
+    });
     await page.evaluate(() => document.documentElement.classList.add('dark'));
     await page.screenshot({
-      path: `${screenshots}/settlement-narrow-dark.png`,
+      path: `${screenshots}/evidence-settlement-narrow-dark.png`,
     });
   }
   expect(errors).toEqual([]);

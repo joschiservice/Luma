@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from 'vitest';
 
-import { caseWorkflowFixture } from './case-workflows-fixture.mjs';
+import {
+  caseWorkflowFixture,
+  workflowWait,
+} from './case-workflows-fixture.mjs';
 import {
   driftedStock,
   shopStock,
@@ -247,7 +250,7 @@ test('a proposal waits hours for a decision, one item follows a stock change, an
       );
     },
     'one item shows the replacement proposal',
-    30_000,
+    workflowWait,
   );
   await f.request(
     '/apps/shopify/inventory-correction-approve',

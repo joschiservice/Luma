@@ -11,6 +11,13 @@ import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 /**
+ * Bound for waits on a workflow run's next state or its Needs you item. Each step runs Temporal
+ * activities against PostgreSQL and the simulator, which a fully loaded machine can delay well
+ * beyond an idle run; the 60-second journey timeout still bounds the test.
+ */
+export const workflowWait = 45_000;
+
+/**
  * Runs case workflows against the simulator, PostgreSQL, the HTTP API and a local Temporal
  * server. The operator turns workflows on, so the requester is the different approver.
  * `imported` starts from the simulator's completed initial import, as `setupSimulator` does.
@@ -123,7 +130,7 @@ export async function caseWorkflowFixture(
         return [states].flat().includes(found?.processState);
       },
       `${definitionId} run ${runId}: ${states}`,
-      30_000,
+      workflowWait,
     ).catch((error) => {
       throw new Error(
         `${error.message}; last seen ${JSON.stringify(found?.processSteps ?? found)}`,

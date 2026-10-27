@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 import {
   buildApp,
@@ -37,6 +37,8 @@ import {
 } from '@luma/sales/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { captureJson } from './test-support/capture.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -519,22 +521,19 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         [...values].sort((a, b) => a - b)[
           Math.floor((values.length - 1) * fraction)
         ]!;
-      await writeFile(
-        '/tmp/luma176-native-order-benchmark.json',
-        JSON.stringify({
-          record: {
-            medianMs: percentile(samples.record, 0.5),
-            p95Ms: percentile(samples.record, 0.95),
-          },
-          publication: {
-            medianMs: percentile(samples.publication, 0.5),
-            p95Ms: percentile(samples.publication, 0.95),
-          },
-          medianOverheadMs:
-            percentile(samples.publication, 0.5) -
-            percentile(samples.record, 0.5),
-        }),
-      );
+      await captureJson('native-order-benchmark.json', {
+        record: {
+          medianMs: percentile(samples.record, 0.5),
+          p95Ms: percentile(samples.record, 0.95),
+        },
+        publication: {
+          medianMs: percentile(samples.publication, 0.5),
+          p95Ms: percentile(samples.publication, 0.95),
+        },
+        medianOverheadMs:
+          percentile(samples.publication, 0.5) -
+          percentile(samples.record, 0.5),
+      });
     }
     // Fail after record and snapshot writes: the owner transaction rolls back every effect.
     const failingDb: typeof db = {
@@ -2604,15 +2603,13 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         );
       }
       const loadElapsed = performance.now() - loadStart;
-      const { writeFile } = await import('node:fs/promises');
-      await writeFile(
-        '/tmp/luma84-query-plans.json',
-        JSON.stringify(
-          { rows: 10001, durations, plans, concurrentDurations, loadElapsed },
-          null,
-          2,
-        ),
-      );
+      await captureJson('metric-query-plans.json', {
+        rows: 10001,
+        durations,
+        plans,
+        concurrentDurations,
+        loadElapsed,
+      });
     }
   }, 60000);
 });

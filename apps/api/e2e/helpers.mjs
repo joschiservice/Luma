@@ -31,6 +31,7 @@ export async function until(check, description, timeout = 15_000) {
 
 /** Starts an isolated child process and registers forced shutdown with the test cleanup context. */
 export function startProcess(t, script, env = {}, ipc = false) {
+  /** @type {import('node:child_process').ChildProcess} */
   const child = spawn(process.execPath, [script], {
     cwd: apiDirectory,
     // Do not inherit developer credentials, telemetry exporters, or NODE_OPTIONS.
@@ -290,6 +291,12 @@ export async function startApi(
     origin,
     process,
     db,
+    /**
+     * Sends a JSON request as the trusted browser origin and asserts the response status.
+     * Prefer the typed client in `typed-client.mjs` for contract routes.
+     * @param {string} path
+     * @param {{ method?: string; cookie?: string; body?: unknown; status?: number }} [options]
+     */
     async request(path, { method = 'GET', cookie, body, status = 200 } = {}) {
       const response = await fetch(`${origin}${path}`, {
         method,
