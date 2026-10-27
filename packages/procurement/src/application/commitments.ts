@@ -255,6 +255,8 @@ export interface CommitmentTransaction {
   command(id: string): Promise<{ digest: string; result: unknown } | null>;
   saveCommand(id: string, digest: string, result: unknown): Promise<void>;
   audit(entry: AuditEntry): Promise<void>;
+  /** The workspace's IANA time zone, which sets the calendar day for overdue dates; UTC when unset. */
+  timeZone(): Promise<string>;
   /** Purchasing-system SKU identities for order-line SKUs, by connection. */
   skuIdentities(
     connectionId: string,

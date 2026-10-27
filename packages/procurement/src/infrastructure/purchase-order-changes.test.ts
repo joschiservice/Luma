@@ -292,6 +292,7 @@ function fixture() {
             draftVerified: false,
             supplierLinked: true,
             now: new Date(now),
+            timeZone: 'UTC',
           }),
         }),
         refresh: async () => {},

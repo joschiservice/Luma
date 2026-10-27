@@ -7,7 +7,7 @@ import {
 import { conflict, notFound, unavailable } from '@luma/platform';
 import type { PolicyDecision } from '@luma/policies';
 
-import type { Submission } from '../domain/commitments.js';
+import { type Submission, workspaceDay } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
 import {
   approvalExpired,
@@ -165,14 +165,17 @@ export function createSubmissionRequests(
     ) {
       context = await authorize(context, true);
       const request = deps.parse.submission(input);
-      const today = deps.now().toISOString().slice(0, 10);
-      if (request.requestedDeliveryDate < today)
-        throw conflict('Choose a delivery date that is today or later.');
-      const existing = await deps.store.transaction(
+      const { existing, timeZone } = await deps.store.transaction(
         context.tenantId,
         false,
-        (tx) => tx.submission(request.id),
+        async (tx) => ({
+          existing: await tx.submission(request.id),
+          timeZone: await tx.timeZone(),
+        }),
       );
+      // "Today" is the workspace's calendar day, the same day overdue dates use.
+      if (request.requestedDeliveryDate < workspaceDay(deps.now(), timeZone))
+        throw conflict('Choose a delivery date that is today or later.');
       if (existing) {
         if (
           existing.purchaseOrderId !== orderId ||

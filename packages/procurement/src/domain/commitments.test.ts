@@ -94,6 +94,7 @@ const progress = (input: {
     draftVerified: false,
     supplierLinked: true,
     now: new Date(input.now ?? '2026-10-01T12:00:00.000Z'),
+    timeZone: 'UTC',
   });
 
 describe('supplier order progress', () => {

@@ -42,6 +42,7 @@ export function createSupplierResponses({
           followUps: await tx.followUps([orderId]),
           supplier: await tx.supplier(order.supplierId),
           verified: new Set(),
+          timeZone: await tx.timeZone(),
         });
         const attention = progress.attention.find(
           (a) => a.key === attentionKey,
@@ -305,6 +306,7 @@ export function createSupplierResponses({
                 followUps: await tx.followUps([orderId]),
                 supplier: await tx.supplier(order.supplierId),
                 verified: new Set(),
+                timeZone: await tx.timeZone(),
               }).progress,
             };
             const attention = current.progress.attention.find(

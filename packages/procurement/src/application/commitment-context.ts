@@ -46,6 +46,8 @@ interface ProgressRecords {
   verified: Set<string>;
   /** Evaluation time; defaults to now. */
   now?: Date;
+  /** The workspace time zone, from `CommitmentTransaction.timeZone`, for overdue dates. */
+  timeZone: string;
 }
 
 /**
@@ -215,6 +217,7 @@ export function createCommitmentContext(
   ): { progress: OrderProgress; submission: Submission | null } {
     const submission =
       data.submissions.find((s) => s.purchaseOrderId === order.id) ?? null;
+    const now = data.now ?? deps.now();
 
     return {
       submission,
@@ -230,7 +233,8 @@ export function createCommitmentContext(
           !!order.origin.workflowRunId &&
           data.verified.has(order.origin.workflowRunId),
         supplierLinked: !!data.supplier?.link,
-        now: data.now ?? deps.now(),
+        now,
+        timeZone: data.timeZone,
       }),
     };
   }

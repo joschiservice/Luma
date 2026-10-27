@@ -20,7 +20,9 @@ key was revoked. Rotate the key to recover.
 Cin7 allows **60 calls per minute per API application** and answers 429 above it, without
 `Retry-After`. All adapters and the verifier of one connection share a pacer in each
 process that admits at most one request per 1.1 seconds. After a 429 or 503 the pacer
-admits nothing for a minute and sync defers the connection. Another process using the same
+admits nothing for a minute and sync defers the connection. The pacer waits in place for
+at most five seconds; while it is paused for longer, reads fail at once with `rate_limited`
+and the remaining delay instead of holding a worker. Another process using the same
 connection (the API during a check while the worker syncs) has its own pacer and can still
 trigger a 429; that is handled, not prevented. Never give Luma's key to another
 integration: it would share the budget.

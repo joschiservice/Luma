@@ -104,6 +104,7 @@ export function commitmentFixture(
   const reads = new Map<string, PurchasingReadEvidence>();
   const receipts = new Map<string, PurchasingWriteReceipt>();
   const commands = new Map<string, { digest: string; result: unknown }>();
+  let timeZone = 'UTC';
   const tx: CommitmentTransaction = {
     order: async (id) => (id === order.id ? order : null),
     orders: async () => [order],
@@ -176,6 +177,7 @@ export function commitmentFixture(
       audits.push(value);
     },
     skuIdentities: async () => new Map(),
+    timeZone: async () => timeZone,
   };
   let tail = Promise.resolve();
   let now = new Date('2026-10-02T12:00:00.000Z');
@@ -263,6 +265,10 @@ export function commitmentFixture(
     request,
     now: (value: string) => {
       now = new Date(value);
+    },
+    /** Sets the workspace time zone that decides the calendar day for overdue dates. */
+    timeZone: (value: string) => {
+      timeZone = value;
     },
     enable: (value: boolean) => {
       enabled = value;

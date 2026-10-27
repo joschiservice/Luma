@@ -189,6 +189,7 @@ export function createSubmissionExecution({
         followUps: [],
         supplier: null,
         verified: new Set(),
+        timeZone: await tx.timeZone(),
       }).progress;
       const settled =
         ['closed', 'cancelled'].includes(order.status) ||

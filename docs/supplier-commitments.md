@@ -123,7 +123,11 @@ the text exists.
 
 Attention covers approvals, uncertain sends, facts to review, changed commitments, missed
 confirmations (submission time plus the supplier's confirmation hours) and overdue
-deliveries (expected date passed with units outstanding). People decide on missing or damaged goods, accept a change or record
+deliveries (expected date passed with units outstanding). A delivery is overdue from the day
+after its expected date in the workspace time zone, not in UTC; order views, lists, incoming
+stock and the supplier follow-up use the same day. A follow-up on an overdue delivery moves
+it to the workspace day of the next check time, and a requested delivery date must be that
+day's date or later. People decide on missing or damaged goods, accept a change or record
 a follow-up with the next check time; the follow-up moves the deadline and the item returns
 when it passes. Needs you shows these items under the purchase order, whose review uses the
 order's own controls.
