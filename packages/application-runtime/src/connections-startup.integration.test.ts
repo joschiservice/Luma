@@ -32,7 +32,10 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     child = undefined;
   }
 
-  async function start(configured = true) {
+  async function start(
+    configured = true,
+    environment: Record<string, string> = {},
+  ) {
     child = fork(
       new URL(
         '../../../apps/api/src/composition/bootstrap.ts',
@@ -71,6 +74,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
           LANGFUSE_PUBLIC_KEY: '',
           LANGFUSE_SECRET_KEY: '',
           POSTHOG_API_KEY: '',
+          ...environment,
         },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       },
@@ -254,6 +258,18 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       code: 'SERVICE_UNAVAILABLE',
       message: 'Connection service is unavailable',
     });
+  }, 30000);
+  it('serves readiness and persisted reads while Temporal is unreachable', async () => {
+    await stop();
+    await start(true, {
+      // Nothing listens on port 1, so every Temporal call fails.
+      TEMPORAL_ADDRESS: '127.0.0.1:1',
+      TEMPORAL_DATA_REGION: 'AU',
+    });
+    expect((await call('/ready')).status).toBe(200);
+    expect(
+      (await call(`/v1/organizations/${organizationId}/connections`)).status,
+    ).toBe(200);
   }, 30000);
   it('fails readiness when the configured runtime loses its connector role', async () => {
     await stop();

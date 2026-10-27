@@ -108,7 +108,10 @@ export async function createPilot(
   const resources = createResourceScope();
   const failureLog = createFailureLog(observability);
   try {
-    const identity = createIdentity(settings);
+    const identity = createIdentity(settings, {
+      onDatabaseError: (error) =>
+        console.error('Identity database connection failed', error),
+    });
     resources.add(identity.close);
     const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
     resources.add(() => pool.end());
@@ -505,7 +508,7 @@ export async function createPilot(
       : null;
     if (deskWorkflow) resources.add(deskWorkflow.close);
     const processClient = temporal
-      ? await createProcessClient(
+      ? createProcessClient(
           { ...temporal, taskQueue: `${temporal.taskQueue}-procurement` },
           identity.service,
         )

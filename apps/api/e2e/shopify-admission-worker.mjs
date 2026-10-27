@@ -12,7 +12,10 @@ process.once('message', async ({ env, manifest }) => {
     ...env,
     SHOPIFY_ADMISSION_URL: process.env.SHOPIFY_ADMISSION_URL,
   };
-  const identity = createIdentity(readIdentityConfig(settings));
+  const identity = createIdentity(readIdentityConfig(settings), {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   const pool = new Pool({
     connectionString: settings.WORKFLOW_DATABASE_URL,
     max: 12,

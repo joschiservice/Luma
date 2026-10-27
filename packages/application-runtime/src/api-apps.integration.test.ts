@@ -299,17 +299,20 @@ describe.skipIf(!databaseUrl)(
         ]),
       );
       const sent: { to: string; subject: string }[] = [];
-      const mailer = createIdentity({
-        databaseUrl: runtimeUrl,
-        secret: 'integration-test-secret-at-least-32-characters',
-        baseURL: origin,
-        trustedOrigins: [origin],
-        mailProvider: {
-          async send(message) {
-            sent.push(message);
+      const mailer = createIdentity(
+        {
+          databaseUrl: runtimeUrl,
+          secret: 'integration-test-secret-at-least-32-characters',
+          baseURL: origin,
+          trustedOrigins: [origin],
+          mailProvider: {
+            async send(message) {
+              sent.push(message);
+            },
           },
         },
-      });
+        { onDatabaseError: () => undefined },
+      );
       try {
         await mailer.mailDelivery.drain();
       } finally {

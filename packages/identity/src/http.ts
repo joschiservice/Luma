@@ -24,9 +24,6 @@ export function registerIdentityHttp(
   app: FastifyInstance,
   identity: ReturnType<typeof createIdentity>,
 ) {
-  identity.onDatabaseError(() =>
-    app.log.error('Identity database connection failed'),
-  );
   registerAuthHandler(
     app,
     identity.handler,

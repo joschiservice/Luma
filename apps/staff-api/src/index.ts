@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { readObservabilityConfig } from '@luma/config';
+import { createFailureLog } from '@luma/platform';
 import { createObservability } from '@luma/platform/composition';
 import { createStaff, readStaffSettings } from '@luma/staff/composition';
 
@@ -8,7 +9,9 @@ import { createStaffHttpApp } from './composition/http-app.js';
 
 const settings = readStaffSettings();
 const observability = createObservability(readObservabilityConfig(process.env));
+const log = createFailureLog(observability);
 const staff = createStaff(settings, {
+  onDatabaseError: (error) => log('Staff database connection failed', error),
   release: async () => {
     const observation = observability.request(randomUUID());
     try {

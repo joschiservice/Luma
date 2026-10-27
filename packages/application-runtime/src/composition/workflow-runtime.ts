@@ -252,10 +252,13 @@ export async function createDefaultExceptionWorker(
   const resources = createResourceScope();
   try {
     // Members and workflow contexts are read with the worker login, never the API's.
-    const identity = createWorkflowIdentity({
-      databaseUrl: settings.databaseUrl,
-      ...cell,
-    });
+    const identity = createWorkflowIdentity(
+      { databaseUrl: settings.databaseUrl, ...cell },
+      {
+        onDatabaseError: (error) =>
+          log('Workflow identity database connection failed', error),
+      },
+    );
     resources.add(identity.close);
     const pool = createDatabasePool({
       connectionString: settings.databaseUrl,
@@ -265,7 +268,7 @@ export async function createDefaultExceptionWorker(
     });
     resources.add(() => pool.end());
     await assertCellRegion(pool, cell.region);
-    const processClient = await createProcessClient(
+    const processClient = createProcessClient(
       {
         ...settings.temporal,
         taskQueue: `${settings.temporal.taskQueue}-procurement`,

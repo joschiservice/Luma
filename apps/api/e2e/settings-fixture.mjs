@@ -54,7 +54,10 @@ export async function settingsFixture(
       },
     },
   };
-  const identity = createIdentity(config);
+  const identity = createIdentity(config, {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   const app = await buildRuntimeApp(
     config,
     {},

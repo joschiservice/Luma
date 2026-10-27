@@ -245,10 +245,13 @@ export async function createDefaultCommerceSyncWorker(
           }
         : undefined;
     // Members and workflow contexts are read with the worker login, never the API's.
-    const identity = createWorkflowIdentity({
-      databaseUrl: settings.databaseUrl,
-      ...cell,
-    });
+    const identity = createWorkflowIdentity(
+      { databaseUrl: settings.databaseUrl, ...cell },
+      {
+        onDatabaseError: (error) =>
+          log('Sync identity database connection failed', error),
+      },
+    );
     resources.add(identity.close);
     const pool = createDatabasePool({
       connectionString: settings.databaseUrl,

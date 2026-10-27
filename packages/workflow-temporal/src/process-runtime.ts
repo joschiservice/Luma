@@ -203,14 +203,18 @@ export async function createProcessWorker(
   }
 }
 
-/** Connects a process client; the returned close method releases its connection. */
-export async function createProcessClient(
+/**
+ * Creates a process client without contacting Temporal. The connection opens on the first
+ * command, so callers start while Temporal is unreachable and each command fails until it is
+ * reachable again. The returned close method releases the connection.
+ */
+export function createProcessClient(
   settings: TemporalSettings,
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   validateSettings(settings);
   const data = temporalDataConverter(settings);
-  const connection = await Connection.connect({
+  const connection = Connection.lazy({
     connectTimeout: '2 seconds',
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),

@@ -69,7 +69,10 @@ export async function seedPilot(
   const featureEnabled = syntheticFeatureRelease(env);
   const settings = identitySettings(env);
   const app = await buildRuntimeApp(settings);
-  const identity = createIdentity(settings);
+  const identity = createIdentity(settings, {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
   const detection = createDetectionServices(env.WORKFLOW_DATABASE_URL);
   const connections = createInstalledConnections(createTenantDatabase(pool), {

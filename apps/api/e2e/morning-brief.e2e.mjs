@@ -69,7 +69,10 @@ it('queues once per member/local day across concurrent schedulers, restart and u
     204,
   );
   await Promise.all([f.schedule(), f.schedule()]);
-  const restarted = createIdentity(f.config);
+  const restarted = createIdentity(f.config, {
+    onDatabaseError: (error) =>
+      console.error('Identity database connection failed', error),
+  });
   t.onTestFinished(() => restarted.close());
   await restarted.morningBriefScheduler(f.source)();
   const rows = (
@@ -182,10 +185,16 @@ it('rechecks opt-out, access changes, workspace state and the release before dis
     "DELETE FROM workspace_mail WHERE kind='morning_brief'",
   );
   await f.schedule();
-  const disabled = createIdentity({
-    ...f.config,
-    morningBriefEnabled: async () => false,
-  });
+  const disabled = createIdentity(
+    {
+      ...f.config,
+      morningBriefEnabled: async () => false,
+    },
+    {
+      onDatabaseError: (error) =>
+        console.error('Identity database connection failed', error),
+    },
+  );
   t.onTestFinished(() => disabled.close());
   await disabled.mailDelivery.drain();
   expect(f.messages.size).toBe(0);
