@@ -52,6 +52,8 @@ export interface TelemetrySettings {
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
   posthog?: { apiKey: string; host: string; secretKey?: string };
   featureFlagOverrides?: Readonly<Record<string, boolean>>;
+  /** Cell-wide flag values for every environment; overrides take precedence over them. */
+  staticFeatureFlags?: Readonly<Record<string, boolean>>;
 }
 
 const uuid =
@@ -67,8 +69,10 @@ const operations: Record<Operation, string> = {
 
 /**
  * Explicit context keeps concurrent requests and background work isolated. PostHog receives
- * product events and evaluates flags only in staging and production. Throws when a flag
- * override names a flag outside the allowlist.
+ * product events and evaluates flags only in staging and production. A flag resolves to its
+ * development or test override, then its static cell-wide value, then PostHog, then the caller's
+ * fallback; flags with a fixed value are never sent to PostHog. Throws when an override or static
+ * flag names a flag outside the allowlist.
  */
 export function createObservability(
   settings: TelemetrySettings,
@@ -82,17 +86,21 @@ export function createObservability(
     posthogFetch?: PostHogOptions['fetch'];
   } = {},
 ): Observability {
-  // Development and test never contact PostHog: no product events, and flags use overrides
-  // or the fallback.
+  // Development and test never contact PostHog: no product events, and flags use overrides,
+  // static values or the fallback.
   const usePostHog =
     settings.environment === 'staging' || settings.environment === 'production';
-  const flagOverrides = new Map<string, boolean>();
-  for (const [flag, enabled] of Object.entries(
-    settings.featureFlagOverrides ?? {},
-  )) {
-    if (!isFeatureFlag(flag))
-      throw new Error(`Feature flag override ${flag} is not an allowed flag`);
-    flagOverrides.set(flag, enabled);
+  // Static values apply first so development and test overrides replace them.
+  const fixedFlags = new Map<string, boolean>();
+  for (const [source, values] of [
+    ['Static feature flag', settings.staticFeatureFlags],
+    ['Feature flag override', settings.featureFlagOverrides],
+  ] as const) {
+    for (const [flag, enabled] of Object.entries(values ?? {})) {
+      if (!isFeatureFlag(flag))
+        throw new Error(`${source} ${flag} is not an allowed flag`);
+      fixedFlags.set(flag, enabled);
+    }
   }
   const approvedModels = new Set([
     'test-model',
@@ -506,8 +514,8 @@ export function createObservability(
     },
     async flag(context, flag, fallback = false) {
       if (!isFeatureFlag(flag)) return fallback;
-      const override = flagOverrides.get(flag);
-      if (override !== undefined) return override;
+      const fixed = fixedFlags.get(flag);
+      if (fixed !== undefined) return fixed;
       try {
         return (
           (await posthog?.isFeatureEnabled(

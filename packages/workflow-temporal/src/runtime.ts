@@ -71,6 +71,21 @@ export interface TemporalSettings {
  */
 export const workerShutdownGraceTime = '6 minutes';
 
+/**
+ * Reports whether a worker is running with both its workflow and activity pollers active. A
+ * worker that failed, is draining or has stopped polling reports false. This reads the
+ * worker's own state and does not contact the Temporal server.
+ */
+export function isPolling(worker: Pick<Worker, 'getStatus'>) {
+  const status = worker.getStatus();
+
+  return (
+    status.runState === 'RUNNING' &&
+    status.workflowPollerState === 'POLLING' &&
+    status.activityPollerState === 'POLLING'
+  );
+}
+
 /** Checks Temporal connection settings before opening a client or worker. */
 export function validateSettings(settings: TemporalSettings) {
   z.object({
@@ -311,6 +326,8 @@ export async function createExceptionWorker(
 
     return {
       run: () => worker.run(),
+      /** True while Temporal reports the worker running with its workflow and activity pollers active. */
+      polling: () => isPolling(worker),
       shutdown: () => worker.shutdown(),
       close: async () => {
         data.close();

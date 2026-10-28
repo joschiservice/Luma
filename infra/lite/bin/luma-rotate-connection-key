@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Adds a new connection encryption key and makes it the active one. Older keys stay in
+# CONNECTIONS_KEYS so stored credentials sealed with them still decrypt; new and changed
+# credentials are sealed with the new key. Never delete an older key: Luma does not re-encrypt
+# stored credentials. Takes effect with the next deploy.
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+load_parameters
+# generated/CONNECTION_KEY is k1; later keys are generated/CONNECTION_KEY_k<n>.
+last=$(jq -r --arg prefix "$PARAMETER_PATH/generated/CONNECTION_KEY_k" \
+  '[.[] | .name | select(startswith($prefix)) | ltrimstr($prefix) | tonumber? ] | max // 1' \
+  <<<"$PARAMETERS")
+id="k$((last + 1))"
+log "adding connection key $id"
+aws ssm put-parameter --name "$PARAMETER_PATH/generated/CONNECTION_KEY_$id" \
+  --type SecureString --value "$(openssl rand -base64 32)" --no-overwrite >/dev/null
+aws ssm put-parameter --name "$PARAMETER_PATH/generated/CONNECTIONS_ACTIVE_KEY_ID" \
+  --type SecureString --value "$id" --overwrite >/dev/null
+log "connection key $id is active from the next deploy; redeploy the current tag to apply it"

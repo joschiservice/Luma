@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runLoops } from './commerce-sync.js';
+import { runLoops, syncStalled, syncStallMs } from './commerce-sync.js';
 
 /** A loop that runs until shut down, or rejects at once with `failure`. */
 function loop(failure?: Error) {
@@ -28,5 +28,13 @@ describe('runLoops', () => {
       runLoops([healthy[0]!, loop(failure), healthy[1]!]),
     ).rejects.toBe(failure);
     expect(healthy.map((item) => item.state.finished)).toEqual([true, true]);
+  });
+});
+
+describe('syncStalled', () => {
+  it('reports a loop stalled only after ten minutes without progress', () => {
+    expect(syncStallMs).toBe(10 * 60_000);
+    expect(syncStalled(0, syncStallMs)).toBe(false);
+    expect(syncStalled(0, syncStallMs + 1)).toBe(true);
   });
 });

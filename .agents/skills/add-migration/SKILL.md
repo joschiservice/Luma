@@ -5,9 +5,10 @@ description: Add a PostgreSQL migration to Luma safely - numbering, tenant row-l
 
 # Adding a migration
 
-One shared runner applies migrations. It applies every pending file in a single transaction
-under an advisory lock, records a checksum per file and refuses to start when an applied file
-has changed. Runtime logins can never migrate; they get only the grants a migration gives
+One shared runner applies migrations. Under a session advisory lock it verifies the checksum
+of every applied file and refuses to start when one has changed, then applies each pending
+file in its own transaction together with its record. The simulator's runner follows the same
+rules with its own `simulator_migrations` table and advisory lock. Runtime logins can never migrate; they get only the grants a migration gives
 their group roles.
 
 Read [tenant isolation](../../../docs/architecture/003-tenant-isolation-and-data-residency.md)
@@ -31,14 +32,60 @@ and the [database roles](../../../docs/development.md#database-roles) section fi
 - Start the file with a comment that explains why, as existing migrations do, especially for
   non-obvious grants, indexes and trade-offs.
 
-## 2. Write it for one transaction
+## 2. Write it for one transaction and short locks
 
-Everything pending runs in one transaction, so statements that refuse to run inside a
-transaction (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail the whole run. Keep each migration
-safe to apply to a database with existing tenant data: add columns as nullable or with a
-default, and backfill in the same migration when the data is small enough.
+Each file is atomic on its own: it commits or rolls back as a whole, and a later file's failure
+keeps it applied. Statements that refuse to run inside a transaction (`CREATE INDEX
+CONCURRENTLY`, `VACUUM`) fail the file, and transaction control (`BEGIN`, `COMMIT`) breaks it.
 
-## 3. Tenant-owned tables
+The previous release keeps serving while migrations run. Every lock request gives up after
+5 seconds (`lock_timeout`), so a migration that waits behind traffic fails instead of queueing
+every later query on that table; the run can be repeated. There is no statement timeout, but
+locks are held until the file commits: keep heavy rewrites, table-wide `ALTER`s and index
+builds on busy tables short or split them into separate files. Keep each migration safe to
+apply to a database with existing tenant data: add columns as nullable or with a default, and
+backfill in the same migration when the data is small enough.
+
+## 3. Keep the previous release working (expand, then contract)
+
+A deploy whose services do not become healthy starts the previous image again, and migrations
+are never undone. Release N-1 must therefore run on schema N, both while the deploy migrates
+and after a rollback. Split a breaking change across releases:
+
+1. **Expand:** add the new table, column or function next to the old one, and keep the old one
+   readable and writable (nullable or defaulted columns, `CREATE OR REPLACE` with a compatible
+   signature).
+2. Ship code that writes both shapes or only the new one, and no longer reads the old one.
+3. **Contract** in a later release, once no release that may still run uses the old shape:
+   drop, rename or narrow it.
+
+`pnpm lint` (`pnpm lint:migrations`) checks the migrations added or changed since the merge
+base with the pull request base (`origin/main` locally; `--base <ref>` or `TURBO_SCM_BASE`
+overrides it). It rejects these statements, including dynamic SQL in `DO` blocks:
+
+- `DROP TABLE`, `VIEW`, `MATERIALIZED VIEW`, `FUNCTION`, `PROCEDURE`, `TYPE`, `DOMAIN`,
+  `SEQUENCE` or `SCHEMA`;
+- dropping, renaming or retyping a column (`ALTER COLUMN … TYPE`), renaming or moving a table,
+  view, function, type or sequence;
+- `ALTER COLUMN … SET NOT NULL`, `ALTER COLUMN … DROP DEFAULT`, and `ADD COLUMN … NOT NULL`
+  without a `DEFAULT` (or `GENERATED`), because the previous release's inserts omit the column.
+
+Function bodies, comments and string literals are ignored. Constraints, indexes, policies,
+triggers and grants are not checked: a new or narrowed `CHECK`, foreign key or unique
+constraint, or a `REVOKE`, can still reject the previous release's writes, so review those by
+hand. When the contract step is due, put a marker comment directly above the statement:
+
+```sql
+-- contract: release 2026.11 (abc1234) stopped reading orders.legacy_note.
+ALTER TABLE orders DROP COLUMN legacy_note;
+```
+
+The marker covers only the next statement. A pull request that adds or changes migrations also
+runs the **Previous release on new schema** CI job: it runs the base branch's backend journeys on
+a database migrated with the pull request's files. Reproduce it with `pnpm test:schema-compat`
+(add `-- <journey file>` to narrow it; `--dry-run` only prepares the base checkout).
+
+## 4. Tenant-owned tables
 
 Each domain owns writes to its tables. For a table that holds tenant data:
 
@@ -78,7 +125,7 @@ Each domain owns writes to its tables. For a table that holds tenant data:
 A new group role must also be granted to the logins that need it: local logins in
 `tooling/dev/database.mjs`, and journey fixtures that grant roles to their runtime login.
 
-## 4. Indexes under RLS
+## 5. Indexes under RLS
 
 Lead indexes with `tenant_id`. Row security keeps PostgreSQL from using indexes on JSON
 expressions such as `document->>'kind'`, because `->>` is not leakproof. Store the key as a
@@ -86,7 +133,7 @@ expressions such as `document->>'kind'`, because `->>` is not leakproof. Store t
 Check the plan with `EXPLAIN` as a runtime role with `app.tenant_id` set; a superuser
 bypasses RLS and shows a plan the API never gets.
 
-## 5. Live updates and functions
+## 6. Live updates and functions
 
 - If the table feeds a metric, Home, Insights or Needs you, attach the `metric_change` trigger
   with the right topics; tables that feed Needs you also carry `decisions`. See
@@ -97,7 +144,7 @@ bypasses RLS and shows a plan the API never gets.
 - `SECURITY DEFINER` functions set `search_path`, `REVOKE ALL ... FROM PUBLIC`, and check that
   the row's `tenant_id` matches `app.tenant_id` before acting.
 
-## 6. Test it
+## 7. Test it
 
 - `pnpm dev` applies pending migrations to this checkout's database. Never edit the database
   by hand to match a migration.

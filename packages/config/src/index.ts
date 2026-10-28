@@ -1,7 +1,11 @@
 import type { AuthProtectionConfig } from './auth-protection.js';
 import { readAuthProtectionConfig } from './auth-protection.js';
 import type { DataRegion } from './regions.js';
-import { assertRegionalServiceEndpoint, readRegionConfig } from './regions.js';
+import {
+  assertRegionalServiceEndpoint,
+  readRegionConfig,
+  regionalAwsRegions,
+} from './regions.js';
 import { isWeakSecret } from './secrets.js';
 
 const levels = [
@@ -52,19 +56,32 @@ export function readApiConfig(
   };
 }
 
+/** The sender, the origin for links in messages and the provider that sends them. */
+type MailConfig = { from: string; origin: string } & (
+  | {
+      provider: 'resend';
+      apiKey: string;
+      /** Signing secret of the Resend webhook that reports delivery, bounces and complaints. */
+      webhookSecret?: string;
+    }
+  | {
+      provider: 'ses';
+      /** AWS region of the SES API; always one of the cell jurisdiction's regions. */
+      region: string;
+      credentials: { accessKeyId: string; secretAccessKey: string };
+      /** SES configuration set whose suppression and event settings apply to every message. */
+      configurationSet?: string;
+    }
+);
+
 export interface IdentityConfig {
   region: DataRegion;
   enabledRegions: DataRegion[];
   passkeyRpId: string;
   regionalOrigins: Partial<Record<DataRegion, string>>;
   globalEntryUrl?: string;
-  mail?: {
-    apiKey: string;
-    from: string;
-    origin: string;
-    /** Signing secret of the Resend webhook that reports delivery, bounces and complaints. */
-    webhookSecret?: string;
-  };
+  /** Account and workspace mail through exactly one provider. */
+  mail?: MailConfig;
   databaseUrl: string;
   secret: string;
   baseURL: string;
@@ -196,40 +213,7 @@ export function readIdentityConfig(
       'BETTER_AUTH_COOKIE_PREFIX must contain 1–64 letters, numbers, underscores or hyphens',
     );
 
-  let mail: IdentityConfig['mail'];
-  if (env.MAIL_RESEND_API_KEY || env.MAIL_FROM || env.MAIL_PUBLIC_ORIGIN) {
-    if (!env.MAIL_RESEND_API_KEY || !env.MAIL_FROM || !env.MAIL_PUBLIC_ORIGIN)
-      throw new Error(
-        'Configure MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN together',
-      );
-    assertRegionalServiceEndpoint(env, 'mail', 'https://api.resend.com');
-    const origin = new URL(env.MAIL_PUBLIC_ORIGIN);
-    if (
-      origin.origin !== env.MAIL_PUBLIC_ORIGIN ||
-      !['https:', 'http:'].includes(origin.protocol) ||
-      origin.username ||
-      origin.password ||
-      (env.NODE_ENV === 'production' && origin.protocol !== 'https:')
-    )
-      throw new Error('MAIL_PUBLIC_ORIGIN must be the public web origin');
-    const webhookSecret = env.MAIL_RESEND_WEBHOOK_SECRET;
-    if (
-      webhookSecret !== undefined &&
-      !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(webhookSecret)
-    )
-      throw new Error(
-        'MAIL_RESEND_WEBHOOK_SECRET must be a Resend signing secret',
-      );
-    mail = {
-      apiKey: env.MAIL_RESEND_API_KEY,
-      from: env.MAIL_FROM,
-      origin: origin.origin,
-      ...(webhookSecret ? { webhookSecret } : {}),
-    };
-  } else if (env.MAIL_RESEND_WEBHOOK_SECRET)
-    throw new Error(
-      'MAIL_RESEND_WEBHOOK_SECRET needs MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN',
-    );
+  const mail = readMailConfig(env);
 
   return {
     ...(mail ? { mail } : {}),
@@ -271,3 +255,117 @@ export { readAuthProtectionConfig } from './auth-protection.js';
 export { readRegionConfig } from './regions.js';
 
 export type { DataRegion, RegionConfig } from './regions.js';
+
+/**
+ * Reads the optional mail provider: Resend with `MAIL_RESEND_API_KEY`, or Amazon SES with
+ * `MAIL_SES_REGION`, `MAIL_SES_ACCESS_KEY_ID` and `MAIL_SES_SECRET_ACCESS_KEY`, each with
+ * `MAIL_FROM` and `MAIL_PUBLIC_ORIGIN`. Throws when both providers or only part of one are
+ * configured, when Resend's endpoint is not allowed for the cell region, or when the SES region
+ * is outside the cell jurisdiction.
+ */
+function readMailConfig(
+  env: Readonly<Record<string, string | undefined>>,
+): MailConfig | undefined {
+  const ses = {
+    region: env.MAIL_SES_REGION || undefined,
+    accessKeyId: env.MAIL_SES_ACCESS_KEY_ID || undefined,
+    secretAccessKey: env.MAIL_SES_SECRET_ACCESS_KEY || undefined,
+    configurationSet: env.MAIL_SES_CONFIGURATION_SET || undefined,
+  };
+  const sesConfigured = Object.values(ses).some(Boolean);
+  if (
+    sesConfigured &&
+    (env.MAIL_RESEND_API_KEY || env.MAIL_RESEND_WEBHOOK_SECRET)
+  )
+    throw new Error('Configure either Resend or Amazon SES mail, not both');
+  if (sesConfigured) {
+    if (
+      !ses.region ||
+      !ses.accessKeyId ||
+      !ses.secretAccessKey ||
+      !env.MAIL_FROM ||
+      !env.MAIL_PUBLIC_ORIGIN
+    )
+      throw new Error(
+        'Configure MAIL_SES_REGION, MAIL_SES_ACCESS_KEY_ID, MAIL_SES_SECRET_ACCESS_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN together',
+      );
+    if (!regionalAwsRegions[readRegionConfig(env).region].includes(ses.region))
+      throw new Error(
+        'MAIL_SES_REGION must be an AWS region in the cell jurisdiction',
+      );
+    if (
+      !/^[A-Z0-9]{16,128}$/.test(ses.accessKeyId) ||
+      /\s/.test(ses.secretAccessKey)
+    )
+      throw new Error('Amazon SES credentials are invalid');
+    if (
+      ses.configurationSet !== undefined &&
+      !/^[A-Za-z0-9_-]{1,64}$/.test(ses.configurationSet)
+    )
+      throw new Error(
+        'MAIL_SES_CONFIGURATION_SET must be an SES configuration set name',
+      );
+
+    return {
+      provider: 'ses',
+      from: env.MAIL_FROM,
+      origin: readMailOrigin(env, env.MAIL_PUBLIC_ORIGIN),
+      region: ses.region,
+      credentials: {
+        accessKeyId: ses.accessKeyId,
+        secretAccessKey: ses.secretAccessKey,
+      },
+      ...(ses.configurationSet
+        ? { configurationSet: ses.configurationSet }
+        : {}),
+    };
+  }
+  if (env.MAIL_RESEND_API_KEY || env.MAIL_FROM || env.MAIL_PUBLIC_ORIGIN) {
+    if (!env.MAIL_RESEND_API_KEY || !env.MAIL_FROM || !env.MAIL_PUBLIC_ORIGIN)
+      throw new Error(
+        'Configure MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN together',
+      );
+    assertRegionalServiceEndpoint(env, 'mail', 'https://api.resend.com');
+    const origin = readMailOrigin(env, env.MAIL_PUBLIC_ORIGIN);
+    const webhookSecret = env.MAIL_RESEND_WEBHOOK_SECRET;
+    if (
+      webhookSecret !== undefined &&
+      !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(webhookSecret)
+    )
+      throw new Error(
+        'MAIL_RESEND_WEBHOOK_SECRET must be a Resend signing secret',
+      );
+
+    return {
+      provider: 'resend',
+      apiKey: env.MAIL_RESEND_API_KEY,
+      from: env.MAIL_FROM,
+      origin,
+      ...(webhookSecret ? { webhookSecret } : {}),
+    };
+  }
+  if (env.MAIL_RESEND_WEBHOOK_SECRET)
+    throw new Error(
+      'MAIL_RESEND_WEBHOOK_SECRET needs MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN',
+    );
+
+  return undefined;
+}
+
+/** Validates the public web origin used in mail links; production requires HTTPS. */
+function readMailOrigin(
+  env: Readonly<Record<string, string | undefined>>,
+  value: string,
+): string {
+  const origin = new URL(value);
+  if (
+    origin.origin !== value ||
+    !['https:', 'http:'].includes(origin.protocol) ||
+    origin.username ||
+    origin.password ||
+    (env.NODE_ENV === 'production' && origin.protocol !== 'https:')
+  )
+    throw new Error('MAIL_PUBLIC_ORIGIN must be the public web origin');
+
+  return origin.origin;
+}

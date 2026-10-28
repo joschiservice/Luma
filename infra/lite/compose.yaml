@@ -1,6 +1,7 @@
 # The Lite cell: every Luma process and its infrastructure on one host. luma-deploy renders the
 # environment files under ${LUMA_STATE_DIR}/env and runs the setup services in order; do not
-# start this file by hand without them.
+# start this file by hand without them. Third-party images are pinned by digest; update the tag
+# and digest together.
 name: luma
 
 x-logging: &logging
@@ -9,8 +10,11 @@ x-logging: &logging
     awslogs-region: ${AWS_REGION:?}
     awslogs-group: ${LUMA_LOG_GROUP:?}
     tag: '{{.Name}}'
+    # Non-blocking keeps a container running when CloudWatch is slow or unreachable; blocking
+    # mode would stall every write to stdout. Lines beyond the buffer are dropped, so the buffer
+    # absorbs bursts such as a failing deploy or an error storm.
     mode: non-blocking
-    max-buffer-size: 4m
+    max-buffer-size: 16m
 
 x-server: &server
   image: ${LUMA_IMAGE:?}
@@ -48,7 +52,7 @@ services:
   # memory settings for the host. JIT is off: Luma's short queries pay its compilation cost
   # without benefiting.
   postgres:
-    image: postgres:17.11-alpine
+    image: postgres:17.11-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
     command:
       [
         'postgres',
@@ -86,7 +90,7 @@ services:
       retries: 30
 
   valkey:
-    image: valkey/valkey:9.1.2-alpine
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
     # The password reaches the server as configuration on standard input and the health check
     # through REDISCLI_AUTH, so it never appears in process arguments. The image entrypoint
     # still drops to the valkey user. Shopify admission requires noeviction; every key expires,
@@ -116,7 +120,7 @@ services:
   # as production configuration requires. Each of its four services opens its own pools, so
   # Temporal holds at most 4 × (6 + 2) connections.
   temporal:
-    image: temporalio/server:1.32.1
+    image: temporalio/server:1.32.1@sha256:acecbab5b0b8ae9cf4012b508866ca97feda3709577bf157b537239f40029049
     environment: &temporal-database
       DB: postgres12
       DB_PORT: '5432'
@@ -149,7 +153,7 @@ services:
       retries: 60
 
   temporal-schema:
-    image: temporalio/admin-tools:1.32.1
+    image: temporalio/admin-tools:1.32.1@sha256:9ef0dc5b063bf4ffd5c1512de72e0e73e225bd2c7006a18ce69bd592a8862a83
     profiles: [setup]
     entrypoint: ['sh', '/setup/setup-schema.sh']
     environment:
@@ -161,7 +165,7 @@ services:
       - ./temporal:/setup:ro
 
   temporal-namespace:
-    image: temporalio/admin-tools:1.32.1
+    image: temporalio/admin-tools:1.32.1@sha256:9ef0dc5b063bf4ffd5c1512de72e0e73e225bd2c7006a18ce69bd592a8862a83
     profiles: [setup]
     entrypoint: ['sh', '/setup/setup-namespace.sh']
     environment:
@@ -294,7 +298,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3000/favicon.svg').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
@@ -331,7 +335,7 @@ services:
   # The only public listener. Staff sites listen on internal ports that only the Tailscale
   # nodes below reach; they are never published on the host.
   caddy:
-    image: caddy:2.11.7-alpine
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
     mem_limit: 192m
     restart: unless-stopped
     logging: *logging
@@ -355,7 +359,7 @@ services:
   # Private staff access: each Tailscale node gets its own tailnet HTTPS name and forwards to a
   # Caddy staff listener. Nothing about the staff console is reachable from the internet.
   tailscale-staff:
-    image: tailscale/tailscale:v1.104.1
+    image: tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
     profiles: [staff]
     mem_limit: 96m
     restart: unless-stopped
@@ -375,7 +379,7 @@ services:
       - ./tailscale/staff.json:/config/serve.json:ro
 
   tailscale-staff-api:
-    image: tailscale/tailscale:v1.104.1
+    image: tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
     profiles: [staff]
     mem_limit: 96m
     restart: unless-stopped

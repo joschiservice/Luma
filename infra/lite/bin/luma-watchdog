@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Restarts containers of the luma Compose project that Docker reports unhealthy, then alerts.
+# Docker's restart policy covers crashed processes; this covers processes that run but fail
+# their health checks. It does nothing while a deploy runs. Alerts for one container repeat at
+# most hourly. The luma-watchdog timer runs it every minute.
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+flock -n /run/luma-deploy.lock true || exit 0
+mapfile -t unhealthy < <(docker ps --filter health=unhealthy \
+  --filter label=com.docker.compose.project=luma --format '{{.Names}}')
+((${#unhealthy[@]})) || exit 0
+
+alerted=/run/luma-watchdog
+install -d -m 0700 "$alerted"
+for container in "${unhealthy[@]}"; do
+  log "restarting unhealthy container $container"
+  docker restart "$container" >/dev/null
+  if [[ -z $(find "$alerted/$container" -mmin -60 2>/dev/null) ]]; then
+    touch "$alerted/$container"
+    notify_alert "restarted $container" \
+      "The container $container failed its health checks and was restarted. Read its logs in the CloudWatch log group of the stage and docker inspect $container on the host."
+  fi
+done

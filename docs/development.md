@@ -245,6 +245,17 @@ CI runs the same gates as `pnpm test:full` in parallel jobs. A regression test c
 the two; update both when adding a gate. The required `Quality gates` check passes only
 when every job succeeds.
 
+One gate is CI-only. A failed deploy restarts the previous image on the already migrated
+schema, so a pull request that adds or changes core or app migrations runs **Previous release
+on new schema**: the base branch's backend journeys against a database migrated with the pull
+request's migration files. The job checks out the base branch in a separate worktree, copies the
+migrations in, and runs that checkout's own install, build and `pnpm test:e2e`. Without
+migration changes it passes immediately, so `Quality gates` can require it on every run.
+`pnpm test:schema-compat` runs the same steps locally (it installs and builds a second checkout
+and removes it afterwards). `pnpm lint` rejects the statements this job would catch most often;
+see the [add-migration](../.agents/skills/add-migration/SKILL.md) skill for the rule and the
+`-- contract:` marker.
+
 ## Repository checks
 
 - `pnpm lint` enforces package and layer boundaries, import order, spacing and doc

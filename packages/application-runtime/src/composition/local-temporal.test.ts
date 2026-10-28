@@ -72,6 +72,7 @@ it('propagates an API span through a real Temporal client, workflow and activity
     reconcile: async () => ({ state: 'succeeded' }),
     verify: async () => true,
   });
+  expect(worker.polling()).toBe(false);
   const running = worker.run();
   try {
     let traceId = '';
@@ -87,6 +88,8 @@ it('propagates an API span through a real Temporal client, workflow and activity
           expect(
             await env.client.workflow.getHandle(workflowId).result(),
           ).toEqual({ phase: 'no_incident' });
+          // Health checks read this while the worker serves its task queue.
+          expect(worker.polling()).toBe(true);
         } finally {
           span.end();
         }

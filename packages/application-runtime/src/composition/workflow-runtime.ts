@@ -457,6 +457,8 @@ export async function createDefaultExceptionWorker(
           await schedules;
         }
       },
+      /** True while both Temporal workers are running and polling their task queues. */
+      polling: () => workers.every((each) => each.polling()),
       shutdown,
       close: resources.close,
     };

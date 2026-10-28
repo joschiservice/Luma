@@ -17,8 +17,8 @@ interface ClosureMessage {
 
 /**
  * Delivers queued notices to owners of closed workspaces: deletion scheduled, and a reminder about
- * a week before. Each attempt is committed before sending, so the provider's idempotency key
- * covers uncertain responses. A notice is cancelled when the person is no longer an owner, the
+ * a week before. Each attempt is committed before sending, so uncertain responses are retried
+ * as `dispatchMail` allows. A notice is cancelled when the person is no longer an owner, the
  * workspace was reopened, its deletion date changed or removal started. Notices use the
  * person's language. Returns false when the provider's rate limit ended the pass.
  */
@@ -57,6 +57,7 @@ export async function drainWorkspaceClosureMail(
         workspace: message.workspace,
         deletionAt: message.deletion_at,
       },
+      attempt: message.attempts,
     });
     if (outcome.status === 'deferred') {
       // A rate-limited request was never processed, so it doesn't use up an attempt.

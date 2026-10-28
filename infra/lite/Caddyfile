@@ -12,6 +12,20 @@
 {$LUMA_APP_HOST} {
 	encode zstd gzip
 
+	# JSON access logs feed the server error alarm. Query strings can carry OAuth codes and
+	# tokens, and headers carry cookies, so neither is logged.
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>uri regexp [?].* ?redacted
+				resp_headers delete
+			}
+		}
+	}
+
 	# The API sees the browser's address and the original Host, Origin and cookies, without
 	# the /api prefix.
 	handle_path /api/* {

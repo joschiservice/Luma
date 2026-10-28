@@ -7,7 +7,7 @@ import {
   readObservabilityConfig,
   readTemporalConfig,
 } from '@luma/config';
-import { createFailureLog } from '@luma/platform';
+import { createFailureLog, logStaticFeatureFlags } from '@luma/platform';
 import {
   createObservability,
   type startLocalTelemetry,
@@ -27,8 +27,9 @@ export async function main(
   const config = readApiConfig(process.env);
   const identityConfig = readIdentityConfig(process.env);
   const modelSettings = readModelGatewayConfig(process.env);
+  const observabilityConfig = readObservabilityConfig(process.env);
   const observability = createObservability({
-    ...readObservabilityConfig(process.env),
+    ...observabilityConfig,
     approvedModels: Object.values(modelSettings.routes).map(
       (route) => route.model,
     ),
@@ -56,6 +57,10 @@ export async function main(
   app.addHook('onClose', async () => {
     await localTelemetry?.shutdown();
   });
+  logStaticFeatureFlags(
+    observabilityConfig.staticFeatureFlags,
+    (message, fields) => app.log.info(fields, message),
+  );
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {

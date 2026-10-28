@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # Prepares the Lite cell host: attaches and mounts the data volume, installs Docker and
-# Compose, adds swap and the daily backup timer, then restores the last deployment when the
-# volume has one. The instance user data runs it on first boot; rerunning it is safe.
+# Compose, adds swap, the host's timers and the CloudWatch agent, then restores the last
+# deployment when the volume has one. The instance user data runs it on first boot, after the
+# host signalled CloudFormation, so a failure alerts instead. Rerunning it is safe.
 set -euo pipefail
 # shellcheck source=luma-lib.sh
 source "$(dirname "$0")/luma-lib.sh"
+
+alerted=
+alert_on_failure() {
+  local status=$?
+  if ((status != 0)) && [[ -z $alerted ]]; then
+    notify_alert 'host setup failed' \
+      'luma-host-setup failed on the Lite cell host and services may not be running. Read /var/log/cloud-init-output.log through an SSM session.'
+  fi
+}
+trap alert_on_failure EXIT
 
 COMPOSE_VERSION=v5.6.0
 declare -A COMPOSE_SHA256=(
@@ -34,9 +45,31 @@ attach_data_volume() {
   DATA_DEVICE=$(readlink -f "$device")
 }
 
+# A blank data volume on a stage that already has backups means its data is missing, for
+# example after the volume was replaced without a restore snapshot. Formatting it would start
+# an empty cell, so setup stops unless the operator sets host/ALLOW_EMPTY_DATA_VOLUME=true.
+ensure_blank_volume_expected() {
+  local bucket allowed existing
+  bucket=$(aws ssm get-parameter --name "$PARAMETER_PATH/host/BACKUP_BUCKET" \
+    --query Parameter.Value --output text)
+  allowed=$(aws ssm get-parameter --name "$PARAMETER_PATH/host/ALLOW_EMPTY_DATA_VOLUME" \
+    --query Parameter.Value --output text 2>/dev/null || true)
+  [[ $allowed == true ]] && return
+  existing=$(aws s3api list-objects-v2 --bucket "$bucket" --prefix "lite/$LUMA_STAGE/" \
+    --max-items 1 --query 'Contents[0].Key' --output text)
+  [[ $existing == None || -z $existing ]] && return
+  alerted=1
+  notify_alert 'blank data volume refused' \
+    "The host found a blank data volume, but backups of this stage exist in s3://$bucket/lite/$LUMA_STAGE/. Services stay stopped. Restore the volume from a snapshot, or set host/ALLOW_EMPTY_DATA_VOLUME=true and rerun luma-host-setup to start an empty cell."
+  die 'refusing to format a blank data volume of a stage with backups'
+}
+
 mount_data_volume() {
   local uuid
-  blkid "$DATA_DEVICE" >/dev/null 2>&1 || mkfs.xfs -q -L luma-data "$DATA_DEVICE"
+  if ! blkid "$DATA_DEVICE" >/dev/null 2>&1; then
+    ensure_blank_volume_expected
+    mkfs.xfs -q -L luma-data "$DATA_DEVICE"
+  fi
   uuid=$(blkid -s UUID -o value "$DATA_DEVICE")
   mkdir -p "$LUMA_STATE_DIR"
   grep -q "UUID=$uuid " /etc/fstab ||
@@ -77,19 +110,15 @@ configure_swap() {
   echo '/swapfile none swap defaults 0 0' >>/etc/fstab
 }
 
-install_backup_timer() {
-  install -m 0644 "$LUMA_HOME"/systemd/luma-backup.* /etc/systemd/system/
-  systemctl daemon-reload
-  systemctl enable --now luma-backup.timer
-}
-
 attach_data_volume
 mount_data_volume
 install_docker
 configure_swap
-install_backup_timer
+install_host_services
+# The deploy installs the host files of the recorded image before it starts anything.
 if [[ -s $LUMA_STATE_DIR/state/image ]]; then
-  log "restoring deployment $(cat "$LUMA_STATE_DIR/state/image")"
-  LUMA_HOST_FILES_FRESH=1 bash "$LUMA_HOME/bin/luma-deploy" "$(cat "$LUMA_STATE_DIR/state/image")"
+  read -r tag digest <<<"$(deployed_image)"
+  log "restoring deployment $tag${digest:+ ($digest)}"
+  bash "$LUMA_HOME/bin/luma-deploy" "$tag" ${digest:+"$digest"}
 fi
 log 'host ready'

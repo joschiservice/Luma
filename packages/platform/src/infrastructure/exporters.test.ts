@@ -351,6 +351,63 @@ it('applies allowed flag overrides without PostHog and rejects unknown ones', as
   ).toThrow('unlisted-flag');
 });
 
+it('resolves overrides, then static flags, then PostHog, then the fallback', async () => {
+  const posthog = {
+    capture: vi.fn(),
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  };
+  const telemetry = createObservability(
+    {
+      environment: 'production',
+      release: 'test',
+      sampleRate: 0,
+      posthog: { apiKey: 'phc_project', host: 'https://eu.i.posthog.com' },
+      staticFeatureFlags: {
+        'observability-test': false,
+        'stock-protection': false,
+      },
+      featureFlagOverrides: { 'observability-test': true },
+    },
+    { posthog },
+  );
+  const root = telemetry.request(randomUUID());
+  expect(await telemetry.flag(root.context, 'observability-test')).toBe(true);
+  expect(await telemetry.flag(root.context, 'stock-protection', true)).toBe(
+    false,
+  );
+  expect(posthog.isFeatureEnabled).not.toHaveBeenCalled();
+  expect(await telemetry.flag(root.context, 'scoped-autonomy')).toBe(true);
+  expect(posthog.isFeatureEnabled).toHaveBeenCalledOnce();
+  root.end();
+  await telemetry.shutdown();
+
+  const withoutPostHog = createObservability({
+    environment: 'production',
+    release: 'test',
+    sampleRate: 0,
+    staticFeatureFlags: { 'stock-protection': true },
+  });
+  const request = withoutPostHog.request(randomUUID());
+  expect(await withoutPostHog.flag(request.context, 'stock-protection')).toBe(
+    true,
+  );
+  expect(await withoutPostHog.flag(request.context, 'scoped-autonomy')).toBe(
+    false,
+  );
+  request.end();
+  await withoutPostHog.shutdown();
+
+  expect(() =>
+    createObservability({
+      environment: 'production',
+      release: 'test',
+      sampleRate: 0,
+      staticFeatureFlags: { 'unlisted-flag': true },
+    }),
+  ).toThrow('Static feature flag unlisted-flag');
+});
+
 function locallyEvaluated(
   status: number,
   environment: 'development' | 'staging' = 'staging',

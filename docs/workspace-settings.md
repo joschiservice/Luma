@@ -66,24 +66,37 @@ The token travels only in the URL fragment, tab-local session storage during sig
 
 ## Email delivery
 
-Configure all three API variables with a verified Resend sender and the public web origin. The webhook secret is optional; see [delivery events](#delivery-events).
+Each cell sends through one provider: Amazon SES in an AWS region of its own jurisdiction, or Resend. Both need a verified sender in `MAIL_FROM` and the public web origin. Configuring both providers, or only part of one, fails at startup.
 
 ```dotenv
-MAIL_RESEND_API_KEY=re_...
 MAIL_FROM=Luma <notifications@example.com>
 MAIL_PUBLIC_ORIGIN=https://app.example.com
+
+# Amazon SES; the configuration set is optional.
+MAIL_SES_REGION=ap-southeast-2
+MAIL_SES_ACCESS_KEY_ID=AKIA...
+MAIL_SES_SECRET_ACCESS_KEY=...
+MAIL_SES_CONFIGURATION_SET=luma-mail
+
+# Or Resend; the webhook secret is optional, see delivery events.
+MAIL_RESEND_API_KEY=re_...
 MAIL_RESEND_WEBHOOK_SECRET=whsec_...
 ```
 
-Without them, Settings reports delivery unavailable and disables invitations and test sends; personal preferences still persist, and optional email starts off. New accounts can't confirm their email address, so they can't sign in; see [email confirmation](identity.md#email-confirmation). Every API replica needs the same provider, public origin and identity signing secret.
+- `MAIL_SES_REGION` must be one of the cell jurisdiction's AWS regions; AU accepts only `ap-southeast-2` and `ap-southeast-4`. SES needs no regional service allowlist entry.
+- Resend stores message content in the US, so AU refuses it. Other cells need a `mail` entry for `https://api.resend.com` in `LUMA_REGIONAL_SERVICE_ENDPOINTS`.
+- The SES credentials need `ses:SendEmail` on the sender identity and, when set, the configuration set. Session tokens are not read.
 
-Mail goes through three PostgreSQL queues: password mail, account notices and workspace mail. The API drains them every five seconds, in that order, through one dispatch step that renders the message and calls Resend. Source transactions enqueue opted-in members when an issue needs approval, manual intervention or uncertainty review, or a connection becomes degraded or revoked.
+Without a provider, Settings reports delivery unavailable and disables invitations and test sends; personal preferences still persist, and optional email starts off. New accounts can't confirm their email address, so they can't sign in; see [email confirmation](identity.md#email-confirmation). Every API replica needs the same provider, public origin and identity signing secret.
+
+Mail goes through four PostgreSQL queues: password mail, account notices, workspace closure notices and workspace mail. The API drains them every five seconds, in that order, through one dispatch step that renders the message and calls the provider. Source transactions enqueue opted-in members when an issue needs approval, manual intervention or uncertainty review, or a connection becomes degraded or revoked.
 
 - Issue messages are deduplicated per incident and recipient; connection messages per lifecycle version and recipient. Opting in does not backfill past events; opting out cancels queued optional messages.
 - Before dispatch, a short transaction rechecks membership, workspace state and preference. Invitations also recheck that the inviter still holds `members.manage`, that a custom role is still active and the link generation. A message already dispatched may still arrive after opt-out or removal.
 - Attempts are committed before the provider call, and provider calls run outside operational locks. The stable message ID is the Resend idempotency key.
 - Calls time out after eight seconds. Retries back off exponentially, with at most five attempts, all within 23 hours of the first. That keeps every retry inside [Resend's 24-hour deduplication window](https://resend.com/changelog/idempotency-keys), including after a process crash. An expired retry window fails without sending again.
-- A rate-limited request was never processed, so it gives the attempt back, waits for Resend's `retry-after` delay and ends the pass. The 23-hour window still counts from the first attempt.
+- SES has no idempotency key. A timeout, dropped connection or server error after the request left is uncertain: SES may have accepted the message. The first attempt is retried after an uncertain outcome; from the second attempt on, an uncertain outcome counts as sent and is not retried. A recipient therefore gets at most one extra copy from retries, and a process crash during a send can add one more. Refusals, such as an unverified sender, and connections that never opened are retried as usual.
+- A rate-limited or over-quota request was never processed, so it gives the attempt back, waits for the provider's `retry-after` delay, or a minute without one, and ends the pass. The 23-hour window still counts from the first attempt.
 - `sent` means the provider accepted the message, not that it reached the inbox. Failed invitations can be resent; failed test messages can be retried.
 
 The mail port accepts a destination, subject, HTML and plain-text parts, a category tag and the message ID. Messages contain authorized issue or connection links and no provider payloads. Tests inject a deterministic provider through composition; there is no public test-mailbox endpoint. Queue tenant discovery and source triggers run as the migration owner, which needs RLS bypass; runtime connections stay restricted.
@@ -133,6 +146,8 @@ Templates live in `packages/email`. They share one layout: wordmark, a card with
 Run `pnpm --filter @luma/email preview` to open the React Email preview server with every message in English and German. It reads the package's sample data, so add a sample and a preview file per language with each new message. The render tests send every sample through both languages.
 
 ### Delivery events
+
+Only Resend reports delivery events to Luma. With SES, Luma records the message ID but no delivery, bounce or complaint, so notifications are never paused and Settings never shows the paused notice. The SES account suppression list, applied to bounces and complaints through the configuration set, takes that role: SES accepts a message to a suppressed address and drops it, so Luma counts it as sent. That covers every message, including invitations, test messages and account and security mail, and a delivered test message can't lift it. An operator removes a corrected address from the SES suppression list.
 
 With `MAIL_RESEND_WEBHOOK_SECRET`, Resend reports delivery, delays, bounces and spam complaints to `POST /api/v1/email/resend/events`. Point a Resend webhook at that URL with the `email.delivered`, `email.delivery_delayed`, `email.bounced` and `email.complained` events and copy its signing secret.
 

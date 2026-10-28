@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Uploads logical PostgreSQL backups (roles without passwords, and each database in custom
-# format) to the stage's backup bucket, which expires them after 35 days. The luma-backup
-# timer runs it daily; it skips hosts without a deployment.
+# Streams logical PostgreSQL backups (roles without passwords, and each database in custom
+# format) to the stage's backup bucket, which locks and keeps them for 35 days. Nothing is
+# staged on the data volume. A COMPLETE marker is written last, so readers ignore a backup
+# that failed part-way. The dumps are taken one after another and are not consistent with
+# each other; the EBS snapshot is the consistent copy of the whole cell. The luma-backup timer
+# runs it daily; it skips hosts without a deployment. Success publishes BackupCompleted.
 set -euo pipefail
 # shellcheck source=luma-lib.sh
 source "$(dirname "$0")/luma-lib.sh"
@@ -13,14 +16,19 @@ source "$(dirname "$0")/luma-lib.sh"
 load_parameters
 bucket=$(parameter host/BACKUP_BUCKET)
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-work=$(mktemp -d -p "$LUMA_STATE_DIR")
-trap 'rm -rf "$work"' EXIT
+target="s3://$bucket/lite/$LUMA_STAGE/$stamp"
 
-compose exec -T postgres pg_dumpall -U postgres --globals-only --no-role-passwords \
-  >"$work/globals.sql"
+# Object Lock requires an integrity checksum on every upload.
+upload() {
+  aws s3 cp --only-show-errors --checksum-algorithm CRC32 - "$target/$1"
+}
+
+compose exec -T postgres pg_dumpall -U postgres --globals-only --no-role-passwords |
+  upload globals.sql
 for database in luma temporal temporal_visibility; do
-  compose exec -T postgres pg_dump -U postgres --format=custom "$database" \
-    >"$work/$database.dump"
+  compose exec -T postgres pg_dump -U postgres --format=custom "$database" |
+    upload "$database.dump"
 done
-aws s3 cp --only-show-errors --recursive "$work" "s3://$bucket/lite/$LUMA_STAGE/$stamp/"
+printf '%s\n' "$(cat "$LUMA_STATE_DIR/state/image")" | upload COMPLETE
+put_metric BackupCompleted
 log "backup $stamp uploaded"

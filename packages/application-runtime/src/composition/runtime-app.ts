@@ -24,6 +24,7 @@ import {
   createModelRequestLimit,
   createTenantDatabase,
   createValkeyStore,
+  signAwsRequest,
 } from '@luma/platform/composition';
 import {
   createShipmentDispatchOptionsReader,
@@ -116,6 +117,7 @@ export async function buildRuntimeApp(
       {
         onDatabaseError: (error) =>
           log('Identity database connection failed', error),
+        signAwsRequest,
       },
     );
     resources.add(identity.close);

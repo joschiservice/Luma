@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Proves that the newest complete logical backup restores: streams its luma.dump from S3 into
+# a scratch database in the cell's PostgreSQL, checks that migrations were recorded, and drops
+# the scratch database again, also on failure. The restore needs free space on the data volume
+# about the size of the luma database. Success publishes RestoreDrillSucceeded; a failure fails
+# the unit, which alerts. The luma-restore-drill timer runs it monthly.
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+[[ -s $LUMA_STATE_DIR/state/image ]] || {
+  log 'nothing deployed; skipping the restore drill'
+  exit 0
+}
+load_parameters
+bucket=$(parameter host/BACKUP_BUCKET)
+backup=$(latest_backup "$bucket")
+[[ -n $backup ]] || die 'no complete backup to restore'
+scratch=luma_restore_drill
+
+psql_admin() { compose exec -T postgres psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
+drop_scratch() { psql_admin -c "DROP DATABASE IF EXISTS $scratch WITH (FORCE)" || true; }
+trap drop_scratch EXIT
+
+log "restoring s3://$bucket/$backup/luma.dump into $scratch"
+drop_scratch
+psql_admin -c "CREATE DATABASE $scratch"
+# Owners and grants name the cell's roles, which exist on this server; the drill skips them so
+# it never depends on them.
+aws s3 cp --only-show-errors "s3://$bucket/$backup/luma.dump" - |
+  compose exec -T postgres pg_restore -U postgres --dbname "$scratch" --no-owner \
+    --no-privileges --exit-on-error
+migrations=$(compose exec -T postgres psql -At -v ON_ERROR_STOP=1 -U postgres -d "$scratch" \
+  -c 'SELECT count(*) FROM identity_migrations')
+((migrations > 0)) || die "restored backup $backup has no recorded migrations"
+put_metric RestoreDrillSucceeded
+log "restore drill of $backup succeeded with $migrations migrations"

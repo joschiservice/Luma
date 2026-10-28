@@ -50,6 +50,15 @@ describe('observability configuration', () => {
       OBSERVABILITY_ENVIRONMENT: 'production',
       FEATURE_FLAG_OVERRIDES: 'observability-test=true',
     },
+    { FEATURE_FLAGS: 'observability-test' },
+    { FEATURE_FLAGS: 'observability-test=on' },
+    { FEATURE_FLAGS: 'Stock Protection=true' },
+    { FEATURE_FLAGS: 'observability-test=true,observability-test=true' },
+    { FEATURE_FLAGS: 'observability-test=true,' },
+    {
+      OBSERVABILITY_ENVIRONMENT: 'production',
+      FEATURE_FLAGS: 'observability-test=true=false',
+    },
   ])('rejects unsafe or partial settings: %j', (settings) => {
     expect(() => readObservabilityConfig(settings)).toThrow();
   });
@@ -84,6 +93,27 @@ describe('observability configuration', () => {
         FEATURE_FLAG_OVERRIDES: ' observability-test=true, constructor=false ',
       }).featureFlagOverrides,
     ).toEqual({ 'observability-test': true, constructor: false });
+  });
+  it('reads static feature flags in production alongside development overrides', () => {
+    expect(
+      readObservabilityConfig({
+        LUMA_REGION: 'AU',
+        LUMA_ENABLED_REGIONS: 'AU',
+        OBSERVABILITY_ENVIRONMENT: 'production',
+        FEATURE_FLAGS: 'stock-protection=true, purchasing-plans=false',
+      }).staticFeatureFlags,
+    ).toEqual({ 'stock-protection': true, 'purchasing-plans': false });
+    expect(
+      readObservabilityConfig({
+        LUMA_REGION: 'EU',
+        LUMA_ENABLED_REGIONS: 'EU',
+        FEATURE_FLAGS: 'observability-test=false',
+        FEATURE_FLAG_OVERRIDES: 'observability-test=true',
+      }),
+    ).toMatchObject({
+      staticFeatureFlags: { 'observability-test': false },
+      featureFlagOverrides: { 'observability-test': true },
+    });
   });
 });
 

@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
 import { readObservabilityConfig } from '@luma/config';
-import { createFailureLog } from '@luma/platform';
+import { createFailureLog, logStaticFeatureFlags } from '@luma/platform';
 import { createObservability } from '@luma/platform/composition';
 import { createStaff, readStaffSettings } from '@luma/staff/composition';
 
 import { createStaffHttpApp } from './composition/http-app.js';
 
 const settings = readStaffSettings();
-const observability = createObservability(readObservabilityConfig(process.env));
+const observabilityConfig = readObservabilityConfig(process.env);
+const observability = createObservability(observabilityConfig);
 const log = createFailureLog(observability);
 const staff = createStaff(settings, {
   onDatabaseError: (error) => log('Staff database connection failed', error),
@@ -27,6 +28,10 @@ const staff = createStaff(settings, {
 });
 const app = createStaffHttpApp(staff, settings.trustedProxy ?? []);
 app.addHook('onClose', () => observability.shutdown());
+logStaticFeatureFlags(
+  observabilityConfig.staticFeatureFlags,
+  (message, fields) => app.log.info(fields, message),
+);
 for (const signal of ['SIGINT', 'SIGTERM'] as const)
   process.once(signal, () => {
     void app.close();

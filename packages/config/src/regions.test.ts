@@ -117,6 +117,44 @@ it('accepts Sydney Bedrock and rejects foreign processing and Vercel in AU', () 
   ).toThrow('unavailable');
 });
 
+it('sends AU mail through SES in Sydney or Melbourne only', () => {
+  const env = {
+    IDENTITY_DATABASE_URL: 'postgresql://localhost/luma',
+    BETTER_AUTH_SECRET: 'a'.repeat(32),
+    BETTER_AUTH_URL: 'https://au.app.example.test',
+    MAIL_SES_ACCESS_KEY_ID: 'AKIAEXAMPLEMAIL0001',
+    MAIL_SES_SECRET_ACCESS_KEY: 'secret',
+    MAIL_FROM: 'Luma <notifications@example.test>',
+    MAIL_PUBLIC_ORIGIN: 'https://au.app.example.test',
+  };
+  for (const region of ['ap-southeast-2', 'ap-southeast-4'])
+    expect(
+      readIdentityConfig({ ...env, MAIL_SES_REGION: region }).mail,
+    ).toMatchObject({ provider: 'ses', region });
+  for (const region of ['us-east-1', 'eu-central-1', 'ap-southeast-1'])
+    expect(() =>
+      readIdentityConfig({ ...env, MAIL_SES_REGION: region }),
+    ).toThrow('jurisdiction');
+  expect(() =>
+    readIdentityConfig({
+      ...env,
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
+      BETTER_AUTH_URL: 'https://eu.app.example.test',
+      MAIL_SES_REGION: 'ap-southeast-2',
+    }),
+  ).toThrow('jurisdiction');
+  expect(() =>
+    readIdentityConfig({
+      ...env,
+      MAIL_SES_REGION: undefined,
+      MAIL_SES_ACCESS_KEY_ID: undefined,
+      MAIL_SES_SECRET_ACCESS_KEY: undefined,
+      MAIL_RESEND_API_KEY: 're_test',
+    }),
+  ).toThrow('unavailable in Australia');
+});
+
 it('uses an explicit parent RP domain and rejects sibling or untrusted origins', () => {
   const env = {
     IDENTITY_DATABASE_URL: 'postgresql://localhost/luma',
