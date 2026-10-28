@@ -38,7 +38,7 @@
     "@opentelemetry/sdk-trace-node": "catalog:",
     "@pyroscope/nodejs": "0.7.0",
     "@sentry/node": "10.76.2",
-    "@sentry/opentelemetry": "10.76.2",
+    "@sentry/opentelemetry": "11.9.0",
     "@valkey/valkey-glide": "2.5.3",
     "pg": "catalog:",
     "posthog-node": "5.57.0",
