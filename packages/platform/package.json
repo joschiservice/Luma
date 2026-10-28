@@ -41,7 +41,7 @@
     "@sentry/opentelemetry": "10.76.2",
     "@valkey/valkey-glide": "2.5.3",
     "pg": "catalog:",
-    "posthog-node": "5.57.0",
+    "posthog-node": "5.57.1",
     "zod": "catalog:"
   },
   "devDependencies": {

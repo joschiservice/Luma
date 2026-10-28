@@ -85,7 +85,7 @@
     "eslint-plugin-react-hooks": "^7.0.0",
     "eslint-plugin-simple-import-sort": "14.0.0",
     "globals": "17.13.0",
-    "knip": "6.42.1",
+    "knip": "6.43.0",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "pg": "catalog:",

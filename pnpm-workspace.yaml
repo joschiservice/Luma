@@ -22,7 +22,7 @@ allowBuilds:
 # Shared versions; named catalogs preserve intentional version differences.
 catalog:
   '@opentelemetry/api': '1.9.1'
-  '@opentelemetry/instrumentation': '0.223.0'
+  '@opentelemetry/instrumentation': '0.300.0'
   '@opentelemetry/resources': '2.12.0'
   '@opentelemetry/sdk-trace-node': '2.12.0'
   '@orpc/client': '1.16.1'
