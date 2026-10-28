@@ -5,7 +5,8 @@ const commands = {
   e2e: 'pnpm test:e2e',
   browser: 'pnpm test:browser',
   full: 'pnpm test:full',
-  workflows: 'pnpm --filter @luma/workflows exec vitest run',
+  workflows:
+    'pnpm --filter @luma/workflows exec vitest run --fsModuleCachePath node_modules/.vitest-cache',
 };
 
 /** Validates benchmark options and builds a fixed suite command with optional worker limits. */

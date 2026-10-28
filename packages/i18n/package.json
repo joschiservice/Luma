@@ -27,7 +27,7 @@
   "scripts": {
     "build": "node scripts/compile.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "peerDependencies": {
     "react": "catalog:",

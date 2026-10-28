@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
     "generate:openapi": "pnpm build && node dist/generate-openapi.js",
     "generate:index": "node src/generate-index.ts",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"

@@ -8,7 +8,7 @@
     "build": "vite build",
     "start": "srvx serve --prod --entry dist/server/server.js --static ../client",
     "typecheck": "node scripts/generate-routes.mjs && tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache --config vitest.config.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",

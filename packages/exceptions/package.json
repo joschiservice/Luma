@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache --passWithNoTests"
   },
   "dependencies": {
     "@luma/api-contract": "workspace:*",

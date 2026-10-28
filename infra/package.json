@@ -6,7 +6,7 @@
   "description": "AWS CDK app describing Luma's regional cells. Synthesizing is offline; deploying is an explicit operator step.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
     "synth": "cdk synth --quiet",
     "cdk": "cdk"
   },

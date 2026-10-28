@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache --passWithNoTests",
     "dev": "tsx watch --conditions=luma-source --env-file-if-exists=.env src/index.ts",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "staff:provision": "node scripts/provision.mjs"

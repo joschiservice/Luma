@@ -6,13 +6,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache --passWithNoTests",
     "dev": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/composition/bootstrap.ts",
     "start": "node --env-file-if-exists=.env dist/composition/bootstrap.js",
     "db:migrate": "node --env-file-if-exists=.env ../../packages/application-runtime/scripts/migrate.mjs",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e": "vitest run --fsModuleCachePath node_modules/.vitest-cache --config vitest.e2e.config.ts",
     "test:browser": "playwright test --config playwright.config.ts",
-    "test:e2e:performance": "vitest run --config vitest.performance.config.ts",
+    "test:e2e:performance": "vitest run --fsModuleCachePath node_modules/.vitest-cache --config vitest.performance.config.ts",
     "test:browser:performance": "playwright test --config playwright.performance.config.ts"
   },
   "devDependencies": {

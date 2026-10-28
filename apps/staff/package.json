@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache --config vitest.config.ts"
   },
   "dependencies": {
     "@luma/api-contract": "workspace:*",

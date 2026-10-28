@@ -164,3 +164,23 @@ test('declared test inputs match no ignored files', () => {
       assert.deepEqual(matched, [], `${directory}/turbo.json: ${pattern}`);
     }
 });
+
+test('package Vitest runs keep their module cache inside the package', () => {
+  // Vitest defaults to one module cache at the workspace root and deletes it when the lockfile
+  // changes. Parallel package runs then delete the directory while others write to it and fail
+  // with ENOTEMPTY.
+  const shared = [];
+  for (const { directory, manifest } of workspacePackages().values())
+    for (const [script, command] of Object.entries(manifest.scripts ?? {}))
+      if (
+        /\bvitest run\b/.test(command) &&
+        !command.includes('--fsModuleCachePath node_modules/.vitest-cache')
+      )
+        shared.push(`${directory}: ${script}`);
+
+  assert.deepEqual(
+    shared,
+    [],
+    'Pass --fsModuleCachePath node_modules/.vitest-cache to vitest run',
+  );
+});

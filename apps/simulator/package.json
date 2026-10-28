@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "start": "node dist/server.js"
   },
