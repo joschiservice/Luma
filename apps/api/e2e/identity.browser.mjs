@@ -4,6 +4,7 @@ import {
   confirmAndSignIn,
   createAccount,
   database,
+  signup,
   startApi,
   verifyEmail,
 } from './helpers.mjs';
@@ -181,6 +182,50 @@ test('registers, creates AU workspaces, restores links, switches tabs and revoke
   await signIn(page);
   await heading(page, 'Choose a workspace');
   expect(new URL(page.url()).origin).toBe(origin);
+  expect(errors).toEqual([]);
+});
+
+test('renders entry pages before the app loads and keeps what was entered meanwhile', async ({
+  resources: t,
+  web,
+}) => {
+  const { api, page, errors } = await fixture(t, web);
+  await signup(api, 'early');
+  // Holds the app's scripts back until `release`, so the page shows only server markup.
+  let release;
+  let scripts;
+  const hold = () => (scripts = new Promise((resolve) => (release = resolve)));
+  await page.route(/\/assets\/.*\.js$/, async (route) => {
+    await scripts;
+    await route.continue();
+  });
+  hold();
+
+  // Until the app hydrates, the server's markup is all there is; a submit must not run natively.
+  await page.goto('/sign-in', { waitUntil: 'commit' });
+  await heading(page, 'Sign in to Luma');
+  const submit = page.getByRole('button', { name: 'Sign in', exact: true });
+  await expect(submit).toBeDisabled();
+  await page.getByLabel('Email', { exact: true }).fill('early@example.test');
+  await page
+    .getByLabel('Password', { exact: true })
+    .fill('long-e2e-test-password');
+  await page.getByLabel('Password', { exact: true }).press('Enter');
+  expect(new URL(page.url()).search).not.toContain('password');
+
+  release();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await heading(page, 'Create a workspace');
+
+  // Workspace pages stay client-rendered, but the server sends their public loading state.
+  hold();
+  await page.goto('/app', { waitUntil: 'commit' });
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Opening your workspace…' }),
+  ).toBeVisible();
+  release();
+  await heading(page, 'Create a workspace');
   expect(errors).toEqual([]);
 });
 

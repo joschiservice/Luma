@@ -4,7 +4,6 @@ import { AuthForm } from '../features/account/auth-form';
 import { authSearch } from '../kit/identity/data';
 
 export const Route = createFileRoute('/sign-up')({
-  ssr: false,
   validateSearch: authSearch,
   component: Page,
 });

@@ -5,7 +5,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
 import { useForm } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useHydrated } from '@tanstack/react-router';
 import { KeyRound } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { z } from 'zod';
@@ -20,6 +20,7 @@ import {
 } from '../../kit/identity/data';
 import { regionLabel } from '../../kit/identity/region';
 import { ResendConfirmation } from './email-verification';
+import { useAdoptEnteredValues } from './entered-values';
 import { RegionChoice } from './region-choice';
 import { SecondFactorForm } from './second-factor';
 import { ResolutionStory } from './story';
@@ -46,6 +47,8 @@ export function AuthForm({
   // Set when a sign-in was refused because the account's address isn't confirmed.
   const [unconfirmed, setUnconfirmed] = useState(false);
   const passkeys = usePasskeySupport() && !signup;
+  // Before hydration a submit would bypass the handler and put the fields in the URL.
+  const hydrated = useHydrated();
   const lock = useRef(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
   const formElement = useRef<HTMLFormElement>(null);
@@ -177,6 +180,12 @@ export function AuthForm({
       }
     },
   });
+
+  useAdoptEnteredValues(
+    formElement,
+    ['name', 'email', 'password'],
+    (name, value) => form.setFieldValue(name, value),
+  );
 
   const pendingLabel = signup
     ? m.identity_auth_creating_account()
@@ -360,7 +369,7 @@ export function AuthForm({
         {unconfirmed && !pending ? (
           <ResendConfirmation email={() => form.getFieldValue('email')} />
         ) : null}
-        <Button size="lg" type="submit" disabled={pending}>
+        <Button size="lg" type="submit" disabled={pending || !hydrated}>
           {pending
             ? pendingLabel
             : signup

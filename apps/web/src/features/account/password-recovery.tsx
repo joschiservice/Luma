@@ -4,11 +4,12 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { useEffect, useId, useState } from 'react';
+import { Link, useHydrated } from '@tanstack/react-router';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { auth, clearPrivate } from '../../kit/identity/data';
 import { AuthLayout } from './auth-form';
+import { useAdoptEnteredValues } from './entered-values';
 
 /** Requests a recovery email or consumes a reset token from a URL fragment. */
 export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
@@ -19,6 +20,9 @@ export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
   );
   const [message, setMessage] = useState('');
   const [done, setDone] = useState(false);
+  // Before hydration a submit would bypass the handler and put the field in the URL.
+  const hydrated = useHydrated();
+  const formElement = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (!reset) return;
 
@@ -81,6 +85,9 @@ export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
       }
     },
   });
+  useAdoptEnteredValues(formElement, ['email', 'password'], (name, value) =>
+    form.setFieldValue(name, value),
+  );
 
   return (
     <AuthLayout
@@ -103,6 +110,7 @@ export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
         </Alert>
       ) : (
         <form
+          ref={formElement}
           onSubmit={(event) => {
             event.preventDefault();
             void form.handleSubmit();
@@ -118,6 +126,7 @@ export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
                 </label>
                 <Input
                   id={id}
+                  name={reset ? 'password' : 'email'}
                   type={reset ? 'password' : 'email'}
                   autoComplete={reset ? 'new-password' : 'email'}
                   required
@@ -142,7 +151,7 @@ export function PasswordRecovery({ reset = false }: { reset?: boolean }) {
           ) : null}
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(pending) => (
-              <Button size="lg" type="submit" disabled={pending}>
+              <Button size="lg" type="submit" disabled={pending || !hydrated}>
                 {pending
                   ? m.identity_recovery_sending()
                   : reset

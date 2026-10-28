@@ -4,4 +4,4 @@ import { AcceptInvitation } from '../features/settings/invitation';
 
 export const Route = createFileRoute(
   '/app/invitations/$organizationId/$invitationId',
-)({ component: AcceptInvitation });
+)({ ssr: false, component: AcceptInvitation });
