@@ -73,6 +73,7 @@
   "identity_auth_passkey_canceled": "Passkey sign-in was canceled or timed out. Try again, or sign in with your email and password.",
   "identity_auth_passkey_unknown": "That passkey isn’t registered with Luma. Sign in with your email and password.",
   "identity_auth_passkey_failed": "Luma couldn’t sign you in with a passkey. Try again in a moment, or use your email and password.",
+  "identity_auth_passkey_unsupported": "This browser doesn’t support passkeys. Sign in with your email and password instead.",
   "identity_factor_code_label": "Authentication code",
   "identity_factor_backup_label": "Backup code",
   "identity_factor_code_help": "The 6-digit code shown for Luma in your authenticator app.",

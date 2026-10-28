@@ -46,9 +46,11 @@ export function AuthForm({
   const [sentTo, setSentTo] = useState<string>();
   // Set when a sign-in was refused because the account's address isn't confirmed.
   const [unconfirmed, setUnconfirmed] = useState(false);
-  const passkeys = usePasskeySupport() && !signup;
   // Before hydration a submit would bypass the handler and put the fields in the URL.
   const hydrated = useHydrated();
+  // Support is known only in the browser; the button is always rendered so the form doesn't shift.
+  const passkeysSupported = usePasskeySupport();
+  const passkeysUnsupported = hydrated && !passkeysSupported;
   const lock = useRef(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
   const formElement = useRef<HTMLFormElement>(null);
@@ -382,7 +384,7 @@ export function AuthForm({
           <Link to="/forgot-password">{m.identity_auth_forgot_password()}</Link>
         </p>
       ) : null}
-      {passkeys ? (
+      {!signup ? (
         <>
           <p className="auth-divider">
             <span>{m.identity_auth_divider()}</span>
@@ -391,12 +393,20 @@ export function AuthForm({
             variant="outline"
             size="lg"
             type="button"
-            disabled={pending}
+            disabled={pending || !hydrated || passkeysUnsupported}
+            aria-describedby={
+              passkeysUnsupported ? 'passkey-unsupported' : undefined
+            }
             onClick={() => void signInWithPasskey()}
           >
             <KeyRound aria-hidden="true" />
             {m.identity_auth_passkey_submit()}
           </Button>
+          {passkeysUnsupported ? (
+            <p id="passkey-unsupported" className="field-help">
+              {m.identity_auth_passkey_unsupported()}
+            </p>
+          ) : null}
         </>
       ) : null}
       <p className="auth-switch">

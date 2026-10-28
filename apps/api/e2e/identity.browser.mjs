@@ -205,7 +205,9 @@ test('renders entry pages before the app loads and keeps what was entered meanwh
   await page.goto('/sign-in', { waitUntil: 'commit' });
   await heading(page, 'Sign in to Luma');
   const submit = page.getByRole('button', { name: 'Sign in', exact: true });
+  const passkey = page.getByRole('button', { name: 'Sign in with a passkey' });
   await expect(submit).toBeDisabled();
+  await expect(passkey).toBeDisabled();
   await page.getByLabel('Email', { exact: true }).fill('early@example.test');
   await page
     .getByLabel('Password', { exact: true })
@@ -215,6 +217,7 @@ test('renders entry pages before the app loads and keeps what was entered meanwh
 
   release();
   await expect(submit).toBeEnabled();
+  await expect(passkey).toBeEnabled();
   await submit.click();
   await heading(page, 'Create a workspace');
 
@@ -226,6 +229,26 @@ test('renders entry pages before the app loads and keeps what was entered meanwh
   ).toBeVisible();
   release();
   await heading(page, 'Create a workspace');
+  expect(errors).toEqual([]);
+});
+
+test('keeps the passkey option in place and explains it where passkeys are unsupported', async ({
+  resources: t,
+  web,
+}) => {
+  const { page, errors } = await fixture(t, web);
+  await page.addInitScript(() => delete window.PublicKeyCredential);
+
+  await page.goto('/sign-in');
+  await heading(page, 'Sign in to Luma');
+  const passkey = page.getByRole('button', { name: 'Sign in with a passkey' });
+  await expect(passkey).toBeDisabled();
+  await expect(passkey).toHaveAccessibleDescription(
+    'This browser doesn’t support passkeys. Sign in with your email and password instead.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Sign in', exact: true }),
+  ).toBeEnabled();
   expect(errors).toEqual([]);
 });
 

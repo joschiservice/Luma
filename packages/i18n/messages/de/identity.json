@@ -73,6 +73,7 @@
   "identity_auth_passkey_canceled": "Die Anmeldung mit Passkey wurde abgebrochen oder ist abgelaufen. Versuch es erneut oder melde dich mit E-Mail-Adresse und Passwort an.",
   "identity_auth_passkey_unknown": "Dieser Passkey ist bei Luma nicht registriert. Melde dich mit E-Mail-Adresse und Passwort an.",
   "identity_auth_passkey_failed": "Luma konnte dich nicht mit dem Passkey anmelden. Versuch es gleich noch einmal oder verwende E-Mail-Adresse und Passwort.",
+  "identity_auth_passkey_unsupported": "Dieser Browser unterstützt keine Passkeys. Melde dich stattdessen mit E-Mail-Adresse und Passwort an.",
   "identity_factor_code_label": "Authentifizierungscode",
   "identity_factor_backup_label": "Backup-Code",
   "identity_factor_code_help": "Der 6-stellige Code, den deine Authentifizierungs-App für Luma anzeigt.",
