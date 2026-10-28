@@ -15,10 +15,8 @@ import type {
   EffectRegistry,
   ProviderCatalog,
 } from '@luma/connections';
-import { describeActionDiff } from '@luma/connections';
 import {
   createConnectionCoverage,
-  createOrderSourceVisibility,
   createSourceAuthority,
   type InstalledMessageRuntime,
   type InstalledPurchaseOrderRuntime,
@@ -26,21 +24,11 @@ import {
 } from '@luma/connections/composition';
 import { createCustomerErasure } from '@luma/customers/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
-import { createPendingStockSyncReader } from '@luma/exceptions/composition';
 import type { BoundActionStep } from '@luma/execution';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import {
-  createPurchaseIncoming,
-  createPurchaseIncomingStore,
-  createPurchaseReceiptStages,
-} from '@luma/inventory/composition';
+import { createPurchaseReceiptStages } from '@luma/inventory/composition';
 import { createMessaging } from '@luma/messaging/composition';
 import {
-  createReturnActionService,
-  createReturnCaseService,
-  createReturnDeadlineService,
-  createReturnExchangeService,
-  createReturnMoneySource,
   orderStateQueries,
   type ReturnActions,
   type ReturnCases,
@@ -53,7 +41,6 @@ import type {
   Observability,
   TenantDatabase,
 } from '@luma/platform';
-import { canonicalJson } from '@luma/platform';
 import { createFollowUpEnvironmentReader } from '@luma/procurement';
 import {
   createIncomingStock,
@@ -78,7 +65,6 @@ import {
   appDecisionProvider,
   createActionDiffReader,
   createSourceOrderLines,
-  readNativePurchaseIncoming,
 } from '@luma/read-models/composition';
 import {
   createReturnStepFollowUp,
@@ -89,7 +75,6 @@ import {
   createRefundFollowUpCursor,
   createResolutionLearning,
   createResolutionMeasurements,
-  createResolutionMetricReader,
   createShadowEvaluations,
   createWorkspaceActivity,
   createWorkspacePeople,
@@ -108,7 +93,6 @@ import {
   createWorkflowTriggerStore,
 } from '@luma/workflows/composition';
 
-import { createActiveDiagnosisRereader } from './active-diagnosis.js';
 import { createAdaptiveWorkspaceRuntime } from './adaptive.js';
 import {
   createAdmissionEligibility,
@@ -120,24 +104,11 @@ import {
   type FollowUpTiming,
 } from './case-workflows.js';
 import { createDecisionServices } from './decisions.js';
+import { createDetectionRuntime } from './detection.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createInventoryLedgerRuntime } from './inventory-ledger.js';
-import {
-  createMailboxConnections,
-  createMemberDirectory,
-  createMessageReader,
-  createProcurementHandoff,
-  createRecordDirectory,
-} from './messaging.js';
-import {
-  createAttachmentReader,
-  createDocumentDirectory,
-} from './messaging-documents.js';
-import {
-  createRecordStates,
-  createReplyAdmission,
-  createReplyEffects,
-} from './messaging-replies.js';
+import { createReplyEffects } from './messaging-replies.js';
+import { createMessagingServices } from './messaging-services.js';
 import { createNativeStockRuntime } from './native-stock.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
@@ -151,6 +122,7 @@ import {
   createPurchaseOrderChangeEffects,
 } from './purchase-order-changes.js';
 import { createPurchaseReceiptTimeline } from './purchase-receipt-timeline.js';
+import { createPurchasingServices } from './purchasing.js';
 import { createPurchasingAdmission } from './purchasing-admission.js';
 import {
   createReadModelServices,
@@ -160,21 +132,11 @@ import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
 } from './replenishment.js';
-import {
-  createReturnCreationAdmission,
-  createReturnCreationEffects,
-  createReturnSystem,
-} from './return-cases.js';
-import { createReturnConsistencySystem } from './return-consistency.js';
-import {
-  createReturnExchangeAdmission,
-  createReturnExchangeEffects,
-} from './return-exchanges.js';
-import {
-  createReturnSettlementAdmission,
-  createReturnSettlementEffects,
-  createReturnSettlementSystem,
-} from './return-settlement.js';
+import { createResolutionServices } from './resolution.js';
+import { createReturnCreationEffects } from './return-cases.js';
+import { createReturnExchangeEffects } from './return-exchanges.js';
+import { createReturnSettlementEffects } from './return-settlement.js';
+import { createReturnServices } from './returns.js';
 import { createSalesRuntime } from './sales.js';
 import { createScopedSupplierFollowUp } from './scoped-follow-up.js';
 import {
@@ -183,6 +145,7 @@ import {
   createResolutionPlaybooks,
   createSafetyServices,
 } from './services.js';
+import { createSourceServices } from './sources.js';
 import {
   createWorkflowAuthoring,
   type WorkflowAuthoring,
@@ -423,107 +386,34 @@ export function createApplicationServices(
     options.execution.kind === 'enabled'
       ? options.execution.effects
       : { resolve: async () => null };
-  const erpEnabledForTenant = async (tenantId: string) => {
-    const observation = options.observability?.request(
-      randomBytes(16).toString('hex'),
-    );
-    if (!observation || !options.observability) return false;
-    try {
-      const trace = options.observability.forTenant(
-        observation.context,
-        tenantId,
-        options.observability.dataRegion ?? 'AU',
-      );
-
-      return await options.observability.flag(trace, 'luma-erp-orders', false);
-    } finally {
-      observation.end();
-    }
-  };
-  const hiddenOrderSources = createOrderSourceVisibility(
-    database,
-    erpEnabledForTenant,
-  );
-  const authority = (scoped: TenantDatabase) =>
-    createSourceAuthority(
-      scoped,
-      (provider) =>
-        provider === 'luma-erp'
-          ? 'erp'
-          : (options.providerCatalog?.get(provider)?.category ?? null),
-      identity.refreshContext,
-      erpEnabledForTenant,
-    );
-  const diagnosisRereader = createActiveDiagnosisRereader({
-    database,
-    authority: authority(database),
-    reader: options.nativeStockReader,
-    identity,
-    enabled: (tenantId) =>
-      createTenantFeatureRelease(options.observability)(
-        tenantId,
-        'active-diagnosis',
-      ),
-  });
-  const detection = createDetectionServices(
-    database,
-    undefined,
-    options.verifier,
-    { ...(diagnosisRereader ? { rereader: diagnosisRereader } : {}) },
-    authority(database),
-    identity,
-  );
-  const purchasingRelease = createTenantFeatureRelease(options.observability);
-  const nativeIncomingHash = (value: unknown) =>
-    createHash('sha256').update(canonicalJson(value)).digest('hex');
-  const nativeIncoming = createPurchaseIncoming({
-    store: createPurchaseIncomingStore(
+  const { authority, erpEnabledForTenant, hiddenOrderSources } =
+    createSourceServices({
       database,
-      createAuditLog,
-      readNativePurchaseIncoming,
-    ),
-    refreshContext: identity.refreshContext,
-    enabled: (context) =>
-      purchasingRelease(context.tenantId, 'purchasing-incoming'),
-    hash: nativeIncomingHash,
-    uuid: (key) => {
-      const hex = nativeIncomingHash(key);
-
-      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-    },
-  });
-  const projectIncoming = async (
-    context: import('@luma/identity').TenantContext,
-    orderId: string,
-  ) => {
-    await nativeIncoming.reconcile(context, orderId);
-  };
-  const incoming = createIncomingStock({
-    refreshContext: identity.refreshContext,
-    enabled: (context) =>
-      purchasingRelease(context.tenantId, 'purchasing-incoming'),
-    read: createIncomingStockReader(database),
-    now: () => new Date(),
-  });
-  const supplierTerms = createSupplierTerms(
+      identity,
+      providerCatalog: options.providerCatalog,
+      observability: options.observability,
+    });
+  const detection = createDetectionRuntime({
     database,
-    identity.refreshContext,
-    createAuditLog,
-    (context) =>
-      purchasingRelease(context.tenantId, 'supplier-purchasing-terms'),
-  );
-  const procurement = createProcurement(
-    database,
-    identity.refreshContext,
-    createAuditLog,
-    projectIncoming,
-  );
+    identity,
+    authority,
+    reader: options.nativeStockReader,
+    verifier: options.verifier,
+    observability: options.observability,
+  });
+  const purchasingRelease = createTenantFeatureRelease(options.observability);
+  const { incoming, procurement, projectIncoming, supplierTerms } =
+    createPurchasingServices({
+      database,
+      identity,
+      release: purchasingRelease,
+    });
   // The owners below and their action controls refer to each other. `safety` admits and runs
   // every owner's actions through `combinedEffects` and its `eligible` chain, which call back
   // into owners composed after it; supplier commitments, messaging and supplier email also read
   // one another. These references are closures that run only once requests arrive, so an owner
-  // may be named before it is composed. Keep these owners in this function, where that order
-  // stays visible; services that only read composed owners have their own modules.
+  // may be named before it is composed. Keep the calls that compose these owners in this
+  // function, where that order stays visible; their modules receive later owners as thunks.
   const resolvable = resolvableEffects(options);
   const none: EffectRegistry = { resolve: async () => null };
   const procurementEffects = resolvable.has('procurement')
@@ -748,145 +638,30 @@ export function createApplicationServices(
           c.granted.includes('purchase-orders.revise'),
       ),
   });
-  const directory = createRecordDirectory(database);
-  const messaging = createMessaging(database, {
-    audit: createAuditLog,
-    refreshContext: identity.refreshContext,
-    resolveContext: identity.resolveWorkflowContext,
-    connections: createMailboxConnections(
-      database,
-      options.messaging?.installations ?? { list: async () => [] },
-    ),
-    directory,
-    members: createMemberDirectory(identity),
-    reader: options.messaging?.reader
-      ? createMessageReader(options.messaging.reader)
-      : undefined,
-    handoff: createProcurementHandoff(() => commitments),
-    settled: (context, outbound) => supplierEmail.settled(context, outbound),
-    eligibleOwner: (context, outbound) =>
-      supplierEmail.eligible(context, outbound),
-    // The order workspace is composed below; drafts read it only once requests arrive.
-    records: createRecordStates({
-      orders: () => orders,
-      commitments: () => commitments,
-      directory,
-    }),
-    replyAdmission: resolvable.has('reply')
-      ? createReplyAdmission(safety, combinedEffects)
-      : null,
-    // Attachments are read through the same installed runtime as messages.
-    documents: {
-      attachments: options.messaging?.reader
-        ? createAttachmentReader(options.messaging.reader)
-        : undefined,
-      directory: createDocumentDirectory(database),
-      extraction: {
-        gateway: options.modelGateway ?? null,
-        available: options.documentExtraction?.available ?? false,
-        reason: options.documentExtraction?.reason ?? null,
-      },
-    },
-    retentionDays: options.messaging?.retentionDays,
-    pollMs: options.messaging?.pollMs,
-    log: options.messaging?.log,
-  });
-  const supplierEmail = createSupplierEmailService({
+  const { messaging, supplierEmail } = createMessagingServices({
+    database,
+    identity,
+    messaging: options.messaging,
+    modelGateway: options.modelGateway,
+    documentExtraction: options.documentExtraction,
     commitments,
-    refreshContext: identity.refreshContext,
-    available: (context, feature) =>
-      purchasingRelease(
-        context.tenantId,
-        feature === 'submission'
-          ? 'procurement-email-submission'
-          : 'procurement-supplier-follow-ups',
-      ),
-    digest: (value) =>
-      createHash('sha256').update(JSON.stringify(value)).digest('hex'),
-    now: () => new Date(),
-    inbox: {
-      mailboxes: (context) => messaging.service.mailboxes(context),
-      work: (context, id) => messaging.replies.supplierWork(context, id),
-      attachment: (context, orderId, outboundId) =>
-        messaging.replies.supplierAttachment(context, orderId, outboundId),
-      compose: (context, input) => messaging.replies.compose(context, input),
-      threads: async (context, id) =>
-        (
-          await messaging.service.recordThreads(context, 'purchase_order', id)
-        ).items.map((t) => ({
-          id: t.id,
-          connectionId: t.connectionId,
-          address: t.correspondent?.address ?? null,
-        })),
-    },
+    // The order workspace is composed below; drafts read it only once requests arrive.
+    orders: () => orders,
+    resolvable,
+    safety,
+    effects: combinedEffects,
+    release: purchasingRelease,
   });
-  const returnCases: ReturnCases = createReturnCaseService(
-    database,
-    createAuditLog,
-    {
-      system: options.returns
-        ? createReturnSystem(
-            options.returns.runtime,
-            options.returns.installations,
-          )
-        : null,
-      admission: resolvable.has('return_creation')
-        ? createReturnCreationAdmission(safety, combinedEffects)
-        : null,
-      refreshContext: identity.refreshContext,
-      principal: identity.resolveWorkflowContext,
-    },
-  );
-  const returnActions = createReturnActionService(database, createAuditLog, {
-    system: options.returns
-      ? createReturnSettlementSystem(options.returns.runtime)
-      : null,
-    admission: resolvable.has('return_settlement')
-      ? createReturnSettlementAdmission(safety, combinedEffects)
-      : null,
-    describeDiff: async (context, action, observedAt, plan) =>
-      (await purchasingRelease(context.tenantId, 'action-review-diffs'))
-        ? describeActionDiff(action, observedAt, { plan })
-        : null,
-    refreshContext: identity.refreshContext,
-    principal: identity.resolveWorkflowContext,
-  });
-  const returnExchanges = createReturnExchangeService(
-    database,
-    createAuditLog,
-    {
-      system: options.returns
-        ? createReturnConsistencySystem(options.returns.runtime)
-        : null,
-      admission: resolvable.has('return_exchange')
-        ? createReturnExchangeAdmission(safety, combinedEffects)
-        : null,
-      describeDiff: async (context, action, observedAt, plan) =>
-        (await purchasingRelease(context.tenantId, 'action-review-diffs'))
-          ? describeActionDiff(action, observedAt, { plan })
-          : null,
-      refreshContext: identity.refreshContext,
-      principal: identity.resolveWorkflowContext,
-    },
-  );
-  const returnDeadlines = createReturnDeadlineService(
-    database,
-    createAuditLog,
-    {
-      refreshContext: identity.refreshContext,
-      // Without installed return connections, sent money cannot be read.
-      source: createReturnMoneySource(
-        options.returns
-          ? {
-              refund: (context, caseId, id) =>
-                returnActions.observe(context, caseId, id),
-              exchange: (context, caseId, id) =>
-                returnExchanges.observe(context, caseId, id),
-            }
-          : null,
-      ),
-    },
-  );
+  const { returnActions, returnCases, returnDeadlines, returnExchanges } =
+    createReturnServices({
+      database,
+      identity,
+      returns: options.returns,
+      resolvable,
+      safety,
+      effects: combinedEffects,
+      release: purchasingRelease,
+    });
   const desk = createDeskServices(database, identity, combinedEffects, {
     ...options.desk,
     diffEnabled: (tenantId) =>
@@ -1152,6 +927,9 @@ export function createApplicationServices(
     },
   });
 
+  const { activity, learning, measurements, operations, shadow } =
+    createResolutionServices({ database, identity, cases: detection.cases });
+
   return {
     coordination,
     codeProcesses,
@@ -1175,11 +953,7 @@ export function createApplicationServices(
     library,
     messaging,
     http: {
-      activity: createWorkspaceActivity(
-        database,
-        identity.refreshContext,
-        createAuditLog(database),
-      ),
+      activity,
       adaptive,
       assistant,
       cases: detection.cases,
@@ -1204,24 +978,15 @@ export function createApplicationServices(
       insights,
       inventory,
       inventoryLedger: createInventoryLedgerRuntime(database, identity),
-      learning: createResolutionLearning(database, identity.refreshContext),
-      measurements: createResolutionMeasurements(
-        database,
-        identity.refreshContext,
-      ),
+      learning,
+      measurements,
       messaging: messaging.service,
       messagingDocuments: messaging.documents,
       messagingReplies: messaging.replies,
       metrics,
       nativeStock,
       operationalSummary,
-      operations: createOperationsOverview(
-        detection.cases,
-        createConnectionCoverage(database),
-        () => new Date(),
-        createResolutionMetricReader(database),
-        createPendingStockSyncReader(database),
-      ),
+      operations,
       orderChanges,
       orders,
       playbooks: library,
@@ -1243,7 +1008,7 @@ export function createApplicationServices(
         authority,
       ),
       scopedAutonomy: safety.autonomy,
-      shadow: createShadowEvaluations(database, identity.refreshContext),
+      shadow,
       sourceAuthority: authority(database),
       supplierEmail,
       supplierTerms,
