@@ -44,6 +44,10 @@ export const ignoredPaths = [
   'apps/api/tsconfig.e2e.json',
   // The performance suite; affected selection never runs it.
   'apps/api/{playwright,vitest}.performance.config.ts',
+  // The web server's health route serves only the container health check.
+  'apps/web/src/routes/healthz.ts',
+  // The staging smoke journey runs after staging deploys, never against local journeys.
+  'tooling/smoke/**',
   // Route tree generation for the web typecheck; journeys use the build.
   'apps/web/scripts/generate-routes.mjs',
   // Generated from mapped sources.
