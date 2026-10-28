@@ -2,8 +2,6 @@ import './fulfillment.css';
 
 import {
   collectionField,
-  type CollectionGroup,
-  collectionWhereIssues,
   fulfillmentCatalog,
   type FulfillmentItem,
   type FulfillmentList,
@@ -32,7 +30,7 @@ import {
 } from '@luma/ui/lib/collection-conditions';
 import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
 import { selectRange } from '@luma/ui/lib/row-selection';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
@@ -44,20 +42,13 @@ import { type ReactNode, type Ref, useContext, useRef, useState } from 'react';
 
 import { useCollectionControls } from '../../kit/collections/controls';
 import { DescribedFilter } from '../../kit/collections/described-filter';
-import { useGroupPages } from '../../kit/collections/groups';
 import {
   CollectionLoading,
   CollectionNotices,
 } from '../../kit/collections/notices';
-import {
-  type CollectionError,
-  collectionError,
-  collectionServerIssue,
-  useCursorPaging,
-  useOnline,
-} from '../../kit/collections/paging';
-import { repairedState } from '../../kit/collections/repair';
-import { type CollectionSearch, groupOf } from '../../kit/collections/state';
+import { useCursorPaging, useOnline } from '../../kit/collections/paging';
+import { useRecordCollection } from '../../kit/collections/record-collection';
+import type { CollectionSearch } from '../../kit/collections/state';
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
@@ -175,7 +166,6 @@ export function FulfillmentPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/fulfillment/' });
   const navigate = useNavigate({ from: '/app/$organizationId/fulfillment/' });
-  const queryClient = useQueryClient();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
   const can = permissions.can;
@@ -199,26 +189,30 @@ export function FulfillmentPage() {
   const state = view.state;
 
   const connections = useQuery(connectionsOptions(organizationId));
-  const ready = permissions.ready;
-  const fieldPermissions = new Set(
-    fulfillmentCatalog.fields.flatMap((field) =>
-      field.permission && can(field.permission) ? [field.permission] : [],
-    ),
-  );
-  const clientIssues = ready
-    ? collectionWhereIssues(fulfillmentCatalog, state.where, {
-        permissions: fieldPermissions,
-      })
-    : [];
   const query = fulfillmentListQuery(state, search, timeZone);
-  const list = useQuery({
-    ...fulfillmentListOptions(organizationId, query),
-    enabled: ready && !clientIssues.length,
+  const {
+    list,
+    serverIssue,
+    repair,
+    error,
+    grouping,
+    collapsed,
+    setCollapsed,
+    more,
+  } = useRecordCollection({
+    catalog: fulfillmentCatalog,
+    view,
+    permissions,
+    cursor: search.cursor,
+    list: fulfillmentListOptions(organizationId, query),
+    resetKey: JSON.stringify([organizationId, query]),
+    groupPage: (key, cursor) =>
+      fulfillmentListOptions(
+        organizationId,
+        fulfillmentListQuery(state, search, timeZone, { key, cursor }),
+      ),
+    gatedFields: true,
   });
-  // With a page cursor, a refused request means the page link is stale, not the view.
-  const serverIssue = search.cursor
-    ? undefined
-    : collectionServerIssue(list.error);
   const data = list.data;
   const options = {
     connections:
@@ -263,45 +257,6 @@ export function FulfillmentPage() {
     title: 'order',
     preview: true,
     serverIssues: serverIssue ? [serverIssue] : [],
-  });
-  // A 403 for a reader who can read fulfillment means a field the view uses is closed to them.
-  const fieldDenied =
-    list.error instanceof ApiError &&
-    list.error.status === 403 &&
-    can('fulfillment.read');
-  const issues = [
-    ...clientIssues,
-    ...(serverIssue ? [serverIssue] : []),
-    ...(fieldDenied ? [{ index: null }] : []),
-  ];
-  const repair = issues.length
-    ? () => view.change(repairedState(fulfillmentCatalog, state, issues, can))
-    : undefined;
-  const error: CollectionError | undefined =
-    clientIssues.length || fieldDenied
-      ? { kind: 'invalid', message: m.collections_needs_repair() }
-      : collectionError(list.error, search.cursor);
-
-  const grouping = state.group;
-  const groupPrefix = `${groupOf(state) ?? ''}=`;
-  const collapsed = view.display.collapsedGroups
-    .filter((id) => id.startsWith(groupPrefix))
-    .map((id) => id.slice(groupPrefix.length));
-  const resetKey = JSON.stringify([organizationId, query]);
-  const more = useGroupPages<FulfillmentItem>({
-    resetKey,
-    load: (key: CollectionGroup['key'], cursor: string) =>
-      queryClient
-        .fetchQuery(
-          fulfillmentListOptions(
-            organizationId,
-            fulfillmentListQuery(state, search, timeZone, { key, cursor }),
-          ),
-        )
-        .then((page) => ({
-          rows: page.items,
-          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
-        })),
   });
   const groups =
     data && grouping && data.groups
@@ -500,17 +455,7 @@ export function FulfillmentPage() {
           )
         }
         collapsed={collapsed}
-        onCollapsedChange={(id, closed) =>
-          view.setDisplay({
-            ...view.display,
-            collapsedGroups: [
-              ...view.display.collapsedGroups.filter(
-                (item) => item !== `${groupPrefix}${id}`,
-              ),
-              ...(closed ? [`${groupPrefix}${id}`] : []),
-            ].slice(-100),
-          })
-        }
+        onCollapsedChange={setCollapsed}
         more={more}
       />
     ) : null;

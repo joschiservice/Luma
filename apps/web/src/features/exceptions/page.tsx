@@ -3,7 +3,6 @@ import './exceptions.css';
 import {
   type CaseSummary,
   type CollectionGroup,
-  collectionWhereIssues,
   issuesCatalog,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
@@ -42,22 +41,11 @@ import { useContext, useEffect, useRef, useState } from 'react';
 
 import { useCollectionControls } from '../../kit/collections/controls';
 import { DescribedFilter } from '../../kit/collections/described-filter';
-import { useGroupPages } from '../../kit/collections/groups';
 import { CollectionNotices } from '../../kit/collections/notices';
-import {
-  type CollectionError,
-  collectionError,
-  collectionServerIssue,
-  useCursorPaging,
-  useOnline,
-} from '../../kit/collections/paging';
+import { useCursorPaging, useOnline } from '../../kit/collections/paging';
 import { usePrivateSearch } from '../../kit/collections/private-search';
-import { repairedState } from '../../kit/collections/repair';
-import {
-  type CollectionSearch,
-  groupOf,
-  viewParam,
-} from '../../kit/collections/state';
+import { useRecordCollection } from '../../kit/collections/record-collection';
+import { type CollectionSearch, viewParam } from '../../kit/collections/state';
 import {
   type CollectionView,
   useCollectionView,
@@ -208,19 +196,30 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     ].map((system) => ({ value: system, label: sourceLabel(system) })),
   };
 
-  const ready = permissions.ready;
-  const clientIssues = ready
-    ? collectionWhereIssues(issuesCatalog, state.where)
-    : [];
   const query = caseListQuery(state, { q, cursor: search.cursor }, timeZone);
-  const list = useQuery({
-    ...casesOptions(organizationId, query),
-    enabled: ready && !clientIssues.length,
+  const {
+    list,
+    serverIssue,
+    repair,
+    error,
+    grouping,
+    collapsed,
+    setCollapsed,
+    more,
+  } = useRecordCollection({
+    catalog: issuesCatalog,
+    view,
+    state,
+    permissions,
+    cursor: search.cursor,
+    list: casesOptions(organizationId, query),
+    resetKey: JSON.stringify([organizationId, query]),
+    groupPage: (key, cursor) =>
+      casesOptions(
+        organizationId,
+        caseListQuery(state, { q }, timeZone, { key, cursor }),
+      ),
   });
-  // With a page cursor, a refused request means the page link is stale, not the view.
-  const serverIssue = search.cursor
-    ? undefined
-    : collectionServerIssue(list.error);
   const controls = useCollectionControls({
     view: listView,
     catalog: issuesCatalog,
@@ -232,38 +231,11 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     serverIssues: serverIssue ? [serverIssue] : [],
     owner: { field: 'owner', members: options.members, unassigned: true },
   });
-  const issues = [...clientIssues, ...(serverIssue ? [serverIssue] : [])];
-  const repair = issues.length
-    ? () => view.change(repairedState(issuesCatalog, view.state, issues, can))
-    : undefined;
-  const error: CollectionError | undefined = clientIssues.length
-    ? { kind: 'invalid', message: m.collections_needs_repair() }
-    : collectionError(list.error, search.cursor);
   const listData =
     error?.kind === 'access' || error?.kind === 'invalid'
       ? undefined
       : list.data;
 
-  const grouping = state.group;
-  const groupPrefix = `${groupOf(state) ?? ''}=`;
-  const collapsed = view.display.collapsedGroups
-    .filter((id) => id.startsWith(groupPrefix))
-    .map((id) => id.slice(groupPrefix.length));
-  const more = useGroupPages<CaseSummary>({
-    resetKey: JSON.stringify([organizationId, query]),
-    load: (key: CollectionGroup['key'], cursor: string) =>
-      client
-        .fetchQuery(
-          casesOptions(
-            organizationId,
-            caseListQuery(state, { q }, timeZone, { key, cursor }),
-          ),
-        )
-        .then((page) => ({
-          rows: page.items,
-          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
-        })),
-  });
   const groups =
     listData && grouping
       ? issueGroups({
@@ -584,17 +556,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   current={exceptionId}
                   groupLabel={groupLabel}
                   collapsed={collapsed}
-                  onCollapsedChange={(id, closed) =>
-                    view.setDisplay({
-                      ...view.display,
-                      collapsedGroups: [
-                        ...view.display.collapsedGroups.filter(
-                          (entry) => entry !== `${groupPrefix}${id}`,
-                        ),
-                        ...(closed ? [`${groupPrefix}${id}`] : []),
-                      ].slice(-100),
-                    })
-                  }
+                  onCollapsedChange={setCollapsed}
                   more={more}
                 />
                 {!grouping && listData.items.length ? (

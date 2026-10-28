@@ -2,9 +2,6 @@ import './orders.css';
 
 import {
   collectionField,
-  type CollectionGroup,
-  type CollectionViewState,
-  collectionWhereIssues,
   type OrderListItem,
   ordersCatalog,
 } from '@luma/api-contract';
@@ -28,7 +25,7 @@ import {
 } from '@luma/ui/lib/collection-conditions';
 import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
 import { selectRange } from '@luma/ui/lib/row-selection';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
@@ -40,24 +37,14 @@ import { type ReactNode, type Ref, useContext, useRef, useState } from 'react';
 
 import { useCollectionControls } from '../../kit/collections/controls';
 import { DescribedFilter } from '../../kit/collections/described-filter';
-import { useGroupPages } from '../../kit/collections/groups';
 import {
   CollectionLoading,
   CollectionNotices,
 } from '../../kit/collections/notices';
-import {
-  type CollectionError,
-  collectionError,
-  collectionServerIssue,
-  useCursorPaging,
-  useOnline,
-} from '../../kit/collections/paging';
+import { useCursorPaging, useOnline } from '../../kit/collections/paging';
 import { usePrivateSearch } from '../../kit/collections/private-search';
-import {
-  type CollectionSearch,
-  groupOf,
-  viewParam,
-} from '../../kit/collections/state';
+import { useRecordCollection } from '../../kit/collections/record-collection';
+import { type CollectionSearch, viewParam } from '../../kit/collections/state';
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
@@ -106,46 +93,6 @@ const shortcuts: readonly ListShortcut[] = [
 ];
 
 /**
- * Removes what a view asks for that the reader's list can't do. Conditions with a known problem
- * go; a problem the list couldn't tie to one condition (a grouping or sort it refused, or a
- * custom field the reader may not read) removes the grouping, a custom sort and custom-field
- * conditions instead, keeping the other conditions so the view never matches more than needed.
- */
-function repaired(
-  state: CollectionViewState,
-  issues: readonly { index: number | null }[],
-  can: (permission: string) => boolean,
-): CollectionViewState {
-  const broken = new Set(issues.map((issue) => issue.index));
-  const general = broken.has(null);
-  const usable = (field: string) => {
-    const definition = collectionField(ordersCatalog, field);
-
-    return !definition?.permission || can(definition.permission);
-  };
-  const group =
-    state.group && usable(state.group.field) && !general ? state.group : null;
-
-  return {
-    ...state,
-    where: {
-      match: state.where.match,
-      conditions: state.where.conditions.filter(
-        (condition, index) =>
-          !broken.has(index) &&
-          !(general && condition.field.startsWith('custom:')),
-      ),
-    },
-    sort:
-      general && state.sort?.field.startsWith('custom:')
-        ? ordersCatalog.defaultSort
-        : state.sort,
-    group,
-    layout: !group && state.layout === 'board' ? 'table' : state.layout,
-  };
-}
-
-/**
  * The Orders list: the member's view with its conditions, sort, grouping and layout from the
  * URL and remembered state, the shared toolbar and view bar, list keys, an optional preview
  * pane and keyset paging. A filter change keeps the previous rows until the new ones arrive.
@@ -158,7 +105,6 @@ export function OrdersPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/orders/' });
   const navigate = useNavigate({ from: '/app/$organizationId/orders/' });
-  const queryClient = useQueryClient();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
   const can = permissions.can;
@@ -205,42 +151,34 @@ export function OrdersPage() {
   });
   const custom = customFieldColumns(fields.data ?? []);
 
-  // Problems the client can see before asking, once permissions and custom fields are known.
-  const usesCustom = state.where.conditions.some((condition) =>
-    condition.field.startsWith('custom:'),
-  );
-  const fieldsKnown =
-    !usesCustom ||
-    fields.isSuccess ||
-    fields.isError ||
-    (availability.isSuccess &&
-      permissions.ready &&
-      !(availability.data.fields && can('adaptive.fields.read')));
-  const ready = permissions.ready && fieldsKnown;
-  const fieldPermissions = new Set(
-    ordersCatalog.fields.flatMap((field) =>
-      field.permission && can(field.permission) ? [field.permission] : [],
-    ),
-  );
-  const clientIssues = ready
-    ? collectionWhereIssues(ordersCatalog, state.where, {
-        permissions: fieldPermissions,
-        customFieldTypes: new Map(
-          custom
-            .filter((field) => !field.archived)
-            .map((field) => [field.id, field.type]),
-        ),
-      })
-    : [];
   const query = orderListQuery(state, { q, cursor: search.cursor }, timeZone);
-  const list = useQuery({
-    ...ordersOptions(organizationId, query),
-    enabled: ready && !clientIssues.length,
+  const {
+    list,
+    serverIssue,
+    repair,
+    error,
+    grouping,
+    collapsed,
+    setCollapsed,
+    more,
+  } = useRecordCollection({
+    catalog: ordersCatalog,
+    view,
+    permissions,
+    cursor: search.cursor,
+    list: ordersOptions(organizationId, query),
+    resetKey: JSON.stringify([organizationId, query]),
+    groupPage: (key, cursor) =>
+      ordersOptions(
+        organizationId,
+        orderListQuery(state, { q, cursor: search.cursor }, timeZone, {
+          key,
+          cursor,
+        }),
+      ),
+    customFields: { availability, definitions: fields, columns: custom },
+    gatedFields: true,
   });
-  // With a page cursor, a refused request means the page link is stale, not the view.
-  const serverIssue = search.cursor
-    ? undefined
-    : collectionServerIssue(list.error);
   const options = {
     connections: connections.data?.map((item) => ({
       value: item.id,
@@ -279,49 +217,6 @@ export function OrdersPage() {
     title: 'number',
     preview: true,
     serverIssues: serverIssue ? [serverIssue] : [],
-  });
-  // A 403 for a reader who can read orders means a field the view uses is closed to them.
-  const fieldDenied =
-    list.error instanceof ApiError &&
-    list.error.status === 403 &&
-    can('orders.read');
-  const issues = [
-    ...clientIssues,
-    ...(serverIssue ? [serverIssue] : []),
-    ...(fieldDenied ? [{ index: null }] : []),
-  ];
-  const repair = issues.length
-    ? () => view.change(repaired(state, issues, can))
-    : undefined;
-  const error: CollectionError | undefined = clientIssues.length
-    ? { kind: 'invalid', message: m.collections_needs_repair() }
-    : fieldDenied
-      ? { kind: 'invalid', message: m.collections_needs_repair() }
-      : collectionError(list.error, search.cursor);
-
-  const grouping = state.group;
-  const groupPrefix = `${groupOf(state) ?? ''}=`;
-  const collapsed = view.display.collapsedGroups
-    .filter((id) => id.startsWith(groupPrefix))
-    .map((id) => id.slice(groupPrefix.length));
-  const resetKey = JSON.stringify([organizationId, query]);
-  const more = useGroupPages<OrderListItem>({
-    resetKey,
-    load: (key: CollectionGroup['key'], cursor: string) =>
-      queryClient
-        .fetchQuery(
-          ordersOptions(
-            organizationId,
-            orderListQuery(state, { q, cursor: search.cursor }, timeZone, {
-              key,
-              cursor,
-            }),
-          ),
-        )
-        .then((page) => ({
-          rows: page.items,
-          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
-        })),
   });
   const data = list.data;
   const groups =
@@ -569,17 +464,7 @@ export function OrdersPage() {
           )
         }
         collapsed={collapsed}
-        onCollapsedChange={(id, closed) =>
-          view.setDisplay({
-            ...view.display,
-            collapsedGroups: [
-              ...view.display.collapsedGroups.filter(
-                (item) => item !== `${groupPrefix}${id}`,
-              ),
-              ...(closed ? [`${groupPrefix}${id}`] : []),
-            ].slice(-100),
-          })
-        }
+        onCollapsedChange={setCollapsed}
         more={more}
       />
     ) : null;
