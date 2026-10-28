@@ -32,6 +32,7 @@
   --foreground: #15171c;
   --foreground-muted: #4a5163;
   --foreground-subtle: #5f6779;
+  /* Decoration only (separators, chevrons, grips): below text contrast. */
   --foreground-faint: #9aa1b1;
   --line: #15171c14;
   --line-strong: #15171c26;
@@ -100,7 +101,8 @@
   --destructive: #c4353a;
   --destructive-foreground: #ffffff;
   --border: var(--line);
-  --input: var(--line-strong);
+  /* Form control borders: at least 3:1 against raised and page surfaces. */
+  --input: #868e9f;
   --ring: var(--signal);
   --overlay: #0b102066;
   --transparent: #00000000;
@@ -151,6 +153,7 @@
   --foreground-faint: #5d6880;
   --line: #ffffff12;
   --line-strong: #ffffff24;
+  --input: #6a758c;
 
   --signal: #54a3ff;
   --signal-text: #7db8ff;

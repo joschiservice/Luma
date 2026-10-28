@@ -140,5 +140,21 @@ test('explains a record beside its page and preserves exact chart selection', as
   expect(navigation.content).toContain('"range":"7d"');
   expect(navigation.content).toContain('"series":"held"');
   expect(navigation.content).toContain('"asOf":');
+
+  // On a phone the command menu sits in the navigation drawer. Asking Luma there closes the
+  // drawer and leaves focus in the composer rather than on the menu button.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.getByRole('button', { name: 'Close Ask Luma' }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Navigation' });
+  await drawer.getByRole('button', { name: 'Open search' }).click();
+  await page
+    .getByRole('textbox', { name: 'Search workspace' })
+    .fill('late orders');
+  await page.getByRole('button', { name: /Ask “late orders”/ }).click();
+  await expect(drawer).toHaveCount(0);
+  const composer = page.getByRole('textbox', { name: 'Question for Luma' });
+  await expect(composer).toHaveValue('late orders');
+  await expect(composer).toBeFocused();
   expect(errors).toEqual([]);
 });

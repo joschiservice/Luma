@@ -580,7 +580,7 @@
 }
 
 .assistant-input textarea::placeholder {
-  color: var(--foreground-faint);
+  color: var(--foreground-subtle);
 }
 
 .assistant-send[data-slot='button'] {

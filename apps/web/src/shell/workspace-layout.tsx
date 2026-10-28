@@ -24,7 +24,8 @@ type WorkspaceLayoutProps = {
   workspaceSwitcher: ReactNode;
   navigation: (close?: () => void) => ReactNode;
   accountMenu: ReactNode;
-  search?: ReactNode;
+  /** The command menu; the navigation drawer renders its own copy and passes `close`. */
+  search?: (close?: () => void) => ReactNode;
   context?: ReactNode;
   help?: ReactNode;
   /** A notice above the top bar on every page, such as the support view banner. */
@@ -115,7 +116,7 @@ export function WorkspaceLayout({
                   <PanelLeft aria-hidden="true" />
                 </Button>
               </div>
-              {search}
+              {search?.()}
               <div className="sidebar-scroll">{navigation()}</div>
               <div className="sidebar-bottom">{accountMenu}</div>
             </aside>
@@ -146,6 +147,7 @@ export function WorkspaceLayout({
                         {m.identity_layout_navigation_description()}
                       </DialogDescription>
                       <div className="sidebar-top">{workspaceSwitcher}</div>
+                      {search?.(() => setOpen(false))}
                       <div className="sidebar-scroll">
                         {navigation(() => setOpen(false))}
                       </div>

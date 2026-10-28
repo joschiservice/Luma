@@ -49,7 +49,7 @@
 }
 
 .decisions-group-heading .lu-numeric {
-  color: var(--foreground-faint);
+  color: var(--foreground-subtle);
   font-weight: 500;
 }
 

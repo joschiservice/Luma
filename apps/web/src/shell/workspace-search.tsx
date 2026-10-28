@@ -159,11 +159,15 @@ function matches(query: string, text: string) {
 /**
  * Opens the command menu for pages and workspace actions with ⌘K or Ctrl K. Arrow keys
  * move between results, Enter opens the first match, and focus returns on dismissal.
+ * A copy given `onSelect`, such as the one in the navigation drawer, calls it after a result
+ * is chosen and leaves the keyboard shortcut to the sidebar copy.
  */
 export function WorkspaceSearch({
   organizationId,
+  onSelect,
 }: {
   organizationId: string;
+  onSelect?: (() => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -196,7 +200,13 @@ export function WorkspaceSearch({
     if (!value) setQuery('');
   }
 
+  function select() {
+    changeOpen(false);
+    onSelect?.();
+  }
+
   useEffect(() => {
+    if (onSelect) return;
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -207,7 +217,7 @@ export function WorkspaceSearch({
     window.addEventListener('keydown', onKey);
 
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onSelect]);
 
   useEffect(() => {
     const timer = setTimeout(() => setRecordQuery(query.trim()), 250);
@@ -375,7 +385,7 @@ export function WorkspaceSearch({
               to="/app/$organizationId/views/$viewId"
               params={{ organizationId, viewId: view.id }}
               search={{}}
-              onClick={() => changeOpen(false)}
+              onClick={select}
             >
               <span className="command-item-icon">
                 <Search size={16} aria-hidden="true" />
@@ -399,7 +409,7 @@ export function WorkspaceSearch({
                 to={`/app/$organizationId/${path}`}
                 params={{ organizationId }}
                 search={search ?? {}}
-                onClick={() => changeOpen(false)}
+                onClick={select}
               >
                 <span className="command-item-icon">
                   {domain ? (
@@ -426,7 +436,7 @@ export function WorkspaceSearch({
               to={`/app/$organizationId/${page.path}`}
               params={{ organizationId }}
               search={section.search}
-              onClick={() => changeOpen(false)}
+              onClick={select}
             >
               <span className="command-item-icon">
                 <page.Icon size={16} aria-hidden="true" />
@@ -478,7 +488,7 @@ export function WorkspaceSearch({
                         },
                         search: { q: recordQuery },
                       })}
-              onClick={() => changeOpen(false)}
+              onClick={select}
             >
               <span className="command-item-icon">
                 <Search size={16} aria-hidden="true" />
@@ -505,7 +515,7 @@ export function WorkspaceSearch({
               className="command-item"
               to="/app/$organizationId/returns/cases/$caseId"
               params={{ organizationId, caseId: item.id }}
-              onClick={() => changeOpen(false)}
+              onClick={select}
             >
               <span className="command-item-icon">
                 <DomainIcon domain="returns" size="sm" />
@@ -539,7 +549,7 @@ export function WorkspaceSearch({
                       purchaseOrderId: item.purchaseOrderId,
                     },
                   })}
-              onClick={() => changeOpen(false)}
+              onClick={select}
             >
               <span className="command-item-icon">
                 <DomainIcon domain="procurement" size="sm" />
@@ -591,7 +601,7 @@ export function WorkspaceSearch({
               <span
                 key={command.id}
                 className="command-item-link"
-                onClickCapture={() => changeOpen(false)}
+                onClickCapture={select}
               >
                 {command.render(content)}
               </span>
@@ -609,7 +619,7 @@ export function WorkspaceSearch({
                     handoff.current = true;
                     askLuma(question);
                   }
-                  changeOpen(false);
+                  select();
                 }}
               >
                 {content}

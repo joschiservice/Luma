@@ -41,6 +41,7 @@ import {
   sessionOptions,
 } from '../kit/identity/data';
 import { NoAccess, usePermissions } from '../kit/identity/permissions';
+import { SidebarLinkLabel } from '../kit/layout/sidebar-link-label';
 import {
   type RecordMessagesProps,
   RecordMessagesProvider,
@@ -93,7 +94,7 @@ function NavigationLink({
       ) : (
         <Icon className="sidebar-link-icon" size={16} aria-hidden="true" />
       )}
-      <span className="sidebar-link-label">{label}</span>
+      <SidebarLinkLabel>{label}</SidebarLinkLabel>
       {count ? (
         <span className="sidebar-link-count">
           <span aria-hidden="true">{formatNumber(count)}</span>
@@ -298,7 +299,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             </WorkspaceTimezone>
           ) : null
         }
-        search={<WorkspaceSearch organizationId={organizationId} />}
+        search={(close) => (
+          <WorkspaceSearch organizationId={organizationId} onSelect={close} />
+        )}
         navigation={(close) => (
           <Navigation organizationId={organizationId} close={close} />
         )}

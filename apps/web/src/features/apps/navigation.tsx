@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 
 import { appsOptions } from '../../kit/apps/data';
 import { usePermissions } from '../../kit/identity/permissions';
+import { SidebarLinkLabel } from '../../kit/layout/sidebar-link-label';
 
 /** Adds a sidebar section for installed apps that contribute workspace pages. */
 export function AppNavigation({
@@ -51,7 +52,7 @@ export function AppNavigation({
               <span className="sidebar-app-icon" aria-hidden="true">
                 {app.name.slice(0, 1)}
               </span>
-              <span className="sidebar-link-label">{app.name}</span>
+              <SidebarLinkLabel>{app.name}</SidebarLinkLabel>
             </Link>
           </li>
         ))}

@@ -115,7 +115,7 @@
   font-variant-numeric: tabular-nums;
 }
 .returns-stage[data-empty] strong {
-  color: var(--foreground-faint);
+  color: var(--foreground-subtle);
 }
 .returns-stage small {
   color: var(--muted-foreground);
