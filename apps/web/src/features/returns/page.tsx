@@ -2,8 +2,6 @@ import './returns.css';
 
 import {
   collectionField,
-  type CollectionGroup,
-  collectionWhereIssues,
   type ReturnList,
   type ReturnListItem,
   returnsCatalog,
@@ -32,7 +30,6 @@ import {
 } from '@luma/ui/lib/collection-conditions';
 import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
 import { selectRange } from '@luma/ui/lib/row-selection';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
@@ -44,24 +41,16 @@ import { type ReactNode, type Ref, useContext, useRef, useState } from 'react';
 
 import { useCollectionControls } from '../../kit/collections/controls';
 import { DescribedFilter } from '../../kit/collections/described-filter';
-import { useGroupPages } from '../../kit/collections/groups';
 import {
   CollectionLoading,
   CollectionNotices,
 } from '../../kit/collections/notices';
-import {
-  type CollectionError,
-  collectionError,
-  collectionServerIssue,
-  useCursorPaging,
-  useOnline,
-} from '../../kit/collections/paging';
+import { useCursorPaging, useOnline } from '../../kit/collections/paging';
 import { usePrivateSearch } from '../../kit/collections/private-search';
-import { repairedState } from '../../kit/collections/repair';
+import { useRecordCollection } from '../../kit/collections/record-collection';
 import {
   builtinState,
   type CollectionSearch,
-  groupOf,
   stateChanges,
   viewParam,
 } from '../../kit/collections/state';
@@ -184,7 +173,6 @@ export function ReturnsPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/returns/' });
   const navigate = useNavigate({ from: '/app/$organizationId/returns/' });
-  const queryClient = useQueryClient();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
   const can = permissions.can;
@@ -218,23 +206,35 @@ export function ReturnsPage() {
       }),
   );
 
-  const ready = permissions.ready;
-  const clientIssues = ready
-    ? collectionWhereIssues(returnsCatalog, state.where)
-    : [];
   const query = returnListQuery(state, { q, cursor: search.cursor }, timeZone);
-  const list = useQuery({
-    ...returnsOptions(organizationId, query),
-    enabled: ready && !clientIssues.length,
+  const {
+    list,
+    serverIssue,
+    repair,
+    error,
+    grouping,
+    collapsed,
+    setCollapsed,
+    more,
+  } = useRecordCollection({
+    catalog: returnsCatalog,
+    view,
+    state,
+    permissions,
+    cursor: search.cursor,
+    list: returnsOptions(organizationId, query),
+    resetKey: JSON.stringify([organizationId, query]),
+    groupPage: (key, cursor) =>
+      returnsOptions(
+        organizationId,
+        returnListQuery(state, { q, cursor: search.cursor }, timeZone, {
+          key,
+          cursor,
+        }),
+      ),
+    // A chosen stage is sent apart from the conditions, so the server's numbers skip it.
+    serverIssueIndex: (index) => viewConditionIndex(state, index),
   });
-  // With a page cursor, a refused request means the page link is stale, not the view.
-  const sentIssue = search.cursor
-    ? undefined
-    : collectionServerIssue(list.error);
-  const serverIssue = sentIssue && {
-    ...sentIssue,
-    index: viewConditionIndex(state, sentIssue.index),
-  };
   const data = list.data;
   const sources = data?.sources ?? [];
   const sourceLabel = returnSourceLabel(sources);
@@ -264,14 +264,6 @@ export function ReturnsPage() {
     preview: true,
     serverIssues: serverIssue ? [serverIssue] : [],
   });
-  const issues = [...clientIssues, ...(serverIssue ? [serverIssue] : [])];
-  const repair = issues.length
-    ? () => view.change(repairedState(returnsCatalog, view.state, issues, can))
-    : undefined;
-  const error: CollectionError | undefined = clientIssues.length
-    ? { kind: 'invalid', message: m.collections_needs_repair() }
-    : collectionError(list.error, search.cursor);
-
   const segment = (
     state.segment && views.has(state.segment) ? state.segment : 'all'
   ) as ReturnView;
@@ -296,29 +288,6 @@ export function ReturnsPage() {
     });
   };
 
-  const grouping = state.group;
-  const groupPrefix = `${groupOf(state) ?? ''}=`;
-  const collapsed = view.display.collapsedGroups
-    .filter((id) => id.startsWith(groupPrefix))
-    .map((id) => id.slice(groupPrefix.length));
-  const more = useGroupPages<ReturnListItem>({
-    resetKey: JSON.stringify([organizationId, query]),
-    load: (key: CollectionGroup['key'], cursor: string) =>
-      queryClient
-        .fetchQuery(
-          returnsOptions(
-            organizationId,
-            returnListQuery(state, { q, cursor: search.cursor }, timeZone, {
-              key,
-              cursor,
-            }),
-          ),
-        )
-        .then((page) => ({
-          rows: page.items,
-          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
-        })),
-  });
   const groups =
     data && grouping && data.groups ? returnGroups(data, grouping, more) : [];
   // Keys in the order rows appear on the page, so the list keys follow the screen.
@@ -529,17 +498,7 @@ export function ReturnsPage() {
           )
         }
         collapsed={collapsed}
-        onCollapsedChange={(id, closed) =>
-          view.setDisplay({
-            ...view.display,
-            collapsedGroups: [
-              ...view.display.collapsedGroups.filter(
-                (item) => item !== `${groupPrefix}${id}`,
-              ),
-              ...(closed ? [`${groupPrefix}${id}`] : []),
-            ].slice(-100),
-          })
-        }
+        onCollapsedChange={setCollapsed}
         more={more}
       />
     ) : null;

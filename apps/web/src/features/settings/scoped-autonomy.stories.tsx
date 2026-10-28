@@ -171,7 +171,7 @@ export const LostSaveResponse: Story = {
     ).resolves.toBeVisible();
     await userEvent.click(page.getByRole('button', { name: m.common_save() }));
     await waitFor(() => expect(requests).toHaveLength(2));
-    expect(requests[1]).toEqual(requests[0]);
+    await expect(requests[1]).toEqual(requests[0]);
     await expect(canvas.findByText('Supplier notes')).resolves.toBeVisible();
   },
 };

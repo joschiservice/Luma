@@ -25,7 +25,7 @@ jobs:
         include:
           - name: Static checks and builds
             cache: builds
-            command: pnpm format:check && pnpm lint && pnpm knip:check && pnpm typecheck && pnpm build
+            command: pnpm format:check && pnpm lint && pnpm knip:check && pnpm typecheck && pnpm lint:types && pnpm build
           - name: Main tests
             cache: tests
             # Forward --filter to our database runner, not pnpm's recursive test shortcut.

@@ -261,6 +261,13 @@ see the [add-migration](../.agents/skills/add-migration/SKILL.md) skill for the 
 - `pnpm lint` enforces package and layer boundaries, import order, spacing and doc
   comments on exported functions; `pnpm test:architecture` checks the boundary policy and
   documentation links; `pnpm test:style` checks the lint configuration.
+- `pnpm lint:types` runs the rules that need type information, `no-floating-promises` and
+  `no-misused-promises`, with oxlint on the native TypeScript compiler; `.oxlintrc.json` lists
+  them. It builds the packages first, because imported types come from their emitted
+  declarations; without them the types are unknown and violations go unreported. It is never
+  cached, since a change to an imported type can change another file's result. Suppress a
+  finding with `// oxlint-disable-next-line typescript/<rule>`. `pnpm check` and CI run it
+  after the typecheck.
 - Run `pnpm lint:fix`, then `pnpm format`. Both interfaces and type aliases are allowed:
   database row types rely on the implicit index signature of type aliases. An
   intentionally empty production callback needs a comment.

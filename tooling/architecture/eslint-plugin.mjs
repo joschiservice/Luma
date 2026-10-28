@@ -1,3 +1,4 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,55 +12,61 @@ import {
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
-const modulePrefix = 'apps/api/src/modules/';
+const runtimePrefix = 'packages/application-runtime/src/';
 
 const codeExtension = /\.(?:[cm]?[jt]sx?)$/;
 
 const normalize = (file) =>
   file.replaceAll(path.sep, '/').replace(codeExtension, '.ts');
 
-const apiImports = {
-  '#modules/*': { 'luma-source': './src/modules/*.ts' },
-  '#test-support/*': { 'luma-source': './src/test-support/*.ts' },
-  '#app': { 'luma-source': './src/app.ts' },
-};
-
-function canonical(file) {
-  const match = /^packages\/([^/]+)\/src\/(.+)$/.exec(file);
-  if (!match) return file;
-  if (match[1] === 'application-runtime') return `apps/api/src/${match[2]}`;
-  if (match[1] === 'workflow-temporal')
-    return `${modulePrefix}temporal/${match[2] === 'index.ts' ? 'composition.ts' : `infrastructure/${match[2]}`}`;
-  const module = domainPackages[match[1]];
-
-  return module ? `${modulePrefix}${module}/${match[2]}` : file;
-}
-
-function apiImportTarget(specifier) {
-  for (const [pattern, conditions] of Object.entries(apiImports)) {
-    const prefix = pattern.endsWith('*') ? pattern.slice(0, -1) : null;
-    const subpath = prefix === null ? '' : specifier.slice(prefix.length);
-    if (prefix === null ? specifier !== pattern : !specifier.startsWith(prefix))
-      continue;
-    if (
-      prefix !== null &&
-      (codeExtension.test(subpath) ||
-        !/^[\w./-]+$/.test(subpath) ||
-        subpath
-          .split('/')
-          .some((part) => ['', '.', '..', 'node_modules'].includes(part)))
+/** Workspace packages by name, with their directory and the source file of each export. */
+const workspace = new Map(
+  [
+    'apps',
+    'packages',
+    'packages/apps',
+    'packages/connectors',
+    'packages/simulator',
+  ]
+    .flatMap((parent) =>
+      readdirSync(path.join(root, parent), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => `${parent}/${entry.name}`),
     )
-      return null;
+    .filter((dir) => existsSync(path.join(root, dir, 'package.json')))
+    .map((dir) => {
+      const manifest = JSON.parse(
+        readFileSync(path.join(root, dir, 'package.json'), 'utf8'),
+      );
+      const sources = Object.entries(manifest.exports ?? {}).flatMap(
+        ([subpath, conditions]) =>
+          typeof conditions === 'object' && conditions['luma-source']
+            ? [[subpath, conditions['luma-source']]]
+            : [],
+      );
 
-    return normalize(
-      path.posix.join(
-        'apps/api',
-        conditions['luma-source'].replace('*', subpath),
-      ),
-    );
-  }
+      return [manifest.name, { dir, sources: new Map(sources) }];
+    }),
+);
 
-  return null;
+/**
+ * Resolves a `@luma/*` specifier to the file it loads. Packages that publish their sources
+ * resolve through their `luma-source` exports, and an unexported subpath names the source file
+ * it would reach, so its layer is still checked. Other packages resolve to their directory and
+ * subpath, such as `packages/connectors/core/transport`.
+ */
+function packageTarget(specifier) {
+  const [name, ...subpath] = specifier.slice('@luma/'.length).split('/');
+  const target = workspace.get(`@luma/${name}`);
+  if (!target) return `packages/${name}/${subpath.join('/')}`;
+  const source = target.sources.get(
+    subpath.length ? `./${subpath.join('/')}` : '.',
+  );
+  if (source) return normalize(path.posix.join(target.dir, source));
+  if (target.sources.size)
+    return `${target.dir}/src/${subpath.length ? `${subpath.join('/')}.ts` : 'index.ts'}`;
+
+  return `${target.dir}/${subpath.join('/')}`;
 }
 
 function appInfo(file) {
@@ -89,9 +96,19 @@ function appViolation(from, source, target) {
   return 'Import violates the app layer direction.';
 }
 
+/**
+ * Names the backend module and layer of a domain package source file, or null. The Temporal
+ * package is one flat adapter: its root export is the module's composition entry point.
+ */
 function moduleInfo(file) {
-  if (!file.startsWith(modulePrefix)) return null;
-  const [name, layer, ...rest] = file.slice(modulePrefix.length).split('/');
+  const match = /^packages\/([^/]+)\/src\/(.+)$/.exec(file);
+  const name = match && domainPackages[match[1]];
+  if (!name) return null;
+  if (match[1] === 'workflow-temporal')
+    return match[2] === 'index.ts'
+      ? { name, layer: 'composition.ts', entry: true }
+      : { name, layer: 'infrastructure', entry: false };
+  const [layer, ...rest] = match[2].split('/');
 
   return { name, layer, entry: rest.length === 0 };
 }
@@ -101,8 +118,6 @@ function moduleInfo(file) {
  * permitted.
  */
 export function violation(from, to) {
-  from = canonical(from);
-  to = canonical(to);
   const source = moduleInfo(from);
   const target = moduleInfo(to);
   const sourceApp = appInfo(from);
@@ -135,7 +150,7 @@ export function violation(from, to) {
       (from.startsWith('packages/') &&
         !from.startsWith('packages/app-') &&
         !from.startsWith('packages/apps/') &&
-        !from.startsWith('apps/api/'))
+        !from.startsWith(runtimePrefix))
     )
       return 'Core modules must not depend on app implementations.';
   }
@@ -163,63 +178,14 @@ export function violation(from, to) {
   if (
     from.startsWith('apps/') &&
     to.startsWith('apps/') &&
-    from.split('/')[1] !== to.split('/')[1] &&
-    !moduleInfo(to) &&
-    to !== 'apps/api/src/app.ts'
+    from.split('/')[1] !== to.split('/')[1]
   ) {
     return 'Apps must communicate through public API contracts, not source imports.';
   }
-  // Synthetic observation fixtures are excluded from the production build.
-  if (
-    from === 'apps/api/src/test-support/detection-fixtures.ts' &&
-    [
-      'apps/api/src/modules/connectors/application/capabilities.ts',
-      'apps/api/src/modules/connectors/infrastructure/jtl/adapter.ts',
-      'apps/api/src/modules/connectors/infrastructure/shopify/adapter.ts',
-    ].includes(to)
-  )
-    return null;
   if (!source && target) {
     if (
+      !from.startsWith(runtimePrefix) &&
       ![
-        'apps/api/src/app.ts',
-        'apps/api/src/app.test.ts',
-        'apps/api/src/exceptions.integration.test.ts',
-        'apps/api/src/commerce.integration.test.ts',
-        'apps/api/src/commerce-sync.integration.test.ts',
-        'apps/api/src/shopify-admission.integration.test.ts',
-        'apps/api/src/test-support/shopify-admission-child.ts',
-        'apps/api/src/orders.integration.test.ts',
-        'apps/api/src/catalog-lists.integration.test.ts',
-        'apps/api/src/procurement-lists.integration.test.ts',
-        'apps/api/src/adaptive-views.integration.test.ts',
-        'apps/api/src/activity.integration.test.ts',
-        'apps/api/src/execution.integration.test.ts',
-        'apps/api/src/diagnosis-reread.test.ts',
-        'apps/api/src/workflow-runtime.test.ts',
-        'apps/api/src/resolution-learning.test.ts',
-        'apps/api/src/connections.integration.test.ts',
-        'apps/api/src/staff.integration.test.ts',
-        'apps/api/src/membership-suspension.integration.test.ts',
-        'apps/api/src/workflow-identity.integration.test.ts',
-        'apps/api/src/account-deletion.integration.test.ts',
-        'apps/api/src/account-mail-outbox.integration.test.ts',
-        'apps/api/src/api-apps.integration.test.ts',
-        'apps/api/src/support-view.integration.test.ts',
-        'apps/api/src/support-view.test.ts',
-        'apps/api/src/shopify-oauth.integration.test.ts',
-        'apps/api/src/shopify-order-edits.integration.test.ts',
-        'apps/api/src/starshipit-update-starts.integration.test.ts',
-        'apps/api/src/connections.test.ts',
-        'apps/api/src/installation-verifier.test.ts',
-        'apps/api/src/apps.integration.test.ts',
-        'apps/api/src/messaging.integration.test.ts',
-        'apps/api/src/messaging-replies.integration.test.ts',
-        'apps/api/src/messaging-documents.integration.test.ts',
-        'apps/api/src/inventory-ledger.integration.test.ts',
-        'apps/api/src/test-support/apps.ts',
-        'apps/api/src/test-support/detection-fixtures.ts',
-        'apps/api/src/test-support/safety-fixtures.ts',
         'apps/api/src/index.ts',
         'apps/worker/src/index.ts',
         'apps/worker/src/bootstrap.ts',
@@ -228,8 +194,7 @@ export function violation(from, to) {
         'apps/staff-api/src/index.ts',
         'apps/staff-api/scripts/provision.ts',
       ].includes(from) &&
-      !/^apps\/api\/src\/composition\/(features\/)?[^/]+\.ts$/.test(from) &&
-      !/^apps\/staff-api\/src\/composition\/[^/]+\.ts$/.test(from) &&
+      !/^apps\/(?:api|staff-api)\/src\/composition\/[^/]+\.ts$/.test(from) &&
       !from.startsWith('apps/api/e2e/')
     ) {
       return 'Only the API composition root may wire backend modules.';
@@ -356,8 +321,7 @@ export function violation(from, to) {
 const rule = {
   meta: { type: 'problem', schema: [], messages: { boundary: '{{reason}}' } },
   create(context) {
-    const physicalFrom = normalize(path.relative(root, context.filename));
-    const from = canonical(physicalFrom);
+    const from = normalize(path.relative(root, context.filename));
     const source = moduleInfo(from);
 
     function report(node, reason) {
@@ -382,37 +346,14 @@ const rule = {
         return;
       }
       let to;
-      if (
-        value.startsWith('#') &&
-        (from.startsWith('apps/api/') ||
-          from.startsWith('packages/connectors/'))
-      ) {
-        to = apiImportTarget(value);
-        if (!to) {
-          report(
-            node,
-            'Use a declared API package import with a canonical path.',
-          );
-
-          return;
-        }
-      } else if (value.startsWith('.')) {
+      if (value.startsWith('.')) {
         to = normalize(
           path.posix.normalize(
-            path.posix.join(path.posix.dirname(physicalFrom), value),
+            path.posix.join(path.posix.dirname(from), value),
           ),
         );
       } else if (value.startsWith('@luma/')) {
-        const [name, ...subpath] = value.slice(6).split('/');
-        to = domainPackages[name]
-          ? `apps/api/src/modules/${domainPackages[name]}/${subpath.length ? subpath.join('/') + '.ts' : name === 'workflow-temporal' ? 'composition.ts' : 'index.ts'}`
-          : name === 'application-runtime'
-            ? 'apps/api/src/app.ts'
-            : name.startsWith('simulator-')
-              ? `packages/simulator/${name.slice(10)}/${subpath.join('/')}`
-              : Object.hasOwn(connectorPackages, name)
-                ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
-                : `packages/${name}/${subpath.join('/')}`;
+        to = packageTarget(value);
       } else {
         // Only package imports with known source targets can be checked for ownership.
         if (
@@ -424,7 +365,7 @@ const rule = {
         ) {
           report(
             node,
-            'Use declared API package imports or relative imports inside the backend.',
+            'Use package exports or relative imports inside the backend.',
           );
         } else if (
           source &&

@@ -13,10 +13,10 @@ describe('Shopify read admission', () => {
         time += ms;
       },
     });
-    budget.observe('orders', 727, 100, 100);
+    await budget.observe('orders', 727, 100, 100);
     await budget.run('orders', async () => undefined);
     expect(waits).toEqual([6270]);
-    budget.observe('orders', 727, 900, 100);
+    await budget.observe('orders', 727, 900, 100);
     await budget.run('orders', async () => undefined);
     expect(waits).toEqual([6270]);
     // A calculated cost stands in for a shape Shopify has not reported yet.
@@ -35,7 +35,7 @@ describe('Shopify read admission', () => {
         time += ms;
       },
     });
-    budget.cooldown(2000);
+    await budget.cooldown(2000);
     const result = await Promise.allSettled([
       budget.run('first', async () => {
         order.push('first');

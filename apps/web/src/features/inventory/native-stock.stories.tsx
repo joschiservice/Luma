@@ -217,7 +217,7 @@ export const Unopened: Story = {
         'No reviewed native opening exists for this stock pool.',
       ),
     ).resolves.toBeVisible();
-    expect(canvas.queryByRole('table')).toBeNull();
+    await expect(canvas.queryByRole('table')).toBeNull();
   },
 };
 

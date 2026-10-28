@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, it, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -17,8 +16,18 @@ RuleTester.it = it;
 const filename = (file) =>
   fileURLToPath(new URL(`../../${file}`, import.meta.url));
 
+const packageOf = Object.fromEntries(
+  Object.entries(domainPackages).map(([directory, module]) => [
+    module,
+    directory,
+  ]),
+);
+
 const moduleFile = (module, layer = 'application/service.ts') =>
-  filename(`apps/api/src/modules/${module}/${layer}`);
+  filename(`packages/${packageOf[module]}/src/${layer}`);
+
+const runtimeFile = (file) =>
+  filename(`packages/application-runtime/src/${file}`);
 
 const sample = (file, code) => ({ filename: file, code });
 
@@ -26,27 +35,6 @@ const invalid = (file, code) => ({
   ...sample(file, code),
   errors: [{ messageId: 'boundary' }],
 });
-
-// Run every relative-import boundary case through the native package imports too.
-function withPackageImport(entry) {
-  const sourceRoot = filename('apps/api/src/');
-  if (!entry.filename.startsWith(sourceRoot)) return [entry];
-  const code = entry.code.replace(
-    /(['"])(\.[^'"]+\.js)\1/g,
-    (match, quote, specifier) => {
-      const target = path.resolve(path.dirname(entry.filename), specifier);
-      if (!target.startsWith(sourceRoot)) return match;
-      const relative = path
-        .relative(sourceRoot, target)
-        .replaceAll(path.sep, '/')
-        .slice(0, -3);
-
-      return `${quote}#${relative}${quote}`;
-    },
-  );
-
-  return code === entry.code ? [entry] : [entry, { ...entry, code }];
-}
 
 new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   'boundaries',
@@ -71,16 +59,14 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       sample(
         moduleFile('connectors', 'infrastructure/installations/runtime.ts'),
-        "import type { InstallationService } from '#modules/connectors/application/installations';",
+        "import type { InstallationService } from '../../application/installations.js';",
       ),
       sample(
-        filename('apps/api/src/composition/services.ts'),
-        "import { createCases } from '#modules/exceptions/composition';",
+        runtimeFile('composition/services.ts'),
+        "import { createCases } from '@luma/exceptions/composition';",
       ),
       sample(
-        filename(
-          'packages/application-runtime/src/composition/features/procurement.ts',
-        ),
+        runtimeFile('composition/features/procurement.ts'),
         "import { procurementRoutes } from '@luma/procurement/http';",
       ),
       ...[
@@ -93,21 +79,37 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'workflow-runtime.test.ts',
       ].map((name) =>
         sample(
-          filename(`apps/api/src/${name}`),
-          "import { createInstalledConnections } from './modules/connectors/composition.js';",
+          runtimeFile(name),
+          "import { createInstalledConnections } from '@luma/connections/composition';",
         ),
       ),
       sample(
-        filename('apps/api/src/exceptions.integration.test.ts'),
-        "import { createExceptions } from './modules/exceptions/composition.js';",
+        runtimeFile('exceptions.integration.test.ts'),
+        "import { createExceptions } from '@luma/exceptions/composition';",
       ),
       sample(
-        filename('apps/api/src/test-support/detection-fixtures.ts'),
-        "import { createInstalledRuntime } from '../modules/connectors/composition.js';",
+        runtimeFile('test-support/detection-fixtures.ts'),
+        "import { createCapabilityRuntime } from '@luma/connections/adapters';",
       ),
       sample(
-        filename('apps/api/src/app.test.ts'),
-        "import { createObservability } from './modules/platform/composition.js';",
+        runtimeFile('app.test.ts'),
+        "import { createObservability } from '@luma/platform/composition';",
+      ),
+      // Process entry points wire the runtime's services.
+      ...[
+        'apps/api/src/index.ts',
+        'apps/api/src/composition/bootstrap.ts',
+        'apps/worker/src/sync.ts',
+        'apps/staff-api/src/composition/http-app.ts',
+      ].map((file) =>
+        sample(
+          filename(file),
+          "import { createIdentity } from '@luma/identity/composition';",
+        ),
+      ),
+      sample(
+        filename('apps/worker/src/index.ts'),
+        "import { createWorkflowRuntime } from '@luma/application-runtime/worker';",
       ),
       sample(
         moduleFile('connectors', 'api/routes.ts'),
@@ -127,11 +129,15 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       sample(
         moduleFile('execution'),
-        "import type { Policy } from '../../policies/index.js';",
+        "import type { Policy } from '@luma/policies';",
+      ),
+      sample(
+        moduleFile('execution'),
+        "import type { Policy } from '../../../policies/src/index.js';",
       ),
       sample(
         moduleFile('orders', 'domain/order.ts'),
-        "import type { TenantId } from '../../platform/index.js';",
+        "import type { TenantId } from '@luma/platform';",
       ),
       sample(
         moduleFile('orders', 'infrastructure/repository.ts'),
@@ -142,8 +148,8 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         "import { repository } from './infrastructure/repository.js';",
       ),
       sample(
-        filename('apps/api/src/app.ts'),
-        "import { createOrders } from './modules/orders/composition.js';",
+        runtimeFile('app.ts'),
+        "import { createOrders } from '@luma/orders/composition';",
       ),
       sample(
         filename('apps/web/src/home.tsx'),
@@ -153,11 +159,11 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         moduleFile('orders', 'domain/order.test.ts'),
         "import { expect } from 'vitest';",
       ),
-    ].flatMap(withPackageImport),
+    ],
     invalid: [
       invalid(
-        filename('apps/api/src/resolution-learning.test.ts'),
-        "import { createLearningService } from '#modules/workflows/application/learning';",
+        runtimeFile('resolution-learning.test.ts'),
+        "import { createLearningService } from '@luma/workflows/application/learning';",
       ),
       invalid(
         moduleFile('connectors', 'application/installations.ts'),
@@ -177,27 +183,31 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(
         filename('packages/connectors/shopify/src/client.ts'),
-        "import type { TenantContext } from '#modules/identity/index';",
+        "import type { TenantContext } from '@luma/identity';",
       ),
       invalid(
         filename('packages/connectors/jtl/src/client.ts'),
-        "import { buildApp } from '../../../../apps/api/src/app.js';",
+        "import { buildApp } from '../../../../apps/api/src/index.js';",
+      ),
+      invalid(
+        runtimeFile('composition/services.ts'),
+        "import { app } from '../../../../apps/web/src/router.js';",
       ),
       invalid(
         moduleFile('connectors', 'application/installations.ts'),
-        "import { createSecretCipher } from '#modules/connectors/infrastructure/installations/secret-cipher';",
+        "import { createSecretCipher } from '../infrastructure/installations/secret-cipher.js';",
       ),
       invalid(
         moduleFile('execution', 'infrastructure/adapter.ts'),
-        "import { createSecretCipher } from '#modules/connectors/infrastructure/installations/secret-cipher';",
+        "import { createSecretCipher } from '@luma/connections/infrastructure/installations/secret-cipher';",
       ),
       invalid(
-        filename('apps/api/src/composition/services.ts'),
-        "import { createCaseReader } from '#modules/exceptions/infrastructure/cases';",
+        runtimeFile('composition/services.ts'),
+        "import { createCaseReader } from '@luma/exceptions/infrastructure/cases';",
       ),
       invalid(
         moduleFile('exceptions'),
-        "import { createDetectionServices } from '../../../composition/services.js';",
+        "import { createDetectionServices } from '../../../application-runtime/src/composition/services.js';",
       ),
       ...[
         'connections.test.ts',
@@ -208,21 +218,21 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'workflow-runtime.test.ts',
       ].map((name) =>
         invalid(
-          filename(`apps/api/src/${name}`),
-          "import { createSecretCipher } from './modules/connectors/infrastructure/installations/secret-cipher.js';",
+          runtimeFile(name),
+          "import { createSecretCipher } from '@luma/connections/infrastructure/installations/secret-cipher';",
         ),
       ),
       invalid(
-        filename('apps/api/src/exceptions.integration.test.ts'),
-        "import { createDetectionRepository } from './modules/exceptions/infrastructure/repository.js';",
+        runtimeFile('exceptions.integration.test.ts'),
+        "import { createDetectionRepository } from '@luma/exceptions/infrastructure/repository';",
       ),
       invalid(
-        filename('apps/api/src/app.ts'),
-        "import { createJtlConnector } from './modules/connectors/infrastructure/jtl/adapter.js';",
+        runtimeFile('app.ts'),
+        "import { createJtlConnector } from '@luma/connections/infrastructure/jtl/adapter';",
       ),
       invalid(
-        filename('apps/api/src/app.test.ts'),
-        "import { adapter } from './modules/platform/infrastructure/adapter.js';",
+        runtimeFile('app.test.ts'),
+        "import { adapter } from '../../platform/src/infrastructure/adapter.js';",
       ),
       ...[
         'domain/model.ts',
@@ -243,24 +253,25 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ...['infrastructure/repository.ts', 'composition.ts'].flatMap((layer) =>
         ['node:module', 'module'].flatMap((specifier) =>
           [
-            `import { createRequire } from '${specifier}'; const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
-            `import { createRequire as makeLoader } from '${specifier}'; const load = makeLoader(import.meta.url); load('../../inventory/index.js');`,
-            `import * as nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('../../inventory/index.js');`,
-            `import nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('../../inventory/index.js');`,
-            `const { createRequire } = await import('${specifier}'); const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
-            `const { createRequire } = require('${specifier}'); const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `import { createRequire } from '${specifier}'; const load = createRequire(import.meta.url); load('@luma/inventory');`,
+            `import { createRequire as makeLoader } from '${specifier}'; const load = makeLoader(import.meta.url); load('@luma/inventory');`,
+            `import * as nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('@luma/inventory');`,
+            `import nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('@luma/inventory');`,
+            `const { createRequire } = await import('${specifier}'); const load = createRequire(import.meta.url); load('@luma/inventory');`,
+            `const { createRequire } = require('${specifier}'); const load = createRequire(import.meta.url); load('@luma/inventory');`,
             `export { createRequire as makeLoader } from '${specifier}';`,
             `export * from '${specifier}';`,
           ].map((code) => invalid(moduleFile('orders', layer), code)),
         ),
       ),
+      invalid(moduleFile('orders'), "import { stock } from '@luma/inventory';"),
       invalid(
         moduleFile('orders'),
-        "import { stock } from '../../inventory/index.js';",
+        "import { stock } from '../../../inventory/src/index.js';",
       ),
       invalid(
         moduleFile('execution'),
-        "import { policy } from '../../policies/domain/policy.js';",
+        "import { policy } from '@luma/policies/domain/policy';",
       ),
       invalid(
         moduleFile('orders'),
@@ -268,7 +279,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(
         moduleFile('orders', 'domain/order.ts'),
-        "import type { User } from '../../identity/index.js';",
+        "import type { User } from '@luma/identity';",
       ),
       invalid(
         moduleFile('orders', 'domain/order.ts'),
@@ -285,66 +296,49 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(
         moduleFile('orders'),
-        "const policy = import('../../execution/index.js');",
+        "const policy = import('@luma/execution');",
       ),
       invalid(
         moduleFile('orders'),
-        "const policy = require('../../execution/index.js');",
+        "const policy = require('@luma/execution');",
       ),
       invalid(
         moduleFile('orders'),
-        "type Policy = import('../../execution/index.js').Policy;",
+        "type Policy = import('@luma/execution').Policy;",
       ),
       invalid(moduleFile('orders'), 'const adapter = import(name);'),
       invalid(moduleFile('orders'), "import x from '#internal/orders';"),
-      ...['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs'].flatMap(
-        (extension) => [
+      ...['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs'].map(
+        (extension) =>
           invalid(
             moduleFile('identity'),
             `import type { TenantContext } from '#modules/identity/domain/context.${extension}';`,
           ),
-          invalid(
-            filename('apps/api/src/app.test.ts'),
-            `import { detectionFixtures } from '#test-support/detection-fixtures.${extension}';`,
-          ),
-        ],
       ),
-      invalid(
-        moduleFile('orders'),
-        "import x from '#modules/orders/../inventory/index';",
-      ),
-      invalid(
-        moduleFile('orders'),
-        "import x from '#modules/orders/%2e%2e/inventory/index';",
-      ),
-      invalid(moduleFile('orders'), "import x from '#modules/orders//index';"),
-      invalid(
-        moduleFile('orders'),
-        "import x from '#test-support/detection-fixtures';",
-      ),
-      invalid(moduleFile('orders'), "import x from '#app';"),
       invalid(moduleFile('orders'), "import { config } from '@luma/config';"),
-      invalid(moduleFile('orders'), "import { app } from '../../../app.js';"),
-      invalid(moduleFile('orders'), "import x from '../../unknown/index.js';"),
-      invalid(moduleFile('unknown'), 'export {};'),
+      invalid(
+        moduleFile('orders'),
+        "import { buildApp } from '@luma/application-runtime';",
+      ),
+      invalid(moduleFile('orders'), "import x from '@luma/unknown';"),
       invalid(moduleFile('orders', 'helpers.ts'), 'export {};'),
       invalid(
         filename('packages/config/src/index.ts'),
-        "import { app } from '../../../apps/api/src/app.js';",
+        "import { app } from '../../../apps/api/src/index.js';",
       ),
       invalid(
         filename('apps/web/src/home.tsx'),
-        "import { orders } from '../../api/src/modules/orders/index.js';",
+        "import { orders } from '../../../packages/orders/src/index.js';",
       ),
       invalid(
-        filename('apps/api/src/app.ts'),
-        "import { repo } from './modules/orders/infrastructure/repo.js';",
+        runtimeFile('app.ts'),
+        "import { repo } from '@luma/orders/infrastructure/repo';",
       ),
       invalid(
         filename('apps/api/src/helper.ts'),
-        "import { orders } from './modules/orders/index.js';",
+        "import { orders } from '@luma/orders';",
       ),
-    ].flatMap(withPackageImport),
+    ],
   },
 );
 

@@ -144,7 +144,7 @@ describe('shared Shopify admission failure boundaries', () => {
       continuationWaitMs: 100,
     });
     const parent = vi.fn(async (feedback: BudgetFeedback) => {
-      feedback.observe('parent', 1, 1999, 100, 1, 2000);
+      await feedback.observe('parent', 1, 1999, 100, 1, 2000);
 
       return 'parent';
     });

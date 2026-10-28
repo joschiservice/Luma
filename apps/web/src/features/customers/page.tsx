@@ -2,9 +2,7 @@ import './customers.css';
 
 import {
   collectionField,
-  type CollectionGroup,
   type CollectionViewState,
-  collectionWhereIssues,
   type CustomerList,
   type CustomerListItem,
   customersCatalog,
@@ -29,7 +27,7 @@ import {
 } from '@luma/ui/lib/collection-conditions';
 import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
 import { selectRange } from '@luma/ui/lib/row-selection';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
@@ -48,25 +46,15 @@ import {
 
 import { useCollectionControls } from '../../kit/collections/controls';
 import { DescribedFilter } from '../../kit/collections/described-filter';
-import { useGroupPages } from '../../kit/collections/groups';
 import {
   CollectionLoading,
   CollectionNotices,
 } from '../../kit/collections/notices';
-import {
-  type CollectionError,
-  collectionError,
-  collectionServerIssue,
-  useCursorPaging,
-  useOnline,
-} from '../../kit/collections/paging';
+import { useCursorPaging, useOnline } from '../../kit/collections/paging';
 import { usePrivateSearch } from '../../kit/collections/private-search';
+import { useRecordCollection } from '../../kit/collections/record-collection';
 import { repairedState } from '../../kit/collections/repair';
-import {
-  type CollectionSearch,
-  groupOf,
-  viewParam,
-} from '../../kit/collections/state';
+import { type CollectionSearch, viewParam } from '../../kit/collections/state';
 import { useCollectionView } from '../../kit/collections/use-collection-view';
 import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { SignInRedirect } from '../../kit/identity/common';
@@ -145,7 +133,6 @@ export function CustomersPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/customers/' });
   const navigate = useNavigate({ from: '/app/$organizationId/customers/' });
-  const queryClient = useQueryClient();
   const timeZone = useContext(WorkspaceTimezone);
   const permissions = usePermissions(organizationId);
   const can = permissions.can;
@@ -204,46 +191,39 @@ export function CustomersPage() {
   });
   const custom = customFieldColumns(fields.data ?? []);
 
-  // Problems the client can see before asking, once permissions and custom fields are known.
-  const usesCustom = state.where.conditions.some((condition) =>
-    condition.field.startsWith('custom:'),
-  );
-  const fieldsKnown =
-    !usesCustom ||
-    fields.isSuccess ||
-    fields.isError ||
-    (availability.isSuccess &&
-      permissions.ready &&
-      !(availability.data.fields && can('adaptive.fields.read')));
-  const ready = permissions.ready && fieldsKnown;
-  const fieldPermissions = new Set(
-    customersCatalog.fields.flatMap((field) =>
-      field.permission && can(field.permission) ? [field.permission] : [],
-    ),
-  );
-  const clientIssues = ready
-    ? collectionWhereIssues(customersCatalog, state.where, {
-        permissions: fieldPermissions,
-        customFieldTypes: new Map(
-          custom
-            .filter((field) => !field.archived)
-            .map((field) => [field.id, field.type]),
-        ),
-      })
-    : [];
   const query = customerListQuery(
     state,
     { q, cursor: search.cursor },
     timeZone,
   );
-  const list = useQuery({
-    ...customersOptions(organizationId, query),
-    enabled: ready && !clientIssues.length,
+  const {
+    list,
+    serverIssue,
+    repair,
+    error,
+    grouping,
+    collapsed,
+    setCollapsed,
+    more,
+  } = useRecordCollection({
+    catalog: customersCatalog,
+    view,
+    permissions,
+    cursor: search.cursor,
+    list: customersOptions(organizationId, query),
+    resetKey: JSON.stringify([organizationId, query]),
+    groupPage: (key, cursor) =>
+      customersOptions(
+        organizationId,
+        customerListQuery(state, { q, cursor: search.cursor }, timeZone, {
+          key,
+          cursor,
+        }),
+      ),
+    customFields: { availability, definitions: fields, columns: custom },
+    gatedFields: true,
+    repair: (current, issues) => repaired(current, issues, can),
   });
-  // With a page cursor, a refused request means the page link is stale, not the view.
-  const serverIssue = search.cursor
-    ? undefined
-    : collectionServerIssue(list.error);
   const data = list.data;
   const sources = data?.sources ?? [];
   const sourceLabel = customerSourceLabel(sources);
@@ -272,47 +252,6 @@ export function CustomersPage() {
     title: 'name',
     preview: true,
     serverIssues: serverIssue ? [serverIssue] : [],
-  });
-  // A 403 for a reader who can read customers means a field the view uses is closed to them.
-  const fieldDenied =
-    list.error instanceof ApiError &&
-    list.error.status === 403 &&
-    can('customers.read');
-  const issues = [
-    ...clientIssues,
-    ...(serverIssue ? [serverIssue] : []),
-    ...(fieldDenied ? [{ index: null }] : []),
-  ];
-  const repair = issues.length
-    ? () => view.change(repaired(state, issues, can))
-    : undefined;
-  const error: CollectionError | undefined =
-    clientIssues.length || fieldDenied
-      ? { kind: 'invalid', message: m.collections_needs_repair() }
-      : collectionError(list.error, search.cursor);
-
-  const grouping = state.group;
-  const groupPrefix = `${groupOf(state) ?? ''}=`;
-  const collapsed = view.display.collapsedGroups
-    .filter((id) => id.startsWith(groupPrefix))
-    .map((id) => id.slice(groupPrefix.length));
-  const more = useGroupPages<CustomerListItem>({
-    resetKey: JSON.stringify([organizationId, query]),
-    load: (key: CollectionGroup['key'], cursor: string) =>
-      queryClient
-        .fetchQuery(
-          customersOptions(
-            organizationId,
-            customerListQuery(state, { q, cursor: search.cursor }, timeZone, {
-              key,
-              cursor,
-            }),
-          ),
-        )
-        .then((page) => ({
-          rows: page.items,
-          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
-        })),
   });
   const groups =
     data && grouping && data.groups ? customerGroups(data, grouping, more) : [];
@@ -542,17 +481,7 @@ export function CustomersPage() {
           )
         }
         collapsed={collapsed}
-        onCollapsedChange={(id, closed) =>
-          view.setDisplay({
-            ...view.display,
-            collapsedGroups: [
-              ...view.display.collapsedGroups.filter(
-                (item) => item !== `${groupPrefix}${id}`,
-              ),
-              ...(closed ? [`${groupPrefix}${id}`] : []),
-            ].slice(-100),
-          })
-        }
+        onCollapsedChange={setCollapsed}
         more={more}
       />
     ) : null;

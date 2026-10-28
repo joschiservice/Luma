@@ -769,11 +769,11 @@ export function DraftEditor({
           validation={current ? validation : undefined}
           tests={publishTests?.({ draft })}
           close={() => setPublishing(false)}
-          published={async (result) => {
-            await client.invalidateQueries({
+          published={(result) => {
+            void client.invalidateQueries({
               queryKey: workflowsKey(organizationId),
             });
-            await navigate({
+            void navigate({
               to: '/app/$organizationId/workflows/$definitionId',
               params: {
                 organizationId,
@@ -817,6 +817,18 @@ function DiscardDialog({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const discard = async () => {
+    setPending(true);
+    setError('');
+    try {
+      await discardDraft(organizationId, draft.id, draft.revision);
+      await discarded();
+    } catch (failure) {
+      setError(workflowError(failure));
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !pending && close()}>
@@ -837,18 +849,7 @@ function DiscardDialog({
           <Button
             variant="destructive"
             disabled={pending}
-            onClick={async () => {
-              setPending(true);
-              setError('');
-              try {
-                await discardDraft(organizationId, draft.id, draft.revision);
-                await discarded();
-              } catch (failure) {
-                setError(workflowError(failure));
-              } finally {
-                setPending(false);
-              }
-            }}
+            onClick={() => void discard()}
           >
             {pending
               ? m.authoring_discard_pending()

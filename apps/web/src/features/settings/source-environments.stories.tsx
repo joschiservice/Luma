@@ -241,7 +241,7 @@ export const ReviewedDeclaration: Story = {
     await waitFor(() =>
       expect(canvas.getByText(m.settings_source_saved())).toBeVisible(),
     );
-    expect(commands[0]).toMatchObject({
+    await expect(commands[0]).toMatchObject({
       expectedRevision: 0,
       reviewId: '44444444-4444-4444-8444-444444444444',
       liveOperationsConfirmed: true,
@@ -259,7 +259,7 @@ export const ReviewedDeclaration: Story = {
         canvas.getByText(m.settings_source_revoked(), { exact: true }),
       ).toBeVisible(),
     );
-    expect(commands[1]).toMatchObject({
+    await expect(commands[1]).toMatchObject({
       expectedRevision: 1,
       reviewId: null,
       liveOperationsConfirmed: false,
@@ -300,7 +300,7 @@ export const LostResponse: Story = {
       canvas.getByRole('button', { name: m.settings_source_check_saved() }),
     );
     await waitFor(() => expect(commands).toHaveLength(2));
-    expect(commands[1]).toEqual(commands[0]);
+    await expect(commands[1]).toEqual(commands[0]);
     await waitFor(() =>
       expect(canvas.getByText(m.settings_source_saved())).toBeVisible(),
     );
@@ -323,7 +323,7 @@ export const ExpiredReview: Story = {
     await expect(
       canvas.getByRole('button', { name: m.settings_source_declare() }),
     ).toBeDisabled();
-    expect(commands).toHaveLength(0);
+    await expect(commands).toHaveLength(0);
   },
 };
 
@@ -345,7 +345,7 @@ export const UnsupportedSource: Story = {
     await expect(
       canvas.getByRole('button', { name: m.settings_source_inspect() }),
     ).toBeDisabled();
-    expect(commands).toHaveLength(0);
+    await expect(commands).toHaveLength(0);
     await userEvent.type(
       canvas.getByLabelText(m.settings_autonomy_reason()),
       'Revoke unavailable source declaration',
@@ -354,7 +354,7 @@ export const UnsupportedSource: Story = {
       canvas.getByRole('button', { name: m.settings_source_revoke() }),
     );
     await waitFor(() => expect(commands).toHaveLength(1));
-    expect(commands[0]).toMatchObject({
+    await expect(commands[0]).toMatchObject({
       reviewId: null,
       liveOperationsConfirmed: false,
       expectedRevision: 1,

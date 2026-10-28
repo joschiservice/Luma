@@ -166,7 +166,7 @@ export function OwnerReview({
         <PurchasingPlanReview
           organizationId={organizationId}
           planId={owner.planId}
-          done={onChange}
+          done={() => void onChange()}
         />
       );
     case 'message_thread':

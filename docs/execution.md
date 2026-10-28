@@ -5,7 +5,9 @@ single durable dispatch reservation, then independent verification, with append-
 audit evidence at each step. A successful provider call is never verification, and
 retries, restarts and redelivery never dispatch a second write. `@luma/policies`,
 `@luma/execution` and `@luma/audit` own the rules; `@luma/application-runtime` composes
-them with identity, an eligibility reader and the trusted effect registry.
+them with identity, an eligibility reader and the trusted effect registry. The
+[add-governed-action](../.agents/skills/add-governed-action/SKILL.md) skill walks through
+adding an action.
 
 ```mermaid
 flowchart TD
@@ -45,6 +47,9 @@ hash.
   expiry and evidence membership. Bound evidence must be at most five minutes old by
   default and never future-dated. The effect binding separately validates target
   ownership, connection scope, parameter mapping and provider preconditions.
+- Composition routes eligibility by the step's subject kind to the owner that bound it. A
+  new owner-bound action must register its subject kind there; an unregistered kind is
+  routed to replenishment, not to its owner.
 - Admission rechecks activation, current membership and eligibility after the reservation
   reaches audit and before dispatch. Admission metadata does not change the proposal hash,
   so approvals stay bound to the same action.
@@ -291,7 +296,10 @@ delayed request will not commit, so the attempt stays blocked and its reservatio
 consumed; an in-flight dispatch can still record its receipt. Reconciliation keeps
 dispatch certainty and the reserved provider identity and never redispatches. If it cannot
 establish success, escalate to a person instead of retrying. Attempts recorded without a
-dispatch identity reconcile only with a matching mechanism and executor.
+dispatch identity reconcile only with a matching mechanism and executor. A runtime that resolves
+no adapter for the intent, or one with another dispatch identity, refuses to reconcile and
+leaves the attempt unchanged, so every process that runs an owner's send or reconcile path
+must compose that owner's effects.
 
 Policy records, approval responses, reservations and completions commit together with
 their outbox events. The effect is called only after the policy and prepared events reach

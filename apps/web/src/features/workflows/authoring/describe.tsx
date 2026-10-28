@@ -808,6 +808,25 @@ export function CodeStepSuggester({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
 
+  const suggest = async () => {
+    setPending(true);
+    setError('');
+    try {
+      setSuggestion(
+        await suggestCodeStep(organizationId, draft.id, {
+          id: crypto.randomUUID(),
+          revision: draft.revision,
+          stepId,
+          description: description.trim(),
+        }),
+      );
+    } catch (failure) {
+      setError(workflowError(failure));
+    } finally {
+      setPending(false);
+    }
+  };
+
   if (availability.data && !availability.data.available) return null;
 
   return (
@@ -827,24 +846,7 @@ export function CodeStepSuggester({
         <Button
           variant="outline"
           disabled={pending || !description.trim()}
-          onClick={async () => {
-            setPending(true);
-            setError('');
-            try {
-              setSuggestion(
-                await suggestCodeStep(organizationId, draft.id, {
-                  id: crypto.randomUUID(),
-                  revision: draft.revision,
-                  stepId,
-                  description: description.trim(),
-                }),
-              );
-            } catch (failure) {
-              setError(workflowError(failure));
-            } finally {
-              setPending(false);
-            }
-          }}
+          onClick={() => void suggest()}
         >
           {pending
             ? m.authoring_suggest_pending()

@@ -80,7 +80,9 @@ Each process builds its services through its own composition path in
   and `/http` for route registration.
 - **Contracts:** `packages/api-contract/src/<feature>.ts` for schemas and `contracts/` for
   routes. A route area joins the API in `domains/<package>.ts`, the group of the package that
-  serves it.
+  serves it. The root export in `src/generated.ts` re-exports every schema module and every
+  group; regenerate it with `pnpm --filter @luma/api-contract generate:index` after adding or
+  removing a module or group. Don't edit it by hand: a test rejects a stale copy.
 - **Web features:** `apps/web/src/features/<feature>`, usually with `page.tsx`,
   `detail.tsx`, URL state in `data.ts` and wording in `presentation.ts`; text comes from the
   feature's namespace in the `@luma/i18n` catalogs. The workspace shell, navigation, command
@@ -90,7 +92,8 @@ Each process builds its services through its own composition path in
 - **Migrations:** numbered SQL in `packages/application-runtime/migrations`; the simulator
   has its own in `apps/simulator/migrations`.
 - **Wiring:** `packages/application-runtime/src/composition` assembles services for the API,
-  worker, pilot and simulator. A fix in one composition path may be missing in another.
+  worker, pilot and simulator. A fix in one composition path may be missing in another; see
+  the [wire-composition](../.agents/skills/wire-composition/SKILL.md) skill.
   `features/<package>.ts` implements the same route group from the services in
   `ApplicationServices['http']`; keys in these registries stay sorted.
 - **Tests:** unit tests sit next to the code. Database integration tests are
