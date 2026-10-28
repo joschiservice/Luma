@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router';
 import { Pin, PinOff, X } from 'lucide-react';
 
 import { useWorkspaceLayout } from '../kit/layout/data';
+import { SidebarLinkLabel } from '../kit/layout/sidebar-link-label';
 import { destinationFor } from './workspace-destinations';
 
 const maxPins = 12;
@@ -129,7 +130,7 @@ export function PinnedNavigation({
                     aria-hidden="true"
                   />
                 )}
-                <span className="sidebar-link-label">{pin.label}</span>
+                <SidebarLinkLabel>{pin.label}</SidebarLinkLabel>
               </a>
               <button
                 type="button"

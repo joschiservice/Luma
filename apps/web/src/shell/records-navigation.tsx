@@ -2,6 +2,8 @@ import { m } from '@luma/i18n/messages';
 import { ChevronRight, Database } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 
+import { SidebarLinkLabel } from '../kit/layout/sidebar-link-label';
+
 /** Groups record destinations, initially expanded when the current page is a record. */
 export function RecordsNavigation({
   active,
@@ -24,7 +26,7 @@ export function RecordsNavigation({
         onClick={() => setExpanded((value) => !value)}
       >
         <Database className="sidebar-link-icon" size={16} aria-hidden="true" />
-        <span className="sidebar-link-label">{m.identity_nav_records()}</span>
+        <SidebarLinkLabel>{m.identity_nav_records()}</SidebarLinkLabel>
         <ChevronRight
           className="sidebar-records-chevron"
           size={14}

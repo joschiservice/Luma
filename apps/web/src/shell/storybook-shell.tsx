@@ -8,6 +8,7 @@ import {
 import { WorkspaceSwitcher } from '@luma/ui/components/workspace/workspace-switcher';
 import { type ReactNode, useState } from 'react';
 
+import { SidebarLinkLabel } from '../kit/layout/sidebar-link-label';
 import appStyles from '../styles.css?inline';
 import { RecordsNavigation } from './records-navigation';
 import { workspaceDestinations } from './workspace-destinations';
@@ -76,7 +77,7 @@ export function StoryShell({
             aria-hidden="true"
           />
         )}
-        <span className="sidebar-link-label">{item.label}</span>
+        <SidebarLinkLabel>{item.label}</SidebarLinkLabel>
         {item.path === 'needs-you' && attention ? (
           <span className="sidebar-link-count">
             <span aria-hidden="true">{formatNumber(attention)}</span>

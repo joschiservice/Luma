@@ -805,6 +805,8 @@
 }
 
 :is(.command-item, .command-item-link > a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
   background: var(--surface-selected);
 }
 
