@@ -327,5 +327,13 @@
   "identity_staff_region_column": "Region",
   "identity_staff_region_unknown": "Die zuständige Region konnte nicht bestätigt werden. Öffne diesen Workspace aus einem regionalen Suchergebnis.",
   "identity_nav_all_records": "Alle Datensätze",
-  "identity_nav_installed_apps": "Installierte Apps"
+  "identity_nav_installed_apps": "Installierte Apps",
+  "identity_route_missing_title": "Seite nicht gefunden",
+  "identity_route_missing_body": "Diese Seite existiert nicht oder wurde verschoben. Prüfe die Adresse oder mach auf der Startseite weiter.",
+  "identity_route_error_title": "Etwas ist schiefgelaufen",
+  "identity_route_error_body": "Luma konnte diese Seite nicht anzeigen. Versuch es erneut. Wenn das Problem bleibt, lade die Seite neu.",
+  "identity_route_home": "Zur Startseite",
+  "identity_auth_signup_rate_limited": "Zu viele Versuche, ein Konto zu erstellen. Warte einen Moment und versuch es erneut.",
+  "identity_auth_signup_unavailable": "Luma konnte das Konto gerade nicht erstellen. Deine Angaben sind noch da. Versuch es gleich noch einmal.",
+  "identity_verify_done_invitation": "Du trittst einem Workspace bei, zu dem du eingeladen wurdest? Öffne nach der Anmeldung den Einladungslink aus deiner E-Mail erneut."
 }

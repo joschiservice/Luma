@@ -23,6 +23,7 @@ import { ArrowRight, Clock3, Play, ShieldCheck, Zap } from 'lucide-react';
 import { useContext, useState } from 'react';
 
 import { ApiError } from '../../kit/identity/data';
+import { ConfirmAction } from '../../kit/layout/confirm-action';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { vocabularyOptions } from './authoring/data';
@@ -575,7 +576,10 @@ export function WorkflowTriggers({
   );
 }
 
-/** Cancels a pending schedule and refreshes history; uncertain results can be retried safely. */
+/**
+ * Cancels a pending schedule after confirmation and refreshes history; uncertain results can be
+ * retried safely.
+ */
 export function CancelScheduledStart({
   organizationId,
   definitionId,
@@ -606,17 +610,20 @@ export function CancelScheduledStart({
 
   return (
     <div>
-      <Button
+      <ConfirmAction
         variant="outline"
         disabled={pending}
-        onClick={() => void cancel()}
+        prompt={m.workflows_triggers_cancel_prompt()}
+        confirmLabel={m.workflows_triggers_cancel_confirm()}
+        dismissLabel={m.workflows_triggers_cancel_keep()}
+        onConfirm={() => void cancel()}
       >
         {pending
           ? m.workflows_triggers_canceling()
           : coordination
             ? m.common_cancel()
             : m.workflows_triggers_cancel_scheduled()}
-      </Button>
+      </ConfirmAction>
       {error ? <p role="alert">{error}</p> : null}
     </div>
   );

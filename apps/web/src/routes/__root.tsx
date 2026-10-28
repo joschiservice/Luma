@@ -3,11 +3,10 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   createRootRouteWithContext,
   HeadContent,
-  Outlet,
   Scripts,
   useRouter,
 } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 import { themeBootScript, watchTheme } from '../lib/theme';
 import { zodConfigBootScript } from '../lib/zod-config';
@@ -27,11 +26,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
       ],
     }),
-    component: Root,
+    // The document stays in place when the root route fails, so its error page keeps styles.
+    shellComponent: RootDocument,
   },
 );
 
-function Root() {
+function RootDocument({ children }: { children: ReactNode }) {
   const nonce = useRouter().options.ssr?.nonce;
   useEffect(() => watchTheme(), []);
 
@@ -49,7 +49,7 @@ function Root() {
         />
       </head>
       <body>
-        <Outlet />
+        {children}
         <Scripts />
       </body>
     </html>

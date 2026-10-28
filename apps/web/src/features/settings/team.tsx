@@ -23,6 +23,7 @@ import { Failure } from '../../kit/identity/common';
 import { ApiError } from '../../kit/identity/data';
 import { roleName } from '../../kit/identity/permission-text';
 import { isOwnerRole, usePermissions } from '../../kit/identity/permissions';
+import { ConfirmAction } from '../../kit/layout/confirm-action';
 import {
   invitationsOptions,
   membersOptions,
@@ -75,6 +76,12 @@ export function TeamSettings({
   const error = members.error ?? invitations.error;
   if (error instanceof ApiError && [401, 404].includes(error.status))
     return <Failure error={error} retry={() => void members.refetch()} />;
+  // Without any loaded members the list would look empty, so the failure takes its place.
+  const membersMissing = members.isError && !members.data;
+  const retry = () => {
+    void members.refetch();
+    if (manage) void invitations.refetch();
+  };
   const active = roles.data?.roles.filter((role) => !role.archived) ?? [];
   const visible = members.data?.filter((member) =>
     `${member.name ?? ''} ${member.email ?? ''} ${roleName(member.role)}`
@@ -207,16 +214,19 @@ export function TeamSettings({
       {noActiveOwner ? (
         <Alert tone="warning">{m.settings_team_no_active_owner()}</Alert>
       ) : null}
-      {error ? (
+      {membersMissing ? (
+        <Alert tone="danger" role="alert">
+          {members.error instanceof ApiError && members.error.status === 403
+            ? m.settings_team_load_forbidden()
+            : m.settings_team_load_unavailable()}{' '}
+          <Button variant="outline" onClick={retry}>
+            {m.common_retry()}
+          </Button>
+        </Alert>
+      ) : error ? (
         <Alert tone="danger">
           {m.settings_team_load_failed()}{' '}
-          <Button
-            variant="outline"
-            onClick={() => {
-              void members.refetch();
-              if (manage) void invitations.refetch();
-            }}
-          >
+          <Button variant="outline" onClick={retry}>
             {m.common_retry()}
           </Button>
         </Alert>
@@ -408,10 +418,13 @@ export function TeamSettings({
                       >
                         {m.settings_invitation_resend()}
                       </Button>
-                      <Button
-                        variant="ghost"
+                      <ConfirmAction
                         disabled={blocked}
-                        onClick={() =>
+                        prompt={m.settings_invitation_revoke_prompt({
+                          email: invitation.email,
+                        })}
+                        confirmLabel={m.settings_invitation_revoke()}
+                        onConfirm={() =>
                           void command.run(
                             (commandId) =>
                               settingsApi.settings.changeInvitation({
@@ -430,7 +443,7 @@ export function TeamSettings({
                         }
                       >
                         {m.settings_invitation_revoke()}
-                      </Button>
+                      </ConfirmAction>
                     </>
                   )}
                 </div>
@@ -538,13 +551,20 @@ export function TeamSettings({
           ) : null}
           {selected ? <CommandFeedback command={command} /> : null}
           <div className="settings-dialog-actions">
-            <Button
+            <ConfirmAction
               variant="destructive"
               disabled={blocked || lastOwner}
-              onClick={() => void changeMember(true)}
+              prompt={m.settings_member_remove_prompt({
+                name:
+                  selected?.name ??
+                  selected?.email ??
+                  m.settings_team_member_fallback(),
+              })}
+              confirmLabel={m.settings_member_remove()}
+              onConfirm={() => void changeMember(true)}
             >
               {m.settings_member_remove()}
-            </Button>
+            </ConfirmAction>
             <Button
               disabled={
                 blocked ||

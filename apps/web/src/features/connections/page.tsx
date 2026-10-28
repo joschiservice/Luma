@@ -19,7 +19,9 @@ import { AppStore } from '../apps/store';
 /** Lists apps and forwards existing connection links to their app management page. */
 export function ConnectionsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const { appResult } = useSearch({ from: '/app/$organizationId/apps/' });
+  const { appResult, install } = useSearch({
+    from: '/app/$organizationId/apps/',
+  });
   const connections = useQuery(connectionsOptions(organizationId));
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
@@ -43,17 +45,23 @@ export function ConnectionsPage() {
       key={organizationId}
       organizationId={organizationId}
       appResult={appResult}
+      install={install}
     />
   );
 }
 
-/** Shows installed app status and available workspace apps. */
+/**
+ * Shows installed app status and available workspace apps. `install` names an app whose setup
+ * opens right away for people who manage apps.
+ */
 export function Connections({
   organizationId,
   appResult,
+  install,
 }: {
   organizationId: string;
   appResult?: string | undefined;
+  install?: string | undefined;
 }) {
   const client = useQueryClient();
   const { can } = usePermissions(organizationId);
@@ -75,6 +83,7 @@ export function Connections({
       <AppStore
         organizationId={organizationId}
         canManage={canManage}
+        install={install}
         refresh={async () => {
           await client.invalidateQueries({
             queryKey: connectionsOptions(organizationId).queryKey,

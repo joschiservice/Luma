@@ -120,5 +120,20 @@
   "home_window_brief": "Morgenüberblick",
   "home_brief_window": "Verifizierte Ergebnisse von {start} bis {end}. Entscheidungen und laufende Arbeit zeigen den aktuellen Stand.",
   "home_pending_stock": "{count, plural, one {{count, number} mögliche Bestandsabweichung} other {{count, number} mögliche Bestandsabweichungen}}",
-  "home_pending_stock_until": "Bestätigung bis"
+  "home_pending_stock_until": "Bestätigung bis",
+  "home_first_run_connect_shopify": "Shopify verbinden",
+  "home_first_run_other_systems": "Andere Systeme ansehen",
+  "home_first_run_ask_owner": "Bitte einen Inhaber des Workspace, ein System zu verbinden.",
+  "home_first_run_ask_owner_description": "Dafür ist die Berechtigung nötig, Apps zu verwalten. Deine Rolle umfasst sie nicht.",
+  "home_first_run_steps_label": "Schritte zur Einrichtung",
+  "home_first_run_step_done": "Erledigt",
+  "home_first_run_step_yours": "Dein nächster Schritt",
+  "home_first_run_step_luma": "Luma arbeitet daran",
+  "home_first_run_step_later": "Noch nicht begonnen",
+  "home_first_run_connect_title": "Shop verbinden",
+  "home_first_run_connect_description": "Über diese Verbindung liest Luma Bestellungen, Bestände und Fulfillment.",
+  "home_first_run_import_title": "Erster Import",
+  "home_first_run_import_description": "Luma importiert deine Daten und beginnt, sie auf Probleme zu prüfen.",
+  "home_first_run_verify_title": "Erstes bestätigtes Ergebnis",
+  "home_first_run_verify_description": "Ein Problem gilt erst als gelöst, wenn ein neuer Abruf die Behebung bestätigt."
 }
