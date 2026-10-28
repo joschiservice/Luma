@@ -451,6 +451,7 @@ export function AuthLayout({
         <ResolutionStory />
       </section>
       <section className="auth-panel">
+        <LanguageSelect variant="quiet" className="auth-language" />
         <div className="auth-panel-inner">
           <span className="auth-panel-brand" aria-hidden="true">
             <LumaLockup />
@@ -458,9 +459,6 @@ export function AuthLayout({
           <h1>{title}</h1>
           <p className="auth-panel-lead">{lead}</p>
           {children}
-          <footer className="auth-panel-footer">
-            <LanguageSelect className="auth-language" />
-          </footer>
         </div>
       </section>
     </main>

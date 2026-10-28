@@ -5,21 +5,28 @@ import {
   Select,
   type SelectProps,
 } from '@luma/ui/components/primitives/select';
+import { Globe } from 'lucide-react';
 
 /**
  * Chooses the interface language for this browser. Each language is listed in its own name.
  * Choosing another language stores it in a cookie and reloads the page, so server-rendered
- * text and formatting switch together.
+ * text and formatting switch together. The `quiet` variant shows a globe beside the current
+ * language, for the corner of pages outside a workspace.
  */
 export function LanguageSelect(
   props: Pick<
     SelectProps<Locale>,
-    'className' | 'aria-labelledby' | 'aria-describedby'
+    'className' | 'aria-labelledby' | 'aria-describedby' | 'variant'
   >,
 ) {
   return (
     <Select<Locale>
       {...props}
+      icon={
+        props.variant === 'quiet' ? (
+          <Globe size={15} aria-hidden="true" />
+        ) : undefined
+      }
       {...(props['aria-labelledby']
         ? {}
         : { 'aria-label': m.ui_language_label() })}

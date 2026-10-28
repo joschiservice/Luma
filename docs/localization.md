@@ -10,8 +10,9 @@ source language. Translated product guides are covered in
 
 The language is chosen per browser, like the theme: the `luma_locale` cookie, then the
 browser's preferred languages, then English. Changing it (Settings, the account menu, the
-command menu, the sign-in pages or the documentation header) stores the cookie and reloads
-the page, so server-rendered text, document language and formatting switch together.
+command menu, the top corner of sign-in and other pages outside a workspace, or the
+documentation header) stores the cookie and reloads the page, so server-rendered text,
+document language and formatting switch together.
 
 The web server entry runs Paraglide's middleware around every request, which makes the
 request's language available to rendering and server handlers through async local storage.

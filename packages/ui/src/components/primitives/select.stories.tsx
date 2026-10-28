@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Globe } from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
@@ -78,6 +79,31 @@ export const Disabled: Story = {
   args: { disabled: true, defaultValue: 'high' },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('combobox')).toBeDisabled();
+  },
+};
+
+/** A page-level setting outside a form, such as the interface language in a page corner. */
+export const Quiet: Story = {
+  args: {
+    variant: 'quiet',
+    icon: <Globe size={15} />,
+    defaultValue: 'high',
+  },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('combobox', {
+      name: 'Severity',
+    });
+    await expect(trigger).toHaveTextContent('High');
+    await userEvent.click(trigger);
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Medium' }),
+    );
+    await expect(trigger).toHaveTextContent('Medium');
+    await waitFor(() =>
+      expect(
+        within(document.body).queryByRole('listbox'),
+      ).not.toBeInTheDocument(),
+    );
   },
 };
 

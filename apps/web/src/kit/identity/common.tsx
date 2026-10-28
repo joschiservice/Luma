@@ -42,12 +42,14 @@ export function EntryFrame({
     <main className="entry">
       <header className="entry-bar">
         <Brand />
-        {actions ? <div className="entry-bar-actions">{actions}</div> : null}
+        <div className="entry-bar-actions">
+          {actions}
+          <LanguageSelect variant="quiet" />
+        </div>
       </header>
       <div className="entry-body">{children}</div>
       <footer className="entry-footer">
         <p>{m.identity_entry_footer()}</p>
-        <LanguageSelect className="entry-language" />
       </footer>
     </main>
   );

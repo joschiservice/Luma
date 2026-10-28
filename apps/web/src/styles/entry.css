@@ -160,6 +160,7 @@
 }
 
 .auth-panel {
+  position: relative;
   display: grid;
   place-items: center;
   padding: 40px 24px;
@@ -501,6 +502,12 @@
   gap: 16px;
 }
 
+.entry-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .entry-bar-actions a {
   color: var(--foreground-muted);
   font-size: 13px;
@@ -528,16 +535,11 @@
   text-align: center;
 }
 
-/* The language choice stays compact on pages people reach before Settings. */
-.entry-language,
+/* The language choice sits in the form panel's corner, level with the story's lockup. */
 .auth-language {
-  width: auto;
-  min-width: 128px;
-}
-
-.auth-panel-footer {
-  display: flex;
-  justify-content: flex-end;
+  position: absolute;
+  top: 55px;
+  right: clamp(16px, 4vw, 48px);
 }
 
 .entry-panel,
@@ -715,6 +717,12 @@
   .auth-panel-brand {
     display: block;
     margin-bottom: 20px;
+  }
+
+  /* Level with the panel's own lockup once the story is hidden. */
+  .auth-language {
+    top: 16px;
+    right: 16px;
   }
 
   .landing-loop {
