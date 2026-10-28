@@ -120,5 +120,20 @@
   "home_window_brief": "Morning brief",
   "home_brief_window": "Verified results from {start} to {end}. Decisions and ongoing work show the current state.",
   "home_pending_stock": "{count, plural, one {{count, number} possible stock mismatch} other {{count, number} possible stock mismatches}}",
-  "home_pending_stock_until": "Confirming until"
+  "home_pending_stock_until": "Confirming until",
+  "home_first_run_connect_shopify": "Connect Shopify",
+  "home_first_run_other_systems": "See other systems",
+  "home_first_run_ask_owner": "Ask a workspace owner to connect a system.",
+  "home_first_run_ask_owner_description": "Connecting needs permission to manage apps, which your role doesn’t include.",
+  "home_first_run_steps_label": "Setup steps",
+  "home_first_run_step_done": "Done",
+  "home_first_run_step_yours": "Your next step",
+  "home_first_run_step_luma": "Luma is working on it",
+  "home_first_run_step_later": "Not started",
+  "home_first_run_connect_title": "Connect your shop",
+  "home_first_run_connect_description": "Luma reads orders, stock and fulfillment through this connection.",
+  "home_first_run_import_title": "First import",
+  "home_first_run_import_description": "Luma imports your records and starts checking them for problems.",
+  "home_first_run_verify_title": "First verified outcome",
+  "home_first_run_verify_description": "A problem counts as resolved only after a fresh read confirms the fix."
 }

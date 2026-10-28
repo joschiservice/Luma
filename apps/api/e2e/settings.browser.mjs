@@ -202,6 +202,18 @@ test('manages workspace preferences and the complete invitation journey on deskt
     .waitFor();
   await page.getByRole('button', { name: 'Manage Outsider' }).click();
   await page.getByRole('button', { name: 'Remove access' }).click();
+  // Removing access asks first, with focus on Cancel so Enter can't confirm by accident.
+  const removal = page.getByRole('group', {
+    name: /^Remove Outsider’s access/,
+  });
+  await expect(
+    removal.getByRole('button', { name: 'Cancel', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(removal).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Remove access' }).click();
+  await removal.getByRole('button', { name: 'Remove access' }).click();
   await page.getByText('Workspace access removed.').waitFor();
   await recipient.goto(`/app/${f.org.id}/settings/workspace`);
   await recipient

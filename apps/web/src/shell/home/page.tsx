@@ -70,6 +70,7 @@ import { sessionOptions } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { useWorkspaceLayout } from '../../kit/layout/data';
 import { StockProtectionNotice } from '../../shared/stock-protection/notice';
+import { FirstRun } from './first-run';
 import {
   ActivityModule,
   AttentionModule,
@@ -82,10 +83,14 @@ import {
   ReturnsModule,
 } from './modules';
 
-/** Explains setup or data-quality problems that affect everything on Home. */
+/**
+ * Explains setup or data-quality problems that affect everything on Home. `setup` marks a
+ * workspace still being set up, which Home leads with the first-run path instead.
+ */
 function setupNotice(data: OperationsOverview) {
   if (!data.connections.length)
     return {
+      setup: true,
       title: m.home_notice_first_title(),
       tone: 'info' as const,
       description: m.home_notice_first_description(),
@@ -105,6 +110,7 @@ function setupNotice(data: OperationsOverview) {
     };
   if (monitored.every((c) => !c.lastObservedAt))
     return {
+      setup: true,
       title: m.home_notice_waiting_title(),
       tone: 'info' as const,
       description: m.home_notice_waiting_description(),
@@ -484,6 +490,8 @@ export function HomePage() {
         <CaseNotice error title={m.home_failed_title()}>
           {m.home_failed_description()}
         </CaseNotice>
+      ) : data && notice?.setup ? (
+        <FirstRun organizationId={organizationId} data={data} />
       ) : notice ? (
         <Alert
           tone={notice.tone}

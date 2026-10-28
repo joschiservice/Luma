@@ -769,5 +769,9 @@
   "settings_api_apps_token_unavailable": "Die App wurde gespeichert, aber das Token kann nicht noch einmal angezeigt werden. Ersetze das Token, um ein neues zu bekommen.",
   "settings_api_apps_token_label": "API-Token",
   "settings_api_apps_copy_failed": "Kopieren hat nicht funktioniert. Markiere das Token und kopiere es selbst.",
-  "settings_api_apps_done": "Fertig"
+  "settings_api_apps_done": "Fertig",
+  "settings_member_remove_prompt": "Zugriff von {name} entfernen? Die Person verliert sofort den Zugriff auf diesen Workspace.",
+  "settings_invitation_revoke_prompt": "Einladung für {email} widerrufen? Ihr Link funktioniert dann nicht mehr.",
+  "settings_team_load_forbidden": "Deine Rolle umfasst die Mitgliederliste nicht. Wende dich an einen Workspace-Admin, falls du sie benötigst.",
+  "settings_team_load_unavailable": "Luma konnte die Mitgliederliste nicht laden. Prüfe deine Verbindung und versuch es erneut."
 }

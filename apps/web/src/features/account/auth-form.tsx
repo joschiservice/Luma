@@ -137,7 +137,11 @@ export function AuthForm({
           setUnconfirmed(!signup && code === 'EMAIL_NOT_VERIFIED');
           setMessage(
             signup
-              ? m.identity_auth_signup_failed()
+              ? result.error.status === 429
+                ? m.identity_auth_signup_rate_limited()
+                : result.error.status >= 500
+                  ? m.identity_auth_signup_unavailable()
+                  : m.identity_auth_signup_failed()
               : code === 'ACCOUNT_DISABLED'
                 ? m.identity_auth_account_disabled()
                 : code === 'EMAIL_NOT_VERIFIED'
@@ -169,13 +173,16 @@ export function AuthForm({
         }
         await enter();
       } catch {
+        // The account may exist now, so the next step is signing in, not another sign-up.
+        if (signup) form.setFieldValue('password', '');
         setMessage(
           signup
             ? m.identity_auth_signup_unconfirmed()
             : m.identity_error_network(),
         );
       } finally {
-        form.setFieldValue('password', '');
+        // A rejected sign-up keeps its new password for another attempt.
+        if (!signup) form.setFieldValue('password', '');
         lock.current = false;
         setPending(false);
         requestAnimationFrame(() => resultRef.current?.focus());

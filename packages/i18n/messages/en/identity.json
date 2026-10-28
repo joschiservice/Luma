@@ -327,5 +327,13 @@
   "identity_staff_region_column": "Region",
   "identity_staff_region_unknown": "The owning region could not be confirmed. Open this workspace from a regional directory result.",
   "identity_nav_all_records": "All records",
-  "identity_nav_installed_apps": "Installed apps"
+  "identity_nav_installed_apps": "Installed apps",
+  "identity_route_missing_title": "Page not found",
+  "identity_route_missing_body": "This page doesn’t exist or has moved. Check the address, or continue from Home.",
+  "identity_route_error_title": "Something went wrong",
+  "identity_route_error_body": "Luma couldn’t show this page. Try again. If it keeps happening, reload the page.",
+  "identity_route_home": "Go to Home",
+  "identity_auth_signup_rate_limited": "Too many attempts to create an account. Wait a moment and try again.",
+  "identity_auth_signup_unavailable": "Luma couldn’t create the account right now. Your details are still here. Try again in a moment.",
+  "identity_verify_done_invitation": "Joining a workspace you were invited to? After you sign in, open the invitation link from your email again."
 }

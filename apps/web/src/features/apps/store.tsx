@@ -10,7 +10,7 @@ import { StatePill } from '@luma/ui/components/primitives/state';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { ChevronRight, Plug } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { appsOptions, changeApp } from '../../kit/apps/data';
 import {
@@ -35,10 +35,13 @@ const namedConnections = 3;
 export function AppStore({
   organizationId,
   canManage,
+  install: requested,
   refresh,
 }: {
   organizationId: string;
   canManage: boolean;
+  /** An app to set up on arrival: its consent opens, or its page when already installed. */
+  install?: string | undefined;
   refresh: () => Promise<void>;
 }) {
   const query = useQuery(appsOptions(organizationId));
@@ -48,7 +51,43 @@ export function AppStore({
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
   const [message, setMessage] = useState('');
-  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  // The requested app's consent shows until the person answers it or picks another app; it
+  // outlives the search parameter, which is cleared on arrival.
+  const [request, setRequest] = useState(requested);
+  const reviewing =
+    chosen ??
+    (request &&
+    canManage &&
+    query.data?.catalog.some((app) => app.id === request)
+      ? request
+      : null);
+  const setReviewing = (appId: string | null) => {
+    setRequest(undefined);
+    setChosen(appId);
+  };
+  useEffect(() => {
+    if (!requested || !canManage || !query.data) return;
+    const installed = query.data.installations.some(
+      (item) => item.appId === requested && item.status === 'installed',
+    );
+    if (installed) {
+      void navigate({
+        to: '/app/$organizationId/apps/$appId/settings',
+        params: { organizationId, appId: requested },
+        replace: true,
+      });
+
+      return;
+    }
+    // Closing the consent must not reopen it on reload or back navigation.
+    void navigate({
+      to: '/app/$organizationId/apps',
+      params: { organizationId },
+      search: (search) => ({ ...search, install: undefined }),
+      replace: true,
+    });
+  }, [requested, canManage, query.data, organizationId, navigate]);
 
   async function install(id: string, scopes: readonly string[]) {
     if (lock.current) return;

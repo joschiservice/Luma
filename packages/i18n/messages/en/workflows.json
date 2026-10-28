@@ -610,5 +610,8 @@
   "workflows_runs_subject_show": "Show all {count, number} runs for this record",
   "workflows_runs_subject_scope": "{count, plural, one {Showing {count, number} recent run for one record ({subject}).} other {Showing {count, number} recent runs for one record ({subject}).}}",
   "workflows_runs_subject_clear": "Show all runs",
-  "workflows_library_groups_label": "Workflows by status"
+  "workflows_library_groups_label": "Workflows by status",
+  "workflows_triggers_cancel_prompt": "Cancel this start? The workflow won’t run for it.",
+  "workflows_triggers_cancel_confirm": "Cancel start",
+  "workflows_triggers_cancel_keep": "Keep start"
 }

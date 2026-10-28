@@ -129,9 +129,13 @@ export function EmailVerification() {
       {state === 'confirming' ? (
         <p role="status">{m.identity_verify_confirming()}</p>
       ) : state === 'done' ? (
-        <Alert tone="success" role="status">
-          {m.identity_verify_done()}
-        </Alert>
+        <>
+          <Alert tone="success" role="status">
+            {m.identity_verify_done()}
+          </Alert>
+          {/* The invitation credential stays in the tab where sign-up started, not this one. */}
+          <p>{m.identity_verify_done_invitation()}</p>
+        </>
       ) : state === 'failed' ? (
         <Alert tone="danger" role="alert">
           {m.identity_verify_failed()}

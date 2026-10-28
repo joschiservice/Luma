@@ -1,0 +1,12 @@
+/* The question and its two answers wrap together on narrow panels. */
+.confirm-action {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-action-prompt {
+  color: var(--foreground);
+  font-size: 13px;
+}

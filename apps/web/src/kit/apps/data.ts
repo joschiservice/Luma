@@ -8,12 +8,14 @@ import { localizeManifest } from './catalog-text';
 
 const api = createWebApiClient();
 
-/** Search state for returning from an app's authorization flow. */
+/** Search state for returning from an app's authorization flow or opening one app's setup. */
 export const appResultSearch = z.object({
   appResult: z
     .enum(['connected', 'denied', 'permissions', 'failed'])
     .optional()
     .catch(undefined),
+  // Opens the app's install consent, or its page when it is already installed.
+  install: z.string().max(100).optional().catch(undefined),
 });
 
 /** Outcome of an app's authorization flow, as reported on return. */

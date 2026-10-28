@@ -610,5 +610,8 @@
   "workflows_runs_subject_show": "Alle {count, number} Ausführungen für diesen Datensatz zeigen",
   "workflows_runs_subject_scope": "{count, plural, one {{count, number} aktuelle Ausführung für einen Datensatz ({subject}) wird gezeigt.} other {{count, number} aktuelle Ausführungen für einen Datensatz ({subject}) werden gezeigt.}}",
   "workflows_runs_subject_clear": "Alle Ausführungen zeigen",
-  "workflows_library_groups_label": "Workflows nach Status"
+  "workflows_library_groups_label": "Workflows nach Status",
+  "workflows_triggers_cancel_prompt": "Diesen Start abbrechen? Der Workflow läuft dafür dann nicht.",
+  "workflows_triggers_cancel_confirm": "Start abbrechen",
+  "workflows_triggers_cancel_keep": "Start behalten"
 }

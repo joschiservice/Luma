@@ -232,6 +232,76 @@ test('renders entry pages before the app loads and keeps what was entered meanwh
   expect(errors).toEqual([]);
 });
 
+test('unknown route shows localized not-found with Home link', async ({
+  resources: t,
+  web,
+}) => {
+  const { db, page, context, errors } = await fixture(t, web);
+  await register(page, db);
+  const organizationId = await createWorkspace(page, 'North Studio');
+
+  // Inside a workspace the page keeps the shell and links to the workspace's Home.
+  await page.goto(`/app/${organizationId}/nonexistent-page`);
+  await heading(page, 'Page not found');
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Go to Home' }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/app/${organizationId}/home(\\?|$)`),
+  );
+
+  await context.addCookies([{ name: 'luma_locale', value: 'de', url: origin }]);
+  await page.goto(`/app/${organizationId}/gibt-es-nicht`);
+  await heading(page, 'Seite nicht gefunden');
+  await expect(
+    page.getByRole('link', { name: 'Zur Startseite' }),
+  ).toHaveAttribute('href', `/app/${organizationId}/home`);
+
+  // Outside a workspace the server renders the branded entry page.
+  await page.goto('/gibt-es-nicht');
+  await heading(page, 'Seite nicht gefunden');
+  await expect(
+    page.getByRole('link', { name: 'Zur Startseite' }),
+  ).toHaveAttribute('href', '/');
+  await context.addCookies([{ name: 'luma_locale', value: 'en', url: origin }]);
+  await page.goto('/nonexistent-page');
+  await heading(page, 'Page not found');
+  await expect(page.getByRole('link', { name: 'Go to Home' })).toHaveAttribute(
+    'href',
+    '/',
+  );
+  expect(errors).toEqual([]);
+});
+
+test('explains a rate-limited sign-up and keeps the entered password', async ({
+  resources: t,
+  web,
+}) => {
+  const { page, errors } = await fixture(t, web);
+  await page.route('**/api/auth/sign-up/email', (route) =>
+    route.fulfill({ status: 429, json: { message: 'Too many requests' } }),
+  );
+  await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Ada');
+  await page.getByLabel('Email', { exact: true }).fill('ada@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await page
+    .getByText(
+      'Too many attempts to create an account. Wait a moment and try again.',
+    )
+    .waitFor();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue(
+    password,
+  );
+  expect(errors).toEqual([]);
+});
+
 test('keeps the passkey option in place and explains it where passkeys are unsupported', async ({
   resources: t,
   web,

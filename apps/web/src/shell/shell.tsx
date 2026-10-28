@@ -42,6 +42,7 @@ import {
 } from '../kit/identity/data';
 import { NoAccess, usePermissions } from '../kit/identity/permissions';
 import { SidebarLinkLabel } from '../kit/layout/sidebar-link-label';
+import { WorkspaceFrame } from '../kit/layout/workspace-frame';
 import {
   type RecordMessagesProps,
   RecordMessagesProvider,
@@ -381,7 +382,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             />
           ) : (
             <RecordMessagesProvider value={recordMessages}>
-              <Outlet />
+              <WorkspaceFrame.Provider value={organizationId}>
+                <Outlet />
+              </WorkspaceFrame.Provider>
             </RecordMessagesProvider>
           )}
         </WorkspaceTimezone>

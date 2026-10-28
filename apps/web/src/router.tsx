@@ -5,6 +5,7 @@ import {
   getGlobalStartContext,
 } from '@tanstack/react-start';
 
+import { RouteError, RouteNotFound } from './kit/identity/common';
 import { clearPrivate } from './kit/identity/data';
 import { createQueryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
@@ -35,8 +36,8 @@ function nonceFrom(context: { nonce?: unknown } | undefined) {
 }
 
 /**
- * Creates a router with an isolated query client, the generated route tree and the request's
- * script nonce.
+ * Creates a router with an isolated query client, the generated route tree, the request's
+ * script nonce and localized pages for unknown addresses and failed routes.
  */
 export function getRouter() {
   const queryClient = createQueryClient();
@@ -45,6 +46,8 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    defaultErrorComponent: RouteError,
+    defaultNotFoundComponent: RouteNotFound,
     ssr: nonce ? { nonce } : {},
   });
   router.subscribe('onBeforeNavigate', ({ fromLocation, toLocation }) => {

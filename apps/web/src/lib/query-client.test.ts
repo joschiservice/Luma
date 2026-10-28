@@ -86,3 +86,61 @@ it('discards loaded activity pages on workspace access loss', async () => {
     client.clear();
   }
 });
+
+it('notifies a mounted session observer when a write returns 401', async () => {
+  const client = createQueryClient();
+  const sessionKey = ['private', 'session'];
+  client.setQueryData(sessionKey, { user: { name: 'Ada' } });
+  client.setQueryData(['private', 'organization', 'previous'], 'private data');
+  const observer = new QueryObserver(client, {
+    queryKey: sessionKey,
+    enabled: false,
+  });
+  let session: unknown;
+  const unsubscribe = observer.subscribe((result) => {
+    session = result.data;
+  });
+  try {
+    await expect(
+      client
+        .getMutationCache()
+        .build(client, {
+          mutationFn: () =>
+            Promise.reject(
+              Object.assign(new Error('Session expired'), { status: 401 }),
+            ),
+        })
+        .execute(undefined),
+    ).rejects.toThrow('Session expired');
+    await expect.poll(() => session).toBeNull();
+    expect(
+      client.getQueryData(['private', 'organization', 'previous']),
+    ).toBeUndefined();
+  } finally {
+    unsubscribe();
+    client.clear();
+  }
+});
+
+it('keeps the session when a write fails for another reason', async () => {
+  const client = createQueryClient();
+  client.setQueryData(['private', 'session'], { user: { name: 'Ada' } });
+  try {
+    await expect(
+      client
+        .getMutationCache()
+        .build(client, {
+          mutationFn: () =>
+            Promise.reject(
+              Object.assign(new Error('Forbidden'), { status: 403 }),
+            ),
+        })
+        .execute(undefined),
+    ).rejects.toThrow('Forbidden');
+    expect(client.getQueryData(['private', 'session'])).toEqual({
+      user: { name: 'Ada' },
+    });
+  } finally {
+    client.clear();
+  }
+});
