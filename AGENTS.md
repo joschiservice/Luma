@@ -32,7 +32,7 @@ Use the [codebase map](docs/codebase-map.md) to find the owning package, then se
 
 ## Skills and local instructions
 
-- Procedures live as skills in `.agents/skills`; `.claude/skills` links to the same directory. Load the matching skill before you start: `add-migration`, `add-workspace-app`, `add-operational-scenario`, `add-needs-you-source`, `add-insights-chart` or `localize-ui`. Use `verify-change` before calling any change complete.
+- Procedures live as skills in `.agents/skills`; `.claude/skills` links to the same directory. Load the matching skill before you start: `add-migration`, `add-workspace-app`, `add-governed-action`, `wire-composition`, `add-operational-scenario`, `add-needs-you-source`, `add-insights-chart` or `localize-ui`. Use `verify-change` before calling any change complete.
 - Directories with their own `AGENTS.md` add rules for work inside them. Read the nearest one before changing code there.
 
 ## Shared vocabulary
