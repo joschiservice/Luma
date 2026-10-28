@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Sends an alert that a systemd unit failed. Units name it in OnFailure=luma-alert@%n.service;
+# the message points to the unit's journal on the host rather than copying it.
+#
+#   luma-alert <unit>
+set -euo pipefail
+# shellcheck source=luma-lib.sh
+source "$(dirname "$0")/luma-lib.sh"
+
+unit=${1:?usage: luma-alert <unit>}
+notify_alert "$unit failed" \
+  "The systemd unit $unit failed on the Lite cell host. Open an SSM session and read journalctl -u $unit."

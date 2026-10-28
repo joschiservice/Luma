@@ -38,10 +38,45 @@ describe('worker health', () => {
     }
   });
 
+  it('reports a running process unhealthy while its probe fails', async () => {
+    const server = await startHealthServer(0);
+    let probe = () => true;
+    const check = async () => {
+      const response = await fetch(`http://127.0.0.1:${server.port}/health`);
+
+      return { status: response.status, body: await response.text() };
+    };
+    try {
+      server.watch(() => probe());
+      expect((await check()).body).toBe('{"state":"starting"}');
+      server.set('running');
+      expect(await check()).toEqual({
+        status: 200,
+        body: '{"state":"running"}',
+      });
+      probe = () => false;
+      expect(await check()).toEqual({
+        status: 503,
+        body: '{"state":"unhealthy"}',
+      });
+      probe = () => {
+        throw new Error('Probe failed');
+      };
+      expect((await check()).status).toBe(503);
+      probe = () => true;
+      expect((await check()).status).toBe(200);
+      server.set('stopping');
+      expect((await check()).body).toBe('{"state":"stopping"}');
+    } finally {
+      await server.close();
+    }
+  });
+
   it('does nothing without a configured port', async () => {
     const health = createHealth(undefined);
     await health.listen();
     health.set('running');
+    health.watch(() => false);
     await expect(health.close()).resolves.toBeUndefined();
   });
 });

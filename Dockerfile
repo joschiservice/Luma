@@ -2,7 +2,8 @@
 # One server image runs the API, the workflow worker, commerce sync, the web server, the staff
 # API and the deploy steps; each container chooses its command. JavaScript builds on the build
 # platform, so a cross-architecture build emulates only the Code Steps runtime installation.
-ARG NODE_IMAGE=node:24.22.0-trixie-slim
+# Pinned by digest; update the tag and digest together.
+ARG NODE_IMAGE=node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c
 
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS build
 ARG TARGETARCH
@@ -31,6 +32,9 @@ RUN apt-get update \
     && test -x /usr/bin/prlimit
 WORKDIR /app
 COPY --from=build /repo /app
+# The Lite cell host installs its scripts and Compose files from here on each deploy, so they
+# always match the deployed commit.
+COPY --from=build /repo/infra/lite /opt/luma-host
 # The installer creates its directories owner-only; the node user must read and run the runtime.
 RUN install -d -m 0755 /opt/luma \
     && node tooling/code-runtime/setup.mjs \

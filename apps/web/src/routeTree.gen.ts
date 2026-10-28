@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as DocsSearchRouteImport } from './routes/docs-search'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as HealthzRouteImport } from './routes/healthz'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignOutRouteImport } from './routes/sign-out'
@@ -93,6 +94,11 @@ const DocsSearchRoute = DocsSearchRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthzRoute = HealthzRouteImport.update({
+  id: '/healthz',
+  path: '/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -453,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/docs-search': typeof DocsSearchRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/healthz': typeof HealthzRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
@@ -519,6 +526,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/docs-search': typeof DocsSearchRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/healthz': typeof HealthzRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
@@ -587,6 +595,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/docs-search': typeof DocsSearchRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/healthz': typeof HealthzRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
@@ -656,6 +665,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/docs-search'
     | '/forgot-password'
+    | '/healthz'
     | '/reset-password'
     | '/sign-in'
     | '/sign-out'
@@ -722,6 +732,7 @@ export interface FileRouteTypes {
     | '/'
     | '/docs-search'
     | '/forgot-password'
+    | '/healthz'
     | '/reset-password'
     | '/sign-in'
     | '/sign-out'
@@ -789,6 +800,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/docs-search'
     | '/forgot-password'
+    | '/healthz'
     | '/reset-password'
     | '/sign-in'
     | '/sign-out'
@@ -857,6 +869,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   DocsSearchRoute: typeof DocsSearchRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  HealthzRoute: typeof HealthzRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignInRoute: typeof SignInRoute
   SignOutRoute: typeof SignOutRoute
@@ -895,6 +908,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/healthz': {
+      id: '/healthz'
+      path: '/healthz'
+      fullPath: '/healthz'
+      preLoaderRoute: typeof HealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -1487,6 +1507,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   DocsSearchRoute: DocsSearchRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  HealthzRoute: HealthzRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignInRoute: SignInRoute,
   SignOutRoute: SignOutRoute,

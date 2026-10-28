@@ -13,11 +13,18 @@ export interface ObservabilityConfig {
   posthog?: { apiKey: string; host: string; secretKey?: string };
   /** Development and test values that replace flag evaluation, keyed by flag. */
   featureFlagOverrides?: Readonly<Record<string, boolean>>;
+  /**
+   * Cell-wide flag values from `FEATURE_FLAGS`, accepted in every environment. Listed flags are
+   * not evaluated in PostHog; development and test overrides still take precedence.
+   */
+  staticFeatureFlags?: Readonly<Record<string, boolean>>;
 }
 
 /**
  * Reads telemetry settings and validates regional export destinations; enabled exports require a
- * tenant hash key. Feature flag overrides are accepted only in development and test.
+ * tenant hash key. Feature flag overrides are accepted only in development and test; static
+ * feature flags (`FEATURE_FLAGS`) are accepted everywhere, so cells without PostHog, such as AU,
+ * can release features. Both throw on malformed, duplicate or invalid flag keys.
  */
 export function readObservabilityConfig(
   env: Readonly<Record<string, string | undefined>>,
@@ -40,8 +47,13 @@ export function readObservabilityConfig(
   if (env.FEATURE_FLAG_OVERRIDES) {
     if (environment !== 'development' && environment !== 'test')
       throw new Error('FEATURE_FLAG_OVERRIDES requires development or test');
-    config.featureFlagOverrides = flagOverrides(env.FEATURE_FLAG_OVERRIDES);
+    config.featureFlagOverrides = flagValues(
+      'FEATURE_FLAG_OVERRIDES',
+      env.FEATURE_FLAG_OVERRIDES,
+    );
   }
+  if (env.FEATURE_FLAGS)
+    config.staticFeatureFlags = flagValues('FEATURE_FLAGS', env.FEATURE_FLAGS);
   if (env.LUMA_LOCAL_OTLP_ENDPOINT) {
     if (environment !== 'development' && environment !== 'test')
       throw new Error('Local telemetry requires development or test');
@@ -125,23 +137,21 @@ export function readObservabilityConfig(
   return config;
 }
 
-function flagOverrides(value: string): Record<string, boolean> {
-  const overrides: Record<string, boolean> = {};
+function flagValues(setting: string, value: string): Record<string, boolean> {
+  const values: Record<string, boolean> = {};
   for (const entry of value.split(',')) {
     const [key = '', enabled, extra] = entry.trim().split('=');
     if (
       !/^[a-z0-9][a-z0-9-]{0,63}$/.test(key) ||
       (enabled !== 'true' && enabled !== 'false') ||
       extra !== undefined ||
-      Object.hasOwn(overrides, key)
+      Object.hasOwn(values, key)
     )
-      throw new Error(
-        'FEATURE_FLAG_OVERRIDES must list unique flag=true|false entries',
-      );
-    overrides[key] = enabled === 'true';
+      throw new Error(`${setting} must list unique flag=true|false entries`);
+    values[key] = enabled === 'true';
   }
 
-  return overrides;
+  return values;
 }
 
 function localEndpoint(value: string): string {

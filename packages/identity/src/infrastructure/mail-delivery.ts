@@ -564,7 +564,10 @@ export function createMailDelivery(
         );
         if (!delivery) continue;
         // Eligibility is committed before dispatch; network I/O never holds operational locks.
-        const outcome = await dispatchMail(pool, provider, delivery);
+        const outcome = await dispatchMail(pool, provider, {
+          ...delivery,
+          attempt: reserved.attempts,
+        });
         await workspaceTransaction(pool, tenantId, '', async (tx) => {
           await tx.query(
             outcome.status === 'deferred'

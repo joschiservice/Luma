@@ -164,7 +164,7 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
       recursive: true,
     },
   );
-  // Sort a pending migration before the checksum failure to prove transaction rollback.
+  // Sort a pending migration before the checksum failure to prove checksums are verified before any migration runs.
   await appendFile(
     join(directory, 'migrations/0000_e2e_pending.sql'),
     'CREATE TABLE e2e_migration_probe (id integer);\n',
@@ -197,6 +197,71 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
     1,
   );
   assert.strictEqual(await db.migrate(), '');
+});
+
+test('migration command commits each file and fails fast behind a held table lock', async (t) => {
+  const db = await database(t);
+  await db.migrate();
+  const directory = await temporaryDirectory(t);
+  await mkdir(join(directory, 'scripts'));
+  await cp(
+    join(runtimeDirectory, 'scripts/migrate.mjs'),
+    join(directory, 'scripts/migrate.mjs'),
+  );
+  await cp(
+    join(runtimeDirectory, 'migrations'),
+    join(directory, 'migrations'),
+    { recursive: true },
+  );
+  await appendFile(
+    join(directory, 'migrations/9998_e2e_first.sql'),
+    'CREATE TABLE e2e_migration_first (id integer);\n',
+  );
+  await appendFile(
+    join(directory, 'migrations/9999_e2e_locked.sql'),
+    'CREATE TABLE e2e_migration_partial (id integer);\nALTER TABLE users ADD COLUMN e2e_probe integer;\n',
+  );
+  const traffic = await db.owner.connect();
+  try {
+    // Stands in for a running release reading the table the migration must alter.
+    await traffic.query('BEGIN');
+    await traffic.query('LOCK TABLE users IN ACCESS SHARE MODE');
+    const started = Date.now();
+    const failure = await db.migrate(join(directory, 'scripts/migrate.mjs'), 1);
+    assert.ok(Date.now() - started < 30_000, 'migration waited for the lock');
+    assert.ok(
+      failure.includes(
+        'Migration 9999_e2e_locked.sql failed: could not acquire a lock within 5s',
+      ),
+      failure,
+    );
+  } finally {
+    await traffic.query('ROLLBACK');
+    traffic.release();
+  }
+  const recorded = async () =>
+    (
+      await db.owner.query(
+        "SELECT name FROM identity_migrations WHERE name LIKE '999%_e2e_%' ORDER BY name",
+      )
+    ).rows.map((row) => row.name);
+  assert.deepStrictEqual(await recorded(), ['9998_e2e_first.sql']);
+  assert.deepStrictEqual(
+    (
+      await db.owner.query(
+        "SELECT to_regclass('e2e_migration_first')::text AS first, to_regclass('e2e_migration_partial')::text AS partial",
+      )
+    ).rows[0],
+    { first: 'e2e_migration_first', partial: null },
+  );
+
+  const output = await db.migrate(join(directory, 'scripts/migrate.mjs'));
+  assert.ok(!output.includes('Applied 9998_e2e_first.sql'), output);
+  assert.ok(output.includes('Applied 9999_e2e_locked.sql'), output);
+  assert.deepStrictEqual(await recorded(), [
+    '9998_e2e_first.sql',
+    '9999_e2e_locked.sql',
+  ]);
 });
 
 test('SIGKILL after a committed effect recovers in a fresh worker without redelivery', async (t) => {

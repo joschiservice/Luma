@@ -6,7 +6,7 @@ Luma stores Better Auth users, credentials and sessions in its PostgreSQL databa
 
 The API connects with a restricted login: `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`, granted only the group roles it needs. Never give the API or worker migration credentials. `pnpm run setup` provisions the local logins; when you manage PostgreSQL yourself and run `pnpm dev:manual`, grant the same group roles that `tooling/dev/database.mjs` grants, or features fail with permission errors.
 
-Migrations run through the shared runner in `@luma/application-runtime` in one transaction under an advisory lock. It records checksums in `identity_migrations` (the name predates the shared runner; it tracks every migration), skips applied files and rejects changes to applied ones. The initial migration needs permission to create the `luma_identity` group role.
+Migrations run through the shared runner in `@luma/application-runtime` under a session advisory lock, each file in its own transaction with its record. It records checksums in `identity_migrations` (the name predates the shared runner; it tracks every migration), skips applied files and rejects changes to applied ones. The initial migration needs permission to create the `luma_identity` group role.
 
 The API needs `IDENTITY_DATABASE_URL` (the restricted login), `BETTER_AUTH_SECRET` (`openssl rand -base64 32`; production refuses sample values and repeated patterns), `BETTER_AUTH_URL` (the public browser origin) and `AUTH_TRUSTED_ORIGINS` (exact browser origins). Production origins require HTTPS. `/ready` checks connectivity, migrated tables and the runtime role restrictions.
 

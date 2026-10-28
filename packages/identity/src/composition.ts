@@ -24,7 +24,11 @@ import {
   createInvitationToken,
   hashInvitationToken,
 } from './infrastructure/invitation-token.js';
-import { createResendMail } from './infrastructure/mail.js';
+import {
+  type AwsRequestSigner,
+  createResendMail,
+  createSesMail,
+} from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createMailEvents } from './infrastructure/mail-events.js';
 import { createMorningBriefScheduler } from './infrastructure/morning-brief.js';
@@ -37,7 +41,8 @@ import { createWorkflowIdentityRepository } from './infrastructure/workflow-iden
 /**
  * Creates identity services, an authentication handler, and readiness checks. Errors from idle
  * pool clients, such as a database restart, go to `onDatabaseError` instead of crashing the
- * process. Call close to release the owned database pool.
+ * process. Throws when `mail` uses Amazon SES without `signAwsRequest`. Call close to release
+ * the owned database pool.
  */
 export function createIdentity(
   settings: Omit<AuthSettings, 'rateLimit'> & {
@@ -55,20 +60,42 @@ export function createIdentity(
     /** Header in which the proxy in front of the API sets the client address. */
     clientIpHeader?: string;
     databaseUrl: string;
-    mail?: {
-      apiKey: string;
-      from: string;
-      origin: string;
-      webhookSecret?: string;
-    };
+    /** The configured mail provider: Resend, or Amazon SES in the cell's own AWS region. */
+    mail?: { from: string; origin: string } & (
+      | { provider: 'resend'; apiKey: string; webhookSecret?: string }
+      | {
+          provider: 'ses';
+          region: string;
+          credentials: { accessKeyId: string; secretAccessKey: string };
+          configurationSet?: string;
+        }
+    );
     mailProvider?: MailProvider;
     mailOrigin?: string;
     morningBriefEnabled?: (tenantId: string) => Promise<boolean>;
     /** Reports whether the current request may only read, as in a support view. */
     readOnly?: () => boolean;
   },
-  dependencies: { onDatabaseError: (error: Error) => void },
+  dependencies: {
+    onDatabaseError: (error: Error) => void;
+    /** Signs Amazon SES requests; required when `mail` uses SES. */
+    signAwsRequest?: AwsRequestSigner;
+  },
 ) {
+  const mail = settings.mail;
+  if (
+    mail?.provider === 'ses' &&
+    !settings.mailProvider &&
+    !dependencies.signAwsRequest
+  )
+    throw new Error('Amazon SES mail needs an AWS request signer');
+  const provider =
+    settings.mailProvider ??
+    (mail?.provider === 'resend'
+      ? createResendMail(mail)
+      : mail?.provider === 'ses' && dependencies.signAwsRequest
+        ? createSesMail(mail, { sign: dependencies.signAwsRequest })
+        : undefined);
   const pool = new Pool({
     connectionString: settings.databaseUrl,
     max: 10,
@@ -77,9 +104,6 @@ export function createIdentity(
     idle_in_transaction_session_timeout: 10000,
   });
   pool.on('error', dependencies.onDatabaseError);
-  const provider =
-    settings.mailProvider ??
-    (settings.mail ? createResendMail(settings.mail) : undefined);
   const rateLimitStore = settings.rateLimitStore;
   const { repository, auth } = createRepository(pool, {
     ...settings,
@@ -151,13 +175,14 @@ export function createIdentity(
 
       return (now?: Date) => (provider ? schedule(now) : Promise.resolve());
     },
-    /** Records Resend delivery events; absent without a webhook secret. */
-    mailEvents: settings.mail?.webhookSecret
-      ? createMailEvents(pool, {
-          apiKey: settings.mail.apiKey,
-          webhookSecret: settings.mail.webhookSecret,
-        })
-      : undefined,
+    /** Records Resend delivery events; absent without Resend and its webhook secret. */
+    mailEvents:
+      settings.mail?.provider === 'resend' && settings.mail.webhookSecret
+        ? createMailEvents(pool, {
+            apiKey: settings.mail.apiKey,
+            webhookSecret: settings.mail.webhookSecret,
+          })
+        : undefined,
     /**
      * Applies security event retention as of `now`: clears IP addresses and user agents after
      * 90 days and deletes events after a year. Safe to run repeatedly and concurrently.

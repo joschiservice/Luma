@@ -36,6 +36,7 @@ export async function settingsFixture(
     ...(mailWebhookSecret
       ? {
           mail: {
+            provider: 'resend',
             apiKey: 're_test_key',
             from: 'Luma <notifications@example.test>',
             origin,

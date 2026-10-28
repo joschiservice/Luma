@@ -253,6 +253,25 @@ export function buildApp(
       error instanceof Error
         ? error.message
         : knownError?.message;
+    if (!knownError && isClientAbort(error, request.raw.socket)) {
+      // The client closed the connection, so nobody receives a response. Not a server failure:
+      // keep it out of `Request failed`, error reports and 5xx counts.
+      request.log.info(
+        {
+          traceId: request.observation?.context.traceId,
+          method: request.method,
+          route: request.routeOptions.url ?? 'unmatched',
+          error: describeError(error),
+        },
+        'Request aborted by client',
+      );
+
+      return reply.status(499).send({
+        code: 'CLIENT_CLOSED_REQUEST',
+        message: 'Client closed the request',
+        requestId: request.id,
+      });
+    }
     if (!knownError) {
       const route = request.routeOptions.url ?? 'unmatched';
       if (request.observation)
@@ -382,4 +401,37 @@ export function buildApp(
   app.get('/openapi.public.json', async () => publicOpenApiDocument);
 
   return app;
+}
+
+const clientAbortCodes = new Set([
+  'ECONNRESET',
+  'ECONNABORTED',
+  'EPIPE',
+  'ERR_STREAM_PREMATURE_CLOSE',
+]);
+
+/**
+ * Recognizes a failure caused by the client closing its connection: the request's socket is
+ * gone and the error, or one of its causes, is an abort or connection reset. The same errors
+ * from a provider or database call while the client is still connected are server failures.
+ */
+function isClientAbort(
+  error: unknown,
+  socket: Pick<Socket, 'destroyed'> | null | undefined,
+): boolean {
+  if (socket && !socket.destroyed) return false;
+  let current = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (
+      current.name === 'AbortError' ||
+      (typeof code === 'string' && clientAbortCodes.has(code)) ||
+      current.message === 'aborted' ||
+      current.message === 'Premature close'
+    )
+      return true;
+    current = current.cause;
+  }
+
+  return false;
 }

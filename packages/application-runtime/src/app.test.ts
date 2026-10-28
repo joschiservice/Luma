@@ -574,6 +574,77 @@ describe('observability baseline', () => {
     }
   });
 
+  it('logs client aborts without reporting them as request failures', async () => {
+    const { observability } = fixture();
+    const captureError = vi.spyOn(observability, 'captureError');
+    let log = '';
+    const stream = new Writable({
+      write(chunk, _encoding, done) {
+        log += chunk.toString();
+        done();
+      },
+    });
+    const app = buildApp({ logger: { stream } }, { observability });
+    let entered: () => void = () => {};
+    const handling = new Promise<void>((resolve) => (entered = resolve));
+    app.addHook('preHandler', async (request) => {
+      if (request.headers['x-test-abort'] !== 'yes')
+        throw Object.assign(new Error('read ECONNRESET'), {
+          code: 'ECONNRESET',
+        });
+      const closed = new Promise((resolve) =>
+        request.raw.socket.once('close', resolve),
+      );
+      entered();
+      await closed;
+      throw Object.assign(new Error('aborted'), { code: 'ECONNRESET' });
+    });
+    const entries = () =>
+      log
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { msg: string; level: number });
+    try {
+      await app.listen({ host: '127.0.0.1', port: 0 });
+      const address = app.server.address();
+      if (!address || typeof address === 'string') throw new Error('No port');
+      const socket = createConnection(address.port, '127.0.0.1');
+      socket.on('error', () => {});
+      socket.write(
+        'GET /health HTTP/1.1\r\nHost: localhost\r\nx-test-abort: yes\r\n\r\n',
+      );
+      await handling;
+      socket.destroy();
+      await vi.waitFor(
+        () =>
+          expect(
+            entries().find((line) => line.msg === 'Request aborted by client'),
+          ).toMatchObject({
+            level: 30,
+            method: 'GET',
+            route: '/health',
+            error: { code: 'ECONNRESET' },
+          }),
+        { timeout: 2000 },
+      );
+      expect(entries().some((line) => line.msg === 'Request failed')).toBe(
+        false,
+      );
+      expect(captureError).not.toHaveBeenCalled();
+
+      // The same error while the client is still connected is a server failure.
+      const response = await app.inject({ url: '/health' });
+      expect(response.statusCode).toBe(500);
+      expect(
+        entries().find((line) => line.msg === 'Request failed'),
+      ).toMatchObject({ level: 50, error: { code: 'ECONNRESET' } });
+      expect(captureError).toHaveBeenCalledOnce();
+    } finally {
+      await app.close();
+    }
+  });
+
   it('records the catalog action through the real typed HTTP client', async () => {
     const { observability, posthog } = fixture();
     const app = buildApp(

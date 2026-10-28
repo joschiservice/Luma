@@ -145,3 +145,28 @@ export interface Observability {
   ): Promise<boolean>;
   shutdown(): Promise<void>;
 }
+
+/**
+ * Logs the cell-wide `FEATURE_FLAGS` values once at process startup, so operators can see which
+ * releases a process runs with. Writes nothing when no static flag is set. The values are
+ * deployment settings and carry no tenant data. Without a writer, the line is JSON on stdout.
+ */
+export function logStaticFeatureFlags(
+  flags: Readonly<Record<string, boolean>> | undefined,
+  write: (
+    message: string,
+    fields: { featureFlags: Record<string, boolean> },
+  ) => void = (message, fields) => {
+    console.info(
+      JSON.stringify({
+        time: new Date().toISOString(),
+        level: 'INFO',
+        message,
+        ...fields,
+      }),
+    );
+  },
+): void {
+  if (!flags || Object.keys(flags).length === 0) return;
+  write('Static feature flags', { featureFlags: { ...flags } });
+}

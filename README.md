@@ -55,4 +55,5 @@ Branch from `main` as `feat/LUMA-<id>-<short-description>`, use Conventional Com
 title pull requests `LUMA-<id>: <summary>`. Link the Linear issue, describe the behavior
 change and its validation, and run `pnpm check` before review. Commit lockfile and
 generated route-tree changes. Pull requests squash-merge after review and a passing
-`Quality gates` check.
+`Quality gates` check. `main` is the release trunk: the AU cell deploys only from `main` or a
+`v*` tag (see [deployment](docs/deployment.md#releases-and-deploys)).

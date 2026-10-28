@@ -69,18 +69,18 @@ jobs:
             browser: '@luma/api'
             command: pnpm test:browser $AFFECTED --shard=4/4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Affected selection compares against the merge base with the pull request base.
           fetch-depth: 0
           filter: blob:none
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-${{ github.sha }}
@@ -95,7 +95,7 @@ jobs:
       - name: Summarize performance budgets
         if: always() && matrix.cache == 'evaluation'
         run: node tooling/performance/summary.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && matrix.cache == 'evaluation'
         with:
           name: performance
@@ -103,14 +103,14 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && matrix.cache == 'evaluation'
         with:
           name: playbook-evaluation
           path: .luma/evaluations/
           include-hidden-files: true
           if-no-files-found: warn
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && (startsWith(matrix.cache, 'browser-') || matrix.cache == 'evaluation')
         with:
           name: playwright-${{ matrix.cache }}
@@ -118,14 +118,77 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: warn
+  image:
+    name: Server image scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      # Builds the deployable image without pushing it. The deploy builds for arm64; the scan
+      # builds for the runner's architecture, which installs the same packages.
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: luma/server:ci
+          cache-from: type=gha,scope=image-scan
+          cache-to: type=gha,scope=image-scan,mode=max
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: luma/server:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+  schema-compat:
+    name: Previous release on new schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TURBO_CONCURRENCY: '100%'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      # A rollback runs the previous image on the new schema, so a pull request that adds or
+      # changes migrations runs the base branch's backend journeys against them. Without
+      # migration changes the job passes without setting up, so Quality gates can require it.
+      - name: Detect migration changes
+        id: migrations
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] && git diff --name-only "origin/$BASE_REF...HEAD" -- packages/application-runtime/migrations packages/apps | grep -qE '^packages/(application-runtime|apps/[^/]+)/migrations/[^/]+\.sql$'; then
+            echo changed=true >> "$GITHUB_OUTPUT"
+          else
+            echo 'No migration changes; the previous release is not rerun.'
+            echo changed=false >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.migrations.outputs.changed == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - if: steps.migrations.outputs.changed == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Checks out the base branch beside this checkout, copies this pull request's migrations
+      # into it, installs it and runs its backend journeys; see tooling/dev/schema-compat.mjs.
+      - if: steps.migrations.outputs.changed == 'true'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node tooling/dev/schema-compat.mjs --base "origin/$BASE_REF" --directory ../base
   quality:
     name: Quality gates
     if: always()
-    needs: checks
+    needs: [checks, image, schema-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
       - name: Require all checks to pass
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
-        run: test "$CHECKS_RESULT" = success
+          IMAGE_RESULT: ${{ needs.image.result }}
+          SCHEMA_RESULT: ${{ needs.schema-compat.result }}
+        run: test "$CHECKS_RESULT" = success && test "$IMAGE_RESULT" = success && test "$SCHEMA_RESULT" = success

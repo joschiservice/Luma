@@ -192,7 +192,7 @@ async function inspectionNotice(
 /**
  * Delivers queued account notices: deletion scheduled, restored and completed, and Luma support
  * requests or emergency access to the account. Each attempt is
- * committed before sending, so the provider's idempotency key covers uncertain responses. A
+ * committed before sending, so uncertain responses are retried as `dispatchMail` allows. A
  * notice fails after five attempts or 23 hours, and is cancelled when the account is gone.
  * Notices use the person's language. Returns false when the provider's rate limit ended the pass.
  */
@@ -228,6 +228,7 @@ export async function drainAccountMail(
     const outcome = await dispatchMail(pool, provider, {
       id: message.id,
       ...notice,
+      attempt: message.attempts,
     });
     if (outcome.status === 'deferred') {
       // A rate-limited request was never processed, so it doesn't use up an attempt.

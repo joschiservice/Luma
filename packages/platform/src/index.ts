@@ -11,7 +11,10 @@ export {
   unavailable,
 } from './domain/service-error.js';
 
-export { featureFlags } from './application/observability.js';
+export {
+  featureFlags,
+  logStaticFeatureFlags,
+} from './application/observability.js';
 
 export type {
   FeatureFlag,

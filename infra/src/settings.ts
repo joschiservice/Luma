@@ -25,6 +25,11 @@ export interface CellSettings {
   readonly alertEmail?: string;
   /** Recreates the data volume from this EBS snapshot, replacing the host with it. */
   readonly restoreSnapshotId?: string;
+  /**
+   * The host's Amazon Machine Image in the cell region. Deployable stages pin it so a stack
+   * update never replaces the host with whatever image is newest; OS updates bump it.
+   */
+  readonly hostImage?: string;
   readonly monthlyBudgetUsd: number;
   readonly github: {
     readonly repository: string;
@@ -52,7 +57,9 @@ const repository = 'joschiservice/Luma';
 
 /**
  * Reads one stage's settings. Account IDs, domains and alert addresses come from CDK context
- * (`-c luma:staging:account=123456789012`) so they stay out of source control.
+ * (`-c luma:staging:account=123456789012`) so they stay out of source control. Throws on
+ * malformed values, and when a stage with an account lacks a pinned host image or, for
+ * production, an alert address.
  */
 export function readCellSettings(
   stage: Stage,
@@ -85,6 +92,19 @@ export function readCellSettings(
   )
     throw new Error(`luma:${stage}:restoreSnapshot must be an EBS snapshot ID`);
 
+  const hostImage = text(`luma:${stage}:hostImage`);
+  if (hostImage !== undefined && !/^ami-[0-9a-f]{8,17}$/.test(hostImage))
+    throw new Error(`luma:${stage}:hostImage must be an AMI ID`);
+  // A stage with an account can be deployed; synthesis without one stays environment-agnostic.
+  if (account !== undefined && hostImage === undefined)
+    throw new Error(
+      `luma:${stage}:hostImage is required once luma:${stage}:account is set`,
+    );
+  if (account !== undefined && stage === 'production' && !alertEmail)
+    throw new Error(
+      'luma:production:alertEmail or luma:alertEmail is required once luma:production:account is set',
+    );
+
   return {
     stage,
     ...defaults[stage],
@@ -92,6 +112,7 @@ export function readCellSettings(
     ...(domain ? { domain } : {}),
     ...(alertEmail ? { alertEmail } : {}),
     ...(restoreSnapshotId ? { restoreSnapshotId } : {}),
+    ...(hostImage ? { hostImage } : {}),
     github: { repository, environment: stage },
   };
 }

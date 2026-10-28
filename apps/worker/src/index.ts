@@ -8,6 +8,7 @@ import {
   readRegionConfig,
   readWorkflowConfig,
 } from '@luma/config';
+import { logStaticFeatureFlags } from '@luma/platform';
 import {
   createObservability,
   type startLocalTelemetry,
@@ -35,9 +36,9 @@ export async function main(
   };
   // Temporal logs as JSON with sanitized errors; installed before any worker connects.
   installRuntimeLogger();
-  const observability = createObservability(
-    readObservabilityConfig(process.env),
-  );
+  const observabilityConfig = readObservabilityConfig(process.env);
+  const observability = createObservability(observabilityConfig);
+  logStaticFeatureFlags(observabilityConfig.staticFeatureFlags);
   try {
     await health.listen();
     const config = workflowConfig();
@@ -61,6 +62,8 @@ export async function main(
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, shutdown);
     try {
+      // Healthy only while both Temporal workers run and poll their task queues.
+      health.watch(worker.polling);
       health.set('running');
       await worker.run();
     } finally {

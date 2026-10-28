@@ -1,0 +1,9 @@
+[Unit]
+Description=Restart unhealthy Luma containers
+Requires=docker.service
+After=docker.service
+OnFailure=luma-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/luma/bin/luma-watchdog

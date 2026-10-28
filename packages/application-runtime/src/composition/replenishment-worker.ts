@@ -194,6 +194,7 @@ export async function createReplenishmentWorker(
         await polling;
       }
     },
+    polling: worker.polling,
     shutdown: () => {
       stop.abort();
       worker.shutdown();

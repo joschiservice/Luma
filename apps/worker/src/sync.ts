@@ -5,6 +5,7 @@ import {
   readObservabilityConfig,
   readRegionConfig,
 } from '@luma/config';
+import { logStaticFeatureFlags } from '@luma/platform';
 import {
   createObservability,
   type startLocalTelemetry,
@@ -21,12 +22,14 @@ export async function main(
   );
   // Mailbox reading sends documents and supplier messages to the configured EU model routes.
   const modelSettings = readModelGatewayConfig(process.env);
+  const observabilityConfig = readObservabilityConfig(process.env);
   const observability = createObservability({
-    ...readObservabilityConfig(process.env),
+    ...observabilityConfig,
     approvedModels: Object.values(modelSettings.routes).map(
       (route) => route.model,
     ),
   });
+  logStaticFeatureFlags(observabilityConfig.staticFeatureFlags);
   try {
     await health.listen();
     const worker = await createDefaultCommerceSyncWorker(
@@ -43,6 +46,8 @@ export async function main(
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, shutdown);
     try {
+      // Unhealthy once the sync loop stops making progress, though the process still runs.
+      health.watch(() => !worker.stalled());
       health.set('running');
       await worker.run();
     } finally {

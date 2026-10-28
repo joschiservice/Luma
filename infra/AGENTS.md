@@ -12,8 +12,12 @@ before changing either.
   or snapshot removal policy.
 - Prefer a narrower permission to a cdk-nag acknowledgment; an acknowledgment states why
   the finding is acceptable.
-- `lite/` is uploaded to the host as is. Its scripts run as root with `set -euo pipefail`;
-  keep them idempotent, keep secrets out of process arguments where a tool allows it, and
-  check them with shellcheck.
+- `lite/` reaches the host as is, from the CDK asset on first boot and from the server image
+  (`/opt/luma-host`) on every deploy, so a change ships with the next image. Its scripts run
+  as root with `set -euo pipefail`; keep them idempotent, keep secrets out of process
+  arguments where a tool allows it, and check them with shellcheck.
+- Production never builds images: it deploys, by digest, only images that staging deployed
+  successfully and replicated to it. Keep production's deploy role pull-only and keep the
+  deploy document's parameters limited to a validated tag and digest.
 - Containers must not reach the instance metadata service. Do not raise the hop limit or
   give application containers the host's AWS credentials.

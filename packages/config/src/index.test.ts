@@ -153,13 +153,18 @@ it('reads the optional Resend webhook secret only with the mail settings', () =>
     MAIL_FROM: 'Luma <notifications@example.test>',
     MAIL_PUBLIC_ORIGIN: 'http://localhost:3000',
   };
-  expect(readIdentityConfig(mail).mail).not.toHaveProperty('webhookSecret');
+  expect(readIdentityConfig(mail).mail).toEqual({
+    provider: 'resend',
+    apiKey: 're_test',
+    from: 'Luma <notifications@example.test>',
+    origin: 'http://localhost:3000',
+  });
   expect(
     readIdentityConfig({
       ...mail,
       MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
-    }).mail?.webhookSecret,
-  ).toBe('whsec_c2VjcmV0LXNpZ25pbmcta2V5');
+    }).mail,
+  ).toMatchObject({ webhookSecret: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5' });
   expect(() =>
     readIdentityConfig({ ...mail, MAIL_RESEND_WEBHOOK_SECRET: 'not-a-secret' }),
   ).toThrow('MAIL_RESEND_WEBHOOK_SECRET');
@@ -171,4 +176,85 @@ it('reads the optional Resend webhook secret only with the mail settings', () =>
       MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
     }),
   ).toThrow('MAIL_RESEND_WEBHOOK_SECRET needs');
+});
+
+describe('Amazon SES mail', () => {
+  const ses = {
+    LUMA_REGION: 'EU',
+    LUMA_ENABLED_REGIONS: 'EU',
+    ...authEnvironment,
+    MAIL_SES_REGION: 'eu-central-1',
+    MAIL_SES_ACCESS_KEY_ID: 'AKIAEXAMPLEMAIL0001',
+    MAIL_SES_SECRET_ACCESS_KEY: 'mail-secret',
+    MAIL_FROM: 'Luma <notifications@example.test>',
+    MAIL_PUBLIC_ORIGIN: 'http://localhost:3000',
+  };
+
+  it('reads the region, credentials and optional configuration set without an allowlist', () => {
+    expect(readIdentityConfig(ses).mail).toEqual({
+      provider: 'ses',
+      from: 'Luma <notifications@example.test>',
+      origin: 'http://localhost:3000',
+      region: 'eu-central-1',
+      credentials: {
+        accessKeyId: 'AKIAEXAMPLEMAIL0001',
+        secretAccessKey: 'mail-secret',
+      },
+    });
+    expect(
+      readIdentityConfig({ ...ses, MAIL_SES_CONFIGURATION_SET: 'luma-mail' })
+        .mail,
+    ).toMatchObject({ configurationSet: 'luma-mail' });
+  });
+
+  it.each([
+    'MAIL_SES_REGION',
+    'MAIL_SES_ACCESS_KEY_ID',
+    'MAIL_SES_SECRET_ACCESS_KEY',
+    'MAIL_FROM',
+    'MAIL_PUBLIC_ORIGIN',
+  ])('refuses SES settings without %s', (name) => {
+    expect(() => readIdentityConfig({ ...ses, [name]: undefined })).toThrow(
+      'together',
+    );
+  });
+
+  it('refuses a configuration set alone', () => {
+    expect(() =>
+      readIdentityConfig({
+        ...authEnvironment,
+        MAIL_SES_CONFIGURATION_SET: 'luma-mail',
+      }),
+    ).toThrow('together');
+  });
+
+  it('refuses Resend and SES together', () => {
+    expect(() =>
+      readIdentityConfig({ ...ses, MAIL_RESEND_API_KEY: 're_test' }),
+    ).toThrow('not both');
+    expect(() =>
+      readIdentityConfig({
+        ...ses,
+        MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
+      }),
+    ).toThrow('not both');
+  });
+
+  it('refuses malformed credentials, configuration sets and origins', () => {
+    expect(() =>
+      readIdentityConfig({ ...ses, MAIL_SES_ACCESS_KEY_ID: 'not a key' }),
+    ).toThrow('credentials');
+    expect(() =>
+      readIdentityConfig({ ...ses, MAIL_SES_SECRET_ACCESS_KEY: 'with space' }),
+    ).toThrow('credentials');
+    expect(() =>
+      readIdentityConfig({ ...ses, MAIL_SES_CONFIGURATION_SET: 'luma mail' }),
+    ).toThrow('MAIL_SES_CONFIGURATION_SET');
+    expect(() =>
+      readIdentityConfig({
+        ...ses,
+        MAIL_PUBLIC_ORIGIN: 'http://localhost:3000/path',
+      }),
+    ).toThrow('MAIL_PUBLIC_ORIGIN');
+  });
 });

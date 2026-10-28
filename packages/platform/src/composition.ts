@@ -94,3 +94,5 @@ export { createValkeyStore } from './infrastructure/valkey.js';
 export { createModelRequestLimit } from './infrastructure/model-limits.js';
 
 export { createKmsDataKeyService } from './infrastructure/kms-data-key.js';
+
+export { signAwsRequest } from './infrastructure/aws-signature.js';

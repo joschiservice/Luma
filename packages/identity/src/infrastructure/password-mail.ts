@@ -211,6 +211,7 @@ export async function drainPasswordMail(
       to: user.email,
       locale: message.locale,
       email: securityEmail(message, token, origin),
+      attempt: message.attempts,
     });
     if (outcome.status === 'deferred') {
       // A rate-limited request was never processed, so it doesn't use up an attempt.

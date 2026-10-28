@@ -1,0 +1,25 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "omit_hostname": true
+  },
+  "metrics": {
+    "namespace": "Luma/Lite",
+    "metrics_collected": {
+      "mem": {
+        "measurement": ["mem_used_percent"],
+        "append_dimensions": { "Stage": "__STAGE__" }
+      },
+      "swap": {
+        "measurement": ["swap_used_percent"],
+        "append_dimensions": { "Stage": "__STAGE__" }
+      },
+      "disk": {
+        "measurement": ["used_percent"],
+        "resources": ["/", "/var/lib/luma"],
+        "drop_device": true,
+        "append_dimensions": { "Stage": "__STAGE__" }
+      }
+    }
+  }
+}

@@ -1,30 +1,60 @@
 #!/usr/bin/env bash
-# Deploys one server image to the Lite cell: refreshes the host files, creates missing secrets
-# and keys, renders the environment, migrates, and starts every service. The GitHub deploy
-# workflow runs it as root through SSM Run Command; rerunning it with the same tag is safe.
-# Migrations only move forward, so redeploying an older tag needs a compatible schema.
+# Deploys one server image to the Lite cell: installs the host files from the image, creates
+# missing secrets and keys, renders the environment, migrates, and starts every service. The
+# GitHub deploy workflow runs it as root through the stage's SSM deploy document; rerunning it
+# with the same tag is safe. With a digest, the tag must point to that digest and the services
+# run the image by digest; the tag still names the release.
 #
-#   luma-deploy <image-tag>
+# When the final start fails, the services return to the previously deployed tag and the
+# deploy fails. Migrations only move forward and are not undone, so that rollback relies on
+# expand and contract migrations: the previous release must accept the new schema.
+#
+#   luma-deploy <image-tag> [sha256:<digest>]
 set -euo pipefail
 
-tag=${1:?usage: luma-deploy <image-tag>}
+tag=${1:?usage: luma-deploy <image-tag> [sha256:<digest>]}
+digest=${2:-}
 [[ $tag =~ ^[A-Za-z0-9._-]{1,128}$ ]] || {
   echo 'luma: invalid image tag' >&2
   exit 1
 }
-# Continue with the newest copy of this script and the files it uses.
-if [[ -z ${LUMA_HOST_FILES_FRESH:-} ]]; then
-  # shellcheck source=luma-lib.sh
-  source /opt/luma/bin/luma-lib.sh
-  refresh_host_files
-  LUMA_HOST_FILES_FRESH=1 exec bash /opt/luma/bin/luma-deploy "$@"
-fi
+[[ -z $digest || $digest =~ ^sha256:[0-9a-f]{64}$ ]] || {
+  echo 'luma: invalid image digest' >&2
+  exit 1
+}
 # shellcheck source=luma-lib.sh
 source /opt/luma/bin/luma-lib.sh
-exec 9>/run/luma-deploy.lock
-flock -n 9 || die 'another deploy is running'
+# The first pass takes the lock, pulls the image and continues with the host files of the
+# deployed commit. The second pass inherits the lock on descriptor 9 through exec.
+if [[ -z ${LUMA_DEPLOY_LOCKED:-} ]]; then
+  exec 9>/run/luma-deploy.lock
+  flock -n 9 || die 'another deploy is running'
+fi
+if [[ -z ${LUMA_HOST_FILES_FRESH:-} ]]; then
+  load_parameters
+  repository=$(parameter host/IMAGE_REPOSITORY)
+  aws ecr get-login-password | docker login --username AWS --password-stdin "${repository%%/*}" >/dev/null
+  docker pull --quiet "$repository:$tag" >/dev/null
+  # Docker records the registry digest it pulled the tag at; it must be the requested one.
+  if [[ -n $digest ]] && ! docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+    "$repository:$tag" | grep -qxF "$repository@$digest"; then
+    die "image tag $tag does not point to $digest"
+  fi
+  if ! extract_host_files "$repository:$tag"; then
+    log 'the image has no host files; using the CDK bundle'
+    refresh_host_files
+  fi
+  LUMA_DEPLOY_LOCKED=1 LUMA_HOST_FILES_FRESH=1 exec bash /opt/luma/bin/luma-deploy "$@"
+fi
 
 connection_key() { openssl rand -base64 32; }
+
+# Prints the image reference the services run: by digest when the deploy pinned one.
+image_reference() {
+  local repository
+  repository=$(parameter host/IMAGE_REPOSITORY)
+  if [[ -n $digest ]]; then echo "$repository@$digest"; else echo "$repository:$tag"; fi
+}
 
 # Creates an access key for an application principal on first deploy. The ID is written last,
 # so an interrupted run creates a fresh key next time.
@@ -50,7 +80,21 @@ generate_secrets() {
   ensure_generated CONNECTION_KEY connection_key
   ensure_access_key TEMPORAL_KMS "$(parameter host/TEMPORAL_KMS_USER)"
   ensure_access_key BEDROCK "$(parameter host/BEDROCK_USER)"
+  # The mail principal exists only for stages with a domain.
+  if [[ -n $(parameter host/MAIL_USER) ]]; then
+    ensure_access_key MAIL "$(parameter host/MAIL_USER)"
+  fi
   load_parameters
+}
+
+# Prints CONNECTIONS_KEYS as JSON: generated/CONNECTION_KEY is k1, and each
+# generated/CONNECTION_KEY_<id> that luma-rotate-connection-key adds is <id>.
+connection_keys() {
+  jq -c --arg key "$PARAMETER_PATH/generated/CONNECTION_KEY" '
+    [.[] | select(.name == $key or (.name | startswith($key + "_")))
+      | { key: (if .name == $key then "k1" else (.name | ltrimstr($key + "_")) end),
+          value: .value }]
+    | from_entries' <<<"$PARAMETERS"
 }
 
 # Temporal's frontend presents a certificate for the name `temporal` from a private CA. The CA
@@ -116,6 +160,7 @@ EOF
 
 render_environment() {
   local env=$LUMA_STATE_DIR/env domain app_host tailnet staff_node staff_api_node valkey
+  local release=${tag:0:64} keys active_key
   domain=$(parameter host/DOMAIN)
   # Without a domain, sslip.io resolves names that embed the Elastic IP, such as
   # au.app.203-0-113-10.sslip.io, so Caddy can still obtain a public certificate.
@@ -125,13 +170,18 @@ render_environment() {
   staff_node="luma-$LUMA_STAGE-staff"
   staff_api_node="luma-$LUMA_STAGE-au-staff-api"
   valkey="redis://:$(parameter generated/VALKEY_PASSWORD)@valkey:6379"
+  keys=$(connection_keys)
+  active_key=$(parameter generated/CONNECTIONS_ACTIVE_KEY_ID)
+  active_key=${active_key:-k1}
+  jq -e --arg id "$active_key" 'has($id)' <<<"$keys" >/dev/null ||
+    die "active connection key $active_key has no generated/CONNECTION_KEY_$active_key"
 
   umask 077
   cat >"$env/compose.env" <<EOF
 AWS_REGION=$AWS_REGION
 LUMA_STATE_DIR=$LUMA_STATE_DIR
 LUMA_LOG_GROUP=$(parameter host/LOG_GROUP)
-LUMA_IMAGE=$(parameter host/IMAGE_REPOSITORY):$tag
+LUMA_IMAGE=$(image_reference)
 LUMA_APP_HOST=$app_host
 LUMA_STAFF_NODE=$staff_node
 LUMA_STAFF_API_NODE=$staff_api_node
@@ -158,10 +208,11 @@ EOF
 LUMA_REGION=AU
 LUMA_ENABLED_REGIONS=AU
 OBSERVABILITY_ENVIRONMENT=$LUMA_STAGE
+OBSERVABILITY_RELEASE=$release
 BETTER_AUTH_URL=https://$app_host
 SHOPIFY_ADMISSION_URL=$valkey
-CONNECTIONS_ACTIVE_KEY_ID=k1
-CONNECTIONS_KEYS={"k1":"$(parameter generated/CONNECTION_KEY)"}
+CONNECTIONS_ACTIVE_KEY_ID=$active_key
+CONNECTIONS_KEYS=$keys
 TEMPORAL_ADDRESS=temporal:7233
 TEMPORAL_NAMESPACE=luma
 TEMPORAL_TASK_QUEUE=luma-exceptions-v1
@@ -178,6 +229,14 @@ EOF
     if [[ -n $(parameter app/MODEL_GATEWAY_BEDROCK_REGION) ]]; then
       echo "MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID=$(parameter generated/BEDROCK_ACCESS_KEY_ID)"
       echo "MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY=$(parameter generated/BEDROCK_SECRET_ACCESS_KEY)"
+    fi
+    # SES credentials only accompany a configured sender on a stage with a mail identity.
+    if [[ -n $(parameter app/MAIL_FROM) && -n $(parameter host/MAIL_USER) ]]; then
+      echo "MAIL_SES_REGION=$AWS_REGION"
+      echo "MAIL_SES_ACCESS_KEY_ID=$(parameter generated/MAIL_ACCESS_KEY_ID)"
+      echo "MAIL_SES_SECRET_ACCESS_KEY=$(parameter generated/MAIL_SECRET_ACCESS_KEY)"
+      echo "MAIL_SES_CONFIGURATION_SET=$(parameter host/MAIL_CONFIGURATION_SET)"
+      [[ -n $(parameter app/MAIL_PUBLIC_ORIGIN) ]] || echo "MAIL_PUBLIC_ORIGIN=https://$app_host"
     fi
     section app
   } >"$env/app.env"
@@ -211,6 +270,7 @@ EOF
 LUMA_REGION=AU
 LUMA_ENABLED_REGIONS=AU
 OBSERVABILITY_ENVIRONMENT=$LUMA_STAGE
+OBSERVABILITY_RELEASE=$release
 STAFF_DATABASE_URL=postgresql://luma_staff:$(parameter generated/STAFF_DATABASE_PASSWORD)@postgres:5432/luma
 STAFF_AUTH_SECRET=$(parameter generated/STAFF_AUTH_SECRET)
 STAFF_AUTH_MODE=google
@@ -252,8 +312,34 @@ REVOKE CONNECT ON DATABASE temporal, temporal_visibility FROM PUBLIC;
 SQL
 }
 
-log "deploying $tag"
+# Returns the services to the previously deployed tag after the new one failed to start, then
+# records the failure and alerts. The host files and the schema stay at the new release.
+roll_back() {
+  local failed=$tag
+  printf '%s %s\n' "$(date -u +%FT%TZ)" "$failed${digest:+@$digest}" >"$LUMA_STATE_DIR/state/failed-image"
+  if [[ -z $previous || $previous == "$failed" ]]; then
+    notify_alert "deploy of $failed failed" \
+      "Services did not become healthy and there is no earlier deployment to return to."
+    die "deploy of $failed failed"
+  fi
+  log "deploy of $failed failed; returning to $previous"
+  tag=$previous
+  digest=$previous_digest
+  render_environment
+  if compose up -d --wait --wait-timeout 600 --remove-orphans; then
+    notify_alert "deploy of $failed rolled back" \
+      "Services did not become healthy with $failed and run $previous again. Migrations of $failed stay applied."
+  else
+    notify_alert "deploy of $failed failed and rollback failed" \
+      "Services did not become healthy with $failed or with $previous. Investigate on the host now."
+  fi
+  die "deploy of $failed failed"
+}
+
+read -r previous previous_digest <<<"$(deployed_image)" || true
+log "deploying $tag${digest:+ ($digest)}"
 load_parameters
+install_host_services
 generate_secrets
 ensure_temporal_certificates
 render_environment
@@ -269,7 +355,12 @@ compose up -d --wait temporal
 [[ $TEMPORAL_CERTIFICATE_RENEWED == 1 ]] && compose restart temporal
 compose run --rm temporal-namespace
 compose run --rm staff-console
-compose up -d --wait --wait-timeout 600 --remove-orphans
+compose up -d --wait --wait-timeout 600 --remove-orphans || roll_back
 echo "$tag" >"$LUMA_STATE_DIR/state/image"
+if [[ -n $digest ]]; then
+  printf '%s %s\n' "$tag" "$digest" >"$LUMA_STATE_DIR/state/image-digest"
+else
+  rm -f "$LUMA_STATE_DIR/state/image-digest"
+fi
 docker image prune -af --filter 'until=168h' >/dev/null
 log "deployed $tag"

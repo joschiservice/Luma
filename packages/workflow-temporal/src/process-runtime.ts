@@ -21,6 +21,7 @@ import { NativeConnection, Worker } from '@temporalio/worker';
 
 import { temporalDataConverter } from './payload-codec.js';
 import {
+  isPolling,
   temporalActivities,
   type TemporalSettings,
   validateSettings,
@@ -216,6 +217,8 @@ export async function createProcessWorker(
 
     return {
       run: () => worker.run(),
+      /** True while Temporal reports the worker running with its workflow and activity pollers active. */
+      polling: () => isPolling(worker),
       shutdown: () => worker.shutdown(),
       close: async () => {
         data.close();

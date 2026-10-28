@@ -16,6 +16,10 @@
     "dev/test-plan.mjs",
     "dev/validation-lock.mjs",
     "dev/affected.mjs",
+    "smoke/mail.mjs",
+    "smoke/staging-smoke.mjs",
+    "dev/migration-contract.mjs",
+    "dev/schema-compat.mjs",
     "evaluation/state.mjs",
     "shopify/read-costs.mjs"
   ]

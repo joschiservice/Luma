@@ -33,14 +33,16 @@ an explicit operator step.
   control policy denies regional actions outside `ap-southeast-2` and `ap-southeast-4`, the
   regions Australian Bedrock profiles use.
 - **Foundation, per stage:** the Temporal payload key, the server image repository, the
-  backup bucket, alerts, a cost budget, the GitHub deployment role, and two IAM principals
-  that sign KMS and Bedrock requests and can do nothing else. Data-bearing resources are
+  Object Lock backup bucket, alerts, a cost budget, the GitHub deployment role, and IAM
+  principals that sign KMS, Bedrock and SES requests and can do nothing else. Data-bearing resources are
   retained when a stack is deleted.
 - **Lite cell, per stage:** one Graviton instance in a public subnet with an Elastic IP and no
   NAT gateway or load balancer. Docker Compose runs Caddy, the Luma processes, PostgreSQL,
   Valkey and Temporal. Caddy terminates TLS in the region and proxies `/api` as the identity
   guide requires. State lives on a separate EBS volume that the host attaches itself, with
-  daily AWS Backup snapshots and logical dumps in S3.
+  daily AWS Backup snapshots copied to a Melbourne vault and logical dumps in S3. The host
+  image is pinned in CDK context, so only a reviewed change replaces the instance. A
+  CloudWatch agent, log metric filters and an external readiness probe raise alarms.
 - **Temporal:** the official server image on the cell's PostgreSQL. Its frontend presents a
   certificate from a private CA that clients trust through `TEMPORAL_TLS_SERVER_CA`, which
   satisfies the production TLS requirement without a public endpoint.
@@ -52,8 +54,12 @@ an explicit operator step.
 - **Staff access:** the staff console and staff API listen only on the private Docker
   network. Two Tailscale nodes give them tailnet HTTPS names; nothing about them is public.
   Google Workspace sign-in remains the authentication.
-- **Delivery:** one server image runs every Node process. A manual GitHub workflow builds it
-  for arm64, pushes it with OIDC credentials and runs the host deploy command through SSM.
+- **Delivery:** one server image runs every Node process and carries the host files of its
+  commit. A manual GitHub workflow accepts only `main` or `v*` commits whose quality gates
+  passed. Staging builds the image for arm64, pushes it with OIDC credentials and must pass a
+  smoke journey; ECR replication copies it to production, which deploys the same digest only
+  after staging succeeded. The host deploy command runs through a stage SSM document that
+  accepts only an image tag and digest.
 
 The production cell keeps the same image, settings and parameter layout and replaces the
 host with managed services: a multi-AZ VPC, a load balancer with WAF, Fargate services, RDS
@@ -68,7 +74,8 @@ customer needs its availability.
   restarts or recovers the instance on failed status checks.
 - A stack update that changes the AMI replaces the instance; the new host waits for the
   data volume and restores the last deployment, with a few minutes of downtime.
-- Migrations only move forward, so rolling back an image requires a compatible schema.
+- Migrations only move forward. A deploy whose services fail health checks returns to the
+  previous image, which works only because migrations follow expand and contract.
 - Without a domain, hosts use sslip.io names derived from the Elastic IP, which depend on
   that service and Let's Encrypt's limits for its shared domain.
 - The access keys are long-lived and must be rotated by the operator.

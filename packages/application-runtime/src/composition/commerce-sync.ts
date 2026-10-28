@@ -133,8 +133,10 @@ export function createCommerceSyncWorker(options: {
   });
   const stop = new AbortController();
   const concurrency = options.concurrency ?? 4;
+  let progressAt = Date.now();
 
   async function pass() {
+    progressAt = Date.now();
     const scopes = await runner.scopes();
     const queue = [...scopes];
     await Promise.all(
@@ -146,6 +148,7 @@ export function createCommerceSyncWorker(options: {
             .catch((error: unknown) =>
               log('Sync pass failed; retrying.', error),
             );
+          progressAt = Date.now();
         }
       }),
     );
@@ -169,12 +172,28 @@ export function createCommerceSyncWorker(options: {
         }).catch(() => undefined);
       }
     },
+    /** When the loop last started a pass or finished a workspace's tick, in epoch milliseconds. */
+    progressAt: () => progressAt,
     shutdown: () => stop.abort(),
     close: async () => {
       await commerce.close();
       await host.close();
     },
   };
+}
+
+/**
+ * How long the sync loop may go without starting a pass or finishing a workspace's tick before
+ * health reports it stalled. Idle passes repeat every 2 seconds and a tick starts pages for at
+ * most 20 seconds, so a working loop reports progress far more often. The bound is two 5-minute
+ * page leases: a page step that has run that long has already lost its lease to another runner,
+ * and the loop cannot start its next pass until that step returns.
+ */
+export const syncStallMs = 10 * 60_000;
+
+/** Reports whether the loop's last progress is older than {@link syncStallMs} at `now`. */
+export function syncStalled(progressAt: number, now: number) {
+  return now - progressAt > syncStallMs;
 }
 
 /** Creates the operator sync service for the API process. */
@@ -337,6 +356,8 @@ export async function createDefaultCommerceSyncWorker(
 
     return {
       run: () => runLoops(loops),
+      /** True when the commerce sync loop has made no progress within {@link syncStallMs}. */
+      stalled: (now = Date.now()) => syncStalled(worker.progressAt(), now),
       shutdown: () => {
         for (const loop of loops) loop.shutdown();
       },
