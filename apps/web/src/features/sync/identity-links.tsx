@@ -164,6 +164,34 @@ export function IdentityLinksView({
     setPending(next);
     setReason(next.operation === 'link' ? next.reason : '');
   };
+  const confirm = async () => {
+    if (!pending || sending) return;
+    setSending(true);
+    try {
+      await submit(
+        pending.operation === 'link'
+          ? {
+              operation: 'link',
+              kind: detail.entity.kind,
+              entityId: detail.entity.id,
+              otherId: pending.otherId,
+              reason: reason.trim(),
+            }
+          : {
+              operation: 'unlink',
+              kind: detail.entity.kind,
+              entityId: detail.entity.id,
+              connectionId: pending.source.connectionId,
+              reason: reason.trim(),
+            },
+      );
+      setPending(null);
+    } catch {
+      /* The requester displays the error and keeps the reason for retry. */
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Card className="sync-identity" as="section">
@@ -417,34 +445,7 @@ export function IdentityLinksView({
               </Button>
               <Button
                 disabled={!reason.trim() || sending}
-                onClick={async () => {
-                  if (!pending || sending) return;
-                  setSending(true);
-                  try {
-                    await submit(
-                      pending.operation === 'link'
-                        ? {
-                            operation: 'link',
-                            kind: detail.entity.kind,
-                            entityId: detail.entity.id,
-                            otherId: pending.otherId,
-                            reason: reason.trim(),
-                          }
-                        : {
-                            operation: 'unlink',
-                            kind: detail.entity.kind,
-                            entityId: detail.entity.id,
-                            connectionId: pending.source.connectionId,
-                            reason: reason.trim(),
-                          },
-                    );
-                    setPending(null);
-                  } catch {
-                    /* The requester displays the error and keeps the reason for retry. */
-                  } finally {
-                    setSending(false);
-                  }
-                }}
+                onClick={() => void confirm()}
               >
                 {pending?.operation === 'link'
                   ? m.sync_links_link_confirm()

@@ -31,6 +31,14 @@ export function IssueRecordDetails({
     'idle',
   );
   const timestamp = (value: string) => <WorkspaceDate value={value} />;
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(item.id);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  };
 
   const content = (
     <>
@@ -98,14 +106,7 @@ export function IssueRecordDetails({
                 size="icon"
                 aria-label={m.issues_details_copy_id()}
                 title={m.issues_details_copy_id()}
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(item.id);
-                    setCopyState('copied');
-                  } catch {
-                    setCopyState('failed');
-                  }
-                }}
+                onClick={() => void copyId()}
               >
                 {copyState === 'copied' ? (
                   <Check aria-hidden="true" />

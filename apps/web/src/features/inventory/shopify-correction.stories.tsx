@@ -253,7 +253,7 @@ export const Review: Story = {
         'Someone else who can approve changes must approve this exact action.',
       ),
     ).resolves.toBeVisible();
-    expect(
+    await expect(
       canvas.queryByRole('button', { name: 'Send to Shopify' }),
     ).toBeNull();
   },

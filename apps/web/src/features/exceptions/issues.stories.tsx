@@ -224,7 +224,7 @@ function IssuesExample({
                       <ResolutionReview
                         review={review}
                         progress={resolutionProgress}
-                        onDecision={async () => {}}
+                        onDecision={() => {}}
                       />
                     }
                     header={

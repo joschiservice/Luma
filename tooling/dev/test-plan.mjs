@@ -30,6 +30,8 @@ const suites = {
   check: [
     // Static checks read only sources, so they run together; tests and the build follow.
     { parallel: [['format:check'], ['lint'], ['knip:check'], ['typecheck']] },
+    // Type-aware lint reads the declarations the typecheck builds and needs much of the memory.
+    ['lint:types'],
     ['test'],
     ['build'],
   ],

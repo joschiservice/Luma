@@ -591,24 +591,25 @@ export function CancelScheduledStart({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const cancel = async () => {
+    setPending(true);
+    setError('');
+    try {
+      await cancelWorkflowStart(organizationId, definitionId, runId);
+      await refresh();
+    } catch (error) {
+      setError(workflowError(error));
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <div>
       <Button
         variant="outline"
         disabled={pending}
-        onClick={async () => {
-          setPending(true);
-          setError('');
-          try {
-            await cancelWorkflowStart(organizationId, definitionId, runId);
-            await refresh();
-          } catch (error) {
-            setError(workflowError(error));
-          } finally {
-            setPending(false);
-          }
-        }}
+        onClick={() => void cancel()}
       >
         {pending
           ? m.workflows_triggers_canceling()

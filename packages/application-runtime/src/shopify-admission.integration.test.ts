@@ -130,7 +130,7 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
     await expect(
       foreground.run('investigate', async (feedback) => {
         await feedback.beforeSend?.();
-        feedback.observe('investigate', 1, 1949, 100, 1, 2000);
+        await feedback.observe('investigate', 1, 1949, 100, 1, 2000);
 
         return 'fresh';
       }),
@@ -236,14 +236,14 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
         await new Promise<void>((resolve) => {
           release = resolve;
         });
-        feedback.observe('first', 1000, 1500, 100, 500, 2000);
+        await feedback.observe('first', 1000, 1500, 100, 500, 2000);
       },
     );
     await expect.poll(() => !!firstFeedback).toBe(true);
     await createSharedReadBudget({ store, key }).run(
       'second',
       async (feedback) => {
-        feedback.observe('second', 1000, 0, 100, 1000, 2000);
+        await feedback.observe('second', 1000, 0, 100, 1000, 2000);
       },
     );
     release();
@@ -274,7 +274,7 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
         await new Promise<void>((resolve) => {
           release = resolve;
         });
-        feedback.observe('first', 1000, 1500, 100, 500, 2000);
+        await feedback.observe('first', 1000, 1500, 100, 500, 2000);
       },
     );
     await expect.poll(() => pending).toBe(true);
@@ -299,7 +299,7 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
         'isolated',
         async (feedback) => {
           await feedback.beforeSend?.();
-          feedback.observe('isolated', 1000, 1999, 100, 1, 2000);
+          await feedback.observe('isolated', 1000, 1999, 100, 1, 2000);
         },
       );
     const available = await store.run(
@@ -346,7 +346,7 @@ describe.skipIf(!url)('Shopify admission on real Valkey', () => {
         createSharedReadBudget({ store: isolated, key }).run(
           'after-restart',
           async (feedback) => {
-            feedback.observe('after-restart', 1, 1999, 100, 1, 2000);
+            await feedback.observe('after-restart', 1, 1999, 100, 1, 2000);
 
             return 'fresh';
           },
@@ -363,7 +363,7 @@ async function seed(store: AtomicStore, key: string) {
   await createSharedReadBudget({ store, key }).run(
     'probe',
     async (feedback) => {
-      feedback.observe('probe', 0, 2000, 100, 0, 2000);
+      await feedback.observe('probe', 0, 2000, 100, 0, 2000);
     },
   );
 }
@@ -374,7 +374,7 @@ async function spend(store: AtomicStore, key: string, available: number) {
     'spent',
     async (feedback) => {
       await feedback.beforeSend?.();
-      feedback.observe('spent', 1, available, 100, 1, 2000);
+      await feedback.observe('spent', 1, available, 100, 1, 2000);
     },
   );
 }

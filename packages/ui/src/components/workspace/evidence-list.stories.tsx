@@ -128,47 +128,49 @@ export const Resolved: Story = {
     const canvas = within(canvasElement);
     const list = canvas.getByRole('list', { name: 'Cited evidence' });
     const entries = within(list).getAllByRole('listitem');
-    expect(entries.filter((entry) => entry.dataset.kind)).toHaveLength(7);
+    await expect(entries.filter((entry) => entry.dataset.kind)).toHaveLength(7);
 
     // Reads name the system, freshness and completeness in text.
-    expect(
+    await expect(
       canvas.getByText('Read from JTL, JTL warehouse'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('Complete')).toBeInTheDocument();
-    expect(canvas.getByText(/5 minutes ago/)).toBeInTheDocument();
-    expect(canvas.getByText('Order number')).toBeInTheDocument();
-    expect(canvas.getAllByText('No').length).toBeGreaterThan(0);
+    await expect(canvas.getByText('Complete')).toBeInTheDocument();
+    await expect(canvas.getByText(/5 minutes ago/)).toBeInTheDocument();
+    await expect(canvas.getByText('Order number')).toBeInTheDocument();
+    await expect(canvas.getAllByText('No').length).toBeGreaterThan(0);
 
     // A partial read says it can't establish the outcome; a removed connection is named so.
-    expect(
+    await expect(
       canvas.getByText(/Partial: this read can't establish the outcome/),
     ).toBeInTheDocument();
-    expect(
+    await expect(
       canvas.getByText('Read from Shopify, a removed connection'),
     ).toBeInTheDocument();
 
     // A receipt is acceptance, not verification.
-    expect(
+    await expect(
       canvas.getByText('Accepted by JTL, JTL warehouse'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('req-58c1')).toBeInTheDocument();
+    await expect(canvas.getByText('req-58c1')).toBeInTheDocument();
     // The read and the receipt each name the adapter version that produced them.
-    expect(canvas.getAllByText('jtl-purchasing/2')).toHaveLength(2);
-    expect(
+    await expect(canvas.getAllByText('jtl-purchasing/2')).toHaveLength(2);
+    await expect(
       canvas.getByText(/Only a later read confirms the outcome/),
     ).toBeInTheDocument();
 
-    expect(canvas.getByText('Approval')).toBeInTheDocument();
-    expect(
+    await expect(canvas.getByText('Approval')).toBeInTheDocument();
+    await expect(
       canvas.getByText('Recorded before Luma kept evidence'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('Not retained')).toBeInTheDocument();
-    expect(canvas.getByText('No stored evidence found')).toBeInTheDocument();
-    expect(
+    await expect(canvas.getByText('Not retained')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('No stored evidence found'),
+    ).toBeInTheDocument();
+    await expect(
       canvas.getByText(/Treat the outcome it supports as unconfirmed/),
     ).toBeInTheDocument();
     // A reference that names nothing this view shows is not presented as missing evidence.
-    expect(
+    await expect(
       canvas.getByText('Nothing to show for this reference'),
     ).toBeInTheDocument();
   },
@@ -200,7 +202,7 @@ export const Truncated: Story = {
     },
   },
   play: async ({ canvasElement }) => {
-    expect(
+    await expect(
       within(canvasElement).getByText('Showing the first 2 references.'),
     ).toBeInTheDocument();
   },
@@ -211,7 +213,7 @@ export const Empty: Story = {
     state: { status: 'ready', evidence: { ...evidence, items: [] } },
   },
   play: async ({ canvasElement }) => {
-    expect(
+    await expect(
       within(canvasElement).getByText('Nothing is cited here yet.'),
     ).toBeInTheDocument();
   },
@@ -220,7 +222,7 @@ export const Empty: Story = {
 export const Loading: Story = {
   args: { state: { status: 'loading' } },
   play: async ({ canvasElement }) => {
-    expect(
+    await expect(
       within(canvasElement).getByText('Loading evidence…'),
     ).toBeInTheDocument();
   },
@@ -230,19 +232,19 @@ export const Failed: Story = {
   args: { state: { status: 'failed', retry: fn() } },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    expect(canvas.getByRole('alert')).toHaveTextContent(
+    await expect(canvas.getByRole('alert')).toHaveTextContent(
       "Luma couldn't load this evidence.",
     );
     await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
     if (args.state.status === 'failed')
-      expect(args.state.retry).toHaveBeenCalledOnce();
+      await expect(args.state.retry).toHaveBeenCalledOnce();
   },
 };
 
 export const Forbidden: Story = {
   args: { state: { status: 'forbidden' } },
   play: async ({ canvasElement }) => {
-    expect(
+    await expect(
       within(canvasElement).getByText(
         "You don't have access to the evidence of this record.",
       ),
@@ -429,48 +431,50 @@ export const Records: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     // A stock read the plan relied on.
-    expect(
+    await expect(
       canvas.getByText('Read from Shopify, Shopify store'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('Reserved')).toBeInTheDocument();
+    await expect(canvas.getByText('Reserved')).toBeInTheDocument();
 
     // A lifecycle event names its change, when and who.
-    expect(canvas.getByText('Purchase order event')).toBeInTheDocument();
-    expect(canvas.getByText('Draft → Open')).toBeInTheDocument();
-    expect(
+    await expect(canvas.getByText('Purchase order event')).toBeInTheDocument();
+    await expect(canvas.getByText('Draft → Open')).toBeInTheDocument();
+    await expect(
       canvas.getAllByText('Mara Lind · mara@example.test').length,
     ).toBeGreaterThan(0);
 
     // Native receipt review and the ledger entry that booked it, with its postings.
-    expect(canvas.getByText('Stock receipt review')).toBeInTheDocument();
-    expect(canvas.getByText('24 each')).toBeInTheDocument();
-    expect(
+    await expect(canvas.getByText('Stock receipt review')).toBeInTheDocument();
+    await expect(canvas.getByText('24 each')).toBeInTheDocument();
+    await expect(
       canvas.getByText('Available: +24 each, balance 30 (version 7)'),
     ).toBeInTheDocument();
-    expect(
+    await expect(
       canvas.getByText('At supplier: -24 each, balance -24 (version 3)'),
     ).toBeInTheDocument();
 
     // Messages show who sent them and whether that is authenticated, never their text.
-    expect(
+    await expect(
       canvas.getByText('Message sent from Purchasing inbox'),
     ).toBeInTheDocument();
-    expect(
+    await expect(
       canvas.getByText('Shop buying <buying@shop.example>'),
     ).toBeInTheDocument();
-    expect(
+    await expect(
       canvas.getByText('No: anyone could have sent this message'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('(no subject)')).toBeInTheDocument();
+    await expect(canvas.getByText('(no subject)')).toBeInTheDocument();
 
     // Evidence another area guards is named, not dropped.
-    expect(canvas.getByText('No access')).toBeInTheDocument();
-    expect(canvas.getByText(/Someone with “View orders”/)).toBeInTheDocument();
+    await expect(canvas.getByText('No access')).toBeInTheDocument();
+    await expect(
+      canvas.getByText(/Someone with “View orders”/),
+    ).toBeInTheDocument();
 
-    expect(
+    await expect(
       canvas.getByText('Note recorded with a receipt'),
     ).toBeInTheDocument();
-    expect(canvas.getByText('Delivery note 4471')).toBeInTheDocument();
+    await expect(canvas.getByText('Delivery note 4471')).toBeInTheDocument();
   },
 };
 
@@ -534,10 +538,10 @@ export const ReplenishmentRun: Story = {
       'Proposed purchase-order draft',
       'Supplier',
     ])
-      expect(canvas.getByText(label)).toBeInTheDocument();
+      await expect(canvas.getByText(label)).toBeInTheDocument();
     // The stock read the proposal rests on is named for readers without inventory access.
-    expect(canvas.getByText('No access')).toBeInTheDocument();
-    expect(
+    await expect(canvas.getByText('No access')).toBeInTheDocument();
+    await expect(
       canvas.getByText(/Someone with “View inventory”/),
     ).toBeInTheDocument();
   },
@@ -570,16 +574,16 @@ export const ReplenishmentRunBeforeDemandReads: Story = {
     const entry = within(list)
       .getAllByRole('listitem')
       .find((item) => item.dataset.kind === 'not_retained');
-    expect(entry).toBeDefined();
-    expect(
+    await expect(entry).toBeDefined();
+    await expect(
       within(entry!).getByText('Demand reads not kept'),
     ).toBeInTheDocument();
-    expect(
+    await expect(
       within(entry!).getByText(
         /^Demand reads weren't kept for runs before 17 Oct/,
       ),
     ).toBeInTheDocument();
-    expect(within(entry!).getByText('Not retained')).toBeInTheDocument();
+    await expect(within(entry!).getByText('Not retained')).toBeInTheDocument();
   },
 };
 
@@ -603,8 +607,8 @@ export const OnlyNotRetained: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    expect(canvas.queryByText('Nothing is cited here yet.')).toBeNull();
-    expect(canvas.getByText('Demand reads not kept')).toBeInTheDocument();
+    await expect(canvas.queryByText('Nothing is cited here yet.')).toBeNull();
+    await expect(canvas.getByText('Demand reads not kept')).toBeInTheDocument();
   },
 };
 
