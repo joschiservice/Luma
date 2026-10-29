@@ -462,8 +462,11 @@
   padding: 0;
 }
 
+/* The rail is exactly one link wide, so drop the expanded scroll gutter that would offset the links. */
 .desk[data-sidebar='collapsed'] .sidebar-scroll {
   width: 100%;
+  margin-inline: 0;
+  padding-inline: 0;
   overflow: visible;
 }
 
@@ -488,10 +491,11 @@
   display: none;
 }
 
+/* Anchored at the icon's corner so longer counts grow away from the icon. */
 .desk[data-sidebar='collapsed'] .sidebar-link-count {
   position: absolute;
   top: 1px;
-  right: 0;
+  left: calc(50% + 4px);
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
