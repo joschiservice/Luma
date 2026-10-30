@@ -39,7 +39,7 @@
     }
   },
   "dependencies": {
-    "@inlang/paraglide-js": "2.29.1",
+    "@inlang/paraglide-js": "2.29.2",
     "@inlang/plugin-icu1": "1.3.4",
     "@inlang/sdk": "4.0.4"
   },
