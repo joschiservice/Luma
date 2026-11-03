@@ -1,5 +1,6 @@
 import { isAppPermission, type TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 import type { Approval, ProposedAction } from '@luma/policies';
 
 import type { PurchaseOrder } from '../domain/procurement.js';
@@ -46,12 +47,12 @@ export function createReplenishmentApprovalCoverage(
             `SELECT p.document AS "order",a.document->'action' AS draft,g.document AS approval,
        s.document->'link' AS link,COALESCE(ws.replenishment_approval,'{"separateSend":false,"threshold":null}'::jsonb) AS rule
        FROM procurement_purchase_orders p
-       JOIN action_admission_steps a ON a.tenant_id=p.tenant_id AND a.proposal_id::text=p.document->'origin'->>'actionId'
+       JOIN LATERAL (SELECT step.tenant_id,step.proposal_id,step.document FROM action_admission_steps step WHERE step.tenant_id=p.tenant_id AND step.proposal_id=${sqlUuid("p.document->'origin'->>'actionId'")} LIMIT 1) a ON true
        JOIN policy_approvals g ON g.tenant_id=a.tenant_id AND g.proposal_id=a.proposal_id AND g.action_hash=a.document->>'actionHash'
        JOIN executed_actions x ON x.tenant_id=a.tenant_id AND x.proposal_id=a.proposal_id AND x.action_hash=g.action_hash
-       JOIN procurement_suppliers s ON s.tenant_id=p.tenant_id AND s.id::text=p.document->>'supplierId'
+       JOIN LATERAL (SELECT supplier.document FROM procurement_suppliers supplier WHERE supplier.tenant_id=p.tenant_id AND supplier.id=${sqlUuid("p.document->>'supplierId'")} LIMIT 1) s ON true
        LEFT JOIN workspace_settings ws ON ws.tenant_id=p.tenant_id
-       WHERE p.tenant_id=$1 AND p.id::text=$2 AND g.document->>'policyVersion'=$3
+       WHERE p.tenant_id=$1 AND p.id=${sqlUuid('$2::text')} AND g.document->>'policyVersion'=$3
         AND g.document->>'outcome'='approved' AND x.document->>'state'='succeeded'
         AND x.document->'attempt'->'verification'->>'outcome'='passed'
        ORDER BY g.created_at DESC LIMIT 1`,

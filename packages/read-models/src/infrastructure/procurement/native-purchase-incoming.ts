@@ -9,6 +9,7 @@ import {
   incomingLineExpectations,
   incomingSubmissionSettled,
   type PurchaseOrder,
+  skuCandidateIdsSql,
   type Submission,
 } from '@luma/procurement';
 
@@ -69,7 +70,7 @@ export function readNativePurchaseIncoming(
       if (!scope || !line.locationId) continue;
       const sku = (
         await tx.query<{ id: string }>(
-          `SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND (e.id::text=$2 OR e.reconciliation_key=$2 OR EXISTS(SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=$2)) LIMIT 2`,
+          `SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND e.id IN (${skuCandidateIdsSql('$1', '$2::text')}) LIMIT 2`,
           [context.tenantId, line.sku],
         )
       ).rows;

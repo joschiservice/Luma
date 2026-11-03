@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { TenantContext } from '@luma/identity';
 import { requirePermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { forbidden } from '@luma/platform';
+import { forbidden, sqlUuid } from '@luma/platform';
 import { z } from 'zod';
 
 import { canReadRecord } from '../application/access.js';
@@ -454,9 +454,9 @@ export function createRecordExplorer(
                 : null;
               const found = await tx.query<{ id: string }>(
                 `SELECT canonical_id AS id FROM connector_source_mappings
-               WHERE tenant_id=$1 AND resource=$2 AND external_id=$3 AND connection_id::text=$4
-               UNION SELECT id FROM orders_entities WHERE tenant_id=$1 AND kind=$2 AND id::text=$3
-               UNION SELECT id FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id::text=$3`,
+               WHERE tenant_id=$1 AND resource=$2 AND external_id=$3 AND connection_id=${sqlUuid('$4::text')}
+               UNION SELECT id FROM orders_entities WHERE tenant_id=$1 AND kind=$2 AND id=${sqlUuid('$3::text')}
+               UNION SELECT id FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id=${sqlUuid('$3::text')}`,
                 [context.tenantId, subjectKind, subjectId, scope ?? ''],
               );
               for (const row of found.rows)

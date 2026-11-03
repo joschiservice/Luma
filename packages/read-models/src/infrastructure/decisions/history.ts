@@ -1,5 +1,6 @@
 import { hasPermission, type TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 
 import type { DecisionItem } from '../../application/decisions.js';
 
@@ -68,7 +69,7 @@ export async function readDecisionHistory(
        jsonb_build_object('kind','workflow_run','definitionId',r.definition_id,'runId',r.id) AS owner,
        NULL::jsonb AS record,COALESCE(p.document->>'reference',a.document->'action'->'parameters'->>'reference') AS label
        FROM workflow_trigger_runs r JOIN action_admission_steps a ON a.tenant_id=r.tenant_id AND a.run_id=r.id AND a.step_id='create-order'
-       LEFT JOIN procurement_purchase_orders p ON p.tenant_id=r.tenant_id AND p.id::text=a.document->'action'->'target'->>'id'
+       LEFT JOIN LATERAL (SELECT o.id,o.document FROM procurement_purchase_orders o WHERE o.tenant_id=r.tenant_id AND o.id=${sqlUuid('a.target_id')} LIMIT 1) p ON true
        WHERE r.tenant_id=$1 AND r.id=$2::uuid`
     : submission
       ? `SELECT c.purchase_order_id,NULL::uuid AS run_id,a.document->'action' AS action,NULL::text AS definition_id,
@@ -86,8 +87,9 @@ export async function readDecisionHistory(
        jsonb_build_object('kind','position','id',c.position_id) AS record,
        COALESCE(c.document->'before'->'product'->>'sku',c.document->'before'->'product'->>'title','Shopify stock correction') AS label
        FROM shopify_inventory_corrections c
-       LEFT JOIN action_admission_steps a ON a.tenant_id=c.tenant_id AND a.proposal_id::text=c.document->'action'->>'id'
-       LEFT JOIN workflow_trigger_runs r ON r.tenant_id=a.tenant_id AND r.id::text=COALESCE(c.document->>'workflowRunId',a.run_id::text)
+       LEFT JOIN LATERAL (SELECT s.tenant_id,s.run_id FROM action_admission_steps s WHERE s.tenant_id=c.tenant_id AND s.proposal_id=${sqlUuid("c.document->'action'->>'id'")} LIMIT 1) a ON true
+       CROSS JOIN LATERAL (SELECT ${sqlUuid("COALESCE(c.document->>'workflowRunId',a.run_id::text)")} AS id OFFSET 0) run
+       LEFT JOIN workflow_trigger_runs r ON r.tenant_id=a.tenant_id AND r.id=run.id
        WHERE c.tenant_id=$1 AND (c.position_id=$2::uuid OR c.id=$2::uuid) AND ($3::uuid IS NULL OR c.connection_id=$3::uuid)
        ORDER BY c.created_at DESC LIMIT 1`;
   const row = await db.transaction(
@@ -102,7 +104,8 @@ export async function readDecisionHistory(
      FROM source s
      LEFT JOIN LATERAL (SELECT document FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=(s.action->>'id')::uuid ORDER BY created_at DESC LIMIT 1) g ON true
      LEFT JOIN LATERAL (SELECT document FROM executed_actions WHERE tenant_id=$1 AND proposal_id=(s.action->>'id')::uuid ORDER BY created_at DESC LIMIT 1) x ON true
-     LEFT JOIN workspace_people person ON person.tenant_id=$1 AND person.user_id::text=g.document->>'approverId'`,
+     CROSS JOIN LATERAL (SELECT ${sqlUuid("g.document->>'approverId'")} AS id OFFSET 0) approver
+     LEFT JOIN workspace_people person ON person.tenant_id=$1 AND person.user_id=approver.id`,
           stock
             ? [context.tenantId, sourceId, connectionId ?? null]
             : [context.tenantId, sourceId],

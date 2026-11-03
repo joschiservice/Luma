@@ -1,4 +1,5 @@
 import type { SqlTransaction } from '@luma/platform';
+import { sqlUuids } from '@luma/platform';
 
 import type {
   PurchasingReadEvidence,
@@ -138,7 +139,7 @@ async function sourceCommitments(
     (
       await tx.query<{ id: string }>(
         `SELECT id::text FROM procurement_commitments
-         WHERE tenant_id=$1 AND purchase_order_id=ANY($2::uuid[]) AND id::text=ANY($3::text[])`,
+         WHERE tenant_id=$1 AND purchase_order_id=ANY($2::uuid[]) AND id=ANY(${sqlUuids('$3::text[]')})`,
         [tenantId, sources, refs],
       )
     ).rows.map((row) => row.id),

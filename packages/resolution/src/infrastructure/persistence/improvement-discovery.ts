@@ -70,7 +70,7 @@ export function createImprovementDiscoveryReader(db: TenantDatabase) {
           WHERE s.incident_id=c.incident_id AND (s.document->'facts'->>'synthetic'='true' OR s.document->>'adapterVersion' LIKE '%synthetic%'
           OR s.document->>'adapterVersion' LIKE '%simulator%' OR s.document->>'key' LIKE 'pilot:%' OR installation.document->>'label' LIKE 'SIMULATED %'
           OR EXISTS(SELECT 1 FROM jsonb_each_text(COALESCE(installation.document->'target','{}'::jsonb)) t WHERE t.value LIKE '%.invalid%' OR t.value LIKE 'luma-synthetic-%'))) AS synthetic,
-        EXISTS(SELECT 1 FROM action_admission_steps step JOIN execution_observe_only observed ON observed.tenant_id=step.tenant_id AND observed.proposal_id=step.proposal_id WHERE step.tenant_id=$1 AND step.document->>'incidentId'=c.incident_id::text) AS "observeOnly"
+        EXISTS(SELECT 1 FROM action_admission_steps step JOIN execution_observe_only observed ON observed.tenant_id=step.tenant_id AND observed.proposal_id=step.proposal_id WHERE step.tenant_id=$1 AND step.incident_id=c.incident_id) AS "observeOnly"
       FROM cohort c ORDER BY c.incident->'resolution'->>'at' DESC,c.incident_id`,
             [context.tenantId, start, asOf],
           )

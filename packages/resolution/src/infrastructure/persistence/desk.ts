@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { requirePermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { conflict, forbidden, notFound } from '@luma/platform';
+import { conflict, forbidden, notFound, sqlUuid } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { workspacePolicyVersion } from '@luma/policies';
 import { z } from 'zod';
@@ -392,8 +392,9 @@ export function createDeskStore(
         SELECT page.id,to_char(page.at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,page.doc,
         ${actorSql({ row: 'person', kind: "COALESCE(page.doc->'actor'->>'kind','user')", id: "page.doc->'actor'->>'id'", luma: "page.doc->>'eventType' LIKE 'exception.%'", workflow: `CASE WHEN page.doc->>'eventType' IN ('approval.responded','case.approve','case.reject','workflow.human_task_answered') THEN NULL ELSE COALESCE(CASE WHEN w.id IS NOT NULL THEN jsonb_build_object('id',w.id,'name',wv.document->'definition'->>'name') END,page.doc->'automation',page.doc->'resolution'->'automation') END` })} AS actor
         FROM page
-        LEFT JOIN action_admission_steps a ON a.tenant_id=$1 AND a.proposal_id::text=page.doc->>'proposalId'
-        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=$1 AND w.id::text=COALESCE(page.doc->'automation'->>'id',page.doc->'resolution'->'automation'->>'id',a.run_id::text,page.doc->>'correlationId')
+        LEFT JOIN LATERAL (SELECT step.run_id FROM action_admission_steps step WHERE step.tenant_id=$1 AND step.proposal_id=${sqlUuid("page.doc->>'proposalId'")} LIMIT 1) a ON true
+        CROSS JOIN LATERAL (SELECT ${sqlUuid("COALESCE(page.doc->'automation'->>'id',page.doc->'resolution'->'automation'->>'id',a.run_id::text,page.doc->>'correlationId')")} AS id OFFSET 0) run
+        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=$1 AND w.id=run.id
         LEFT JOIN playbook_versions wv ON wv.tenant_id=w.tenant_id AND wv.definition_id=w.definition_id AND wv.version=w.version
         ${personSql('person', '$1', "CASE WHEN COALESCE(page.doc->'actor'->>'kind','user')='user' THEN page.doc->'actor'->>'id' END")}
         ORDER BY page.at,page.id`,

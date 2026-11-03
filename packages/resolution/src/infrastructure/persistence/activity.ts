@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { hasPermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ActivityStore } from '../../application/activity.js';
@@ -14,7 +15,7 @@ import {
   activityAttentionOutcomes,
   activityOutcomeRules,
 } from '../../domain/activity-outcome.js';
-import { actorSql, personSql, uuidPattern } from './actors.js';
+import { actorSql, personSql } from './actors.js';
 
 const coverage =
   'Recorded decisions, execution, verification, issue resolutions and procurement changes. People who can view restricted activity also see connection changes and changes to members, invitations, roles and workspace settings. Older unrecorded changes and legacy playbook activation history are unavailable. Execution mode is shown only when recorded.';
@@ -82,7 +83,7 @@ const accessEventsSql = `SELECT * FROM (SELECT x.created_at AS sort_at,x.sort_id
         ${personSql('person', 'e.tenant_id', 'e.actor_id::text')}
         LEFT JOIN LATERAL (SELECT name AS subject_name FROM workspace_people WHERE tenant_id=e.tenant_id
           AND e.event_type LIKE 'support_view.%'
-          AND user_id=CASE WHEN e.after_value->>'userId' ~ ${uuidPattern} THEN (e.after_value->>'userId')::uuid END) subject ON true
+          AND user_id=${sqlUuid("e.after_value->>'userId'")}) subject ON true
         WHERE $4::boolean AND e.tenant_id=$1 AND e.created_at>=$2::timestamptz AND e.created_at<$3::timestamptz
         AND $7::text IS NULL AND $8::uuid IS NULL AND $13::text[] IS NULL
         AND ($9::text IS NULL OR $9::text='access') AND ($10::text[] IS NULL OR 'recorded'=ANY($10::text[]))
@@ -157,6 +158,36 @@ async function readLinkedKeys(
   return result.rows[0]!;
 }
 
+// The connections of each issue a listed event inherits them from: its proposals and the source
+// observations behind its evidence and resolution. Evidence keys name evaluation inputs, whose
+// facts reference the sources. All issues resolve together in one pass, once per read, because
+// joining per issue or per event repeats the source scan. `enriched` stays materialized so
+// `issue_id` reaches these joins as a plain value: row-level security keeps a JSON expression
+// out of the `exception_evidence` index, which would scan the tenant's evidence per row.
+const issueConnectionsSql = `listed_issues AS MATERIALIZED (
+        SELECT DISTINCT issue_id FROM enriched WHERE conn_id IS NULL AND issue_id IS NOT NULL
+      ), issue_evidence AS (
+        SELECT listed.issue_id,ref.key FROM listed_issues listed
+        JOIN exception_evidence ev ON ev.tenant_id=$1 AND ev.exception_id=listed.issue_id
+        JOIN exception_inputs input ON input.tenant_id=$1 AND input.evidence_key=ev.evidence_key
+        CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(input.document->'facts'->'evidenceRefs')='array' THEN input.document->'facts'->'evidenceRefs' ELSE '[]'::jsonb END) ref(key)
+        UNION
+        SELECT listed.issue_id,ref.key FROM listed_issues listed
+        JOIN exceptions issue ON issue.tenant_id=$1 AND issue.id=listed.issue_id
+        CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(issue.document->'resolution'->'evidenceRefs')='array' THEN issue.document->'resolution'->'evidenceRefs' ELSE '[]'::jsonb END) ref(key)
+      ), issue_connections AS MATERIALIZED (
+        SELECT issue_id,array_agg(DISTINCT connection_id) AS connection_ids FROM (
+          SELECT listed.issue_id,(p.document->>'connectionId')::uuid AS connection_id FROM listed_issues listed
+          JOIN case_proposals p ON p.tenant_id=$1 AND p.exception_id=listed.issue_id
+          UNION ALL
+          SELECT evidence.issue_id,${sqlUuid("source.document->>'connectionId'")}
+          FROM issue_evidence evidence
+          JOIN exception_sources source ON source.tenant_id=$1 AND source.evidence_key=evidence.key
+        ) found
+        WHERE connection_id IS NOT NULL
+        GROUP BY issue_id
+      )`;
+
 /** What one read of the activity events returns. */
 type ActivityRead =
   | { kind: 'page'; after: { at: string; id: string } | null }
@@ -220,7 +251,7 @@ async function readActivity<Row extends Record<string, unknown>>(
 
   return tx.query<Row>(
     `
-      WITH enriched AS (
+      WITH enriched AS MATERIALIZED (
         SELECT s.*,COALESCE(eo.document->'automation',eo.document->'resolution'->'automation') AS actor_automation,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
         COALESCE(s.doc->'details'->>'purchaseOrderId',CASE WHEN a.subject_kind='order' THEN a.subject_id END,p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
@@ -237,18 +268,19 @@ async function readActivity<Row extends Record<string, unknown>>(
         s.doc->'details' AS details,
         e.document->>'exceptionClass' AS issue_class
         FROM ${linked ? linkedSources : 'workspace_activity_sources'} s
-        LEFT JOIN exception_outbox eo ON eo.tenant_id=s.tenant_id AND eo.id::text=s.id AND s.doc->>'eventType' LIKE 'exception.%'
+        LEFT JOIN LATERAL (SELECT o.document FROM exception_outbox o WHERE s.doc->>'eventType' LIKE 'exception.%' AND o.tenant_id=s.tenant_id AND o.id=${sqlUuid('s.id')} LIMIT 1) eo ON true
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
         LEFT JOIN exceptions e ON e.tenant_id=s.tenant_id AND e.id=COALESCE(s.exception_id,p.exception_id)
         LEFT JOIN playbook_runs r ON r.tenant_id=s.tenant_id AND r.id=s.proposal_id
         LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version
         LEFT JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id=s.proposal_id
-        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=s.tenant_id AND w.id::text=COALESCE(a.run_id::text,s.doc->>'correlationId',COALESCE(eo.document->'automation'->>'id',eo.document->'resolution'->'automation'->>'id'))
+        CROSS JOIN LATERAL (SELECT ${sqlUuid("COALESCE(a.run_id::text,s.doc->>'correlationId',COALESCE(eo.document->'automation'->>'id',eo.document->'resolution'->'automation'->>'id'))")} AS id OFFSET 0) run
+        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=s.tenant_id AND w.id=run.id
         LEFT JOIN playbook_versions wv ON wv.tenant_id=w.tenant_id AND wv.definition_id=w.definition_id AND wv.version=w.version
         WHERE s.tenant_id=$1 AND s.recorded_at >= $2::timestamptz AND s.recorded_at < $3::timestamptz
         AND (NOT s.restricted OR $4::boolean)
 
-      ), classified AS (
+      ), ${issueConnectionsSql}, classified AS (
         SELECT e.*,connections.items AS connections,
         person.actor_name,person.actor_email,person.actor_member,
         connections.items->0->>'system' AS system,
@@ -262,20 +294,12 @@ async function readActivity<Row extends Record<string, unknown>>(
           ELSE 'issue' END AS type,
         ${outcomeSql} AS outcome
         FROM enriched e
+        LEFT JOIN issue_connections issue ON e.conn_id IS NULL AND issue.issue_id=e.issue_id
         LEFT JOIN LATERAL (
           SELECT COALESCE(jsonb_agg(jsonb_build_object('id',c.id,'system',c.document->'target'->>'kind') ORDER BY c.id),'[]'::jsonb) AS items
           FROM connector_installations c
-          WHERE c.tenant_id=e.tenant_id AND c.id IN (
-            SELECT e.conn_id WHERE e.conn_id IS NOT NULL
-            UNION SELECT e.subject_connection::uuid WHERE e.conn_id IS NULL AND e.subject_connection IS NOT NULL
-            UNION
-            SELECT (source.document->>'connectionId')::uuid
-            FROM exception_evidence ev JOIN exception_sources source ON source.tenant_id=ev.tenant_id AND source.evidence_key=ev.evidence_key
-            WHERE e.conn_id IS NULL AND ev.tenant_id=e.tenant_id AND ev.exception_id=e.issue_id
-            UNION
-            SELECT (p.document->>'connectionId')::uuid FROM case_proposals p
-            WHERE e.conn_id IS NULL AND p.tenant_id=e.tenant_id AND p.exception_id=e.issue_id
-          )
+          WHERE c.tenant_id=e.tenant_id AND c.id=ANY(CASE WHEN e.conn_id IS NOT NULL THEN ARRAY[e.conn_id]
+            ELSE array_append(COALESCE(issue.connection_ids,'{}'::uuid[]),e.subject_connection::uuid) END)
         ) connections ON true
         ${personSql('person', 'e.tenant_id', "CASE WHEN e.doc->'actor'->>'kind'='user' THEN e.doc->'actor'->>'id' END")}
       ), operational AS (

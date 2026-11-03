@@ -9,6 +9,7 @@ import type {
   PurchaseOrderChange,
   PurchaseOrderRevision,
 } from '../domain/purchase-order-changes.js';
+import { skuCandidateIdsSql } from '../domain/sku-candidates.js';
 import {
   insertPurchasingRead,
   insertPurchasingWriteReceipt,
@@ -126,7 +127,7 @@ export function createPurchaseOrderChangeStore(
           skuIdentity: async (connectionId, sku) => {
             const rows = (
               await tx.query<{ external_id: string; scope_key: string }>(
-                `WITH candidates AS (SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND (e.id::text=$3 OR e.reconciliation_key=$3 OR EXISTS(SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=$3))) SELECT DISTINCT m.external_id,m.scope_key FROM candidates c JOIN connector_source_mappings m ON m.tenant_id=$1 AND m.canonical_id=c.id AND m.resource='sku' AND m.connection_id=$2 WHERE (SELECT count(*) FROM candidates)=1`,
+                `WITH candidates AS (SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND e.id IN (${skuCandidateIdsSql('$1', '$3::text')})) SELECT DISTINCT m.external_id,m.scope_key FROM candidates c JOIN connector_source_mappings m ON m.tenant_id=$1 AND m.canonical_id=c.id AND m.resource='sku' AND m.connection_id=$2 WHERE (SELECT count(*) FROM candidates)=1`,
                 [tenantId, connectionId, sku],
               )
             ).rows;

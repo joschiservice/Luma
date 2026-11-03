@@ -1,4 +1,5 @@
 import type { SqlTransaction } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 
 import { replenishmentSource } from '../domain/replenishment.js';
 import { lifecycleEvents } from './purchase-order-evidence.js';
@@ -59,8 +60,8 @@ async function run(tx: SqlTransaction, tenantId: string, runId: string) {
         a.document->>'supplierId' AS supplier_id,s.proposal_id::text,
         s.document->'action'->'target'->>'id' AS draft_id,s.created_at AS admitted_at,c.document AS context
        FROM workflow_trigger_runs r
-       LEFT JOIN replenishment_activations a ON a.tenant_id=r.tenant_id
-        AND a.id::text=r.document->'context'->'inputs'->>'activationId'
+       LEFT JOIN LATERAL (SELECT activation.* FROM replenishment_activations activation WHERE activation.tenant_id=r.tenant_id
+        AND activation.id=${sqlUuid("r.document->'context'->'inputs'->>'activationId'")} LIMIT 1) a ON true
        LEFT JOIN action_admission_steps s ON s.tenant_id=r.tenant_id AND s.run_id=r.id AND s.step_id='create-order'
        LEFT JOIN replenishment_approval_contexts c ON c.tenant_id=r.tenant_id AND c.run_id=r.id
        WHERE r.tenant_id=$1 AND r.id=$2::uuid AND r.definition_id=$3`,

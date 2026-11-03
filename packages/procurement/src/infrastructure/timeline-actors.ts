@@ -1,5 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid, sqlUuids } from '@luma/platform';
 
 import type { PurchasingTimelineEntry } from '../domain/purchasing-timeline.js';
 import {
@@ -35,11 +36,11 @@ export function createPurchasingTimelineActors(database: TenantDatabase) {
             `WITH sources AS (
                SELECT 'execution:'||x.id AS key,a.run_id FROM executed_actions x
                JOIN action_admission_steps a ON a.tenant_id=x.tenant_id AND a.proposal_id=x.proposal_id
-               WHERE x.tenant_id=$1 AND x.id::text=ANY($2::text[])
+               WHERE x.tenant_id=$1 AND x.id=ANY(${sqlUuids('$2::text[]')})
                UNION ALL
                SELECT 'submission:'||s.id AS key,a.run_id FROM procurement_submissions s
-               JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id::text=s.document->>'actionId'
-               WHERE s.tenant_id=$1 AND s.id::text=ANY($3::text[])
+               JOIN LATERAL (SELECT step.run_id FROM action_admission_steps step WHERE step.tenant_id=s.tenant_id AND step.proposal_id=${sqlUuid("s.document->>'actionId'")} LIMIT 1) a ON true
+               WHERE s.tenant_id=$1 AND s.id=ANY(${sqlUuids('$3::text[]')})
               ) SELECT s.key,r.id,r.document->'actor'->>'id' AS "principalId",v.document->'definition'->>'name' AS name
               FROM sources s JOIN workflow_trigger_runs r ON r.tenant_id=$1 AND r.id=s.run_id
               LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version`,
@@ -58,7 +59,7 @@ export function createPurchasingTimelineActors(database: TenantDatabase) {
             email: string | null;
             member: boolean;
           }>(
-            'SELECT user_id::text AS id,name,email,is_member AS member FROM workspace_people WHERE tenant_id=$1 AND user_id::text=ANY($2::text[])',
+            `SELECT user_id::text AS id,name,email,is_member AS member FROM workspace_people WHERE tenant_id=$1 AND user_id=ANY(${sqlUuids('$2::text[]')})`,
             [context.tenantId, timelineActorIds(entries, automated)],
           )
         ).rows.map((person): [string, TimelinePerson] => [person.id, person]),
@@ -66,7 +67,7 @@ export function createPurchasingTimelineActors(database: TenantDatabase) {
       const workflow = workflowRunId
         ? (
             await tx.query<{ id: string; name: string | null }>(
-              `SELECT r.id,v.document->'definition'->>'name' AS name FROM workflow_trigger_runs r LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version WHERE r.tenant_id=$1 AND r.id::text=$2`,
+              `SELECT r.id,v.document->'definition'->>'name' AS name FROM workflow_trigger_runs r LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version WHERE r.tenant_id=$1 AND r.id=${sqlUuid('$2::text')}`,
               [context.tenantId, workflowRunId],
             )
           ).rows[0]

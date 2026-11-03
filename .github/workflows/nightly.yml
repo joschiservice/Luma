@@ -17,6 +17,7 @@ jobs:
     env:
       TURBO_CONCURRENCY: '100%'
       # Sizes for the opt-in size scenarios; see each workspace guide.
+      LUMA_ACTIVITY_BENCHMARK: '50000'
       LUMA_CUSTOMER_BENCHMARK: '50000'
       LUMA_FULFILLMENT_BENCHMARK: '100000'
       LUMA_INSIGHTS_BENCHMARK: '20000'

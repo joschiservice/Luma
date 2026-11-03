@@ -1,5 +1,7 @@
 export { canonicalJson } from './domain/canonical-json.js';
 
+export { sqlUuid, sqlUuids } from './domain/sql-uuid.js';
+
 export {
   conflict,
   forbidden,

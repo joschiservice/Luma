@@ -67,3 +67,5 @@ export {
   followUpReceiptMatches,
   supplierFollowUpNote,
 } from './domain/follow-up-receipt.js';
+
+export { skuCandidateIdsSql } from './domain/sku-candidates.js';

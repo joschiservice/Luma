@@ -133,6 +133,16 @@ expressions such as `document->>'kind'`, because `->>` is not leakproof. Store t
 Check the plan with `EXPLAIN` as a runtime role with `app.tenant_id` set; a superuser
 bypasses RLS and shows a plan the API never gets.
 
+Look keys up by their type. `id::text=...` keeps a column off its index; compare the column with
+`sqlUuid` from `@luma/platform` instead, which also matches nothing for malformed text. An
+architecture test lists the casts that remain and what narrows each. Under RLS, a join clause
+that reads JSON still won't reach the index: it becomes a scan of the tenant's rows per row.
+Convert first and join the plain value, through `CROSS JOIN LATERAL (SELECT ... AS id OFFSET 0)`
+or a materialized CTE's typed column. A scalar subquery, `EXISTS (... OFFSET 0)` or `LATERAL
+(... LIMIT 1)` also works, unless the text reads a column from an earlier outer join. A
+small-table plan can hide this, so check with `enable_seqscan`, `enable_hashjoin` and
+`enable_mergejoin` off.
+
 ## 6. Live updates and functions
 
 - If the table feeds a metric, Home, Insights or Needs you, attach the `metric_change` trigger

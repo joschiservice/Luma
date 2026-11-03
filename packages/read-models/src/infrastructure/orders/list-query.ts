@@ -1,4 +1,5 @@
 import type { OrderStateQueries } from '@luma/orders';
+import { sqlUuid } from '@luma/platform';
 
 import type { OrderView } from '../../application/orders.js';
 import {
@@ -40,14 +41,14 @@ const uuidPattern =
 // Orders with an unresolved issue about the order or one of its fulfillments, whether or not
 // it currently needs a person. Issues name records by Luma ID or by source ID in a connection.
 const issueOrders = `issue_orders AS MATERIALIZED (
- SELECT m.canonical_id AS order_id FROM exceptions e JOIN connector_source_mappings m ON m.tenant_id=e.tenant_id
-  AND m.resource='order' AND m.external_id=e.subject_id AND m.connection_id::text=e.document->'subject'->'scope'->>0
+ SELECT m.canonical_id AS order_id FROM exceptions e CROSS JOIN LATERAL (SELECT mapping.canonical_id FROM connector_source_mappings mapping WHERE mapping.tenant_id=e.tenant_id
+  AND mapping.connection_id=${sqlUuid("e.document->'subject'->'scope'->>0")} AND mapping.resource='order' AND mapping.external_id=e.subject_id OFFSET 0) m
  WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='order'
  UNION SELECT e.subject_id::uuid FROM exceptions e
  WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='order' AND e.subject_id ~* '${uuidPattern}'
- UNION SELECT r.order_id FROM exceptions e JOIN connector_source_mappings m ON m.tenant_id=e.tenant_id
-  AND m.resource='fulfillment' AND m.scope_key='' AND m.external_id=e.subject_id AND m.connection_id::text=e.document->'subject'->'scope'->>0
- JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+ UNION SELECT r.order_id FROM exceptions e CROSS JOIN LATERAL (SELECT mapping.canonical_id FROM connector_source_mappings mapping WHERE mapping.tenant_id=e.tenant_id
+  AND mapping.connection_id=${sqlUuid("e.document->'subject'->'scope'->>0")} AND mapping.resource='fulfillment' AND mapping.scope_key='' AND mapping.external_id=e.subject_id LIMIT 1) m
+ JOIN orders_relationships r ON r.tenant_id=e.tenant_id AND r.child_id=m.canonical_id
  WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='fulfillment'
  UNION SELECT r.order_id FROM exceptions e JOIN orders_relationships r ON r.tenant_id=e.tenant_id
   AND r.child_id=CASE WHEN e.subject_id ~* '${uuidPattern}' THEN e.subject_id::uuid END

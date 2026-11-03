@@ -457,71 +457,82 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
   expect(
     history.find((event) => event.id === `failure:${failureId}`),
   ).toMatchObject({ failureCode: 'unavailable', outcome: 'uncertain' });
-  // Issue-only events inherit recorded source connections even without any proposal.
+  // Issue-only events inherit source connections even without any proposal: through the sources
+  // their evaluation inputs reference, and through the evidence of their resolution.
   const sourceIssue = randomUUID(),
+    resolvedIssue = randomUUID(),
     sourceEvent = randomUUID(),
-    evidenceKey = 'source-only-connection';
+    resolvedEvent = randomUUID(),
+    sourceKey = 'source-only-connection',
+    inputKey = 'source-only-input',
+    resolvedKey = 'resolution-only-connection';
   const sourceIncident = (
     await db.owner.query(
       'SELECT document FROM exceptions WHERE tenant_id=$1 AND id=$2',
       [tenantId, fixture.exceptionId],
     )
   ).rows[0].document;
+  const resolution = (evidenceRefs) => ({
+    kind: 'human_disposition',
+    at: fixture.at,
+    actorId: owner.userId,
+    evidenceRefs,
+  });
   await db.owner.query(
-    "INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'detected',$4)",
+    "INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'detected',$4),($5,$2,$6,'detected',$7)",
     [
       sourceIssue,
       tenantId,
       'c'.repeat(64),
       { ...sourceIncident, id: sourceIssue, fingerprint: 'c'.repeat(64) },
+      resolvedIssue,
+      'd'.repeat(64),
+      {
+        ...sourceIncident,
+        id: resolvedIssue,
+        fingerprint: 'd'.repeat(64),
+        resolution: resolution([resolvedKey]),
+      },
     ],
   );
-  await db.owner.query(
-    'INSERT INTO exception_sources(tenant_id,evidence_key,document) VALUES($1,$2,$3)',
-    [
-      tenantId,
-      evidenceKey,
-      { tenantId, key: evidenceKey, connectionId: fixture.connectionId },
-    ],
-  );
+  for (const key of [sourceKey, resolvedKey])
+    await db.owner.query(
+      'INSERT INTO exception_sources(tenant_id,evidence_key,document) VALUES($1,$2,$3)',
+      [tenantId, key, { tenantId, key, connectionId: fixture.connectionId }],
+    );
   await db.owner.query(
     'INSERT INTO exception_inputs(tenant_id,evidence_key,document) VALUES($1,$2,$3)',
-    [tenantId, evidenceKey, {}],
+    [tenantId, inputKey, { facts: { evidenceRefs: [sourceKey] } }],
   );
   await db.owner.query(
     'INSERT INTO exception_evidence(tenant_id,exception_id,evidence_key,fingerprint) VALUES($1,$2,$3,$4)',
-    [tenantId, sourceIssue, evidenceKey, 'c'.repeat(64)],
+    [tenantId, sourceIssue, inputKey, 'c'.repeat(64)],
   );
   await db.owner.query(
-    'INSERT INTO exception_outbox(id,tenant_id,exception_id,document) VALUES($1,$2,$3,$4)',
+    'INSERT INTO exception_outbox(id,tenant_id,exception_id,document) VALUES($1,$2,$3,$4),($5,$2,$6,$7)',
     [
       sourceEvent,
       tenantId,
       sourceIssue,
-      {
-        type: 'exception.resolved',
-        resolution: {
-          kind: 'human_disposition',
-          at: fixture.at,
-          actorId: owner.userId,
-          evidenceRefs: [evidenceKey],
-        },
-      },
+      { type: 'exception.resolved', resolution: resolution([sourceKey]) },
+      resolvedEvent,
+      resolvedIssue,
+      { type: 'exception.resolved', resolution: resolution([resolvedKey]) },
     ],
   );
-  expect(
-    (
-      await read({
-        connectionId: fixture.connectionId,
-        system: 'jtl-cloud',
-        type: 'resolution',
-        limit: '100',
-      })
-    ).body.items.find((event) => event.id === sourceEvent),
-  ).toMatchObject({
-    outcome: 'manually_disposed',
-    connections: [{ id: fixture.connectionId, system: 'jtl-cloud' }],
-  });
+  const connected = (
+    await read({
+      connectionId: fixture.connectionId,
+      system: 'jtl-cloud',
+      type: 'resolution',
+      limit: '100',
+    })
+  ).body.items;
+  for (const id of [sourceEvent, resolvedEvent])
+    expect(connected.find((event) => event.id === id)).toMatchObject({
+      outcome: 'manually_disposed',
+      connections: [{ id: fixture.connectionId, system: 'jtl-cloud' }],
+    });
   const every = async (extra) => {
     const items = [];
     let cursor;

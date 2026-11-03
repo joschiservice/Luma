@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { canonicalJson, conflict, invalid } from '@luma/platform';
+import { canonicalJson, conflict, invalid, sqlUuid } from '@luma/platform';
 
 import type { CoordinationStore } from '../application/coordination.js';
 import type { WorkflowAuditEntry } from '../application/drafts.js';
@@ -14,6 +14,10 @@ import type {
   ProcessValue,
 } from '../domain/process.js';
 import { compileProcessWorkflow } from './process-schema.js';
+
+// The `OFFSET 0` keeps PostgreSQL from turning this check into a join, where row-level security
+// would keep the case ID off the index and scan the tenant's cases.
+const caseId = sqlUuid("r.document->'context'->'inputs'->>'caseId'");
 
 function correlation(
   value: ProcessValue,
@@ -102,7 +106,7 @@ export function createCoordinationStore(
     db.transaction(context.tenantId, async (tx) => {
       const row = (
         await tx.query<{ document: HumanTask }>(
-          "SELECT t.document FROM workflow_human_tasks t JOIN workflow_trigger_runs r ON r.tenant_id=t.tenant_id AND r.id=t.run_id WHERE t.tenant_id=$1 AND t.run_id=$2 AND t.step_id=$3 AND r.state='awaiting_admission' AND NOT EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=r.tenant_id AND e.id::text=r.document->'context'->'inputs'->>'caseId' AND e.state='resolved')",
+          `SELECT t.document FROM workflow_human_tasks t JOIN workflow_trigger_runs r ON r.tenant_id=t.tenant_id AND r.id=t.run_id WHERE t.tenant_id=$1 AND t.run_id=$2 AND t.step_id=$3 AND r.state='awaiting_admission' AND NOT EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=r.tenant_id AND e.id=${caseId} AND e.state='resolved' OFFSET 0)`,
           [context.tenantId, runId, stepId],
         )
       ).rows[0];
@@ -116,7 +120,7 @@ export function createCoordinationStore(
       db.transaction(context.tenantId, async (tx) =>
         (
           await tx.query<{ document: HumanTask }>(
-            "SELECT t.document FROM workflow_human_tasks t JOIN workflow_trigger_runs r ON r.tenant_id=t.tenant_id AND r.id=t.run_id CROSS JOIN LATERAL (SELECT CASE WHEN (t.document->>'dueAt')::timestamptz <= $4::timestamptz THEN t.document->'escalationTarget' ELSE t.document->'assignee' END AS assignee) effective WHERE t.tenant_id=$1 AND t.state='open' AND r.state='awaiting_admission' AND NOT EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=r.tenant_id AND e.id::text=r.document->'context'->'inputs'->>'caseId' AND e.state='resolved') AND (effective.assignee->>'id'=$2 OR effective.assignee->>'key'=$3) ORDER BY (t.document->>'dueAt')::timestamptz,t.run_id,t.step_id LIMIT 100",
+            `SELECT t.document FROM workflow_human_tasks t JOIN workflow_trigger_runs r ON r.tenant_id=t.tenant_id AND r.id=t.run_id CROSS JOIN LATERAL (SELECT CASE WHEN (t.document->>'dueAt')::timestamptz <= $4::timestamptz THEN t.document->'escalationTarget' ELSE t.document->'assignee' END AS assignee) effective WHERE t.tenant_id=$1 AND t.state='open' AND r.state='awaiting_admission' AND NOT EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=r.tenant_id AND e.id=${caseId} AND e.state='resolved' OFFSET 0) AND (effective.assignee->>'id'=$2 OR effective.assignee->>'key'=$3) ORDER BY (t.document->>'dueAt')::timestamptz,t.run_id,t.step_id LIMIT 100`,
             [context.tenantId, context.actor.id, context.actor.role.id, now()],
           )
         ).rows.map((row) => current(row.document, now())),
@@ -158,7 +162,7 @@ export function createCoordinationStore(
           typeof caseId === 'string' &&
           (
             await tx.query(
-              "SELECT 1 FROM exceptions WHERE tenant_id=$1 AND id::text=$2 AND state='resolved'",
+              `SELECT 1 FROM exceptions WHERE tenant_id=$1 AND id=${sqlUuid('$2::text')} AND state='resolved'`,
               [context.tenantId, caseId],
             )
           ).rowCount

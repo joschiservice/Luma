@@ -199,7 +199,7 @@ export function createResolutionMetricReader(
         JOIN exception_sources s ON s.tenant_id=c.tenant_id AND s.evidence_key=ref.key
       ), proposals AS (
         SELECT p.tenant_id,p.id,p.exception_id FROM case_proposals p JOIN cohort c ON c.tenant_id=p.tenant_id AND c.id=p.exception_id
-        UNION SELECT s.tenant_id,s.proposal_id,c.id FROM action_admission_steps s JOIN cohort c ON c.tenant_id=s.tenant_id AND c.id::text=s.document->>'incidentId'
+        UNION SELECT s.tenant_id,s.proposal_id,c.id FROM action_admission_steps s JOIN cohort c ON c.tenant_id=s.tenant_id AND c.id=s.incident_id
       ), humans AS (
         SELECT p.exception_id AS incident_id,'approval:' || a.id::text AS ref FROM proposals p JOIN policy_approvals a ON a.tenant_id=p.tenant_id AND a.proposal_id=p.id
         UNION SELECT c.id,'disposition:' || o.id::text FROM cohort c JOIN exception_outbox o ON o.tenant_id=c.tenant_id AND o.exception_id=c.id WHERE o.document->'resolution'->>'kind'='human_disposition'

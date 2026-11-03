@@ -1,5 +1,6 @@
 import type { AuditLog } from '@luma/audit';
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 
 import type { CommitmentStore } from '../application/commitments.js';
 import type {
@@ -16,6 +17,7 @@ import type {
   Submission,
 } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
+import { skuCandidateIdsSql } from '../domain/sku-candidates.js';
 import {
   customFieldSql,
   customSortSql,
@@ -488,11 +490,11 @@ export function createCommitmentStore(
                 scope_key: string;
               }>(
                 `SELECT k.key,e.id AS sku_id,
-                  CASE WHEN e.id::text=k.key THEN 0 WHEN e.reconciliation_key=k.key THEN 1 ELSE 2 END AS rank,
+                  CASE WHEN e.id=${sqlUuid('k.key')} THEN 0 WHEN e.reconciliation_key=k.key THEN 1 ELSE 2 END AS rank,
                   m.external_id,m.scope_key
                  FROM unnest($2::text[]) k(key)
-                 JOIN inventory_entities e ON e.tenant_id=$1 AND e.kind='sku' AND (e.id::text=k.key OR e.reconciliation_key=k.key
-                  OR EXISTS (SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=k.key))
+                 CROSS JOIN LATERAL (${skuCandidateIdsSql('$1', 'k.key')}) candidate
+                 JOIN inventory_entities e ON e.tenant_id=$1 AND e.kind='sku' AND e.id=candidate.id
                  JOIN connector_source_mappings m ON m.tenant_id=e.tenant_id AND m.resource='sku' AND m.canonical_id=e.id
                   AND m.connection_id=$3
                  ORDER BY k.key,rank,m.external_id`,

@@ -1,9 +1,7 @@
 import type { SqlTransaction } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 
 import type { ActivityActor } from '../../domain/activity.js';
-
-export const uuidPattern =
-  "'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'";
 
 /**
  * Builds the response actor from the recorded actor and the workspace person it names, read
@@ -36,7 +34,7 @@ export const actorSql = (actor: {
 export const personSql = (alias: string, tenant: string, id: string) =>
   `LEFT JOIN LATERAL (SELECT name AS actor_name,email AS actor_email,is_member AS actor_member
     FROM workspace_people WHERE tenant_id=${tenant}
-    AND user_id=CASE WHEN ${id} ~ ${uuidPattern} THEN (${id})::uuid END) ${alias} ON true`;
+    AND user_id=${sqlUuid(id)}) ${alias} ON true`;
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

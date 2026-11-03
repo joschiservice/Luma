@@ -1726,6 +1726,12 @@ export const journeyAreas = {
     ...webShell,
     ...webInsights,
   ],
+  'operations-reads.performance.e2e.mjs': [
+    ...connections,
+    ...activity,
+    ...cases,
+    'packages/platform/src/infrastructure/database-pool.ts',
+  ],
   'order-journey.performance.e2e.mjs': [
     ...ordersFixture,
     ...orders,

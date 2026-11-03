@@ -40,6 +40,11 @@ non-routine events has, matching what the outcome filter lists. Counting evaluat
 in the date range, as a page read already does before it limits, so the page reads counts only
 when the filters change, on refresh and when the poll sees a new event.
 
+A page and its counts both take time proportional to the events in the date range, because
+grouping and the attention rules run at read time. That reaches the request pool's statement
+timeout at roughly 100,000 events in a range; the read then fails rather than slowing further.
+Measure with `LUMA_ACTIVITY_BENCHMARK` (see [performance measurement](benchmarking.md)).
+
 Search is a case-insensitive literal substring over issue ID, issue class (with underscores
 read as spaces), persisted target reference, action label, actor ID, the actor's name and
 current email, workflow name and workflow run ID. Issue names are translated in the web, so the
@@ -107,6 +112,10 @@ neither action parameters nor display numbers establish an activity association.
 
 Issue-level events resolve connections from persisted proposals, source evidence and
 connection subjects, so system and connection filters also find resolutions and escalations.
+Evidence rows name evaluation inputs, not sources: the sources are the ones an input's
+`facts.evidenceRefs` or the issue's resolution references. A read resolves all its issues
+together, once. Row-level security keeps JSON expressions out of index conditions, so a lookup
+keyed on a computed issue ID per event would scan the tenant's evidence for each one.
 They also carry the issue's class from the already joined issue record, so a row can say what
 it concerns without a per-row read. Record references that are storage IDs are not shown as
 names. Raw documents, credentials, grants and unrestricted audit details never enter the

@@ -14,6 +14,9 @@ const workloadLimits = {
     statement_timeout: 5_000,
     // Some request transactions hold a lock across a provider call with a 15 second timeout.
     idle_in_transaction_session_timeout: 30_000,
+    // Row-level security inflates plan cost estimates, so short reads cross the JIT threshold
+    // and spend more compiling expressions than the compiled code can save.
+    options: '-c jit=off',
   },
   background: {
     connectionTimeoutMillis: 10_000,

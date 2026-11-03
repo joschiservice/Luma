@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -47,6 +48,10 @@ type Row = {
   rank: number;
 };
 
+// A subject ID is free text, and most subjects are not UUIDs of a table read here. Comparing
+// typed IDs keeps the label lookups on their primary keys.
+const subjectUuid = sqlUuid('e.subject_id');
+
 // Attention comes from persisted lifecycle, uncertainty escalation or deterministic manual steps.
 // Model-selected hypotheses and severity never create an attention request.
 // Inbox attention rules. Expects $1 tenant ID and $2 evaluation time. `columns` adds trusted
@@ -54,8 +59,8 @@ type Row = {
 function caseQuery(filter = 'true', columns = '') {
   return `cases AS (
  SELECT COALESCE(
- (SELECT c.document->>'label' FROM connector_installations c WHERE c.tenant_id=e.tenant_id AND c.id::text=e.document->'subject'->>'subjectId'),
- (SELECT COALESCE((SELECT code FROM inventory_product_skus sku WHERE sku.tenant_id=k.tenant_id AND sku.sku_id=k.id AND sku.code_key IS NOT NULL ORDER BY sku.connection_id LIMIT 1),CASE WHEN left(k.reconciliation_key,10)='["source",' THEN k.reconciliation_key::jsonb->>4 ELSE k.reconciliation_key END) FROM inventory_entities k WHERE k.tenant_id=e.tenant_id AND k.id::text=e.document->'subject'->>'subjectId'),
+ (SELECT c.document->>'label' FROM connector_installations c WHERE c.tenant_id=e.tenant_id AND c.id=${subjectUuid}),
+ (SELECT COALESCE((SELECT code FROM inventory_product_skus sku WHERE sku.tenant_id=k.tenant_id AND sku.sku_id=k.id AND sku.code_key IS NOT NULL ORDER BY sku.connection_id LIMIT 1),CASE WHEN left(k.reconciliation_key,10)='["source",' THEN k.reconciliation_key::jsonb->>4 ELSE k.reconciliation_key END) FROM inventory_entities k WHERE k.tenant_id=e.tenant_id AND k.id=${subjectUuid}),
  CASE WHEN e.document->'subject'->>'subjectId' !~* '^[0-9a-f-]{36}$' THEN e.document->'subject'->>'subjectId' END) AS subject_label,e.document,e.version,owner.document || jsonb_build_object('name',person.name) AS owner,d.document AS diagnosis${columns},
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
@@ -113,12 +118,12 @@ function attentionQuery(
   return `WITH ${caseQuery(filter)}
  SELECT DISTINCT r.order_id,(o.document->>'id')::uuid AS issue_id
  FROM ordered o
- JOIN connector_source_mappings m ON m.tenant_id=$1
-  AND m.resource='fulfillment'
-  AND m.connection_id::text=o.document->'subject'->'scope'->>0
-  AND m.external_id=o.document->'subject'->>'subjectId'
-  AND m.scope_key=''
- JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+ JOIN LATERAL (SELECT mapping.canonical_id FROM connector_source_mappings mapping WHERE mapping.tenant_id=$1
+  AND mapping.connection_id=${sqlUuid("o.document->'subject'->'scope'->>0")}
+  AND mapping.resource='fulfillment'
+  AND mapping.scope_key=''
+  AND mapping.external_id=o.document->'subject'->>'subjectId' LIMIT 1) m ON true
+ JOIN orders_relationships r ON r.tenant_id=$1 AND r.child_id=m.canonical_id
  WHERE o.attention_reason IS NOT NULL AND o.document->'subject'->>'subjectKind'='fulfillment'`;
 }
 

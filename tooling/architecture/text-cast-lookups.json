@@ -1,0 +1,42 @@
+{
+  "packages/identity/src/infrastructure/auth.ts": {
+    "count": 1,
+    "reason": "The session is also looked up by its user, whose sessions are few."
+  },
+  "packages/identity/src/infrastructure/security-events.ts": {
+    "count": 2,
+    "reason": "Passkeys and sessions are also narrowed to one user, who has few."
+  },
+  "packages/orders/src/infrastructure/return-case-store.ts": {
+    "count": 2,
+    "reason": "Search: the ILIKE arms of the same OR already scan the listed rows."
+  },
+  "packages/read-models/src/infrastructure/products/catalog.ts": {
+    "count": 1,
+    "reason": "Search: the ILIKE arms of the same OR already scan the listed rows."
+  },
+  "packages/read-models/src/infrastructure/returns/list.ts": {
+    "count": 2,
+    "reason": "Search: the ILIKE arms of the same OR already scan the listed rows."
+  },
+  "packages/read-models/src/infrastructure/record-explorer.ts": {
+    "count": 1,
+    "reason": "connector_mapping_target narrows the mappings to one canonical record first."
+  },
+  "packages/resolution/src/infrastructure/persistence/activity.ts": {
+    "count": 2,
+    "reason": "The subject filter checks rows already read through linked, indexed keys."
+  },
+  "packages/resolution/src/infrastructure/persistence/detection-sources.ts": {
+    "count": 2,
+    "reason": "Part of a composite key OR-ed with the open-fulfillment scan; no single column selects."
+  },
+  "packages/resolution/src/infrastructure/persistence/improvement-discovery.ts": {
+    "count": 1,
+    "reason": "A workspace has few connector installations."
+  },
+  "packages/resolution/src/infrastructure/persistence/measurement.ts": {
+    "count": 1,
+    "reason": "A workspace has few connector installations."
+  }
+}

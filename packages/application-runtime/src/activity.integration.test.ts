@@ -262,6 +262,46 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     return id;
   }
 
+  it('keeps typed incident links and leaves malformed ones unmatched', async () => {
+    const client = await owner.connect();
+    try {
+      // Reads ignore foreign keys, so the fixture skips the run behind the step.
+      await client.query("SET session_replication_role='replica'");
+      const incidentOf = async (incidentId: string) => {
+        const run = randomUUID(),
+          proposal = randomUUID();
+        await client.query(
+          "INSERT INTO action_admission_steps(tenant_id,run_id,step_id,proposal_id,artifact_id,artifact_version,document) VALUES($1,$2,'step',$3,'artifact','1',$4)",
+          [
+            tenant,
+            run,
+            proposal,
+            {
+              tenantId: tenant,
+              runId: run,
+              stepId: 'step',
+              incidentId,
+              action: { id: proposal, target: { kind: 'order', id: 'order' } },
+            },
+          ],
+        );
+
+        return (
+          await client.query<{ incident_id: string | null }>(
+            'SELECT incident_id FROM action_admission_steps WHERE tenant_id=$1 AND proposal_id=$2',
+            [tenant, proposal],
+          )
+        ).rows[0]!.incident_id;
+      };
+      const incident = randomUUID();
+
+      expect(await incidentOf(incident)).toBe(incident);
+      expect(await incidentOf('not-a-uuid')).toBeNull();
+    } finally {
+      await client.query("SET session_replication_role='origin'");
+      client.release();
+    }
+  });
   it('keeps every event linked to an order through issues, runs and targets', async () => {
     const client = await owner.connect();
     const expected: Record<string, string> = {};

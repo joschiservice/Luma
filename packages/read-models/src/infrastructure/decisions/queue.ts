@@ -4,7 +4,7 @@ import { exceptionClassLabel } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { hasPermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { forbidden, settleLimited } from '@luma/platform';
+import { forbidden, settleLimited, sqlUuid } from '@luma/platform';
 import { z } from 'zod';
 
 import { canReadRecord } from '../../application/access.js';
@@ -136,7 +136,7 @@ const recordSql = `SELECT x.id,x.kind,COALESCE(x.record_id,mapped.id::text) AS r
  FROM jsonb_to_recordset($2::jsonb) AS x(id text,kind text,record_id text,connection text,external text)
  LEFT JOIN LATERAL (SELECT m.canonical_id AS id FROM connector_source_mappings m
   WHERE x.record_id IS NULL AND m.tenant_id=$1 AND m.resource=x.kind AND m.external_id=x.external
-  AND m.connection_id::text=x.connection AND m.scope_key='' ORDER BY m.canonical_id LIMIT 1) mapped ON true
+  AND m.connection_id=${sqlUuid('x.connection')} AND m.scope_key='' ORDER BY m.canonical_id LIMIT 1) mapped ON true
  WHERE x.kind IS NOT NULL`;
 
 const encode = (cursor: Cursor) =>

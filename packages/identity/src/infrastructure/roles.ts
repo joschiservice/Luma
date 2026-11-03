@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { conflict } from '@luma/platform';
+import { conflict, sqlUuid } from '@luma/platform';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
@@ -195,8 +195,7 @@ function transaction(tx: PoolClient, tenantId: string): RolesTransaction {
             e.before_value AS before,e.after_value AS after,e.created_at AS "createdAt"
           FROM workspace_access_events e
           LEFT JOIN users a ON a.id=e.actor_id
-          LEFT JOIN users m ON m.id::text=COALESCE(e.after_value->>'userId',e.before_value->>'userId',
-            CASE WHEN e.event_type='invitation.accepted' THEN e.actor_id::text END)
+          LEFT JOIN LATERAL (SELECT u.* FROM users u WHERE u.id=${sqlUuid("COALESCE(e.after_value->>'userId',e.before_value->>'userId',CASE WHEN e.event_type='invitation.accepted' THEN e.actor_id::text END)")} LIMIT 1) m ON true
           WHERE e.tenant_id=$1 AND (
             (e.target_id=$2 AND e.event_type LIKE 'role.%')
             OR (e.event_type IN ('member.add','member.update','member.remove','invitation.accepted')

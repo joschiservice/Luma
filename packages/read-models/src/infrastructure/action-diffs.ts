@@ -6,6 +6,7 @@ import {
 import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { sqlUuid } from '@luma/platform';
 
 /** An immutable action reference selected by an authorized owner's read model. */
 export type ActionDiffReference =
@@ -46,17 +47,19 @@ export function createActionDiffReader(db: TenantDatabase) {
             action: EffectIntent;
             policy: ActionDiff['policy'];
           }>(
-            `SELECT r.id,COALESCE(s.document->'action',p.document) AS action,
+            `WITH requested AS MATERIALIZED (
+         SELECT r.id,${sqlUuid('r."proposalId"')} AS proposal_id,${sqlUuid('r."runId"')} AS run_id,r."stepId" AS step_id
+         FROM jsonb_to_recordset($2::jsonb) AS r(id text,"proposalId" text,"runId" text,"stepId" text)
+       ) SELECT r.id,COALESCE(s.document->'action',p.document) AS action,
          (SELECT jsonb_build_object('outcome',d.document->>'outcome','reason',d.document->>'reason',
             'evaluatedAt',d.document->>'evaluatedAt','validUntil',d.document->>'validUntil',
             'current',false) FROM policy_decisions d
-          WHERE d.tenant_id=$1 AND d.proposal_id::text=COALESCE(s.document->'action',p.document)->>'id'
+          WHERE d.tenant_id=$1 AND d.proposal_id=${sqlUuid("COALESCE(s.document->'action',p.document)->>'id'")}
           ORDER BY d.created_at DESC,d.id DESC LIMIT 1) AS policy
-       FROM jsonb_to_recordset($2::jsonb) AS r(id text,"proposalId" text,"runId" text,"stepId" text)
+       FROM requested r
        LEFT JOIN action_admission_steps s ON s.tenant_id=$1 AND
-         ((r."proposalId" IS NOT NULL AND s.document->'action'->>'id'=r."proposalId") OR
-          (r."runId" IS NOT NULL AND s.run_id::text=r."runId" AND s.step_id=r."stepId"))
-       LEFT JOIN case_proposals p ON p.tenant_id=$1 AND p.id::text=r."proposalId"
+         (s.proposal_id=r.proposal_id OR (s.run_id=r.run_id AND s.step_id=r.step_id))
+       LEFT JOIN case_proposals p ON p.tenant_id=$1 AND p.id=r.proposal_id
        WHERE COALESCE(s.document->'action',p.document) IS NOT NULL`,
             [context.tenantId, JSON.stringify(requested)],
           )

@@ -1193,6 +1193,65 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       ),
     ).toMatchObject({ verifiedResolutions: 0 });
   });
+  it('labels case subjects by typed ID and keeps free-text subjects readable', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const connectionId = randomUUID(),
+      skuId = randomUUID(),
+      unknownId = randomUUID();
+    await owner.query(
+      `INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,'encrypted-fixture')`,
+      [
+        tenantId,
+        connectionId,
+        {
+          tenantId,
+          id: connectionId,
+          version: 1,
+          status: 'active',
+          label: 'Shopify',
+          granted: [],
+          permissions: [],
+        },
+      ],
+    );
+    await owner.query(
+      `INSERT INTO inventory_entities(tenant_id,id,kind,reconciliation_key) VALUES($1,$2,'sku','SKU-1')`,
+      [tenantId, skuId],
+    );
+    const labelOf = async (subjectId: string) => {
+      const id = randomUUID(),
+        fingerprint = randomUUID().replaceAll('-', '').padEnd(64, '0');
+      await owner.query(
+        `INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'detected',$4)`,
+        [
+          id,
+          tenantId,
+          fingerprint,
+          {
+            ...incident,
+            id,
+            fingerprint,
+            subject: { ...incident.subject, subjectId },
+          },
+        ],
+      );
+
+      return (await services.cases.get(context(), id))?.subject.label;
+    };
+
+    expect(await labelOf(connectionId)).toBe('Shopify');
+    expect(await labelOf(skuId)).toBe('SKU-1');
+    expect(await labelOf('Order 1042')).toBe('Order 1042');
+    expect(await labelOf(unknownId)).toBeUndefined();
+    // Text that only resembles a UUID neither fails the read nor matches a record.
+    expect(await labelOf('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz')).toBe(
+      'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+    );
+    await owner.query('DELETE FROM connector_installations WHERE id=$1', [
+      connectionId,
+    ]);
+  });
   it('requires per-capability observations and keeps connector secrets inaccessible to overview readers', async () => {
     const id = randomUUID();
     await owner.query(

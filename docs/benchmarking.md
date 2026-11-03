@@ -48,6 +48,12 @@ Performance suite ceilings:
   virtual members reading both lists for half a minute, with the same failure and p95
   ceilings. This covers socket handling and sustained load that in-process requests skip.
 
+- Operations reads: the operations overview within 500 ms and a business Activity page within
+  700 ms through the API, with 100 cases, 20,000 inventory entities, 2,000 workflow runs,
+  4,000 evidence rows and 5,000 events. A read that scans the tenant's rows per case or per event instead reaches the
+  request pool's five-second statement timeout, which fails the read rather than slowing it.
+  `LUMA_ACTIVITY_BENCHMARK=<event count>` repeats the reads at a larger size, without a budget.
+
 Operational-metric latency and metric listener recovery are recorded without a ceiling.
 These are regression ceilings, not production latency guarantees. Review the scenario and
 its report before changing a budget; never raise one just to silence a failure.

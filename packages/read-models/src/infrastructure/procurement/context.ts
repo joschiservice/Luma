@@ -1,6 +1,8 @@
 import type { TenantContext } from '@luma/identity';
 import { requirePermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { sqlUuid, sqlUuids } from '@luma/platform';
+import { skuCandidateIdsSql } from '@luma/procurement';
 
 import { hiddenSections } from '../../application/access.js';
 import type {
@@ -29,14 +31,14 @@ async function resolveSkus(
       title: string | null;
     }>(
       `SELECT k.key,e.id AS sku_id,e.reconciliation_key AS sku_key,
-        CASE WHEN e.id::text=k.key THEN 0 WHEN e.reconciliation_key=k.key THEN 1 ELSE 2 END AS rank,
+        CASE WHEN e.id=${sqlUuid('k.key')} THEN 0 WHEN e.reconciliation_key=k.key THEN 1 ELSE 2 END AS rank,
         (SELECT COALESCE(s.document->'data'->>'title',p.code) FROM inventory_product_skus p
           JOIN inventory_projections pr ON pr.tenant_id=p.tenant_id AND pr.entity_id=p.product_id AND pr.connection_id=p.connection_id
           JOIN inventory_snapshots s ON s.tenant_id=pr.tenant_id AND s.id=pr.snapshot_id
           WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id ORDER BY p.connection_id LIMIT 1) AS title
        FROM unnest($2::text[]) k(key)
-       JOIN inventory_entities e ON e.tenant_id=$1 AND e.kind='sku' AND (e.id::text=k.key OR e.reconciliation_key=k.key
-        OR EXISTS (SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=k.key))
+       CROSS JOIN LATERAL (${skuCandidateIdsSql('$1', 'k.key')}) candidate
+       JOIN inventory_entities e ON e.tenant_id=$1 AND e.kind='sku' AND e.id=candidate.id
        ORDER BY k.key,rank,e.id`,
       [tenantId, keys],
     )
@@ -153,7 +155,7 @@ async function issues(
         (e.subject_kind='position' AND e.subject_id=ANY($3::text[])) OR
         (e.subject_kind='sku' AND (e.subject_id=ANY($2::text[]) OR EXISTS (
          SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=e.tenant_id AND m.resource='sku'
-         AND m.canonical_id::text=ANY($2::text[]) AND m.external_id=e.subject_id
+         AND m.canonical_id=ANY(${sqlUuids('$2::text[]')}) AND m.external_id=e.subject_id
          AND e.document->'subject'->'scope' ? m.connection_id::text))))
        ORDER BY e.state,e.id LIMIT 51`,
       [tenantId, skuIds, positionIds],
@@ -199,7 +201,7 @@ async function replenishment(
   const rule = activationId
     ? (
         await tx.query<{ document: { minimum: number; target: number } }>(
-          'SELECT document FROM replenishment_activations WHERE tenant_id=$1 AND id::text=$2',
+          `SELECT document FROM replenishment_activations WHERE tenant_id=$1 AND id=${sqlUuid('$2::text')}`,
           [tenantId, activationId],
         )
       ).rows[0]?.document

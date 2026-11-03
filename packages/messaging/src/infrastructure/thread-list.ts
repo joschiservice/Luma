@@ -1,3 +1,5 @@
+import { sqlUuid } from '@luma/platform';
+
 import type {
   ThreadCondition,
   ThreadFilter,
@@ -304,7 +306,7 @@ const groupFields: Readonly<Record<string, GroupField>> = {
     key: 't.connection_id::text',
     cast: 'uuid',
     order: () =>
-      "(SELECT m.document->>'label' FROM messaging_mailboxes m WHERE m.tenant_id=$1 AND m.connection_id::text=g.key),g.key",
+      `(SELECT m.document->>'label' FROM messaging_mailboxes m WHERE m.tenant_id=$1 AND m.connection_id=${sqlUuid('g.key')}),g.key`,
   },
 };
 

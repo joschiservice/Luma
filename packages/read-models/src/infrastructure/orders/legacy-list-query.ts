@@ -1,3 +1,5 @@
+import { sqlUuid } from '@luma/platform';
+
 import type { OrderSort, OrderView } from '../../application/orders.js';
 import type { OrderReadQueries } from './list-query.js';
 
@@ -49,7 +51,7 @@ const hits = `sku_hits AS MATERIALIZED (
  UNION SELECT canonical_id FROM connector_source_mappings m
  WHERE tenant_id=$1 AND ($3::uuid IS NULL OR connection_id=$3) AND resource='order' AND external_id ILIKE $15
  AND EXISTS (SELECT 1 FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.entity_id=m.canonical_id AND p.connection_id=m.connection_id AND s.kind='order' AND NOT (s.document->>'deleted')::boolean)
- UNION SELECT entity_id FROM order_sources WHERE entity_id::text=lower($14)
+ UNION SELECT entity_id FROM order_sources WHERE entity_id=${sqlUuid('lower($14)')}
 )`;
 
 /**

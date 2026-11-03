@@ -2,7 +2,7 @@ import type { TenantContext } from '@luma/identity';
 import { requirePermission } from '@luma/identity';
 import type { PurchaseReceiptEvidence } from '@luma/inventory';
 import type { TenantDatabase } from '@luma/platform';
-import type { Commitment } from '@luma/procurement';
+import { type Commitment, skuCandidateIdsSql } from '@luma/procurement';
 
 /** Deliberate cross-owner read of manual procurement evidence and the receiving location's native scope. */
 export function readNativePurchaseReceipt(
@@ -27,7 +27,7 @@ export function readNativePurchaseReceipt(
         sku_id: string | null;
       }>(
         `SELECT line->>'sku' AS sku,line->>'locationId' AS location_id,line->>'unit' AS unit,scope.mode,scope.version::text AS scope_version,
-       (SELECT e.id::text FROM inventory_entities e WHERE e.tenant_id=o.tenant_id AND e.kind='sku' AND (e.id::text=line->>'sku' OR e.reconciliation_key=line->>'sku' OR EXISTS(SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=line->>'sku')) LIMIT 1) AS sku_id
+       (SELECT e.id::text FROM inventory_entities e WHERE e.tenant_id=o.tenant_id AND e.kind='sku' AND e.id IN (${skuCandidateIdsSql('o.tenant_id', "line->>'sku'")}) LIMIT 1) AS sku_id
        FROM procurement_purchase_orders o JOIN procurement_suppliers supplier ON supplier.tenant_id=o.tenant_id AND supplier.id=o.supplier_id
        CROSS JOIN LATERAL jsonb_array_elements(o.document->'lines') line
        LEFT JOIN inventory_stock_ownership_scopes scope ON scope.tenant_id=o.tenant_id AND scope.location_id=(line->>'locationId')::uuid
@@ -46,7 +46,7 @@ export function readNativePurchaseReceipt(
       return null;
     const candidates = (
       await tx.query<{ id: string }>(
-        `SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND (e.id::text=$2 OR e.reconciliation_key=$2 OR EXISTS(SELECT 1 FROM inventory_product_skus p WHERE p.tenant_id=e.tenant_id AND p.sku_id=e.id AND p.code=$2))`,
+        `SELECT e.id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind='sku' AND e.id IN (${skuCandidateIdsSql('$1', '$2::text')})`,
         [context.tenantId, order.sku],
       )
     ).rows;

@@ -2,7 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { AuditLog } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
-import { canonicalJson, conflict, type TenantDatabase } from '@luma/platform';
+import {
+  canonicalJson,
+  conflict,
+  sqlUuid,
+  type TenantDatabase,
+} from '@luma/platform';
 
 import type { createPurchasingOutcomes } from '../application/purchasing-outcomes.js';
 import type {
@@ -271,7 +276,8 @@ export function createPurchasingOutcomePersistence(
               `
             SELECT r.document->'target'->'receipt'->>'purchaseOrderId' AS order_id,r.document->'target'->'receipt'->>'lineId' AS line_id,e.id,e.observed_at,e.document->>'available' AS available,r.connection_id,s.sku_id,s.document->'data'->>'locationId' AS location_id,s.document->'data'->>'unit' AS unit
             FROM shopify_inventory_corrections r JOIN executed_actions x ON x.tenant_id=r.tenant_id AND x.proposal_id=r.id
-            JOIN shopify_inventory_evidence e ON e.tenant_id=r.tenant_id AND e.connection_id=r.connection_id AND e.id::text IN (SELECT jsonb_array_elements_text(x.document->'attempt'->'verification'->'observationRefs'))
+            CROSS JOIN LATERAL (SELECT DISTINCT ${sqlUuid('ref')} AS id FROM jsonb_array_elements_text(x.document->'attempt'->'verification'->'observationRefs') ref) refs
+            JOIN shopify_inventory_evidence e ON e.tenant_id=r.tenant_id AND e.connection_id=r.connection_id AND e.id=refs.id
             JOIN inventory_projections p ON p.tenant_id=r.tenant_id AND p.entity_id=r.position_id AND p.connection_id=r.connection_id
             JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
             WHERE r.tenant_id=$1 AND r.document->'target'->'receipt'->>'purchaseOrderId'=ANY($2::text[]) AND x.document->'attempt'->>'businessOutcome'='satisfied' AND e.kind='observation' AND e.document->>'complete'='true' AND e.document->>'available'=r.document->'before'->'source'->>'available'

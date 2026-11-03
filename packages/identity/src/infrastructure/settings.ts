@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { notFound } from '@luma/platform';
+import { notFound, sqlUuid } from '@luma/platform';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
@@ -174,7 +174,7 @@ function transaction(
         }>(
           `SELECT r.name,r.revision,r.archived_at IS NOT NULL AS archived,
           ARRAY(SELECT p.permission FROM workspace_role_permissions p WHERE p.tenant_id=r.tenant_id AND p.role_id=r.id) AS permissions
-          FROM workspace_roles r WHERE r.tenant_id=$1 AND r.id::text=$2`,
+          FROM workspace_roles r WHERE r.tenant_id=$1 AND r.id=${sqlUuid('$2::text')}`,
           [tenantId, roleId],
         )
       ).rows[0];
