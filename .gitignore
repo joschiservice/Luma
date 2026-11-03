@@ -11,6 +11,9 @@ coverage/
 .DS_Store
 storybook-static/
 
+# Personal editor settings
+.vscode/
+
 # Temporary backend E2E fixtures
 apps/api/.e2e-*/
 
