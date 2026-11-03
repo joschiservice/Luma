@@ -181,10 +181,14 @@ function createProcessCommands(
   };
 }
 
-/** Connects an isolated process queue so existing exception workers keep their activity contract. */
+/**
+ * Connects an isolated process queue so existing exception workers keep their activity contract.
+ * Requires every activity because `processWorkflow` schedules each one it reaches, and Temporal
+ * retries an unregistered activity until its timeout instead of failing fast.
+ */
 export async function createProcessWorker(
   settings: TemporalSettings,
-  activities: ProcessActivities,
+  activities: Required<ProcessActivities>,
   stockProtection?: StockProtectionActivities,
 ) {
   validateSettings(settings);

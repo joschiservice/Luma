@@ -698,6 +698,8 @@ export function createCaseWorkflows(deps: {
     },
     // Case workflows have no explicit approval steps; policy approval happens at the action.
     decision: async () => ({ state: 'pending' }),
+    // Adapters own their admission, so only running the action again can read its decision.
+    actionApprovalPending: async () => false,
     async action(run, version, step, outputs) {
       const { context, adapter: found, caseRun } = await bound(run);
       if (

@@ -45,6 +45,7 @@ function fixture(
       state: 'approved' as const,
       decisionId: 'decision',
     })),
+    actionApprovalPending: vi.fn(async () => false),
     action: vi.fn(async () => ({
       state: 'accepted' as const,
       proposalId: 'proposal',
@@ -494,7 +495,7 @@ it('rereads a Code Step’s pending approval instead of running the code on ever
       telemetry: { ...telemetry, outcome: 'completed', verifiedActions: 1 },
     });
   const actionApprovalPending = vi
-    .fn<NonNullable<ProcessActivities['actionApprovalPending']>>()
+    .fn<ProcessActivities['actionApprovalPending']>()
     .mockResolvedValueOnce(true)
     .mockResolvedValueOnce(true)
     .mockResolvedValue(false);

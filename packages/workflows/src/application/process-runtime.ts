@@ -64,7 +64,7 @@ export interface ProcessActivities {
    * Reads whether an action step still waits for its approval decision, without evaluating
    * policy or reading the provider. False means `action` should run again.
    */
-  actionApprovalPending?(
+  actionApprovalPending(
     run: ProcessRun,
     step: Extract<ProcessStep, { kind: 'capability' }>,
     proposalId: string,
@@ -289,7 +289,6 @@ async function interpret(
             !changed &&
             approval &&
             action?.kind === 'capability' &&
-            activities.actionApprovalPending &&
             Date.parse(clock.now()) < deadline &&
             (await activities.actionApprovalPending(
               run,
@@ -486,7 +485,6 @@ async function interpret(
           // Running the action again would record a policy decision on every poll.
           if (
             !changed &&
-            activities.actionApprovalPending &&
             (clock.patched?.('read-only-process-approval-wait-v1') ?? true) &&
             Date.parse(clock.now()) < deadline &&
             (await activities.actionApprovalPending(

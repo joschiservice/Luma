@@ -54,16 +54,27 @@ export async function createReplenishmentWorker(
       : caseWorkflows?.owns(run.definitionId)
         ? caseWorkflows.activities
         : codeProcesses?.activities;
-  const activities: ProcessActivities = {
-    ...(coordination ? { coordinate: coordination.coordinate } : {}),
+  const activities: Required<ProcessActivities> = {
+    coordinate: async (...args) => {
+      if (!coordination)
+        throw new Error('Workflow coordination is unavailable');
+
+      return coordination.coordinate(...args);
+    },
     read: (run, step) => select(run)!.read(run, step),
     decision: (run, step) => select(run)!.decision(run, step),
+    actionApprovalPending: (run, step, proposalId, decisionId) =>
+      select(run)!.actionApprovalPending(run, step, proposalId, decisionId),
     action: (run, version, step, outputs) =>
       select(run)!.action(run, version, step, outputs),
     verify: (run, step, outputs) => select(run)!.verify(run, step, outputs),
     record: (run, output) => select(run)!.record(run, output),
-    code: (run, version, step, outputs) =>
-      select(run)!.code!(run, version, step, outputs),
+    code: async (run, version, step, outputs) => {
+      const owner = select(run)!;
+      if (!owner.code) throw new Error('Code execution is unavailable');
+
+      return owner.code(run, version, step, outputs);
+    },
   };
   const worker = await createProcessWorker(
     { ...settings, taskQueue: `${settings.taskQueue}-procurement` },

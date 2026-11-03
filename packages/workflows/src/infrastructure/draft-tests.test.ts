@@ -439,6 +439,7 @@ describe('draft test runs', () => {
     expect(version.digest).toBe(boundRun.versionDigest);
     expect(Object.keys(activities).sort()).toEqual([
       'action',
+      'actionApprovalPending',
       'code',
       'coordinate',
       'decision',

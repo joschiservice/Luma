@@ -170,6 +170,7 @@ export async function evaluateWorkflowImprovement(request: {
         state: scenario === 'approval-denied' ? 'denied' : 'approved',
         decisionId: `trusted:${step.id}`,
       }),
+      actionApprovalPending: async () => false,
       action: async (acting, _version, step, outputs) => {
         if (acting.tenantId !== request.context.tenantId) {
           trace.violations.push('tenant_isolation');

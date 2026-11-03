@@ -150,6 +150,7 @@ function fixture() {
       observedAt: new Date().toISOString(),
     }),
     decision: async () => ({ state: 'approved', decisionId: 'decision' }),
+    actionApprovalPending: async () => false,
     action,
     verify: async () => ({
       state: 'verified',

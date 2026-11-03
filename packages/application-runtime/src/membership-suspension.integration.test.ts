@@ -190,7 +190,12 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
         throw error;
       }
     };
-    const activities: ProcessActivities = {
+    const unused = async (): Promise<never> => {
+      throw new Error('Not used by this workflow');
+    };
+    const activities: Required<ProcessActivities> = {
+      code: unused,
+      coordinate: unused,
       read: async () => {
         await asPrincipal('read');
 
@@ -201,6 +206,7 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
         };
       },
       decision: async () => ({ state: 'approved', decisionId: 'decision' }),
+      actionApprovalPending: async () => false,
       action: async () => {
         await asPrincipal('reserve');
         effects.push('reserve');

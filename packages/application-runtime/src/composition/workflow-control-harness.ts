@@ -599,7 +599,12 @@ async function exercise(
   const pausedCheckpoint = new Promise<void>((resolve) => {
     resumeCheckpoint = resolve;
   });
-  const activities: ProcessActivities = {
+  const unsupported = async (): Promise<never> => {
+    throw new Error('Not used by the trusted control fixture');
+  };
+  const activities: Required<ProcessActivities> = {
+    code: unsupported,
+    coordinate: unsupported,
     read: async (_run, step) => {
       const reply = example.replies[step.id];
       if (reply?.kind !== 'read')
@@ -615,6 +620,7 @@ async function exercise(
       state: 'approved',
       decisionId: 'trusted-workflow-approval',
     }),
+    actionApprovalPending: async () => false,
     action: async (_run, _version, step, outputs) => {
       const existing = await service.provisioning.step(context, runId, step.id);
       const bound = existing

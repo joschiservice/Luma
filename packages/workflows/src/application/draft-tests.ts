@@ -289,6 +289,11 @@ function exampleActivities(
         ? { state: 'pending' }
         : { state: decision, decisionId: `example:${step.id}` };
     },
+    async actionApprovalPending() {
+      live();
+
+      return false;
+    },
     async action(_run, _version, step) {
       live();
       const result = reply(step.id, 'capability')?.result;

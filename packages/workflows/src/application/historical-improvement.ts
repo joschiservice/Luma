@@ -144,6 +144,7 @@ export async function compareHistoricalImprovement(request: {
             decisionId: output.evidenceRefs[0]!,
           };
         },
+        actionApprovalPending: async () => false,
         action: async (acting, _version, step, outputs) => {
           if (acting.tenantId !== request.context.tenantId) {
             trace.violations.push('tenant_isolation');
