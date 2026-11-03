@@ -11,7 +11,7 @@
   "activity_search_placeholder": "Problem, Datensatz, Aktion, Person oder Ausführungs-ID…",
   "activity_refresh": "Aktivität aktualisieren",
   "activity_error_access_lost": "Dein Zugriff auf diesen Workspace hat sich geändert. Die Aktivität ist nicht mehr verfügbar.",
-  "activity_error_unavailable": "Die Aktivität konnte nicht aktualisiert werden. Die angezeigten Ereignisse sind möglicherweise veraltet.",
+  "activity_error_unavailable": "Die Aktivität konnte nicht aktualisiert werden. Die angezeigten Ereignisse sind möglicherweise veraltet. Falls das weiter passiert, wähle einen kürzeren Zeitraum.",
   "activity_new_events": "Neue Ereignisse. Neueste anzeigen",
   "activity_empty_filtered_title": "Keine Aktivität passt zu diesen Filtern",
   "activity_empty_filtered_description": "Wähle einen anderen Zeitraum oder setze die Filter zurück. Änderungen, die Luma nicht erfasst hat, erscheinen hier nicht.",

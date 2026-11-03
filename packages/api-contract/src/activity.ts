@@ -136,6 +136,8 @@ export const activityCountsSchema = z.object({
     z.enum(activityOutcomes),
     z.number().int().nonnegative(),
   ),
+  /** The counts cover only the newest events in the range, so each is a lower bound. */
+  truncated: z.boolean(),
 });
 
 /** Columns an activity export writes, in order. */

@@ -86,6 +86,8 @@ export interface CollectionView<Value extends string> {
   description?: string | undefined;
   icon?: ReactNode;
   count?: number | undefined;
+  /** Shows the count as a lower bound, because the view may hold more. */
+  countIsLowerBound?: boolean | undefined;
   /** Highlights the count when the view holds work that needs attention. */
   attention?: boolean | undefined;
   /**
@@ -168,7 +170,13 @@ export function CollectionViews<Value extends string>({
       {view.label}
       {view.count !== undefined ? (
         <Badge tone={view.attention && view.count ? 'warning' : 'neutral'}>
-          {formatNumber(view.count)}
+          {view.countIsLowerBound ? (
+            <span aria-label={m.ui_views_count_at_least({ count: view.count })}>
+              {`${formatNumber(view.count)}+`}
+            </span>
+          ) : (
+            formatNumber(view.count)
+          )}
         </Badge>
       ) : null}
     </>

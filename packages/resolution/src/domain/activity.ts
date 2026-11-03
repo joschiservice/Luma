@@ -118,4 +118,6 @@ export type ActivityCounts = {
   total: number;
   attention: number;
   outcomes: Partial<Record<ActivityOutcome, number>>;
+  /** The counts stopped at the newest events, so each is a lower bound. */
+  truncated: boolean;
 };

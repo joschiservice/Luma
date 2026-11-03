@@ -238,5 +238,6 @@
   "ui_board_move_to": "Verschieben nach",
   "ui_board_empty": "Keine Einträge",
   "ui_condition_resolved": "{value} ({resolved})",
+  "ui_views_count_at_least": "Mindestens {count, number}",
   "ui_views_more": "{count, plural, one {{count, number} weitere Ansicht} other {{count, number} weitere Ansichten}}"
 }

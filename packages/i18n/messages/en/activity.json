@@ -11,7 +11,7 @@
   "activity_search_placeholder": "Issue, record, action, person or run ID…",
   "activity_refresh": "Refresh activity",
   "activity_error_access_lost": "Your access to this workspace changed. Activity is no longer available.",
-  "activity_error_unavailable": "Activity couldn’t be updated. The events shown may be out of date.",
+  "activity_error_unavailable": "Activity couldn’t be updated. The events shown may be out of date. If this keeps happening, choose a shorter date range.",
   "activity_new_events": "New events. Show latest",
   "activity_empty_filtered_title": "No activity matches these filters",
   "activity_empty_filtered_description": "Try another date range or clear the filters. Changes Luma didn’t record don’t appear here.",

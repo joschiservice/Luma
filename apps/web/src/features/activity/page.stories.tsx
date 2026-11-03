@@ -255,6 +255,7 @@ function Preview({ state = 'ready' }: { state?: State | undefined }) {
           total: 48,
           attention: 3,
           outcomes: { verified: 12, uncertain: 2, failed: 1 },
+          truncated: false,
         }}
         exporting={{
           run: () => setExported(true),

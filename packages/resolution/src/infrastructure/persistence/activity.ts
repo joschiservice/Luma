@@ -1,8 +1,12 @@
 import { createHash } from 'node:crypto';
 
 import { hasPermission } from '@luma/identity';
-import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { sqlUuid } from '@luma/platform';
+import {
+  type SqlTransaction,
+  sqlUuid,
+  type TenantDatabase,
+  unavailable,
+} from '@luma/platform';
 import { z } from 'zod';
 
 import type { ActivityStore } from '../../application/activity.js';
@@ -107,6 +111,21 @@ const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception
   UNION ALL SELECT * FROM workspace_activity_sources
   WHERE proposal_id=ANY($22::uuid[]) AND (exception_id=ANY($21::uuid[])) IS NOT TRUE)`;
 
+/** Most earlier steps one business event carries. */
+const stepLimit = 100;
+
+// One group's steps are its newest events besides the one it lists, so a key can't contribute
+// more than this many. The first lookup reads only timestamps, which builds no events.
+const newestSources = (column: 'exception_id' | 'proposal_id', keys: string) =>
+  `(SELECT s.* FROM unnest(${keys}::uuid[]) key(id)
+    LEFT JOIN LATERAL (SELECT x.recorded_at FROM workspace_activity_sources x
+      WHERE x.tenant_id=$1 AND x.${column}=key.id AND x.recorded_at>=$2::timestamptz AND x.recorded_at<$3::timestamptz
+      ORDER BY x.recorded_at DESC OFFSET ${stepLimit} LIMIT 1) oldest ON true
+    JOIN workspace_activity_sources s ON s.tenant_id=$1 AND s.${column}=key.id AND s.recorded_at>=COALESCE(oldest.recorded_at,$2::timestamptz))`;
+const newestLinkedSources = `(SELECT * FROM ${newestSources('exception_id', '$21')} issue_sources
+  UNION ALL SELECT * FROM ${newestSources('proposal_id', '$22')} proposal_sources
+  WHERE (exception_id=ANY($21::uuid[])) IS NOT TRUE)`;
+
 /**
  * Lists every exception and proposal ID through which a source row can reach the subject
  * filter: the given issues and runs, order-subject issues, proposals and runs of those issues,
@@ -188,30 +207,39 @@ const issueConnectionsSql = `listed_issues AS MATERIALIZED (
         GROUP BY issue_id
       )`;
 
+/** One event of a read, with the recorded time its cursor uses. */
+type ActivityRow = { item: ActivityEvent; at: string };
+
 /** What one read of the activity events returns. */
 type ActivityRead =
   | { kind: 'page'; after: { at: string; id: string } | null }
   | { kind: 'event'; id: string }
+  | { kind: 'steps'; listed: string[]; newestOnly: boolean }
   | { kind: 'counts' };
 
 /** The steps of the selected group, oldest first, when the reader asked for them. */
 const itemSql = (query: ActivityQuery) =>
   `CASE WHEN $19::boolean AND ${query.detail === 'steps' ? 'true' : 'false'} THEN item || jsonb_build_object('steps',
         COALESCE((SELECT jsonb_agg(step.item ORDER BY step.sort_at,step.sort_id) FROM
-          (SELECT e.item,e.sort_at,e.sort_id FROM events e WHERE e.group_key=ranked.group_key AND e.sort_id<>ranked.sort_id ORDER BY e.sort_at DESC,e.sort_id DESC LIMIT 100) step),'[]'::jsonb)) ELSE item END`;
+          (SELECT e.item,e.sort_at,e.sort_id FROM events e WHERE e.group_key=ranked.group_key AND e.sort_id<>ranked.sort_id ORDER BY e.sort_at DESC,e.sort_id DESC LIMIT ${stepLimit}) step),'[]'::jsonb)) ELSE item END`;
 
 // Each read ends differently: a page after the cursor, the group holding one event, or the
 // number of groups per outcome. Groups only list when one of their events is meaningful. A
 // lookup or count passes its value as the last parameter.
 const finalSql = (query: ActivityQuery, read: ActivityRead, last: number) =>
-  read.kind === 'page'
-    ? `SELECT at, ${itemSql(query)} AS item
+  read.kind === 'steps'
+    ? `SELECT group_key AS "groupKey",jsonb_agg(item ORDER BY sort_at,sort_id) AS steps FROM (
+        SELECT group_key,item,sort_at,sort_id,row_number() OVER (PARTITION BY group_key ORDER BY sort_at DESC,sort_id DESC) AS newest
+        FROM events WHERE sort_id<>ALL($${last}::text[])
+      ) step WHERE newest<=${stepLimit} GROUP BY group_key`
+    : read.kind === 'page'
+      ? `SELECT at, ${itemSql(query)} AS item
       FROM ranked WHERE position=1 AND meaningful AND ($5::timestamptz IS NULL OR (sort_at,sort_id)<($5::timestamptz,$6::text))
       ORDER BY sort_at DESC,sort_id DESC LIMIT $12`
-    : read.kind === 'event'
-      ? `SELECT at, ${itemSql(query)} AS item
+      : read.kind === 'event'
+        ? `SELECT at, ${itemSql(query)} AS item
       FROM ranked WHERE position=1 AND meaningful AND group_key IN (SELECT group_key FROM events WHERE sort_id=$${last}::text) LIMIT 1`
-      : `SELECT
+        : `SELECT
         (SELECT count(DISTINCT group_key) FROM events WHERE meaningful)::int AS total,
         (SELECT count(DISTINCT group_key) FROM events WHERE meaningful AND item->>'outcome'=ANY($${last}::text[]))::int AS attention,
         COALESCE((SELECT jsonb_object_agg(outcome,groups) FROM (SELECT item->>'outcome' AS outcome,count(DISTINCT group_key)::int AS groups
@@ -219,6 +247,153 @@ const finalSql = (query: ActivityQuery, read: ActivityRead, last: number) =>
 
 /** Most rows one read may consider: an export, or the access events a count or lookup scans. */
 const readCap = 100_000;
+
+/**
+ * How far back a read looks, in newest events. A page tries each window until it fills, then
+ * the whole date range; building an event costs far more than finding the window's start.
+ * Counts stop at their window and report that they did.
+ */
+const readWindows = { page: [2_000, 8_000, 32_000], counts: 10_000 };
+
+/**
+ * Finds when the window of a query's newest events starts, or null when the date range holds no
+ * more than that. Uses the recorded-time indexes, so it builds no events.
+ */
+async function windowStart(
+  tx: SqlTransaction,
+  context: Parameters<ActivityStore['list']>[0],
+  query: ActivityQuery,
+  events: number,
+) {
+  const result = await tx.query<{ at: string }>(
+    `SELECT to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at
+     FROM workspace_activity_sources
+     WHERE tenant_id=$1 AND recorded_at>=$2::timestamptz AND recorded_at<$3::timestamptz
+     AND (NOT restricted OR $4::boolean)
+     ORDER BY recorded_at DESC OFFSET $5 LIMIT 1`,
+    [
+      context.tenantId,
+      query.from,
+      query.to,
+      hasPermission(context, 'activity.read_restricted'),
+      events,
+    ],
+  );
+
+  return result.rows[0]?.at ?? null;
+}
+
+/**
+ * Reads the steps of the groups a window read found. Steps can be older than the window, so this
+ * reads the whole date range through the groups' indexed issue, run and proposal links. Without
+ * filters only each group's newest events can be steps. Filters may match older ones instead.
+ */
+async function attachSteps(
+  tx: SqlTransaction,
+  context: Parameters<ActivityStore['list']>[0],
+  query: ActivityQuery,
+  rows: ActivityRow[],
+) {
+  const items = rows.map((row) => row.item);
+  const filtered =
+    query.q ||
+    query.searchIssueClasses?.length ||
+    query.system ||
+    query.connectionId ||
+    query.type ||
+    query.outcome?.length ||
+    query.actor;
+  const steps = new Map(
+    (
+      await readActivity<{ groupKey: string; steps: ActivityEvent[] }>(
+        tx,
+        context,
+        {
+          ...query,
+          subjects: {
+            issueIds: items.flatMap((item) => item.exceptionId ?? []),
+            runIds: items.flatMap((item) => [
+              ...(item.workflowRunId ? [item.workflowRunId] : []),
+              ...(item.proposalId ? [item.proposalId] : []),
+            ]),
+            orderRefs: [],
+          },
+        },
+        {
+          kind: 'steps',
+          listed: items.map((item) => item.id),
+          newestOnly: !filtered,
+        },
+      )
+    ).rows.map((row) => [row.groupKey, row.steps]),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    item: {
+      ...row.item,
+      steps:
+        steps.get(
+          row.item.exceptionId ??
+            row.item.workflowRunId ??
+            row.item.proposalId ??
+            row.item.id,
+        ) ?? [],
+    },
+  }));
+}
+
+/**
+ * Reads one page, looking back only as far as it takes to fill it. A window reaching back from
+ * the end of the range gives the same answer as the whole range: it holds a group's newest
+ * meaningful event if it holds any of its meaningful events, and a group it doesn't reach sorts
+ * after every group it does.
+ */
+async function readPage(
+  tx: SqlTransaction,
+  context: Parameters<ActivityStore['list']>[0],
+  query: ActivityQuery,
+  after: { at: string; id: string } | null,
+  windows: readonly number[],
+) {
+  if (!query.subjects)
+    for (const events of windows) {
+      if (events <= query.limit) continue;
+      const from = await windowStart(tx, context, query, events);
+      if (from === null) break;
+      // A window that ends before the cursor can't hold the next page.
+      if (after && from >= after.at) continue;
+      const { rows } = await readActivity<ActivityRow>(
+        tx,
+        context,
+        { ...query, from, detail: 'summary' },
+        { kind: 'page', after },
+      );
+      if (rows.length <= query.limit) continue;
+
+      return query.view === 'business' && query.detail === 'steps'
+        ? attachSteps(tx, context, query, rows)
+        : rows;
+    }
+
+  return (
+    await readActivity<ActivityRow>(tx, context, query, { kind: 'page', after })
+  ).rows;
+}
+
+/** Fails a read that outlasts the statement timeout with what the reader can do about it. */
+async function withinTimeout<Result>(read: Promise<Result>) {
+  try {
+    return await read;
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === '57014')
+      throw unavailable(
+        'Too many events match to read in time. Choose a shorter date range or fewer filters.',
+      );
+
+    throw error;
+  }
+}
 
 /**
  * Reads activity events under the reader's visibility and filters. Pages read one more event than
@@ -267,7 +442,7 @@ async function readActivity<Row extends Record<string, unknown>>(
         COALESCE(v.document->'definition'->>'name',wv.document->'definition'->>'name') AS workflow_name,
         s.doc->'details' AS details,
         e.document->>'exceptionClass' AS issue_class
-        FROM ${linked ? linkedSources : 'workspace_activity_sources'} s
+        FROM ${linked ? (read.kind === 'steps' && read.newestOnly ? newestLinkedSources : linkedSources) : 'workspace_activity_sources'} s
         LEFT JOIN LATERAL (SELECT o.document FROM exception_outbox o WHERE s.doc->>'eventType' LIKE 'exception.%' AND o.tenant_id=s.tenant_id AND o.id=${sqlUuid('s.id')} LIMIT 1) eo ON true
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
         LEFT JOIN exceptions e ON e.tenant_id=s.tenant_id AND e.id=COALESCE(s.exception_id,p.exception_id)
@@ -358,127 +533,140 @@ async function readActivity<Row extends Record<string, unknown>>(
       ...(linked ? [linked.issueIds, linked.proposalIds] : []),
       ...(read.kind === 'event'
         ? [read.id]
-        : read.kind === 'counts'
-          ? [[...activityAttentionOutcomes]]
-          : []),
+        : read.kind === 'steps'
+          ? [read.listed]
+          : read.kind === 'counts'
+            ? [[...activityAttentionOutcomes]]
+            : []),
     ],
   );
 }
 
-/** Reads canonical durable events without per-issue queries or raw payload exposure. */
-export function createActivityStore(db: TenantDatabase): ActivityStore {
+/**
+ * Reads canonical durable events without per-issue queries or raw payload exposure. `windows`
+ * overrides how far back reads look. A read past the statement timeout fails with a 503 that
+ * says to narrow it.
+ */
+export function createActivityStore(
+  db: TenantDatabase,
+  windows = readWindows,
+): ActivityStore {
   return {
     list: (context, query) =>
-      db.transaction(context.tenantId, async (tx) => {
-        // Cursors bind to the visibility they were minted with, so a page link stops working
-        // once restricted access is removed.
-        const restricted = hasPermission(context, 'activity.read_restricted');
-        // Sorted and deduplicated, so the same outcomes in another order share cursors.
-        const outcomes = query.outcome?.length
-          ? [...new Set(query.outcome)].sort()
-          : null;
-        const key = createHash('sha256')
-          .update(
-            JSON.stringify([
-              'activity-v9',
-              query.view ?? 'events',
-              query.detail ?? 'summary',
-              context.tenantId,
-              restricted,
-              query.from,
-              query.to,
-              query.q ?? '',
-              query.searchIssueClasses ?? null,
-              query.system ?? '',
-              query.connectionId ?? '',
-              query.type ?? '',
-              outcomes,
-              query.actor ?? null,
-              query.limit,
-              query.subjects ?? null,
-            ]),
-          )
-          .digest('hex');
-        let after: { at: string; id: string } | null = null;
-        if (query.cursor) {
-          try {
-            const bytes = Buffer.from(query.cursor, 'base64url');
-            if (bytes.toString('base64url') !== query.cursor)
-              throw new Error('Encoding');
-            const value = z
-              .object({
-                context: z.string(),
-                at: z.string().datetime(),
-                id: z.string().min(1).max(200),
-              })
-              .strict()
-              .parse(JSON.parse(bytes.toString()));
-            if (value.context !== key) throw new Error('Context');
-            after = value;
-          } catch {
-            throw Object.assign(
-              new Error(
-                'This page link no longer matches the activity filters. Start from the first page.',
-              ),
-              { statusCode: 400, expose: true },
-            );
+      withinTimeout(
+        db.transaction(context.tenantId, async (tx) => {
+          // Cursors bind to the visibility they were minted with, so a page link stops working
+          // once restricted access is removed.
+          const restricted = hasPermission(context, 'activity.read_restricted');
+          // Sorted and deduplicated, so the same outcomes in another order share cursors.
+          const outcomes = query.outcome?.length
+            ? [...new Set(query.outcome)].sort()
+            : null;
+          const key = createHash('sha256')
+            .update(
+              JSON.stringify([
+                'activity-v9',
+                query.view ?? 'events',
+                query.detail ?? 'summary',
+                context.tenantId,
+                restricted,
+                query.from,
+                query.to,
+                query.q ?? '',
+                query.searchIssueClasses ?? null,
+                query.system ?? '',
+                query.connectionId ?? '',
+                query.type ?? '',
+                outcomes,
+                query.actor ?? null,
+                query.limit,
+                query.subjects ?? null,
+              ]),
+            )
+            .digest('hex');
+          let after: { at: string; id: string } | null = null;
+          if (query.cursor) {
+            try {
+              const bytes = Buffer.from(query.cursor, 'base64url');
+              if (bytes.toString('base64url') !== query.cursor)
+                throw new Error('Encoding');
+              const value = z
+                .object({
+                  context: z.string(),
+                  at: z.string().datetime(),
+                  id: z.string().min(1).max(200),
+                })
+                .strict()
+                .parse(JSON.parse(bytes.toString()));
+              if (value.context !== key) throw new Error('Context');
+              after = value;
+            } catch {
+              throw Object.assign(
+                new Error(
+                  'This page link no longer matches the activity filters. Start from the first page.',
+                ),
+                { statusCode: 400, expose: true },
+              );
+            }
           }
-        }
-        if (query.event) {
-          const found = await readActivity<{ item: ActivityEvent; at: string }>(
-            tx,
-            context,
-            query,
-            { kind: 'event', id: query.event },
-          );
+          if (query.event) {
+            const found = await readActivity<ActivityRow>(tx, context, query, {
+              kind: 'event',
+              id: query.event,
+            });
+
+            return {
+              visibility: restricted ? 'admin' : 'member',
+              items: found.rows.map((row) => row.item),
+              coverage,
+              nextCursor: null,
+            };
+          }
+          const found = await readPage(tx, context, query, after, windows.page);
+          const rows = found.slice(0, query.limit);
+          const last = rows.at(-1);
 
           return {
             visibility: restricted ? 'admin' : 'member',
-            items: found.rows.map((row) => row.item),
+            items: rows.map((r) => r.item),
             coverage,
-            nextCursor: null,
+            nextCursor:
+              found.length > query.limit && last
+                ? Buffer.from(
+                    JSON.stringify({
+                      context: key,
+                      at: last.at,
+                      id: last.item.id,
+                    }),
+                  ).toString('base64url')
+                : null,
           };
-        }
-        const result = await readActivity<{ item: ActivityEvent; at: string }>(
-          tx,
-          context,
-          query,
-          { kind: 'page', after },
-        );
-        const rows = result.rows.slice(0, query.limit);
-        const last = rows.at(-1);
-
-        return {
-          visibility: restricted ? 'admin' : 'member',
-          items: rows.map((r) => r.item),
-          coverage,
-          nextCursor:
-            result.rows.length > query.limit && last
-              ? Buffer.from(
-                  JSON.stringify({
-                    context: key,
-                    at: last.at,
-                    id: last.item.id,
-                  }),
-                ).toString('base64url')
-              : null,
-        };
-      }),
+        }),
+      ),
     counts: (context, query) =>
-      db.transaction(context.tenantId, async (tx) => {
-        const result = await readActivity<ActivityCounts>(
-          tx,
-          context,
-          { ...query, outcome: undefined, event: undefined },
-          { kind: 'counts' },
-        );
-        const row = result.rows[0];
+      withinTimeout(
+        db.transaction(context.tenantId, async (tx) => {
+          const from = await windowStart(tx, context, query, windows.counts);
+          const result = await readActivity<Omit<ActivityCounts, 'truncated'>>(
+            tx,
+            context,
+            {
+              ...query,
+              ...(from ? { from } : {}),
+              outcome: undefined,
+              event: undefined,
+            },
+            { kind: 'counts' },
+          );
+          const row = result.rows[0];
 
-        return {
-          total: row?.total ?? 0,
-          attention: row?.attention ?? 0,
-          outcomes: row?.outcomes ?? {},
-        };
-      }),
+          return {
+            total: row?.total ?? 0,
+            attention: row?.attention ?? 0,
+            outcomes: row?.outcomes ?? {},
+            truncated: from !== null,
+          };
+        }),
+      ),
   };
 }

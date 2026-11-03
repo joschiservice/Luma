@@ -822,6 +822,141 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     await store.list(scoped, { ...range, limit: 100 });
     expect(queries).toBe(small);
   }, 60000);
+  it('reads the same pages through narrow windows as through the whole range', async () => {
+    const client = await owner.connect();
+    const from = '2027-02-01T00:00:00Z';
+    const at = (day: number, hour: number) =>
+      `2027-02-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00Z`;
+    try {
+      await client.query("SET session_replication_role='replica'");
+      const record = async (
+        proposalId: string,
+        when: string,
+        eventType: string,
+        correlationId?: string,
+      ) => {
+        const id = randomUUID();
+        await client.query(
+          'INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document,created_at) VALUES($1,$2,$3,$4,$5,$6)',
+          [
+            id,
+            tenant,
+            id,
+            proposalId,
+            {
+              id,
+              tenantId: tenant,
+              eventType,
+              details: {},
+              ...(correlationId ? { correlationId } : {}),
+            },
+            when,
+          ],
+        );
+      };
+      // Each group's first steps are far older than its newest events, so a narrow window sees
+      // only the newest; a routine step after them must not become the group's event.
+      for (let group = 1; group <= 9; group++) {
+        const proposal = randomUUID();
+        await record(proposal, at(1, group), 'execution.dispatched');
+        await record(proposal, at(20, group), 'execution.completed');
+        await record(proposal, at(20, group + 10), 'workflow.step_recorded');
+      }
+      // Runs group events across proposals, through their correlation.
+      for (let group = 1; group <= 3; group++) {
+        const run = await triggerRun(client);
+        await record(randomUUID(), at(2, group), 'execution.dispatched', run);
+        await record(randomUUID(), at(21, group), 'execution.completed', run);
+      }
+      // A group can hold more steps than an event carries; only its newest ones are shown.
+      const crowded = randomUUID();
+      for (let step = 0; step < 110; step++)
+        await record(
+          crowded,
+          `2027-02-05T00:${String(Math.floor(step / 60)).padStart(2, '0')}:${String(step % 60).padStart(2, '0')}Z`,
+          step % 2 ? 'execution.dispatched' : 'workflow.step_recorded',
+        );
+      await record(crowded, at(22, 1), 'execution.completed');
+      // An older group holding routine steps only never lists, whatever the window.
+      await record(randomUUID(), at(3, 1), 'workflow.step_recorded');
+    } finally {
+      await client.query("SET session_replication_role='origin'");
+      client.release();
+    }
+    const database = createTenantDatabase(reader);
+    const whole = createActivityStore(database, {
+      page: [],
+      counts: 1_000_000,
+    });
+    const narrow = createActivityStore(database, {
+      page: [3, 10],
+      counts: 1_000_000,
+    });
+    const every = async (
+      store: typeof whole,
+      query: Omit<Parameters<typeof whole.list>[1], 'from' | 'to'>,
+    ) => {
+      const items: unknown[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await store.list(context, {
+          ...query,
+          from,
+          to: '2027-03-01T00:00:00Z',
+          ...(cursor ? { cursor } : {}),
+        });
+        items.push(...page.items);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+
+      return items;
+    };
+
+    for (const query of [
+      { view: 'business', detail: 'steps', limit: 2 },
+      { view: 'business', detail: 'summary', limit: 2 },
+      { view: 'events', detail: 'summary', limit: 2 },
+      { view: 'business', detail: 'steps', limit: 5, outcome: ['recorded'] },
+    ] as const) {
+      const items = await every(whole, {
+        ...query,
+        ...('outcome' in query ? { outcome: [...query.outcome] } : {}),
+      });
+      expect(items.length).toBeGreaterThan(0);
+      expect(
+        await every(narrow, {
+          ...query,
+          ...('outcome' in query ? { outcome: [...query.outcome] } : {}),
+        }),
+      ).toEqual(items);
+    }
+    const listed = (await every(whole, {
+      view: 'business',
+      detail: 'steps',
+      limit: 100,
+    })) as { steps?: unknown[] }[];
+    expect(listed).toHaveLength(13);
+    expect(listed.some((item) => item.steps?.length === 100)).toBe(true);
+    expect(listed.every((item) => item.steps?.length)).toBe(true);
+
+    // Counts stop at their window and say so; a range that fits stays exact.
+    const range = {
+      from,
+      to: '2027-03-01T00:00:00Z',
+      limit: 1,
+      view: 'business' as const,
+    };
+    expect(await whole.counts(context, range)).toMatchObject({
+      total: 13,
+      truncated: false,
+    });
+    const capped = await createActivityStore(database, {
+      page: [],
+      counts: 3,
+    }).counts(context, range);
+    expect(capped.truncated).toBe(true);
+    expect(capped.total).toBeLessThan(13);
+  });
   it('groups business events before paging and retains steps without promoting routine checks', async () => {
     const client = await owner.connect();
     const proposal = randomUUID();

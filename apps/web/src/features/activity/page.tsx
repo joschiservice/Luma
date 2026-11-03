@@ -577,12 +577,14 @@ export function ActivityView({
       label: m.activity_quick_all(),
       description: m.activity_quick_all_description(),
       count: counts?.total,
+      countIsLowerBound: counts?.truncated,
     },
     {
       value: 'attention',
       label: m.activity_quick_attention(),
       description: m.activity_quick_attention_description(),
       count: counts?.attention,
+      countIsLowerBound: counts?.truncated,
       attention: true,
     },
     {
@@ -590,6 +592,7 @@ export function ActivityView({
       label: m.activity_quick_verified(),
       description: m.activity_quick_verified_description(),
       count: counts ? (counts.outcomes.verified ?? 0) : undefined,
+      countIsLowerBound: counts?.truncated,
     },
   ];
 

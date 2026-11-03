@@ -77,8 +77,9 @@ it('reads the operations overview and activity within the interactive budget', a
     ],
   );
   await f.db.owner.query(
-    `INSERT INTO exception_outbox(id,tenant_id,exception_id,document)
-     SELECT gen_random_uuid(),$1::uuid,i.id,jsonb_build_object('type','exception.observed','occurredAt',now())
+    `INSERT INTO exception_outbox(id,tenant_id,exception_id,document,created_at)
+     SELECT gen_random_uuid(),$1::uuid,i.id,jsonb_build_object('type','exception.observed','occurredAt',now()),
+       now()-random()*interval '20 hours'
      FROM unnest($2::uuid[]) i(id),generate_series(1,$3::int)`,
     [tenantId, issues.rows.map((row) => row.id), eventsPerCase],
   );
@@ -132,10 +133,18 @@ it('reads the operations overview and activity within the interactive budget', a
       events: cases * eventsPerCase,
       overviewReadMs: await fastest(readOverview),
       activityReadMs: await fastest(readActivity),
+      feedReadMs: await fastest(() =>
+        client.activity.list({
+          params,
+          query: { ...range(), view: 'business', detail: 'steps', limit: 30 },
+        }),
+      ),
       countsReadMs: await fastest(() =>
         client.activity.counts({ params, query: range() }),
       ),
     },
-    sizeRun ? {} : { overviewReadMs: 500, activityReadMs: 700 },
+    sizeRun
+      ? {}
+      : { overviewReadMs: 500, activityReadMs: 700, feedReadMs: 700 },
   );
 }, 300_000);

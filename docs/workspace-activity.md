@@ -34,16 +34,24 @@ under the same filters; an empty result means the filters or date range exclude 
 are offered, not inserted: the page polls the first page every 30 seconds and shows them only
 when the reader asks, by reading every loaded page again.
 
+A page reads back only as far as it takes to fill it: the newest 2,000 events, then wider
+windows, then the whole date range. The result is the same as reading the whole range, because
+a window reaching back from the end holds a group's newest meaningful event whenever it holds
+any of them, and groups it doesn't reach sort after the page. A group's steps can be older than
+the window, so they are read separately through the group's indexed links. Without filters only
+a group's newest events can be its steps, so a large group costs no more than a small one; with
+filters, every event of the page's groups is read, because older ones may be the matches.
+
+Cost therefore grows with how far back the reader pages and how rare the filters' matches are.
+Search and filters that match little, and opening a linked event, can still read the whole
+range. A read past the statement timeout fails with a 503 that says to choose a shorter range.
+
 Counts read the business groups each outcome would list, ignoring the outcome filter, so the
 quick views can show how many events each holds. A group counts under every outcome one of its
-non-routine events has, matching what the outcome filter lists. Counting evaluates every event
-in the date range, as a page read already does before it limits, so the page reads counts only
-when the filters change, on refresh and when the poll sees a new event.
-
-A page and its counts both take time proportional to the events in the date range, because
-grouping and the attention rules run at read time. That reaches the request pool's statement
-timeout at roughly 100,000 events in a range; the read then fails rather than slowing further.
-Measure with `LUMA_ACTIVITY_BENCHMARK` (see [performance measurement](benchmarking.md)).
+non-routine events has, matching what the outcome filter lists. Counts cover the newest 10,000
+events in the range. When the range holds more they are marked `truncated`, so each is a lower
+bound that the quick views show as `N+`. The page reads counts only when the filters change, on
+refresh and when the poll sees a new event.
 
 Search is a case-insensitive literal substring over issue ID, issue class (with underscores
 read as spaces), persisted target reference, action label, actor ID, the actor's name and
