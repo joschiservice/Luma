@@ -10,6 +10,10 @@ run = "pnpm run setup"
 description = "Start the API and web app"
 run = "pnpm dev"
 
+[tasks.simulator]
+description = "Start the commerce simulator with Luma connected to it"
+run = "pnpm simulator"
+
 [tasks.check]
 description = "Run all checks with a disposable test database"
 run = "pnpm test:full"
