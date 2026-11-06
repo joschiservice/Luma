@@ -44,7 +44,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "storybook": "catalog:",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "4.3.4",
     "ts-pattern": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
@@ -68,8 +68,8 @@
     "@luma/i18n": "workspace:*",
     "@tanstack/react-table": "9.3.1",
     "class-variance-authority": "0.7.1",
-    "cn": "0.5.0",
+    "cn": "0.5.2",
     "lucide-react": "catalog:",
-    "react-resizable-panels": "4.14.8"
+    "react-resizable-panels": "4.17.0"
   }
 }
