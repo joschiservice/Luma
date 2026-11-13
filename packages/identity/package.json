@@ -38,7 +38,7 @@
     "drizzle-orm": "0.45.4",
     "fastify": "catalog:",
     "pg": "catalog:",
-    "resend": "6.34.1",
+    "resend": "6.38.0",
     "@luma/platform": "workspace:*"
   },
   "devDependencies": {
